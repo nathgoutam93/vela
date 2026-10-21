@@ -264,21 +264,21 @@ class Layout:
         """rc_retain_T / rc_release_T for every managed struct and enum, box
         helpers for every boxed type, and descriptors for element types.
 
-        All are `static inline`, so the C compiler neither warns about the
-        ones a program never calls nor emits them.
+        All are `static inline VELA_UNUSED`: the C compiler neither warns
+        about the ones a program never calls nor emits any code for them.
         """
         managed = [t for t in self.types if self.managed(t)]
         out = [""]
         for t in managed:
             n = self.names[t]
-            out.append(f"static inline void rc_retain_{n}({n} v);")
-            out.append(f"static inline void rc_release_{n}({n} v);")
+            out.append(f"static inline VELA_UNUSED void rc_retain_{n}({n} v);")
+            out.append(f"static inline VELA_UNUSED void rc_release_{n}({n} v);")
         for t in self.box_types:
-            out.append(f"static inline void {self.box_name(t)}_release({self.box_name(t)} *b);")
+            out.append(f"static inline VELA_UNUSED void {self.box_name(t)}_release({self.box_name(t)} *b);")
         for t in managed:
             n = self.names[t]
             for op in ("retain", "release"):
-                out.append(f"static inline void rc_{op}_{n}({n} v) {{")
+                out.append(f"static inline VELA_UNUSED void rc_{op}_{n}({n} v) {{")
                 if isinstance(t, StructType):
                     for fname, ft in t.fields.items():
                         out += ["    " + s for s in self.slot_ops(t, fname, 0, ft, f"v.m_{fname}", op)]
@@ -301,17 +301,17 @@ class Layout:
             retain = self.retain(t, "copy->value") or ""
             release = self.release(t, "b->value") or ""
             out += [
-                f"static inline {box} *{box}_new({n} value) {{",
+                f"static inline VELA_UNUSED {box} *{box}_new({n} value) {{",
                 f"    {box} *b = vela_alloc(sizeof({box}));",
                 "    b->rc = 1;",
                 "    b->value = value;",
                 "    return b;",
                 "}",
-                f"static inline void {box}_release({box} *b) {{",
+                f"static inline VELA_UNUSED void {box}_release({box} *b) {{",
                 f"    if (--b->rc == 0) {{ {release} free(b); }}",
                 "}",
                 "// Copy-on-write: a box about to change gets a copy if anything else shares it.",
-                f"static inline void {box}_unique({box} **b) {{",
+                f"static inline VELA_UNUSED void {box}_unique({box} **b) {{",
                 "    if ((*b)->rc == 1) return;",
                 f"    {box} *copy = {box}_new((*b)->value);",
                 f"    {retain}",
@@ -325,14 +325,14 @@ class Layout:
             n = self.names[t]
             if self.managed(t):
                 out += [
-                    f"static inline void vt_retain_{n}(void *p) {{ rc_retain_{n}(*({n} *)p); }}",
-                    f"static inline void vt_release_{n}(void *p) {{ rc_release_{n}(*({n} *)p); }}",
+                    f"static inline VELA_UNUSED void vt_retain_{n}(void *p) {{ rc_retain_{n}(*({n} *)p); }}",
+                    f"static inline VELA_UNUSED void vt_release_{n}(void *p) {{ rc_release_{n}(*({n} *)p); }}",
                 ]
                 funcs = f"vt_retain_{n}, vt_release_{n}"
             else:
                 funcs = "NULL, NULL"
             out += [
-                f"static inline const vela_type *vt_{n}(void) {{",
+                f"static inline VELA_UNUSED const vela_type *vt_{n}(void) {{",
                 f"    static const vela_type t = {{sizeof({n}), {funcs}, NULL, NULL}};",
                 "    return &t;",
                 "}",

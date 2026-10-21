@@ -1,0 +1,10 @@
+// Ranges in patterns include their end, so they are written with ..=
+// err: range_pattern_syntax.vl:5:12: error: a range in a pattern includes its end: write ..= instead of ..
+fn f(c: Byte) {
+    match c {
+        '0'..'9' => print(1)
+        _ => print(2)
+    }
+}
+fn main() {
+}

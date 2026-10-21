@@ -15,6 +15,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+// Generated helper functions (retain, release, descriptors) are only used by
+// some programs. This keeps clang from warning about the others.
+#define VELA_UNUSED __attribute__((unused))
+
 // Stops the program: prints "<loc>: panic: <msg>" to stderr, exits with 101.
 // `loc` is the Vela source position, "file.vl:line:col".
 _Noreturn void vela_panic(const char *loc, const char *msg);

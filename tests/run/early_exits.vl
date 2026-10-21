@@ -1,0 +1,68 @@
+// break, continue and return leave scopes early; everything those scopes
+// own must still be released. Under --sanitize a missed release is a leak,
+// and a double release is a use-after-free.
+// out: abc
+// out: 3
+// out: found b
+// out: 2
+// out: ab
+// out: done
+fn first_long(words: [Str]) -> Str {
+    for w in words {
+        let doubled = w + w
+        if len(doubled) > 4 {
+            return w
+        }
+    }
+    return ""
+}
+
+fn count_until_stop(words: [Str]) -> Int {
+    let mut n = 0
+    for w in words {
+        let marker = w + "!"
+        if marker == "stop!" {
+            break
+        }
+        if w == "" {
+            continue
+        }
+        n = n + 1
+    }
+    return n
+}
+
+fn find(words: [Str], want: Byte) -> Option[Str] {
+    let mut i = 0
+    for i < len(words) {
+        let w = words[i]
+        match get(["k": w], "k") {
+            Some(v) => {
+                if v[0] == want {
+                    return Some("found " + v)
+                }
+            }
+            None => return None
+        }
+        i = i + 1
+    }
+    return None
+}
+
+fn main() {
+    print(first_long(["a", "abc", "abcd"]))
+    print(count_until_stop(["x", "", "y", "z", "stop", "w"]))
+    match find(["a", "b", "c"], 'b') {
+        Some(s) => print(s)
+        None => print("none")
+    }
+    let mut built = ""
+    let mut rounds = 0
+    for len(built + "?") < 3 {
+        built = built + ["a", "b"][rounds]
+        rounds = rounds + 1
+    }
+    print(rounds)
+    print(built)
+    print("done")
+}

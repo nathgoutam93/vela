@@ -1,0 +1,60 @@
+// Strings and arrays inside structs and enums, arrays of structs, and
+// changes deep inside values: every level shared with another value is
+// copied first, and every replaced part is released.
+// out: root
+// out: b
+// out: 2
+// out: renamed
+// out: b
+// out: 3
+// out: 1
+// out: x!
+type Tree = struct {
+    name: Str
+    kids: [Tree]
+}
+
+type Shape = enum {
+    Named(Str)
+    Group([Shape])
+}
+
+fn leaf(name: Str) -> Tree {
+    return Tree { name: name, kids: [] }
+}
+
+fn total(s: Shape) -> Int {
+    match s {
+        Shape.Named(_) => return 1
+        Shape.Group(items) => {
+            let mut n = 0
+            for item in items {
+                n = n + total(item)
+            }
+            return n
+        }
+    }
+}
+
+fn main() {
+    let t = Tree { name: "root", kids: [leaf("a"), leaf("b")] }
+    let mut copy = t
+    copy.kids[0].name = "renamed"
+    push(copy.kids[1].kids, leaf("c"))
+    print(t.name)
+    print(t.kids[1].name)
+    print(len(t.kids))
+    print(copy.kids[0].name)
+    print(t.kids[1].name)
+    print(total(Shape.Group([Shape.Named("x"), Shape.Group([Shape.Named("y"), Shape.Named("z")])])))
+    print(len(copy.kids[1].kids))
+    let mut label = Shape.Named("x")
+    label = match label {
+        Shape.Named(n) => Shape.Named(n + "!")
+        other => other
+    }
+    match label {
+        Shape.Named(n) => print(n)
+        Shape.Group(_) => print("group")
+    }
+}

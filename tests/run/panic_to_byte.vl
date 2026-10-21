@@ -1,0 +1,6 @@
+// err: panic_to_byte.vl:5:11: panic: value does not fit in a Byte
+// exit: 101
+// A panic in a runtime operation reports the Vela position.
+fn main() {
+    print(byte(256))
+}

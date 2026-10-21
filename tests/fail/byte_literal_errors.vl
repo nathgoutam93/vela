@@ -1,0 +1,13 @@
+// Byte literals hold exactly one byte.
+// err: byte_literal_errors.vl:8:13: error: empty byte literal; write one character between quotes, as in 'a'
+// err: byte_literal_errors.vl:9:13: error: a byte literal holds one character, as in 'a', not 'ab'
+// err: byte_literal_errors.vl:10:13: error: a byte literal holds one byte, but 'é' is 2 bytes in UTF-8; use a Str instead
+// err: byte_literal_errors.vl:11:14: error: unknown escape '\q'; use \n \t \r \0 \\ \' or \"
+// err: byte_literal_errors.vl:12:13: error: byte literal is not closed; write one character between quotes, as in 'a'
+fn main() {
+    let a = ''
+    let b = 'ab'
+    let c = 'é'
+    let d = '\q'
+    let e = 'x
+}

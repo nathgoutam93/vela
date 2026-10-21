@@ -34,10 +34,11 @@ run_tests.py the golden-test runner
 
 ## Status
 
-M0 to M4 are done: the driver and test runner, expressions, variables,
+M0 to M5 are done: the driver and test runner, expressions, variables,
 functions and control flow, a type checker that reports every error in one
-run, and structs, enums, `match` and `Option`/`Result`. See `docs/` for a
-walkthrough of each milestone.
+run, structs, enums, `match` and `Option`/`Result`, and reference-counted
+strings, arrays and maps. See `docs/` for a walkthrough of each milestone.
+`python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
 
 ```
 fn fib(n: Int) -> Int {

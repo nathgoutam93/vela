@@ -1,0 +1,7 @@
+// err: panic_key.vl:6:12: panic: key not found in map
+// exit: 101
+// A panic in a runtime operation reports the Vela position.
+fn main() {
+    let m = ["a": 1]
+    print(m["b"])
+}

@@ -1,0 +1,16 @@
+// A Byte has 256 values, so ranges that cover them all need no `_` arm.
+// out: low
+// out: high
+// out: low
+fn half(c: Byte) -> Str {
+    return match c {
+        0..=127 => "low"
+        128..=255 => "high"
+    }
+}
+
+fn main() {
+    print(half('a'))
+    print(half(200))
+    print(half(0))
+}

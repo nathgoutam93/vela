@@ -1,0 +1,7 @@
+// err: panic_byte_overflow.vl:6:13: panic: byte overflow
+// exit: 101
+// A panic in a runtime operation reports the Vela position.
+fn main() {
+    let b: Byte = 250
+    print(b + 10)
+}

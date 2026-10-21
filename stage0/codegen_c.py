@@ -481,7 +481,8 @@ class FunctionGen:
             body(arm)
             self.pop_frame()
             self.depth -= 1
-        self.close()
+        self.emit("}")
+        self.dead = False
 
     def arm_stmt(self, arm: Arm) -> None:
         if isinstance(arm.body, Block):

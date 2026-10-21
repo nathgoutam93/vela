@@ -1,0 +1,7 @@
+// err: panic_slice.vl:6:12: panic: slice out of range
+// exit: 101
+// A panic in a runtime operation reports the Vela position.
+fn main() {
+    let s = "abc"
+    print(s[2..1])
+}

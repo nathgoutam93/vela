@@ -1,0 +1,21 @@
+// M5 tokens: byte literals end a line; `..=` is one token, not `..` then `=`.
+// dump: tokens
+// out: 19:1 byte 'a'
+// out: 19:4 ..=
+// out: 19:7 byte 'z'
+// out: 19:10 ; (newline)
+// out: 20:1 ident xs
+// out: 20:3 [
+// out: 20:4 int 1
+// out: 20:5 ..
+// out: 20:7 int 2
+// out: 20:8 ]
+// out: 20:9 ; (newline)
+// out: 21:1 [
+// out: 21:2 :
+// out: 21:3 ]
+// out: 21:4 ; (newline)
+// out: 22:1 eof
+'a'..='z'
+xs[1..2]
+[:]

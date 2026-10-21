@@ -1,0 +1,7 @@
+// err: panic_str_index.vl:6:12: panic: index out of range
+// exit: 101
+// A panic in a runtime operation reports the Vela position.
+fn main() {
+    let s = "abc"
+    print(s[-1])
+}

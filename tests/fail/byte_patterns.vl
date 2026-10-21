@@ -1,0 +1,33 @@
+// Byte and Int patterns: literals, inclusive ranges, and coverage.
+// err: byte_patterns.vl:10:9: error: this range is empty: 122 is greater than 97
+// err: byte_patterns.vl:11:9: error: 300 does not fit in a Byte (0 to 255)
+// err: byte_patterns.vl:15:9: error: this pattern is Byte, but the value being matched is Int
+// err: byte_patterns.vl:20:9: error: this arm can never match: the arms above it cover every value it would
+// err: byte_patterns.vl:23:5: error: match is not exhaustive: 128 is not covered
+// err: byte_patterns.vl:27:5: error: match is not exhaustive: 'B'..='Z' is not covered
+fn f(c: Byte, n: Int) {
+    match c {
+        'z'..='a' => print(1)
+        300 => print(2)
+        _ => print(3)
+    }
+    match n {
+        'a' => print(1)
+        _ => print(2)
+    }
+    match n {
+        1..=5 => print(1)
+        3..=4 => print(2)
+        _ => print(3)
+    }
+    match c {
+        0..=127 => print(1)
+        129..=255 => print(2)
+    }
+    match c {
+        0..='A' => print(1)
+        '['..=255 => print(2)
+    }
+}
+fn main() {
+}

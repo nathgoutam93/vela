@@ -1,0 +1,21 @@
+// dump: ast
+// out: (fn main ()
+// out:   (block
+// out:     (let xs [Int] (array 1 2))
+// out:     (let m Map[Str, [Int]] (map ("a" (array 1)) ("b" (array))))
+// out:     (for x (in ([..] xs 0 1))
+// out:       (block
+// out:         (call print ([] ([] m "a") x))))
+// out:     (match 'q' (=> (..= 'a' 'z') (call print 1)) (=> (..= -5 5) (call print 2)) (=> _ (call print 3)))))
+fn main() {
+    let xs: [Int] = [1, 2]
+    let m: Map[Str, [Int]] = ["a": [1], "b": []]
+    for x in xs[0..1] {
+        print(m["a"][x])
+    }
+    match 'q' {
+        'a'..='z' => print(1)
+        -5..=5 => print(2)
+        _ => print(3)
+    }
+}
