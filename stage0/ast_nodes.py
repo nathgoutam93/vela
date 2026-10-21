@@ -30,7 +30,8 @@ def checked() -> Any:
 
 @dataclass
 class TypeName:
-    """A type in the source: `Int`, `Token`, `Option[Int]`, `Result[Int, Str]`."""
+    """A type in the source: `Int`, `Token`, `Option[Int]`, `Map[Str, Int]`.
+    An array type `[T]` has the name "[]" and T as its one argument."""
     name: str
     args: list[TypeName]
     line: int
@@ -50,6 +51,15 @@ class IntLit:
 @dataclass
 class BoolLit:
     value: bool
+    line: int
+    col: int
+    ty: Any = checked()
+
+
+@dataclass
+class ByteLit:
+    """`'a'`: one byte."""
+    value: int
     line: int
     col: int
     ty: Any = checked()
@@ -115,6 +125,51 @@ class Field:
 
 
 @dataclass
+class Index:
+    """`obj[index]`: an element of an array, a byte of a Str, or a map's value for a key."""
+    obj: Expr
+    index: Expr
+    line: int  # the `[`
+    col: int
+    ty: Any = checked()
+
+
+@dataclass
+class Slice:
+    """`obj[start..end]`: part of a Str or an array, from start up to end - 1."""
+    obj: Expr
+    start: Expr
+    end: Expr
+    line: int  # the `[`
+    col: int
+    ty: Any = checked()
+
+
+@dataclass
+class ArrayLit:
+    """`[1, 2, 3]`, or `[]` (whose element type comes from the context)."""
+    elems: list[Expr]
+    line: int
+    col: int
+    ty: Any = checked()
+
+
+@dataclass
+class MapEntry:
+    key: Expr
+    value: Expr
+
+
+@dataclass
+class MapLit:
+    """`["a": 1, "b": 2]`, or `[:]` (whose types come from the context)."""
+    entries: list[MapEntry]
+    line: int
+    col: int
+    ty: Any = checked()
+
+
+@dataclass
 class FieldInit:
     name: str
     value: Expr
@@ -152,8 +207,17 @@ class PBind:
 
 @dataclass
 class PLit:
-    """A literal: `0`, `-1`, `true`, `"+"`."""
-    value: IntLit | BoolLit | StrLit
+    """A literal: `0`, `-1`, `'a'`, `true`, `"+"`."""
+    value: IntLit | ByteLit | BoolLit | StrLit
+    line: int
+    col: int
+
+
+@dataclass
+class PRange:
+    """An inclusive range of Int or Byte values: `'a'..='z'`, `0..=9`."""
+    lo: IntLit | ByteLit
+    hi: IntLit | ByteLit
     line: int
     col: int
 
@@ -169,7 +233,7 @@ class PVariant:
     ref: Any = checked()  # (EnumType, Variant)
 
 
-Pattern = PWild | PBind | PLit | PVariant
+Pattern = PWild | PBind | PLit | PRange | PVariant
 
 
 @dataclass
@@ -190,7 +254,8 @@ class Match:
     ty: Any = checked()
 
 
-Expr = IntLit | BoolLit | StrLit | Name | Unary | Binary | Call | Field | StructLit | Match
+Expr = (IntLit | ByteLit | BoolLit | StrLit | Name | Unary | Binary | Call | Field | Index
+        | Slice | ArrayLit | MapLit | StructLit | Match)
 
 
 # ---- Statements ----
@@ -258,6 +323,17 @@ class ForRange:
 
 
 @dataclass
+class ForEach:
+    """`for name in xs { }`: name is each element of an array, or each byte of a Str."""
+    name: str
+    iterable: Expr
+    body: Block
+    line: int  # the name's position
+    col: int
+    local: Any = checked()
+
+
+@dataclass
 class Break:
     line: int
     col: int
@@ -285,7 +361,8 @@ class MatchStmt:
     col: int
 
 
-Stmt = Block | ExprStmt | Let | Assign | If | For | ForRange | Break | Continue | Return | MatchStmt
+Stmt = (Block | ExprStmt | Let | Assign | If | For | ForRange | ForEach | Break | Continue | Return
+        | MatchStmt)
 
 
 # ---- Declarations ----
@@ -364,6 +441,8 @@ def dump(program: Program) -> str:
 
 
 def sx_type(t: TypeName) -> str:
+    if t.name == "[]":
+        return f"[{sx_type(t.args[0])}]"
     if not t.args:
         return t.name
     return f"{t.name}[{', '.join(sx_type(a) for a in t.args)}]"
@@ -404,6 +483,8 @@ def sx_stmt(s: Stmt) -> Any:
         return ["for", *([sx_expr(s.cond)] if s.cond else []), sx_stmt(s.body)]
     if isinstance(s, ForRange):
         return ["for", s.name, ["..", sx_expr(s.start), sx_expr(s.end)], sx_stmt(s.body)]
+    if isinstance(s, ForEach):
+        return ["for", s.name, ["in", sx_expr(s.iterable)], sx_stmt(s.body)]
     if isinstance(s, Break):
         return ["break"]
     if isinstance(s, Continue):
@@ -427,6 +508,8 @@ def sx_pattern(p: Pattern) -> Any:
         return p.name
     if isinstance(p, PLit):
         return sx_expr(p.value)
+    if isinstance(p, PRange):
+        return ["..=", sx_expr(p.lo), sx_expr(p.hi)]
     if isinstance(p, PVariant):
         name = f"{p.enum}.{p.variant}" if p.enum else p.variant
         if p.args is None:
@@ -438,6 +521,8 @@ def sx_pattern(p: Pattern) -> Any:
 def sx_expr(e: Expr) -> Any:
     if isinstance(e, IntLit):
         return str(e.value)
+    if isinstance(e, ByteLit):
+        return quote_byte(e.value)
     if isinstance(e, BoolLit):
         return "true" if e.value else "false"
     if isinstance(e, StrLit):
@@ -452,6 +537,14 @@ def sx_expr(e: Expr) -> Any:
         return ["call", sx_expr(e.callee), *[sx_expr(a) for a in e.args]]
     if isinstance(e, Field):
         return [".", sx_expr(e.obj), e.name]
+    if isinstance(e, Index):
+        return ["[]", sx_expr(e.obj), sx_expr(e.index)]
+    if isinstance(e, Slice):
+        return ["[..]", sx_expr(e.obj), sx_expr(e.start), sx_expr(e.end)]
+    if isinstance(e, ArrayLit):
+        return ["array", *[sx_expr(x) for x in e.elems]]
+    if isinstance(e, MapLit):
+        return ["map", *[[sx_expr(en.key), sx_expr(en.value)] for en in e.entries]]
     if isinstance(e, StructLit):
         return ["struct", e.name, *[[f.name, sx_expr(f.value)] for f in e.fields]]
     if isinstance(e, Match):
@@ -465,6 +558,17 @@ UNESCAPES = {0x0A: "\\n", 0x09: "\\t", 0x0D: "\\r", 0x00: "\\0", 0x5C: "\\\\", 0
 def quote(value: bytes) -> str:
     """A string literal as Vela source would spell it."""
     return '"' + "".join(UNESCAPES.get(ord(ch), ch) for ch in value.decode("utf-8")) + '"'
+
+
+def quote_byte(value: int) -> str:
+    """A byte literal as Vela source would spell it: 'a', '\\n', '\\''."""
+    if value == 0x27:
+        return "'\\''"
+    if value in UNESCAPES and value != 0x22:
+        return "'" + UNESCAPES[value] + "'"
+    if 0x20 <= value < 0x7F:
+        return "'" + chr(value) + "'"
+    return str(value)  # no literal spells it; a number in a Byte context does
 
 
 def multiline(x: Any) -> bool:

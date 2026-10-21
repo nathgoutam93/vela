@@ -28,8 +28,9 @@ KEYWORDS = frozenset(
 # reserved: the lexer turns them into `bool` tokens, never names.
 BOOL_WORDS = frozenset({"true", "false"})
 
-# Two-byte operators are tried before one-byte ones (maximal munch), so `==`
-# is one token, not two `=`.
+# Longer operators are tried before shorter ones (maximal munch), so `==`
+# is one token, not two `=`, and `..=` is not `..` then `=`.
+OPERATORS_3 = frozenset({"..="})
 OPERATORS_2 = frozenset({"==", "!=", "<=", ">=", "&&", "||", "..", "->", "=>"})
 OPERATORS_1 = frozenset("()+-*/%,;=<>!{}:.[]")
 
@@ -37,11 +38,12 @@ OPERATORS_1 = frozenset("()+-*/%,;=<>!{}:.[]")
 # one of these. Go's list also has `++ --`; ours gains `?` in M7, because
 # `let n = parse(x)?` ends a statement with it.
 ENDS_STATEMENT = frozenset(
-    {"ident", "int", "bool", "str", ")", "]", "}", "break", "continue", "return"}
+    {"ident", "int", "bool", "str", "byte", ")", "]", "}", "break", "continue", "return"}
 )
 
 # Escapes allowed in string literals and the byte each stands for.
 ESCAPES = {"n": 0x0A, "t": 0x09, "r": 0x0D, "0": 0x00, "\\": 0x5C, '"': 0x22}
+BYTE_ESCAPES = {**ESCAPES, "'": 0x27}  # a Byte literal can also hold \'
 
 INT_MAX = 2**63 - 1
 
@@ -50,11 +52,11 @@ EOF = -1  # what peek() returns past the end; not a byte value, unlike 0
 
 @dataclass(frozen=True)
 class Token:
-    kind: str  # "ident", "int", "bool", "str", "eof", a keyword, or an operator
+    kind: str  # "ident", "int", "bool", "str", "byte", "eof", a keyword, or an operator
     text: str  # source text; for an inserted `;`, "\n" or "" (end of file)
     line: int
     col: int
-    value: bytes | None = None  # a string literal's bytes, escapes decoded
+    value: bytes | None = None  # a string or byte literal's bytes, escapes decoded
 
 
 def tokenize(src: bytes) -> list[Token]:
@@ -128,6 +130,8 @@ class Lexer:
                 self.identifier()
             elif c == ord('"'):
                 self.string()
+            elif c == ord("'"):
+                self.byte_literal()
             else:
                 self.operator(c)
 
@@ -199,7 +203,46 @@ class Lexer:
         text = self.src[start:self.pos].decode("utf-8", errors="replace")
         self.add("str", text, start, bytes(value))
 
+    def byte_literal(self) -> None:
+        """`'a'` or `'\\n'`: one byte, as a Byte value."""
+        start = self.pos
+        end = self.src.find(b"'", start + 1)
+        if self.peek(1) == ord("\\") and self.peek(2) == ord("'"):
+            end = start + 3  # '\'' (an escaped quote)
+        newline = self.src.find(b"\n", start)
+        if end < 0 or (0 <= newline < end):
+            self.error(start, "byte literal is not closed; write one character between quotes, as in 'a'")
+            self.pos += 1
+            return
+        body = self.src[start + 1:end]
+        self.pos = end + 1
+        text = self.src[start:self.pos].decode("utf-8", errors="replace")
+        if len(body) == 2 and body[0] == ord("\\"):
+            escape = chr(body[1])
+            if escape not in BYTE_ESCAPES:
+                self.error(start + 1, f"unknown escape '\\{escape}'; use \\n \\t \\r \\0 \\\\ \\' or \\\"")
+                return
+            value = BYTE_ESCAPES[escape]
+        elif len(body) == 1 and 0x20 <= body[0] < 0x7F and body[0] != ord("\\"):
+            value = body[0]
+        elif not body:
+            self.error(start, "empty byte literal; write one character between quotes, as in 'a'")
+            return
+        elif body[0] >= 0x80:
+            self.error(start, f"a byte literal holds one byte, but {text} is {len(body)} bytes in UTF-8; "
+                              "use a Str instead")
+            return
+        else:
+            self.error(start, f"a byte literal holds one character, as in 'a', not {text}")
+            return
+        self.add("byte", text, start, bytes([value]))
+
     def operator(self, c: int) -> None:
+        three = self.src[self.pos:self.pos + 3].decode("latin-1")
+        if three in OPERATORS_3:
+            self.add(three, three, self.pos)
+            self.pos += 3
+            return
         two = self.src[self.pos:self.pos + 2].decode("latin-1")
         if two in OPERATORS_2:
             self.add(two, two, self.pos)
@@ -238,6 +281,8 @@ def describe(tok: Token) -> str:
         return tok.text
     if tok.kind == "str":
         return f"string {tok.text}"
+    if tok.kind == "byte":
+        return f"byte {tok.text}"
     if tok.kind == "eof":
         return "end of file"
     if tok.kind == ";":
@@ -251,7 +296,7 @@ def dump(tokens: list[Token]) -> str:
     """One token per line, `line:col kind [text]`; what `vela tokens` prints."""
     lines = []
     for tok in tokens:
-        if tok.kind in ("ident", "int", "bool", "str"):
+        if tok.kind in ("ident", "int", "bool", "str", "byte"):
             shown = f"{tok.kind} {tok.text}"
         elif tok.kind == ";" and tok.text != ";":
             shown = "; (newline)" if tok.text == "\n" else "; (end of file)"

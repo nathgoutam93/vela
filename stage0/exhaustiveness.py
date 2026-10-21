@@ -20,16 +20,37 @@ other pattern becomes a constructor with sub-patterns:
     Expr.Add(l, Expr.Num(0))   ->   (Add, [WILD, (Num, [(0, [])])])
 
 A constructor is identified by a key: the Variant object for an enum
-variant, True or False for a Bool, the value itself for an Int or Str
-literal. Enums and Bool have a finite list of constructors, so listing them
-all covers every value. Int and Str do not, and need a `_`.
+variant, True or False for a Bool, the value itself for a Str literal, and
+an Interval for Int and Byte (a literal 5 is the interval 5..=5; a range
+pattern 'a'..='z' is one interval). Enums and Bool have a finite list of
+constructors, so listing them all covers every value. Str has too many, so
+it needs a `_`.
+
+Int and Byte are handled by splitting: the values in question are cut at
+every boundary of the intervals the arms mention, so that each piece lies
+entirely inside or entirely outside every arm's interval. Each piece then
+behaves like one constructor. A Byte has only 256 values, so ranges can
+cover all of them without a `_`.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
-from ast_nodes import Pattern, PBind, PLit, PVariant, PWild
-from typesys import BOOL, EnumType, Type
+from ast_nodes import ByteLit, IntLit, Pattern, PBind, PLit, PRange, PVariant, PWild
+from typesys import BOOL, BYTE, INT, EnumType, Type
+
+
+@dataclass(frozen=True)
+class Interval:
+    lo: int
+    hi: int  # inclusive
+
+    def contains(self, other: Interval) -> bool:
+        return self.lo <= other.lo and other.hi <= self.hi
+
+
+DOMAINS = {INT: Interval(-2**63, 2**63 - 1), BYTE: Interval(0, 255)}
 
 WILD = None
 SPat = Any  # WILD, or (key, [SPat]) for a constructor
@@ -39,7 +60,11 @@ def simplify(p: Pattern) -> SPat:
     if isinstance(p, (PWild, PBind)):
         return WILD
     if isinstance(p, PLit):
+        if isinstance(p.value, (IntLit, ByteLit)):
+            return (Interval(p.value.value, p.value.value), [])
         return (p.value.value, [])
+    if isinstance(p, PRange):
+        return (Interval(p.lo.value, p.hi.value), [])
     if isinstance(p, PVariant):
         _, variant = p.ref
         return (variant, [simplify(a) for a in p.args or []])
@@ -88,6 +113,8 @@ def useful(rows: list[list[SPat]], q: list[SPat], types: list[Type]) -> list[SPa
     if not q:
         return [] if not rows else None  # no columns left: useful only if no row matched
     head, t = q[0], types[0]
+    if t in DOMAINS:
+        return useful_interval(rows, q, types)
     if head is not WILD:
         key, args = head
         payload = payload_types(t, key)
@@ -118,11 +145,46 @@ def useful(rows: list[list[SPat]], q: list[SPat], types: list[Type]) -> list[SPa
     return [(key, [WILD] * len(payload))] + found
 
 
+def useful_interval(rows: list[list[SPat]], q: list[SPat], types: list[Type]) -> list[SPat] | None:
+    """`useful` for a first column of Int or Byte values."""
+    head = q[0]
+    target = DOMAINS[types[0]] if head is WILD else head[0]
+    # Cut the target at every edge of every row's interval inside it.
+    cuts = {target.lo, target.hi + 1}
+    for row in rows:
+        if row[0] is not WILD:
+            iv = row[0][0]
+            for edge in (iv.lo, iv.hi + 1):
+                if target.lo < edge <= target.hi:
+                    cuts.add(edge)
+    edges = sorted(cuts)
+    for lo, next_lo in zip(edges, edges[1:]):
+        piece = Interval(lo, next_lo - 1)
+        matching = [row[1:] for row in rows if row[0] is WILD or row[0][0].contains(piece)]
+        found = useful(matching, q[1:], types[1:])
+        if found is not None:
+            return [(piece, [])] + found
+    return None
+
+
+def render_number(value: int, t: Type) -> str:
+    if t is BYTE and 0x20 <= value < 0x7F and chr(value) not in "'\\":
+        return f"'{chr(value)}'"
+    return str(value)
+
+
 def render(p: SPat, t: Type) -> str:
-    """A witness as Vela source: `Expr.Neg(_)`, `Some(_)`, `false`, `_`."""
+    """A witness as Vela source: `Expr.Neg(_)`, `Some(_)`, `false`, `'a'..='z'`, `_`."""
     if p is WILD:
         return "_"
     key, args = p
+    if isinstance(key, Interval):
+        domain = DOMAINS[t]
+        if key == domain or (t is INT and key.lo != key.hi and (key.lo == domain.lo or key.hi == domain.hi)):
+            return "_"  # "everything else" reads better than -9223372036854775808..=-1
+        if key.lo == key.hi:
+            return render_number(key.lo, t)
+        return f"{render_number(key.lo, t)}..={render_number(key.hi, t)}"
     if t is BOOL:
         return "true" if key else "false"
     assert isinstance(t, EnumType)

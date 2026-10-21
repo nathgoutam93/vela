@@ -14,18 +14,21 @@ commas or newlines):
                                 | "enum" "{" { NAME [ "(" type { "," type } ")" ] } "}" )
     fn        = "fn" NAME "(" [ param { "," param } [ "," ] ] ")" [ "->" type ] block
     param     = NAME ":" type
-    type      = NAME [ "[" type { "," type } "]" ]
+    type      = NAME [ "[" type { "," type } "]" ] | "[" type "]"
     block     = "{" { statement ";" } "}"
     statement = "let" [ "mut" ] NAME [ ":" type ] "=" expr
               | "if" expr block [ "else" ( if | block ) ]
-              | "for" [ expr | NAME "in" expr ".." expr ] block
+              | "for" [ expr | NAME "in" expr [ ".." expr ] ] block
               | "match" expr "{" { pattern "=>" ( block | simple ) } "}"
               | "break" | "continue" | "return" [ expr ]
               | block
               | expr [ "=" expr ]
     expr      = ... | NAME "{" { NAME ":" expr } "}" | expr "." NAME
+              | expr "[" expr [ ".." expr ] "]"
+              | "[" [ expr { "," expr } ] "]" | "[" ":" "]" | "[" expr ":" expr { "," expr ":" expr } "]"
               | "match" expr "{" { pattern "=>" expr } "}"
-    pattern   = "_" | NAME | literal | [ NAME "." ] NAME [ "(" pattern { "," pattern } ")" ]
+    pattern   = "_" | NAME | literal [ "..=" literal ]
+              | [ NAME "." ] NAME [ "(" pattern { "," pattern } ")" ]
 
 `struct` and `enum` are not keywords: they only mean something right after
 `type Name =`, so they are still usable as names elsewhere.
@@ -40,10 +43,11 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from ast_nodes import (
-    Arm, Assign, Binary, Block, BoolLit, Break, Call, Continue, EnumDecl, Expr, ExprStmt,
-    Field, FieldDecl, FieldInit, FnDecl, For, ForRange, If, IntLit, Let, Match, MatchStmt,
-    Name, Param, Pattern, PBind, PLit, Program, PVariant, PWild, Return, Stmt, StrLit,
-    StructDecl, StructLit, TypeName, Unary, VariantDecl,
+    Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, EnumDecl, Expr,
+    ExprStmt, Field, FieldDecl, FieldInit, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let,
+    MapEntry, MapLit, Match, MatchStmt, Name, Param, Pattern, PBind, PLit, Program, PRange,
+    PVariant, PWild, Return, Slice, Stmt, StrLit, StructDecl, StructLit, TypeName, Unary,
+    VariantDecl,
 )
 from errors import CompileError, ErrorList
 from lexer import Token, describe
@@ -61,7 +65,7 @@ INFIX = {
 }
 COMPARISONS = frozenset({"==", "!=", "<", "<=", ">", ">="})
 PREFIX = 30   # unary `-` and `!`: `-a * b` is `(-a) * b`
-POSTFIX = 40  # calls and field access: `-f(x).y` is `-((f(x)).y)`
+POSTFIX = 40  # calls, field access, indexing: `-f(x).y[0]` is `-(((f(x)).y)[0])`
 
 
 def parse(tokens: list[Token]) -> Program:
@@ -247,6 +251,11 @@ class Parser:
         return VariantDecl(name.text, payload, name.line, name.col)
 
     def type_name(self) -> TypeName:
+        if self.peek().kind == "[":
+            open_ = self.advance()
+            elem = self.type_name()
+            self.expect("]", "after the element type of an array type")
+            return TypeName("[]", [elem], open_.line, open_.col)
         tok = self.expect_name("for a type")
         args = []
         if self.peek().kind == "[":
@@ -395,7 +404,10 @@ class Parser:
             name = self.advance()
             self.advance()  # "in"
             start = self.head_expression()
-            self.expect("..", "in the range of a 'for ... in' loop")
+            if self.peek().kind != "..":
+                body = self.block("after the value being looped over")
+                return ForEach(name.text, start, body, name.line, name.col)
+            self.advance()  # ".."
             end = self.head_expression()
             body = self.block("after the range")
             return ForRange(name.text, start, end, body, name.line, name.col)
@@ -419,13 +431,16 @@ class Parser:
 
     def pattern(self) -> Pattern:
         tok = self.peek()
-        if tok.kind == "int":
+        if tok.kind in ("int", "byte") or (tok.kind == "-" and self.peek(1).kind == "int"):
+            lo = self.number_literal()
+            if self.peek().kind == "..":
+                raise self.error(self.peek(), "a range in a pattern includes its end: write ..= instead of ..")
+            if self.peek().kind != "..=":
+                return PLit(lo, tok.line, tok.col)
             self.advance()
-            return PLit(IntLit(int(tok.text), tok.line, tok.col), tok.line, tok.col)
-        if tok.kind == "-" and self.peek(1).kind == "int":
-            self.advance()
-            num = self.advance()
-            return PLit(IntLit(-int(num.text), tok.line, tok.col), tok.line, tok.col)
+            if self.peek().kind not in ("int", "byte", "-"):
+                raise self.error(self.peek(), f"expected the end of the range, found {describe(self.peek())}")
+            return PRange(lo, self.number_literal(), tok.line, tok.col)
         if tok.kind == "bool":
             self.advance()
             return PLit(BoolLit(tok.text == "true", tok.line, tok.col), tok.line, tok.col)
@@ -455,6 +470,19 @@ class Parser:
                 self.advance()
             self.expect(")", f"after the patterns of '{variant.text}'")
         return PVariant(enum, variant.text, args, tok.line, tok.col)
+
+    def number_literal(self) -> IntLit | ByteLit:
+        """An Int literal (possibly negative) or a Byte literal, in a pattern."""
+        tok = self.advance()
+        if tok.kind == "byte":
+            assert tok.value is not None
+            return ByteLit(tok.value[0], tok.line, tok.col)
+        if tok.kind == "-":
+            num = self.advance()
+            if num.kind != "int":
+                raise self.error(num, f"expected a number after '-', found {describe(num)}")
+            return IntLit(-int(num.text), tok.line, tok.col)
+        return IntLit(int(tok.text), tok.line, tok.col)
 
     # ---- Expressions ----
 
@@ -491,6 +519,8 @@ class Parser:
                 self.advance()
                 name = self.expect_name("after '.'")
                 left = Field(left, name.text, name.line, name.col)
+            elif tok.kind == "[" and POSTFIX >= min_bp:
+                left = self.index(left)
             elif tok.kind in INFIX and INFIX[tok.kind][0] >= min_bp:
                 if tok.kind in COMPARISONS and after_comparison:
                     raise self.error(
@@ -514,6 +544,11 @@ class Parser:
         if tok.kind == "str":
             assert tok.value is not None
             return StrLit(tok.value, tok.line, tok.col)
+        if tok.kind == "byte":
+            assert tok.value is not None
+            return ByteLit(tok.value[0], tok.line, tok.col)
+        if tok.kind == "[":
+            return self.collection_lit(tok)
         if tok.kind == "ident":
             if self.peek().kind == "{" and not self.no_struct:
                 return self.struct_lit(tok)
@@ -535,6 +570,48 @@ class Parser:
             arms = self.brace_list(lambda: self.arm(stmt=False), "match")
             return Match(scrutinee, arms, tok.line, tok.col)
         raise self.error(tok, f"expected expression, found {describe(tok)}")
+
+    def index(self, obj: Expr) -> Index | Slice:
+        """`obj[i]` or `obj[a..b]`, after `obj`."""
+        open_ = self.advance()  # "["
+        first = self.nested_expression()
+        if self.peek().kind == "..":
+            self.advance()
+            end = self.nested_expression()
+            self.expect("]", "after the slice")
+            return Slice(obj, first, end, open_.line, open_.col)
+        self.expect("]", "after the index")
+        return Index(obj, first, open_.line, open_.col)
+
+    def collection_lit(self, open_: Token) -> ArrayLit | MapLit:
+        """An array `[a, b]` or a map `[k: v, ...]`, after its `[`. Like brace
+        lists, items are separated by commas or newlines."""
+        if self.peek().kind == ":" and self.peek(1).kind == "]":
+            self.advance()
+            self.advance()
+            return MapLit([], open_.line, open_.col)
+        elems: list[Expr] = []
+        entries: list[MapEntry] = []
+        while self.peek().kind != "]":
+            if self.peek().kind == "eof":
+                raise self.error(self.peek(), "expected ']' to close the list, found end of file")
+            item = self.nested_expression()
+            if self.peek().kind == ":" and not elems:
+                self.advance()
+                entries.append(MapEntry(item, self.nested_expression()))
+            elif entries:
+                raise self.error(self.peek(), f"expected ':' and a value after this key, found {describe(self.peek())}")
+            else:
+                elems.append(item)
+            tok = self.peek()
+            if tok.kind in (",", ";"):
+                self.advance()
+            elif tok.kind != "]":
+                raise self.error(tok, f"expected ',' or ']' in the list, found {describe(tok)}")
+        self.advance()
+        if entries:
+            return MapLit(entries, open_.line, open_.col)
+        return ArrayLit(elems, open_.line, open_.col)
 
     def struct_lit(self, name: Token) -> StructLit:
         self.advance()  # "{"

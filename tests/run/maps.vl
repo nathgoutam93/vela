@@ -1,0 +1,48 @@
+// Maps: literals, [:], reading and writing by key, has, get, remove, len,
+// and keys in insertion order.
+// out: 2
+// out: 1
+// out: true
+// out: false
+// out: 3
+// out: 10
+// out: missing
+// out: 2
+// out: banana
+// out: cherry
+// out: 3
+// out: 8
+fn show(o: Option[Int]) {
+    match o {
+        Some(v) => print(v)
+        None => print("missing")
+    }
+}
+
+fn main() {
+    let mut fruit = ["apple": 1, "banana": 2]
+    print(fruit["banana"])
+    print(fruit["apple"])
+    print(has(fruit, "apple"))
+    print(has(fruit, "kiwi"))
+    fruit["cherry"] = 3
+    print(len(fruit))
+    fruit["apple"] = 10
+    show(get(fruit, "apple"))
+    show(get(fruit, "kiwi"))
+    remove(fruit, "apple")
+    print(len(fruit))
+    for k in keys(fruit) {
+        print(k)
+    }
+    let mut counts: Map[Byte, Int] = [:]
+    for c in "hello world" {
+        if has(counts, c) {
+            counts[c] = counts[c] + 1
+        } else {
+            counts[c] = 1
+        }
+    }
+    print(counts['l'])
+    print(len(counts))
+}

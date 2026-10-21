@@ -12,7 +12,7 @@ type List = struct {
     tail: Option[List]
 }
 
-fn push(value: Int, rest: Option[List]) -> Option[List] {
+fn prepend(value: Int, rest: Option[List]) -> Option[List] {
     return Some(List { head: value, tail: rest })
 }
 
@@ -58,7 +58,7 @@ fn contains(l: Option[List], x: Int) -> Bool {
 fn main() {
     let mut list: Option[List] = None
     for i in 1..5 {
-        list = push(i, list)
+        list = prepend(i, list)
     }
     print(length(list))
     print(total(list))

@@ -1,0 +1,41 @@
+// Arrays, maps and strings are values too: copying one and changing the
+// copy leaves the original alone (copy-on-write).
+// out: 3
+// out: 4
+// out: 1
+// out: 100
+// out: 2
+// out: 1
+// out: x
+// out: xy
+// out: 1
+// out: 2
+fn grow(xs: [Int]) -> Int {
+    let mut mine = xs
+    push(mine, 4)
+    return len(mine)
+}
+
+fn main() {
+    let a = [1, 2, 3]
+    print(len(a))
+    print(grow(a))
+    let mut b = a
+    b[0] = 100
+    print(a[0])
+    print(b[0])
+    let m = ["one": 1]
+    let mut m2 = m
+    m2["two"] = 2
+    print(len(m2))
+    print(len(m))
+    let s = "x"
+    let t = s + "y"
+    print(s)
+    print(t)
+    let nested = [[1]]
+    let mut copy = nested
+    push(copy[0], 2)
+    print(len(nested[0]))
+    print(len(copy[0]))
+}

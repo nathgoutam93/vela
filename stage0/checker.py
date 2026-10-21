@@ -27,19 +27,23 @@ from typing import Callable
 
 import exhaustiveness
 from ast_nodes import (
-    Arm, Assign, Binary, Block, BoolLit, Break, Call, Continue, EnumDecl, Expr, ExprStmt,
-    Field, FnDecl, For, ForRange, If, IntLit, Let, Match, MatchStmt, Name, Pattern, PBind,
-    PLit, Program, PVariant, PWild, Return, Stmt, StrLit, StructDecl, StructLit, TypeName, Unary,
+    Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, EnumDecl, Expr,
+    ExprStmt, Field, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let, MapLit, Match,
+    MatchStmt, Name, Pattern, PBind, PLit, Program, PRange, PVariant, PWild, Return, Slice, Stmt,
+    StrLit, StructDecl, StructLit, TypeName, Unary,
 )
 from errors import CompileError, ErrorList
 from typesys import (
-    BOOL, BUILTIN_VARIANTS, ERROR, GENERICS, INT, PRIMITIVES, STR, EnumType, StructType, Type,
-    TypeTable, Variant,
+    BOOL, BUILTIN_VARIANTS, BYTE, ERROR, GENERICS, INT, MAP_KEYS, PRIMITIVES, STR, ArrayType,
+    EnumType, MapType, StructType, Type, TypeTable, Variant,
 )
 
 NO_VALUE = None  # the "type" of a call that returns nothing
 
-BUILTINS = frozenset({"print"})  # print(x) takes one Int, Bool or Str
+# The built-in functions. push and remove change their first argument, so it
+# must be a place that can change: a `let mut` variable, or a part of one.
+BUILTINS = frozenset({"print", "len", "push", "int", "byte", "has", "get", "remove", "keys"})
+PRINTABLE = (INT, BYTE, BOOL, STR)
 
 ARITHMETIC = frozenset({"+", "-", "*", "/", "%"})
 EQUALITY = frozenset({"==", "!="})
@@ -77,7 +81,7 @@ def plural(n: int, word: str) -> str:
 def comparable(t: Type) -> bool:
     """Whether `==` works on values of `t`: the primitives, and enums whose
     variants carry no data, which compare by variant alone."""
-    return t in (INT, BOOL, STR) or (isinstance(t, EnumType) and not t.builtin and t.c_like)
+    return t in PRIMITIVES.values() or (isinstance(t, EnumType) and not t.builtin and t.c_like)
 
 
 class Checker:
@@ -159,13 +163,20 @@ class Checker:
 
     def resolve_type(self, t: TypeName) -> Type:
         """The type a TypeName in the source stands for (ERROR if unknown)."""
+        if t.name == "[]":
+            return self.table.array(self.resolve_type(t.args[0]))
         if t.name in GENERICS:
             want = GENERICS[t.name]
             if len(t.args) != want:
-                example = "Option[Int]" if t.name == "Option" else "Result[Int, Str]"
+                example = {"Option": "Option[Int]", "Result": "Result[Int, Str]", "Map": "Map[Str, Int]"}[t.name]
                 self.report(t, f"{t.name} needs {plural(want, 'type argument')}, as in {example}")
                 return ERROR
             args = tuple(self.resolve_type(a) for a in t.args)
+            if t.name == "Map":
+                if args[0] not in MAP_KEYS and args[0] is not ERROR:
+                    self.report(t.args[0], f"Map keys must be Int, Byte, Bool or Str, not {args[0]}")
+                    return ERROR
+                return self.table.map(*args)
             return self.table.instance(t.name, args)
         known = PRIMITIVES.get(t.name) or self.types.get(t.name)
         if known is None:
@@ -246,6 +257,22 @@ class Checker:
             self.scopes.append({s.name: s.local})
             self.loop_body(s, s.body)
             self.scopes.pop()
+        elif isinstance(s, ForEach):
+            t = self.value(s.iterable)
+            elem: Type = ERROR
+            if isinstance(t, ArrayType):
+                elem = t.elem
+            elif t is STR:
+                elem = BYTE
+            elif isinstance(t, MapType):
+                self.report(s.iterable, "a map cannot be looped over directly; loop over keys(m) instead")
+            elif t is not ERROR:
+                self.report(s.iterable, f"cannot loop over {t}; 'for ... in' needs an array, a Str or a range")
+            self.check_name_allowed(s)
+            s.local = Local(s.name, elem, "loop variable", s.line, s.col)
+            self.scopes.append({s.name: s.local})
+            self.loop_body(s, s.body)
+            self.scopes.pop()
         elif isinstance(s, (Break, Continue)):
             word = "break" if isinstance(s, Break) else "continue"
             if not self.loops:
@@ -274,7 +301,7 @@ class Checker:
             self.report(s, f"'{s.name}' is already declared in this block, at {first.line}:{first.col}")
         s.local = scope[s.name] = Local(s.name, ty, "let mut" if s.mutable else "let", s.line, s.col)
 
-    def loop_body(self, loop: For | ForRange, body: Block) -> None:
+    def loop_body(self, loop: For | ForRange | ForEach, body: Block) -> None:
         self.loops.append(loop)
         self.block(body)
         self.loops.pop()
@@ -283,34 +310,48 @@ class Checker:
         self.check(cond, BOOL, lambda found: f"the condition of '{word}' must be Bool, found {found}")
 
     def assign(self, s: Assign) -> None:
-        """`x = v`, or `p.f = v` / `p.f.g = v` for a field of a struct variable."""
+        """`x = v`, `p.f = v`, `xs[i] = v`, `m[k] = v`, and paths like `p.f[i].g = v`."""
+        if isinstance(s.target, Name) and s.target.name in self.fns and not self.lookup_local(s.target.name):
+            self.report(s.target, f"cannot assign to function '{s.target.name}'")
+            self.value(s.value)
+            return
+        ty = self.place(s.target, "assign to")
         target = s.target
+        self.check(s.value, ty, lambda found: f"cannot assign {found} to {describe_target(target)}, which is {ty}")
+
+    def place(self, target: Expr, verb: str) -> Type:
+        """Check a place about to be changed: a `let mut` variable, or a field
+        or element of one. Returns its type (ERROR after a reported error)."""
         root = target
-        while isinstance(root, Field):
+        while isinstance(root, (Field, Index)):
             root = root.obj
         if not isinstance(root, Name):
-            self.report(target, "only a variable or one of its fields can be assigned to")
+            self.report(target, "only a variable, or a field or element of one, can be changed")
             self.infer(target)
-            self.value(s.value)
-            return
-        if isinstance(target, Name) and target.name in self.fns and not self.lookup_local(target.name):
-            self.report(target, f"cannot assign to function '{target.name}'")
-            self.value(s.value)
-            return
+            return ERROR
         ty = self.infer(target)
-        ref = root.ref
         if isinstance(target, Field) and target.variant is not None:
             self.report(target, "a variant cannot be assigned to")
-            ty = ERROR
-        elif isinstance(ref, Local):
-            what = f"a field of '{ref.name}'" if isinstance(target, Field) else f"'{ref.name}'"
+            return ERROR
+        node = target
+        while isinstance(node, (Field, Index)):
+            if isinstance(node, Index) and node.obj.ty is STR:
+                self.report(node, "a Str cannot be changed; build a new one instead, for example with +")
+                return ERROR
+            node = node.obj
+        ref = root.ref
+        if isinstance(ref, Local):
+            part = ""
+            if isinstance(target, Field):
+                part = "a field of "
+            elif isinstance(target, Index):
+                part = "an element of "
             if ref.kind == "let":
-                self.report(root, f"cannot assign to {what}, which was declared with 'let'; "
+                self.report(root, f"cannot {verb} {part}'{ref.name}', which was declared with 'let'; "
                                   "use 'let mut' to allow changes")
             elif ref.kind != "let mut":
-                of = "a field of " if isinstance(target, Field) else ""
-                self.report(root, f"cannot assign to {of}{ref.kind} '{ref.name}'")
-        self.check(s.value, ty, lambda found: f"cannot assign {found} to {describe_target(target)}, which is {ty}")
+                self.report(root, f"cannot {verb} {part}{ref.kind} '{ref.name}'")
+        return ty
 
     def return_stmt(self, s: Return) -> None:
         f = self.fn
@@ -375,11 +416,16 @@ class Checker:
             p.local = bindings[p.name] = Local(p.name, t, "match binding", p.line, p.col)
             return True
         if isinstance(p, PLit):
-            lit_t = self.infer(p.value)
-            if t is not ERROR and lit_t is not t:
-                self.report(p, f"this pattern is {lit_t}, but the value being matched is {t}")
+            return self.pattern_literal(p.value, t, p)
+        if isinstance(p, PRange):
+            ok = self.pattern_literal(p.lo, t, p) and self.pattern_literal(p.hi, t, p)
+            if ok and t not in (INT, BYTE, ERROR):
+                self.report(p, f"a range pattern matches Int or Byte values, but the value being matched is {t}")
                 return False
-            return True
+            if ok and p.lo.value > p.hi.value:
+                self.report(p, f"this range is empty: {p.lo.value} is greater than {p.hi.value}")
+                return False
+            return ok
         assert isinstance(p, PVariant)
         written = f"{p.enum}.{p.variant}" if p.enum else p.variant
         if p.enum is None:
@@ -425,6 +471,20 @@ class Checker:
         for sub, sub_t in zip(p.args, variant.payload):
             ok &= self.pattern(sub, sub_t, bindings)
         return ok
+
+    def pattern_literal(self, lit: Expr, t: Type, p: Pattern) -> bool:
+        """A literal in a pattern; an Int literal matching a Byte is a Byte."""
+        if isinstance(lit, IntLit) and t is BYTE:
+            if not 0 <= lit.value <= 255:
+                self.report(p, f"{lit.value} does not fit in a Byte (0 to 255)")
+                return False
+            lit.ty = BYTE
+            return True
+        lit_t = self.infer(lit)
+        if t is not ERROR and lit_t is not t:
+            self.report(p, f"this pattern is {lit_t}, but the value being matched is {t}")
+            return False
+        return True
 
     # ---- Expressions ----
 
@@ -480,6 +540,31 @@ class Checker:
                 if want is not ERROR:
                     self.report(e, message(f"{name}(...)"))
                 return
+        if isinstance(e, IntLit) and want is BYTE:
+            # A number is an Int unless the context wants a Byte.
+            if 0 <= e.value <= 255:
+                e.ty = BYTE
+            else:
+                self.report(e, f"{e.value} does not fit in a Byte (0 to 255)")
+            return
+        if isinstance(e, ArrayLit) and (isinstance(want, ArrayType) or not e.elems):
+            if isinstance(want, ArrayType):
+                e.ty = want
+                for x in e.elems:
+                    self.check(x, want.elem, lambda found: f"the elements of {want} are {want.elem}, but this is {found}")
+            elif want is not ERROR:
+                self.report(e, message("an array"))
+            return
+        if isinstance(e, MapLit) and (isinstance(want, MapType) or not e.entries):
+            if isinstance(want, MapType):
+                e.ty = want
+                for en in e.entries:
+                    self.check(en.key, want.key, lambda found: f"the keys of {want} are {want.key}, but this is {found}")
+                    self.check(en.value, want.value,
+                               lambda found: f"the values of {want} are {want.value}, but this is {found}")
+            elif want is not ERROR:
+                self.report(e, message("a map"))
+            return
         if isinstance(e, Match):
             # Each arm is checked against what the context wants.
             e.ty = want
@@ -507,6 +592,8 @@ class Checker:
     def infer_type(self, e: Expr) -> Type | None:
         if isinstance(e, IntLit):
             return INT
+        if isinstance(e, ByteLit):
+            return BYTE
         if isinstance(e, BoolLit):
             return BOOL
         if isinstance(e, StrLit):
@@ -536,12 +623,39 @@ class Checker:
             return self.struct_lit(e)
         if isinstance(e, Match):
             return self.match_expr(e)
+        if isinstance(e, Index):
+            return self.index(e)
+        if isinstance(e, Slice):
+            return self.slice(e)
+        if isinstance(e, ArrayLit):
+            return self.array_lit(e)
+        if isinstance(e, MapLit):
+            return self.map_lit(e)
         raise AssertionError(f"unknown expression {e!r}")
 
-    def binary(self, e: Binary) -> Type:
+    def operands(self, e: Binary) -> tuple[Type, Type]:
+        """The operands' types. A literal number next to a Byte is a Byte, so
+        `c >= 48` and `c - '0' < 10` work without conversions."""
+        if isinstance(e.left, IntLit) and not isinstance(e.right, IntLit):
+            right = self.value(e.right)
+            return self.literal_like(e.left, right), right
         left = self.value(e.left)
-        right = self.value(e.right)
-        result = INT if e.op in ARITHMETIC else BOOL
+        if isinstance(e.right, IntLit):
+            return left, self.literal_like(e.right, left)
+        return left, self.value(e.right)
+
+    def literal_like(self, lit: IntLit, other: Type) -> Type:
+        if other is BYTE:
+            self.check(lit, BYTE, lambda found: "")  # reports only an out-of-range number
+            return BYTE
+        return self.value(lit)
+
+    def binary(self, e: Binary) -> Type:
+        left, right = self.operands(e)
+        if e.op in ARITHMETIC:
+            result = left if left in (INT, BYTE) or (left is STR and e.op == "+") else INT
+        else:
+            result = BOOL
         if ERROR in (left, right):
             return result  # the operand's error is already reported
         if e.op in EQUALITY:
@@ -550,12 +664,65 @@ class Checker:
             elif not comparable(left):
                 self.report(e, f"{left} values cannot be compared with '{e.op}'; use match, "
                                "or compare their fields")
-        else:
-            want = BOOL if e.op in LOGICAL else INT
-            if left is not want or right is not want:
-                self.report(e, f"operator '{e.op}' needs {want} operands, found {left} and {right}")
+        elif e.op in LOGICAL:
+            if left is not BOOL or right is not BOOL:
+                self.report(e, f"operator '{e.op}' needs Bool operands, found {left} and {right}")
+        elif e.op == "+" and STR in (left, right):
+            if left is not right:
+                self.report(e, f"operator '+' joins two Strs, found {left} and {right}")
+        elif left is not right or left not in (INT, BYTE):
+            if BYTE in (left, right) and {left, right} <= {INT, BYTE}:
+                self.report(e, f"operator '{e.op}' needs two Bytes or two Ints, found {left} and {right}; "
+                               "convert with int() or byte()")
+            else:
+                self.report(e, f"operator '{e.op}' needs Int operands, found {left} and {right}")
         # The result type is known even when the operands were wrong.
         return result
+
+    def index(self, e: Index) -> Type:
+        t = self.value(e.obj)
+        if isinstance(t, ArrayType) or t is STR:
+            self.check(e.index, INT, lambda found: f"an index must be Int, found {found}")
+            return t.elem if isinstance(t, ArrayType) else BYTE
+        if isinstance(t, MapType):
+            self.check(e.index, t.key, lambda found: f"the keys of {t} are {t.key}, but this is {found}")
+            return t.value
+        if t is not ERROR:
+            self.report(e, f"{t} cannot be indexed; only arrays, Strs and maps can")
+        self.infer(e.index)
+        return ERROR
+
+    def slice(self, e: Slice) -> Type:
+        t = self.value(e.obj)
+        for bound in (e.start, e.end):
+            self.check(bound, INT, lambda found: f"the bounds of a slice must be Int, found {found}")
+        if isinstance(t, ArrayType) or t is STR or t is ERROR:
+            return t
+        self.report(e, f"{t} cannot be sliced; only arrays and Strs can")
+        return ERROR
+
+    def array_lit(self, e: ArrayLit) -> Type:
+        if not e.elems:
+            self.report(e, "cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`")
+            return ERROR
+        first = self.value(e.elems[0])
+        for x in e.elems[1:]:
+            self.check(x, first, lambda found: f"the elements of an array must all be {first}, but this is {found}")
+        return self.table.array(first)
+
+    def map_lit(self, e: MapLit) -> Type:
+        if not e.entries:
+            self.report(e, "cannot tell what this [:] holds; give it a type, as in `let m: Map[Str, Int] = [:]`")
+            return ERROR
+        key = self.value(e.entries[0].key)
+        value = self.value(e.entries[0].value)
+        if key not in MAP_KEYS and key is not ERROR:
+            self.report(e.entries[0].key, f"Map keys must be Int, Byte, Bool or Str, not {key}")
+            key = ERROR
+        for en in e.entries[1:]:
+            self.check(en.key, key, lambda found: f"the keys of this map are {key}, but this is {found}")
+            self.check(en.value, value, lambda found: f"the values of this map are {value}, but this is {found}")
+        return self.table.map(key, value)
 
     def enum_named(self, e: Expr) -> EnumType | None:
         """The enum `e` names, if `e` is the name of an enum type that no
@@ -641,14 +808,9 @@ class Checker:
             for arg in call.args:
                 self.infer(arg)  # still look for errors inside the arguments
             return ERROR
-        if target == "print":
-            call.target = "print"
-            self.arity(call, "print", 1)
-            for arg in call.args:
-                t = self.value(arg)
-                if t not in (INT, BOOL, STR, ERROR):
-                    self.report(arg, f"print takes an Int, Bool or Str, not {t}")
-            return NO_VALUE
+        if isinstance(target, str) and target in BUILTINS:
+            call.target = target
+            return self.builtin(call, target)
         if target == "Some":
             # Some(x) is an Option of whatever x is. None, Ok and Err get
             # their types from a context instead; see check().
@@ -733,9 +895,62 @@ class Checker:
             self.report(callee, f"undefined function '{callee.name}'")
         return None
 
-    def arity(self, call: Call, name: str, expected: int) -> None:
+    def arity(self, call: Call, name: str, expected: int) -> bool:
         if len(call.args) != expected:
             self.report(call, f"{name} expects {plural(expected, 'argument')}, got {len(call.args)}")
+            return False
+        return True
+
+    def builtin(self, call: Call, name: str) -> Type | None:
+        """A call to a built-in function (see BUILTINS)."""
+        want = {"print": 1, "len": 1, "int": 1, "byte": 1, "keys": 1}.get(name, 2)
+        if not self.arity(call, name, want):
+            for arg in call.args:
+                self.infer(arg)
+            return {"print": NO_VALUE, "push": NO_VALUE, "remove": NO_VALUE, "len": INT, "int": INT,
+                    "byte": BYTE, "has": BOOL}.get(name, ERROR)
+        args = call.args
+        if name == "print":
+            t = self.value(args[0])
+            if t not in PRINTABLE and t is not ERROR:
+                self.report(args[0], f"print takes an Int, Byte, Bool or Str, not {t}")
+            return NO_VALUE
+        if name == "len":
+            t = self.value(args[0])
+            if not (t is STR or isinstance(t, (ArrayType, MapType)) or t is ERROR):
+                self.report(args[0], f"len takes a Str, an array or a map, not {t}")
+            return INT
+        if name == "int":
+            self.check(args[0], BYTE, lambda found: f"int takes a Byte, found {found}")
+            return INT
+        if name == "byte":
+            self.check(args[0], INT, lambda found: f"byte takes an Int, found {found}")
+            return BYTE
+        if name == "push":
+            t = self.place(args[0], "push onto")
+            if isinstance(t, ArrayType):
+                self.check(args[1], t.elem, lambda found: f"the elements of {t} are {t.elem}, but this is {found}")
+            else:
+                if t is not ERROR:
+                    self.report(args[0], f"push needs an array, not {t}")
+                self.infer(args[1])
+            return NO_VALUE
+        # has, get, remove and keys take a map.
+        t = self.place(args[0], "remove from") if name == "remove" else self.value(args[0])
+        if not isinstance(t, MapType):
+            if t is not ERROR:
+                self.report(args[0], f"{name} needs a map, not {t}")
+            for arg in args[1:]:
+                self.infer(arg)
+            return {"has": BOOL, "remove": NO_VALUE}.get(name, ERROR)
+        if name == "keys":
+            return self.table.array(t.key)
+        self.check(args[1], t.key, lambda found: f"the keys of {t} are {t.key}, but this is {found}")
+        if name == "has":
+            return BOOL
+        if name == "get":
+            return self.table.option(t.value)
+        return NO_VALUE
 
 
 def describe_target(target: Expr) -> str:

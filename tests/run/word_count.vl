@@ -1,0 +1,46 @@
+// Splitting text into words and counting them: strings, slices, maps and
+// arrays together, with a lot of allocation.
+// out: 9
+// out: the 3
+// out: cat 2
+// out: sat 1
+// out: on 1
+// out: mat 1
+// out: and 1
+fn split(text: Str) -> [Str] {
+    let mut words: [Str] = []
+    let mut start = 0
+    for i in 0..len(text) + 1 {
+        if i == len(text) || text[i] == ' ' {
+            if i > start {
+                push(words, text[start..i])
+            }
+            start = i + 1
+        }
+    }
+    return words
+}
+
+fn main() {
+    let words = split("the cat sat on the mat and the cat")
+    print(len(words))
+    let mut counts: Map[Str, Int] = [:]
+    for w in words {
+        let before = match get(counts, w) {
+            Some(n) => n
+            None => 0
+        }
+        counts[w] = before + 1
+    }
+    for w in keys(counts) {
+        print(w + " " + digits(counts[w]))
+    }
+}
+
+fn digits(n: Int) -> Str {
+    if n < 10 {
+        let table = "0123456789"
+        return table[n..n + 1]
+    }
+    return digits(n / 10) + digits(n % 10)
+}

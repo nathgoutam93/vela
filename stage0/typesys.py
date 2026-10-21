@@ -6,16 +6,17 @@ standard library's `types` module (see ast_nodes.py for the same problem).
 Every type is represented by exactly one object, so types are compared with
 `is`, or `==`, which means the same thing here:
 
-- Int, Bool and Str are the singletons INT, BOOL and STR.
+- Int, Byte, Bool and Str are the singletons INT, BYTE, BOOL and STR.
 - Each `type Name = struct {...}` or `enum {...}` is one StructType or
   EnumType object, created when the declaration is read.
 - Option[T] and Result[T, E] are EnumTypes too, built by a TypeTable, which
   hands out the same object every time it is asked for the same arguments.
-  That is called interning.
+  That is called interning. Arrays [T] and maps Map[K, V] are interned the
+  same way.
 - ERROR is the type of an expression whose error is already reported.
 
 A type prints the way it is written in source: Int, Token, Option[Int],
-Result[Int, Str].
+Result[Int, Str], [Int], Map[Str, Int].
 """
 from __future__ import annotations
 
@@ -40,12 +41,31 @@ class ErrorType(Type):
 
 
 INT = PrimType("Int")
+BYTE = PrimType("Byte")
 BOOL = PrimType("Bool")
 STR = PrimType("Str")
 ERROR = ErrorType()
 
-PRIMITIVES = {"Int": INT, "Bool": BOOL, "Str": STR}
-GENERICS = {"Option": 1, "Result": 2}  # built-in generic types: name -> argument count
+PRIMITIVES = {"Int": INT, "Byte": BYTE, "Bool": BOOL, "Str": STR}
+GENERICS = {"Option": 1, "Result": 2, "Map": 2}  # built-in generic types: name -> argument count
+MAP_KEYS = (INT, BYTE, BOOL, STR)  # the types a map can be keyed by
+
+
+@dataclass(eq=False)
+class ArrayType(Type):
+    elem: Type
+
+    def __str__(self) -> str:
+        return f"[{self.elem}]"
+
+
+@dataclass(eq=False)
+class MapType(Type):
+    key: Type
+    value: Type
+
+    def __str__(self) -> str:
+        return f"Map[{self.key}, {self.value}]"
 
 
 @dataclass(eq=False)
@@ -100,10 +120,27 @@ BUILTIN_VARIANTS = {"None": "Option", "Some": "Option", "Ok": "Result", "Err": "
 
 
 class TypeTable:
-    """Hands out Option and Result types, one object per distinct type."""
+    """Hands out Option, Result, array and map types, one object per
+    distinct type."""
 
     def __init__(self) -> None:
         self.instances: dict[tuple[str, tuple[Type, ...]], EnumType] = {}
+        self.arrays: dict[Type, ArrayType] = {}
+        self.maps: dict[tuple[Type, Type], MapType] = {}
+
+    def array(self, elem: Type) -> Type:
+        if elem is ERROR:
+            return ERROR
+        if elem not in self.arrays:
+            self.arrays[elem] = ArrayType(elem)
+        return self.arrays[elem]
+
+    def map(self, key: Type, value: Type) -> Type:
+        if ERROR in (key, value):
+            return ERROR
+        if (key, value) not in self.maps:
+            self.maps[(key, value)] = MapType(key, value)
+        return self.maps[(key, value)]
 
     def option(self, t: Type) -> Type:
         return self.instance("Option", (t,))

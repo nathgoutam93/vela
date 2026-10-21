@@ -4,6 +4,8 @@
     python3 run_tests.py                       every test, stage 0 compiler
     python3 run_tests.py precedence overflow   only tests whose path contains a word
     python3 run_tests.py -v                    also list the tests that pass
+    python3 run_tests.py --sanitize            build with AddressSanitizer, which
+                                               also fails a test that leaks memory
     python3 run_tests.py --compiler "./vela1"  another compiler (Stage 1, from M8)
 
 A test is one .vl file. Comment lines at the very top hold its expectations:
@@ -53,6 +55,9 @@ STRICT_CFLAGS = (
     " -Wno-unused-variable -Wno-unused-parameter -Wno-unused-but-set-variable"
     " -Wno-tautological-compare -Wno-self-assign"
 )
+# --sanitize: catch memory errors (use after free, out of bounds), undefined
+# behaviour, and, when the program exits, any memory it never freed.
+SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all"
 
 HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump):(.*)$")
 COMPILE_TIMEOUT = 60
@@ -127,7 +132,7 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
             return [f"compiler exited with {built.returncode}:", *built.stderr.splitlines()]
         try:
             ran = subprocess.run(
-                [str(exe)], cwd=path.parent, capture_output=True, text=True,
+                [str(exe)], cwd=path.parent, env=env, capture_output=True, text=True,
                 timeout=RUN_TIMEOUT,
             )
         except subprocess.TimeoutExpired:
@@ -168,6 +173,8 @@ def main() -> int:
     ap.add_argument("filters", nargs="*", help="only run tests whose path contains one of these")
     ap.add_argument("--compiler", help="command that runs the compiler (default: stage 0)")
     ap.add_argument("-v", "--verbose", action="store_true", help="list passing tests too")
+    ap.add_argument("--sanitize", action="store_true",
+                    help="build with AddressSanitizer and UBSan; leaks fail the test")
     args = ap.parse_args()
 
     if args.compiler:
@@ -176,6 +183,9 @@ def main() -> int:
         compiler = [sys.executable, str(ROOT / "stage0" / "main.py")]
     env = dict(os.environ)
     env.setdefault("VELA_CFLAGS", STRICT_CFLAGS)
+    if args.sanitize:
+        env["VELA_CFLAGS"] += SANITIZE_CFLAGS
+        env["ASAN_OPTIONS"] = "detect_leaks=1"
 
     tests = find_tests(args.filters)
     if not tests:

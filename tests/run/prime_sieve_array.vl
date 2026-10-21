@@ -1,0 +1,30 @@
+// The sieve of Eratosthenes with a real table, now that arrays exist
+// (M2's version used the bits of one Int).
+// out: 25
+// out: 97
+// out: 1229
+fn sieve(limit: Int) -> [Int] {
+    let mut crossed: [Bool] = []
+    for i in 0..limit + 1 {
+        push(crossed, false)
+    }
+    let mut primes: [Int] = []
+    for n in 2..limit + 1 {
+        if !crossed[n] {
+            push(primes, n)
+            let mut m = n * n
+            for m <= limit {
+                crossed[m] = true
+                m = m + n
+            }
+        }
+    }
+    return primes
+}
+
+fn main() {
+    let small = sieve(100)
+    print(len(small))
+    print(small[len(small) - 1])
+    print(len(sieve(10000)))
+}

@@ -1,0 +1,47 @@
+// Heap strings: joining with +, len, indexing (a Byte), slicing, looping
+// over bytes, and comparing.
+// out: hello, world
+// out: 12
+// out: 104
+// out: world
+// out: hello
+// out: true
+// out: 3
+// out: abcabcabc
+// out: 9
+// out: naïve
+// out: 6
+fn repeat(s: Str, n: Int) -> Str {
+    let mut out = ""
+    for i in 0..n {
+        out = out + s
+    }
+    return out
+}
+
+fn count(s: Str, b: Byte) -> Int {
+    let mut n = 0
+    for c in s {
+        if c == b {
+            n = n + 1
+        }
+    }
+    return n
+}
+
+fn main() {
+    let greeting = "hello" + ", " + "world"
+    print(greeting)
+    print(len(greeting))
+    print(greeting[0])
+    print(greeting[7..12])
+    let first = greeting[0..5]
+    print(first)
+    print(first == "hello")
+    print(count(greeting, 'l'))
+    let r = repeat("abc", 3)
+    print(r)
+    print(len(r))
+    print("naïve")
+    print(len("naïve"))
+}

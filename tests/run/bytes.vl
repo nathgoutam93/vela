@@ -1,0 +1,55 @@
+// Bytes: literals, arithmetic, comparison with numbers, conversions, and
+// range patterns, as a lexer would use them.
+// out: 97
+// out: 7
+// out: 42
+// out: 65
+// out: letter
+// out: digit
+// out: space
+// out: other
+// out: 3
+// out: true
+fn digit_value(c: Byte) -> Int {
+    return int(c - '0')
+}
+
+fn class(c: Byte) -> Str {
+    return match c {
+        'a'..='z' => "letter"
+        'A'..='Z' => "letter"
+        '0'..='9' => "digit"
+        ' ' => "space"
+        '\t' => "space"
+        '\n' => "space"
+        _ => "other"
+    }
+}
+
+fn parse(s: Str) -> Int {
+    let mut n = 0
+    for c in s {
+        n = n * 10 + digit_value(c)
+    }
+    return n
+}
+
+fn main() {
+    print('a')
+    print(digit_value('7'))
+    print(parse("42"))
+    let b: Byte = 65
+    print(b)
+    print(class('q'))
+    print(class('5'))
+    print(class(' '))
+    print(class('+'))
+    let mut letters = 0
+    for c in "a1b2c3" {
+        if c >= 'a' && c <= 122 {
+            letters = letters + 1
+        }
+    }
+    print(letters)
+    print(byte(66) == 'B')
+}

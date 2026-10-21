@@ -1,0 +1,64 @@
+// Lots of allocation: growing arrays, building strings, maps of arrays and
+// recursive trees. Run with `run_tests.py --sanitize`, this must report no
+// leaks and no memory errors.
+// out: 100000
+// out: 4999950000
+// out: 10000
+// out: 1000
+// out: 500
+// out: 1048575
+type Tree = enum {
+    Leaf
+    Node(Tree, Int, Tree)
+}
+
+fn build(depth: Int, value: Int) -> Tree {
+    if depth == 0 {
+        return Tree.Leaf
+    }
+    return Tree.Node(build(depth - 1, value * 2), value, build(depth - 1, value * 2 + 1))
+}
+
+fn count(t: Tree) -> Int {
+    return match t {
+        Tree.Leaf => 0
+        Tree.Node(l, _, r) => count(l) + 1 + count(r)
+    }
+}
+
+fn main() {
+    let mut xs: [Int] = []
+    for i in 0..100000 {
+        push(xs, i)
+    }
+    print(len(xs))
+    let mut total = 0
+    for x in xs {
+        total = total + x
+    }
+    print(total)
+
+    let mut s = ""
+    for i in 0..10000 {
+        s = s + "x"
+    }
+    print(len(s))
+
+    let mut groups: Map[Int, [Str]] = [:]
+    for i in 0..1000 {
+        let key = i % 2
+        if !has(groups, key) {
+            groups[key] = []
+        }
+        push(groups[key], s[0..i % 7])
+    }
+    print(len(groups[0]) + len(groups[1]))
+    print(len(groups[1]))
+
+    for round in 0..3 {
+        let t = build(20 - round * 0, 1)
+        if round == 2 {
+            print(count(t))
+        }
+    }
+}
