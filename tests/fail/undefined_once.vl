@@ -1,0 +1,15 @@
+// An unknown name is reported at its first use in each function only:
+// one misspelling is one mistake, however often it is used.
+// err: undefined_once.vl:7:11: error: undefined name 'nope'
+// err: undefined_once.vl:10:13: error: undefined name 'nope'
+// err: undefined_once.vl:13:5: error: undefined function 'missing_fn'
+fn helper() {
+    print(nope)
+}
+fn main() {
+    let a = nope + 1
+    print(nope)
+    print(nope * a)
+    missing_fn(1)
+    missing_fn(2)
+}

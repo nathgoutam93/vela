@@ -1,0 +1,12 @@
+// A call with the wrong number of arguments still has its arguments checked.
+// err: arity_and_types.vl:10:11: error: add expects 2 arguments, got 1
+// err: arity_and_types.vl:10:15: error: argument 1 of 'add' must be Int, found Bool
+// err: arity_and_types.vl:11:11: error: add expects 2 arguments, got 3
+// err: arity_and_types.vl:11:21: error: undefined name 'x'
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+fn main() {
+    print(add(true))
+    print(add(1, 2, x))
+}

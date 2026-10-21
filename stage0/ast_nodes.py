@@ -203,6 +203,7 @@ class FnDecl:
     body: Block
     line: int  # the name's position
     col: int
+    sig: Any = checked()  # the checker's Signature: resolved parameter and result types
 
 
 @dataclass

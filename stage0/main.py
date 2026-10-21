@@ -29,7 +29,7 @@ import checker
 import codegen_c
 import lexer
 import parser
-from errors import CompileError
+from errors import CompileErrors
 
 RUNTIME_DIR = Path(__file__).resolve().parent.parent / "runtime"
 
@@ -159,8 +159,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         return args.func(args)
-    except CompileError as e:
-        print(e.render(args.file), file=sys.stderr)
+    except CompileErrors as e:
+        for error in e.errors:
+            print(error.render(args.file), file=sys.stderr)
         return EXIT_ERROR
     except DriverError as e:
         print(f"vela: error: {e}", file=sys.stderr)

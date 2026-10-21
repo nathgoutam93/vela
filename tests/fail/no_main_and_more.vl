@@ -1,0 +1,6 @@
+// A missing main is reported along with everything else, first.
+// err: no_main_and_more.vl:1:1: error: the program has no main function; execution starts at fn main()
+// err: no_main_and_more.vl:5:12: error: 'helper' returns Int, but this is Str
+fn helper() -> Int {
+    return "x"
+}

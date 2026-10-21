@@ -1,0 +1,19 @@
+// Independent type errors are all reported, in source order.
+// err: multi_type_errors.vl:9:14: error: operator '/' needs Int operands, found Int and Bool
+// err: multi_type_errors.vl:13:15: error: operator '+' needs Int operands, found Int and Str
+// err: multi_type_errors.vl:14:8: error: the condition of 'if' must be Bool, found Int
+// err: multi_type_errors.vl:16:16: error: argument 1 of 'half' must be Int, found Bool
+// err: multi_type_errors.vl:17:13: error: undefined name 'undefined_thing'
+// err: multi_type_errors.vl:18:5: error: cannot assign to 'b', which was declared with 'let'; use 'let mut' to allow changes
+fn half(n: Int) -> Int {
+    return n / true
+}
+
+fn main() {
+    let a = 1 + "two"
+    if a {
+    }
+    print(half(false))
+    let b = undefined_thing
+    b = 2
+}

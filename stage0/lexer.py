@@ -8,12 +8,15 @@ inside comments and string literals.
 
 Statements end at newlines using Go's rule: the lexer inserts a `;` token
 at the end of any line whose last token could end a statement.
+
+A lexical error does not stop the scan: the lexer records it, skips the bad
+text, and carries on, so one run reports every bad character in the file.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from errors import CompileError
+from errors import CompileError, ErrorList
 
 # All 13 keywords at bootstrap are reserved from the start, even the ones the
 # parser does not use yet, so no early program can use them as names.
@@ -55,7 +58,11 @@ class Token:
 
 
 def tokenize(src: bytes) -> list[Token]:
-    return Lexer(src).run()
+    """Raises CompileErrors with every lexical error in the file, if any."""
+    lexer = Lexer(src)
+    tokens = lexer.run()
+    lexer.errors.raise_if_any()
+    return tokens
 
 
 def is_digit(c: int) -> bool:
@@ -77,6 +84,7 @@ class Lexer:
         self.line = 1
         self.line_start = 0  # index of the first byte of the current line
         self.tokens: list[Token] = []
+        self.errors = ErrorList()
 
     def peek(self, ahead: int = 0) -> int:
         i = self.pos + ahead
@@ -88,8 +96,8 @@ class Lexer:
     def add(self, kind: str, text: str, start: int, value: bytes | None = None) -> None:
         self.tokens.append(Token(kind, text, self.line, self.col(start), value))
 
-    def error(self, start: int, message: str) -> CompileError:
-        return CompileError(self.line, self.col(start), message)
+    def error(self, start: int, message: str) -> None:
+        self.errors.add(CompileError(self.line, self.col(start), message))
 
     def insert_semicolon(self, text: str) -> None:
         if self.tokens and self.tokens[-1].kind in ENDS_STATEMENT:
@@ -132,14 +140,15 @@ class Lexer:
             while is_ident_char(self.peek()):
                 self.pos += 1
             text = self.src[start:self.pos].decode("ascii")
-            raise self.error(start, f"invalid number '{text}'")
+            self.error(start, f"invalid number '{text}'")
+            return
         text = self.src[start:self.pos].decode("ascii")
         if len(text) > 1 and text[0] == "0":
             # Reserved so 0x, 0o and 0b prefixes can be added without
             # anyone mistaking 010 for octal.
-            raise self.error(start, f"integer literal '{text}' has a leading zero")
-        if int(text) > INT_MAX:
-            raise self.error(start, f"integer literal {text} does not fit in Int (max {INT_MAX})")
+            self.error(start, f"integer literal '{text}' has a leading zero")
+        elif int(text) > INT_MAX:
+            self.error(start, f"integer literal {text} does not fit in Int (max {INT_MAX})")
         self.add("int", text, start)
 
     def identifier(self) -> None:
@@ -161,7 +170,9 @@ class Lexer:
         while True:
             c = self.peek()
             if c == EOF or c == ord("\n"):
-                raise self.error(start, "string literal is not closed before the end of the line")
+                # Stop at the end of the line, so the next line lexes normally.
+                self.error(start, "string literal is not closed before the end of the line")
+                return
             self.pos += 1
             if c == ord('"'):
                 break
@@ -169,22 +180,23 @@ class Lexer:
                 escape = self.peek()
                 if escape == EOF or chr(escape) not in ESCAPES:
                     shown = "" if escape in (EOF, ord("\n")) else chr(escape)
-                    raise self.error(
+                    self.error(
                         self.pos - 1,
                         f"unknown escape '\\{shown}'; use \\n \\t \\r \\0 \\\\ or \\\"",
                     )
+                    continue  # keep scanning the string, so its end is found
                 value.append(ESCAPES[chr(escape)])
                 self.pos += 1
             elif c < 0x20 and c != ord("\t"):
-                raise self.error(self.pos - 1, f"control byte 0x{c:02x} in string literal; use an escape")
+                self.error(self.pos - 1, f"control byte 0x{c:02x} in string literal; use an escape")
             else:
                 value.append(c)
         raw = self.src[start + 1:self.pos - 1]
         try:
             raw.decode("utf-8")
         except UnicodeDecodeError as e:
-            raise self.error(start + 1 + e.start, "string literal is not valid UTF-8") from None
-        text = self.src[start:self.pos].decode("utf-8")
+            self.error(start + 1 + e.start, "string literal is not valid UTF-8")
+        text = self.src[start:self.pos].decode("utf-8", errors="replace")
         self.add("str", text, start, bytes(value))
 
     def operator(self, c: int) -> None:
@@ -196,19 +208,24 @@ class Lexer:
             self.add(chr(c), chr(c), self.pos)
             self.pos += 1
         else:
-            raise self.unexpected(c)
+            self.unexpected(c)
 
-    def unexpected(self, c: int) -> CompileError:
+    def unexpected(self, c: int) -> None:
+        """Report a byte that starts no token, and skip it."""
+        start = self.pos
+        self.pos += 1
         if c >= 0x80:
-            return self.error(
-                self.pos,
-                f"unexpected byte 0x{c:02x}; non-ASCII text is only allowed in comments and strings",
-            )
-        if chr(c) in "&|":
-            return self.error(self.pos, f"unexpected character '{chr(c)}'; did you mean '{chr(c) * 2}'?")
-        if 0x21 <= c <= 0x7E:
-            return self.error(self.pos, f"unexpected character '{chr(c)}'")
-        return self.error(self.pos, f"unexpected control byte 0x{c:02x}")
+            # Skip the rest of a multi-byte UTF-8 character too (its
+            # continuation bytes are 0x80-0xBF), so it is one error, not several.
+            while 0x80 <= self.peek() <= 0xBF:
+                self.pos += 1
+            self.error(start, f"unexpected byte 0x{c:02x}; non-ASCII text is only allowed in comments and strings")
+        elif chr(c) in "&|":
+            self.error(start, f"unexpected character '{chr(c)}'; did you mean '{chr(c) * 2}'?")
+        elif 0x21 <= c <= 0x7E:
+            self.error(start, f"unexpected character '{chr(c)}'")
+        else:
+            self.error(start, f"unexpected control byte 0x{c:02x}")
 
 
 def describe(tok: Token) -> str:

@@ -1,0 +1,33 @@
+// After a syntax error the parser skips to the next statement (or, in a
+// signature, to the next function) and carries on. The body of `broken` is
+// skipped with its signature, so its `print(8 +)` is not reported.
+// err: multi_syntax_errors.vl:13:14: error: expected expression, found ')'
+// err: multi_syntax_errors.vl:14:9: error: expected a name after 'let', found '='
+// err: multi_syntax_errors.vl:16:13: error: expected '{' after the 'if' condition, found identifier 'print'
+// err: multi_syntax_errors.vl:17:14: error: expected newline or ';' after statement, found identifier 'print'
+// err: multi_syntax_errors.vl:18:17: error: expected ')' to match '(' at 18:11, found newline
+// err: multi_syntax_errors.vl:22:13: error: expected ':' and a type after parameter 'x', found identifier 'Int'
+// err: multi_syntax_errors.vl:27:5: error: 'else' must be on the same line as the '}' before it
+// err: multi_syntax_errors.vl:32:14: error: expected expression, found ')'
+fn main() {
+    print(1 +)
+    let = 5
+    print(2)
+    if true print(3)
+    print(6) print(7)
+    print((4 + 5
+    )
+}
+
+fn broken(x Int) {
+    print(8 +)
+}
+
+fn also_broken() {
+    else {
+    }
+}
+
+fn after_errors() {
+    print(9 +)
+}
