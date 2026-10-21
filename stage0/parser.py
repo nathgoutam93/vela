@@ -9,12 +9,12 @@ Grammar (`;` includes the ones the lexer inserts at line ends; the last
 statement before a `}` needs none; items in `{ }` lists are separated by
 commas or newlines):
 
-    program   = { ( fn | typedecl ) ";" } EOF
+    program   = { "import" NAME ";" } { [ "pub" ] ( fn | typedecl ) ";" } EOF
     typedecl  = "type" NAME "=" ( "struct" "{" { NAME ":" type } "}"
                                 | "enum" "{" { NAME [ "(" type { "," type } ")" ] } "}" )
     fn        = "fn" NAME "(" [ param { "," param } [ "," ] ] ")" [ "->" type ] block
     param     = NAME ":" type
-    type      = NAME [ "[" type { "," type } "]" ] | "[" type "]"
+    type      = [ NAME "." ] NAME [ "[" type { "," type } "]" ] | "[" type "]"
     block     = "{" { statement ";" } "}"
     statement = "let" [ "mut" ] NAME [ ":" type ] "=" expr
               | "if" expr block [ "else" ( if | block ) ]
@@ -23,12 +23,17 @@ commas or newlines):
               | "break" | "continue" | "return" [ expr ]
               | block
               | expr [ "=" expr ]
-    expr      = ... | NAME "{" { NAME ":" expr } "}" | expr "." NAME
+    expr      = ... | [ NAME "." ] NAME "{" { NAME ":" expr } "}" | expr "." NAME
               | expr "[" expr [ ".." expr ] "]"
               | "[" [ expr { "," expr } ] "]" | "[" ":" "]" | "[" expr ":" expr { "," expr ":" expr } "]"
               | "match" expr "{" { pattern "=>" expr } "}"
     pattern   = "_" | NAME | literal [ "..=" literal ]
-              | [ NAME "." ] NAME [ "(" pattern { "," pattern } ")" ]
+              | [ [ NAME "." ] NAME "." ] NAME [ "(" pattern { "," pattern } ")" ]
+
+A NAME before a "." in a type, struct literal or pattern can be a module:
+`lexer.Token`, `lexer.Token { ... }`, `lexer.TokenKind.Plus`. In other
+expressions, `lexer.next(s)` parses as a field access like any other, and
+the checker works out that `lexer` is a module.
 
 `struct` and `enum` are not keywords: they only mean something right after
 `type Name =`, so they are still usable as names elsewhere.
@@ -44,12 +49,13 @@ from typing import Any, Callable
 
 from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, EnumDecl, Expr,
-    ExprStmt, Field, FieldDecl, FieldInit, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let,
+    ExprStmt, Field, FieldDecl, FieldInit, FnDecl, For, ForEach, ForRange, If, Import, Index,
+    IntLit, Let,
     MapEntry, MapLit, Match, MatchStmt, Name, Param, Pattern, PBind, PLit, Program, PRange,
     PVariant, PWild, Return, Slice, Stmt, StrLit, StructDecl, StructLit, TypeName, Unary,
     VariantDecl,
 )
-from errors import CompileError, ErrorList
+from errors import CompileError, CompileErrors, ErrorList
 from lexer import Token, describe
 from typesys import BUILTIN_VARIANTS
 
@@ -64,15 +70,18 @@ INFIX = {
     "*": (20, 21), "/": (20, 21), "%": (20, 21),
 }
 COMPARISONS = frozenset({"==", "!=", "<", "<=", ">", ">="})
+EXPRESSION_STARTS = frozenset({"int", "bool", "str", "byte", "[", "ident", "-", "!", "(", "match"})
 PREFIX = 30   # unary `-` and `!`: `-a * b` is `(-a) * b`
 POSTFIX = 40  # calls, field access, indexing: `-f(x).y[0]` is `-(((f(x)).y)[0])`
 
 
 def parse(tokens: list[Token]) -> Program:
-    """Raises CompileErrors with every syntax error in the file, if any."""
+    """Raises CompileErrors with every syntax error in the file, if any.
+    The exception's `program` is the tree as far as it could be parsed."""
     parser = Parser(tokens)
     program = parser.program()
-    parser.errors.raise_if_any()
+    if parser.errors.errors:
+        raise CompileErrors(parser.errors.errors, program)
     return program
 
 
@@ -142,6 +151,7 @@ class Parser:
     # ---- Declarations ----
 
     def program(self) -> Program:
+        imports: list[Import] = []
         types: list[StructDecl | EnumDecl] = []
         fns = []
         while self.peek().kind != "eof":
@@ -152,10 +162,29 @@ class Parser:
             start = self.i
             self.open_parens = self.open_braces = 0
             try:
+                if tok.kind == "import":
+                    self.advance()
+                    if types or fns:
+                        # Go's rule: the imports are all at the top, so a
+                        # reader finds a file's dependencies in one place.
+                        raise self.error(tok, "imports must come before all declarations")
+                    name = self.expect_name("of a module after 'import'")
+                    imports.append(Import(name.text, name.line, name.col))
+                    self.end_of_item("import")
+                    continue
+                pub = tok.kind == "pub"
+                if pub:
+                    self.advance()
+                    tok = self.peek()
                 if tok.kind == "fn":
                     fns.append(self.fn_decl())
+                    fns[-1].pub = pub
                 elif tok.kind == "type":
                     types.append(self.type_decl())
+                    types[-1].pub = pub
+                elif pub:
+                    self.advance()  # so recovery does not stop at it, if it is `import`
+                    raise self.error(tok, f"expected 'fn' or 'type' after 'pub', found {describe(tok)}")
                 else:
                     raise self.error(
                         tok,
@@ -166,10 +195,10 @@ class Parser:
             except CompileError as e:
                 self.errors.add(e)
                 self.skip_declaration(start)
-        return Program(types, fns)
+        return Program(imports, types, fns)
 
     def skip_declaration(self, start: int) -> None:
-        """After an error at the top level, skip to the next `fn` or `type`.
+        """After an error at the top level, skip to the next declaration.
 
         Braces are counted, so a keyword inside a skipped body does not
         count, and a whole broken function, body included, is skipped at once.
@@ -177,7 +206,7 @@ class Parser:
         braces = 0
         while self.peek().kind != "eof":
             tok = self.peek()
-            if tok.kind in ("fn", "type") and braces == 0 and self.i > start:
+            if tok.kind in ("fn", "type", "pub", "import") and braces == 0 and self.i > start:
                 return
             if tok.kind == "{":
                 braces += 1
@@ -256,7 +285,11 @@ class Parser:
             elem = self.type_name()
             self.expect("]", "after the element type of an array type")
             return TypeName("[]", [elem], open_.line, open_.col)
-        tok = self.expect_name("for a type")
+        tok = start = self.expect_name("for a type")
+        module = None
+        if self.peek().kind == ".":
+            self.advance()
+            module, tok = tok.text, self.expect_name(f"for a type after '{tok.text}.'")
         args = []
         if self.peek().kind == "[":
             self.advance()
@@ -266,7 +299,7 @@ class Parser:
                     break
                 self.advance()
             self.expect("]", f"after the type arguments of '{tok.text}'")
-        return TypeName(tok.text, args, tok.line, tok.col)
+        return TypeName(tok.text, args, start.line, start.col, module)
 
     # ---- Statements ----
 
@@ -345,6 +378,8 @@ class Parser:
             return MatchStmt(scrutinee, arms, tok.line, tok.col)
         if kind == "{":
             return self.block("")
+        if kind == "import":
+            raise self.error(tok, "imports go at the top of the file, before all declarations")
         if kind == "else":
             # The newline rule put a `;` after the `}`, ending the `if`.
             raise self.error(tok, "'else' must be on the same line as the '}' before it")
@@ -453,10 +488,13 @@ class Parser:
         self.advance()
         if tok.text == "_":
             return PWild(tok.line, tok.col)
-        enum, variant = None, tok
+        module, enum, variant = None, None, tok
         if self.peek().kind == ".":
             self.advance()
             enum, variant = tok.text, self.expect_name("for a variant after '.'")
+            if self.peek().kind == ".":  # module.Enum.Variant
+                self.advance()
+                module, enum, variant = enum, variant.text, self.expect_name("for a variant after '.'")
         elif tok.text not in BUILTIN_VARIANTS:
             return PBind(tok.text, tok.line, tok.col)
         args = None
@@ -469,7 +507,7 @@ class Parser:
                     break
                 self.advance()
             self.expect(")", f"after the patterns of '{variant.text}'")
-        return PVariant(enum, variant.text, args, tok.line, tok.col)
+        return PVariant(enum, variant.text, args, tok.line, tok.col, module)
 
     def number_literal(self) -> IntLit | ByteLit:
         """An Int literal (possibly negative) or a Byte literal, in a pattern."""
@@ -536,7 +574,12 @@ class Parser:
     def prefix(self) -> Expr:
         """The start of an expression: a literal, a name, a struct literal,
         a match, `-x`, `!x` or `( ... )`."""
-        tok = self.advance()
+        tok = self.peek()
+        if tok.kind not in EXPRESSION_STARTS:
+            # Not consumed: in `return 1 +` before a `}`, the `}` still
+            # has to close the block.
+            raise self.error(tok, f"expected expression, found {describe(tok)}")
+        self.advance()
         if tok.kind == "int":
             return IntLit(int(tok.text), tok.line, tok.col)
         if tok.kind == "bool":
@@ -551,7 +594,11 @@ class Parser:
             return self.collection_lit(tok)
         if tok.kind == "ident":
             if self.peek().kind == "{" and not self.no_struct:
-                return self.struct_lit(tok)
+                return self.struct_lit(None, tok)
+            if (self.peek().kind == "." and self.peek(1).kind == "ident" and self.peek(2).kind == "{"
+                    and not self.no_struct):
+                self.advance()  # "."
+                return self.struct_lit(tok, self.advance())
             return Name(tok.text, tok.line, tok.col)
         if tok.kind in ("-", "!"):
             return Unary(tok.kind, self.expression(PREFIX), tok.line, tok.col)
@@ -569,7 +616,7 @@ class Parser:
             self.expect("{", "after the value being matched")
             arms = self.brace_list(lambda: self.arm(stmt=False), "match")
             return Match(scrutinee, arms, tok.line, tok.col)
-        raise self.error(tok, f"expected expression, found {describe(tok)}")
+        raise AssertionError(f"unhandled expression start {tok.kind}")
 
     def index(self, obj: Expr) -> Index | Slice:
         """`obj[i]` or `obj[a..b]`, after `obj`."""
@@ -613,7 +660,8 @@ class Parser:
             return MapLit(entries, open_.line, open_.col)
         return ArrayLit(elems, open_.line, open_.col)
 
-    def struct_lit(self, name: Token) -> StructLit:
+    def struct_lit(self, module: Token | None, name: Token) -> StructLit:
+        """`Name { ... }` or `module.Name { ... }`, from the `{` on."""
         self.advance()  # "{"
 
         def field_init() -> FieldInit:
@@ -621,8 +669,10 @@ class Parser:
             self.expect(":", f"after field '{fname.text}'")
             return FieldInit(fname.text, self.nested_expression(), fname.line, fname.col)
 
-        fields = self.brace_list(field_init, f"'{name.text}' value")
-        return StructLit(name.text, fields, name.line, name.col)
+        written = f"{module.text}.{name.text}" if module else name.text
+        fields = self.brace_list(field_init, f"'{written}' value")
+        start = module or name
+        return StructLit(name.text, fields, start.line, start.col, module.text if module else None)
 
     def call(self, callee: Expr) -> Call:
         self.advance()  # the "("

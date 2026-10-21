@@ -1,0 +1,25 @@
+// dump: ast
+// out: (import lexer)
+// out: (import maps)
+// out: (pub struct Pair (left lexer.Token) (right Option[lexer.Token]))
+// out: (pub fn first ((p Pair)) lexer.Kind
+// out:   (block
+// out:     (let t (struct lexer.Token (kind (. (. lexer Kind) Plus)) (text "+")))
+// out:     (match (. (. p left) kind) (=> (lexer.Kind.Num n) (call print n)) (=> _ (call print (call (. maps has) (map (1 2)) 1))))
+// out:     (return (. t kind))))
+import lexer
+import maps
+
+pub type Pair = struct {
+    left: lexer.Token
+    right: Option[lexer.Token]
+}
+
+pub fn first(p: Pair) -> lexer.Kind {
+    let t = lexer.Token { kind: lexer.Kind.Plus, text: "+" }
+    match p.left.kind {
+        lexer.Kind.Num(n) => print(n)
+        _ => print(maps.has([1: 2], 1))
+    }
+    return t.kind
+}

@@ -188,7 +188,7 @@ def render(p: SPat, t: Type) -> str:
     if t is BOOL:
         return "true" if key else "false"
     assert isinstance(t, EnumType)
-    name = key.name if t.builtin else f"{t.name}.{key.name}"
+    name = key.name if t.builtin else f"{t}.{key.name}"
     if not key.payload:
         return name
     return f"{name}({', '.join(render(a, pt) for a, pt in zip(args, key.payload))})"

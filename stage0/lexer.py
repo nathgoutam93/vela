@@ -18,10 +18,11 @@ from dataclasses import dataclass
 
 from errors import CompileError, ErrorList
 
-# All 13 keywords at bootstrap are reserved from the start, even the ones the
-# parser does not use yet, so no early program can use them as names.
+# The 13 keywords at bootstrap were reserved from the start, even before the
+# parser used them, so no early program could use them as names. `pub`
+# joined them in M6.
 KEYWORDS = frozenset(
-    "fn let mut if else match for in return break continue type import".split()
+    "fn let mut if else match for in return break continue type import pub".split()
 )
 
 # `true` and `false` are literals, not keywords, but they are just as

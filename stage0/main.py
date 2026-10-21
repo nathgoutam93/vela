@@ -7,6 +7,9 @@
     python3 stage0/main.py tokens hello.vl             print the token stream
     python3 stage0/main.py ast hello.vl                print the syntax tree
 
+The file given is the main module. Files it imports are found next to it;
+`tokens` and `ast` look at the one file only.
+
 Exit codes: 0 success, 1 the program has errors, 2 bad command line,
 70 internal compiler error (a bug in Vela, not in the program).
 
@@ -28,6 +31,7 @@ import ast_nodes
 import checker
 import codegen_c
 import lexer
+import modules
 import parser
 from errors import CompileErrors
 
@@ -45,11 +49,11 @@ class InternalError(Exception):
     """The compiler did something wrong, e.g. produced C that does not compile."""
 
 
-def compile_to_c(source: bytes, filename: str) -> str:
-    """The whole compiler: Vela source in, C source out. No files, no processes."""
-    program = parser.parse(lexer.tokenize(source))
-    checker.check(program)
-    return codegen_c.generate(program, filename)
+def compile_to_c(path: str) -> str:
+    """The whole compiler: a Vela program in, C source out."""
+    program = modules.load(path, read_source(path))
+    table = checker.check(program)
+    return codegen_c.generate(program, table)
 
 
 def read_source(path: str) -> bytes:
@@ -61,7 +65,7 @@ def read_source(path: str) -> bytes:
 
 def build_executable(path: str, exe: Path) -> None:
     """Compile a .vl file all the way to a native executable."""
-    c_source = compile_to_c(read_source(path), path)
+    c_source = compile_to_c(path)
     with tempfile.TemporaryDirectory(prefix="vela-") as tmp:
         c_file = Path(tmp) / (Path(path).stem + ".c")
         c_file.write_text(c_source)
@@ -111,7 +115,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_c(args: argparse.Namespace) -> int:
-    sys.stdout.write(compile_to_c(read_source(args.file), args.file))
+    sys.stdout.write(compile_to_c(args.file))
     return 0
 
 
@@ -161,7 +165,8 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(args)
     except CompileErrors as e:
         for error in e.errors:
-            print(error.render(args.file), file=sys.stderr)
+            error.path = error.path or args.file  # `tokens` and `ast` see one file
+            print(error.render(), file=sys.stderr)
         return EXIT_ERROR
     except DriverError as e:
         print(f"vela: error: {e}", file=sys.stderr)

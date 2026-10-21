@@ -1,0 +1,51 @@
+// Mistakes with modules: private names, missing names, modules used as
+// values, and pub declarations that expose private types. Errors in two
+// files come sorted by file name.
+// err: lib.vl:23:18: error: pub function 'leak' uses the private type 'Secret'; declare it with 'pub type Secret'
+// err: lib.vl:27:33: error: pub function 'leak_in_option' uses the private type 'Secret'; declare it with 'pub type Secret'
+// err: lib.vl:32:12: error: pub struct 'Wrapper' uses the private type 'Secret'; declare it with 'pub type Secret'
+// err: lib.vl:36:12: error: pub enum 'Holder' uses the private type 'Secret'; declare it with 'pub type Secret'
+// err: main.vl:29:4: error: function 'lib' has the same name as an imported module
+// err: main.vl:33:17: error: function 'hidden' is private to module 'lib'; declare it with 'pub' in lib.vl to use it here
+// err: main.vl:34:17: error: module 'lib' has no function 'missing'
+// err: main.vl:35:12: error: type 'Secret' is private to module 'lib'; declare it with 'pub' in lib.vl to use it here
+// err: main.vl:36:12: error: unknown module 'other'; is `import other` missing?
+// err: main.vl:37:13: error: 'lib' is a module, not a value
+// err: main.vl:38:5: error: 'lib' is a module; call its functions as lib.name(...)
+// err: main.vl:39:17: error: 'lib.origin' is a function; call it as lib.origin(...)
+// err: main.vl:40:17: error: 'lib.Point' is a type, not a value
+// err: main.vl:41:17: error: 'lib.Point' is a type, not a function
+// err: main.vl:42:23: error: 'lib.Color' has no variant 'Blue'
+// err: main.vl:44:9: error: cannot assign Int to 'p', which is lib.Point
+// err: main.vl:45:24: error: argument 1 of 'lib.leak_in_option' must be Option[lib.Secret], found Int
+// err: main.vl:47:5: error: match is not exhaustive: lib.Color.Green is not covered
+// err: main.vl:50:13: error: undefined function 'keys'; it is maps.keys, after `import maps`
+import lib
+
+type Local = struct {
+    p: lib.Point
+}
+
+fn lib() {
+}
+
+fn main() {
+    let a = lib.hidden()
+    let b = lib.missing()
+    let c: lib.Secret = lib.leak()
+    let d: other.Thing = 1
+    let e = lib
+    lib()
+    let f = lib.origin
+    let g = lib.Point
+    let h = lib.Point(1, 2)
+    let i = lib.Color.Blue
+    let mut p = lib.origin()
+    p = 5
+    lib.leak_in_option(3)
+    let color = lib.Color.Red
+    match color {
+        lib.Color.Red => print(1)
+    }
+    let k = keys([1: 2])
+}

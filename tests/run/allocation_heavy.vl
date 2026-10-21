@@ -7,6 +7,8 @@
 // out: 1000
 // out: 500
 // out: 1048575
+import maps
+
 type Tree = enum {
     Leaf
     Node(Tree, Int, Tree)
@@ -47,7 +49,7 @@ fn main() {
     let mut groups: Map[Int, [Str]] = [:]
     for i in 0..1000 {
         let key = i % 2
-        if !has(groups, key) {
+        if !maps.has(groups, key) {
             groups[key] = []
         }
         push(groups[key], s[0..i % 7])

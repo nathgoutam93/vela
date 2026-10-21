@@ -1,0 +1,29 @@
+// A module with the same names as other modules: Token, next, helper.
+import counter
+
+pub type Token = struct {
+    name: Str
+    size: Int
+}
+
+pub type Shape = enum {
+    Square(Int)
+    Rect(Int, Int)
+    Dot
+}
+
+pub fn next(t: Token) -> Token {
+    return Token { name: t.name + "'", size: helper(t.size) }
+}
+
+pub fn area(s: Shape) -> Int {
+    return match s {
+        Shape.Square(n) => n * n
+        Shape.Rect(w, h) => w * h
+        Shape.Dot => counter.one()
+    }
+}
+
+fn helper(n: Int) -> Int {
+    return n * 2
+}

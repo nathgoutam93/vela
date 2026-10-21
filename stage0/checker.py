@@ -15,6 +15,11 @@ Two ways of looking at an expression:
   `None` and `Ok(1)` do not say which Option or Result they belong to, so
   they get their type from the context.
 
+A program is a list of modules (modules.py). Each has its own top-level
+names: its functions, its types, and the modules it imports. A name
+declared with `pub` can also be used from the modules that import it, as
+`module.name`.
+
 The checker keeps going after an error, so one run reports them all. An
 expression whose error has been reported gets the type ERROR, and every
 rule accepts ERROR silently, so one mistake is reported once instead of
@@ -27,22 +32,26 @@ from typing import Callable
 
 import exhaustiveness
 from ast_nodes import (
-    Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, EnumDecl, Expr,
+    Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, Expr,
     ExprStmt, Field, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let, MapLit, Match,
     MatchStmt, Name, Pattern, PBind, PLit, Program, PRange, PVariant, PWild, Return, Slice, Stmt,
     StrLit, StructDecl, StructLit, TypeName, Unary,
 )
 from errors import CompileError, ErrorList
+from modules import STD_MODULES, Module
 from typesys import (
     BOOL, BUILTIN_VARIANTS, BYTE, ERROR, GENERICS, INT, MAP_KEYS, PRIMITIVES, STR, ArrayType,
-    EnumType, MapType, StructType, Type, TypeTable, Variant,
+    EnumType, MapType, StructType, Type, TypeTable, Variant, viewpoint,
 )
 
 NO_VALUE = None  # the "type" of a call that returns nothing
 
-# The built-in functions. push and remove change their first argument, so it
-# must be a place that can change: a `let mut` variable, or a part of one.
-BUILTINS = frozenset({"print", "len", "push", "int", "byte", "has", "get", "remove", "keys"})
+# The built-in functions. The prelude's are available everywhere and their
+# names are reserved; the others belong to standard modules, as in
+# `maps.get(m, k)`. push and remove change their first argument, so it must
+# be a place that can change: a `let mut` variable, or a part of one.
+PRELUDE = frozenset({"print", "len", "push", "int", "byte"})
+BUILTINS = PRELUDE.union(*STD_MODULES.values())
 PRINTABLE = (INT, BYTE, BOOL, STR)
 
 ARITHMETIC = frozenset({"+", "-", "*", "/", "%"})
@@ -67,11 +76,14 @@ class Signature:
     result: Type | None
 
 
-def check(program: Program) -> None:
-    """Raises CompileErrors with every error in the program, if any."""
+def check(program: list[Module]) -> TypeTable:
+    """Check a program's modules, given in dependency order (see modules.py).
+    Raises CompileErrors with every error in the program, if any. Returns
+    the table of every Option, Result, array and map type the program uses."""
     checker = Checker()
     checker.program(program)
     checker.errors.raise_if_any()
+    return checker.table
 
 
 def plural(n: int, word: str) -> str:
@@ -88,63 +100,116 @@ class Checker:
     def __init__(self) -> None:
         self.errors = ErrorList()
         self.table = TypeTable()
-        self.types: dict[str, Type] = {}  # user-declared types by name
-        self.fns: dict[str, FnDecl] = {}
-        self.sigs: dict[str, Signature] = {}
+        self.module = Module("", "")  # the module being checked
         self.scopes: list[dict[str, Local]] = []  # innermost last
         self.fn: FnDecl | None = None  # the function being checked
         self.loops: list[For | ForRange] = []  # enclosing loops, innermost last
         self.undefined: set[str] = set()  # unknown names already reported in this function
 
+    @property
+    def types(self) -> dict[str, Type]:
+        """The current module's types by name."""
+        return self.module.types
+
+    @property
+    def fns(self) -> dict[str, FnDecl]:
+        """The current module's functions by name."""
+        return self.module.fns
+
+    def enter(self, module: Module) -> None:
+        self.module = module
+        viewpoint.module = module.name
+
     def report(self, node: object, message: str) -> None:
-        self.errors.add(CompileError(node.line, node.col, message))  # type: ignore[attr-defined]
+        self.errors.add(CompileError(node.line, node.col, message, self.module.path))  # type: ignore[attr-defined]
 
     # ---- Declarations ----
 
-    def program(self, program: Program) -> None:
-        program.table = self.table
-        self.type_decls(program.types)
+    def program(self, modules: list[Module]) -> None:
+        """Each step is done for every module before the next step starts:
+        first every type gets an object, then the types' fields and the
+        functions' signatures are worked out, and only then are function
+        bodies checked. So a name can be used above its declaration, and
+        in any module that imports it."""
+        steps = [self.declare_types, self.define_types, self.signatures, self.bodies]
+        for step in steps:
+            for m in modules:
+                assert m.program is not None
+                self.enter(m)
+                step(m.program)
 
-        # Collect every signature before checking any body, so a function
-        # can call one that is defined further down the file (or itself).
+        self.enter(modules[-1])  # the main module
+        main = self.fns.get("main")
+        if main is None:
+            self.errors.add(CompileError(1, 1, "the program has no main function; execution starts at fn main()",
+                                         self.module.path))
+        elif main.params or main.result:
+            self.report(main, "main must take no parameters and return nothing")
+
+    def taken(self, node: object, what: str) -> bool:
+        """Report a top-level name that clashes with an imported module."""
+        name = node.name  # type: ignore[attr-defined]
+        if name in self.module.imports:
+            self.report(node, f"{what} '{name}' has the same name as an imported module")
+            return True
+        return False
+
+    def signatures(self, program: Program) -> None:
+        # Every signature is collected before any body is checked, so a
+        # function can call one defined further down (or itself).
         for f in program.fns:
-            sig = Signature(
+            f.module = self.module.name
+            f.sig = Signature(
                 [self.resolve_type(p.type) for p in f.params],
                 self.resolve_type(f.result) if f.result else None,
             )
-            if f.name in BUILTINS:
+            if f.pub:
+                for t in [p.type for p in f.params] + ([f.result] if f.result else []):
+                    self.exposes(t, f"function '{f.name}'")
+            if f.name in PRELUDE:
                 self.report(f, f"'{f.name}' is a built-in function and cannot be redefined")
             elif f.name in self.fns:
                 first = self.fns[f.name]
                 self.report(f, f"function '{f.name}' is already defined at {first.line}:{first.col}")
-            else:
+            elif not self.taken(f, "function"):
                 self.fns[f.name] = f
-                self.sigs[f.name] = sig
-            f.sig = sig  # the body is checked even when the name is rejected
+            # The body is checked even when the name is rejected.
 
+    def bodies(self, program: Program) -> None:
         for f in program.fns:
             self.function(f)
 
-        main = self.fns.get("main")
-        if main is None:
-            self.errors.add(CompileError(1, 1, "the program has no main function; execution starts at fn main()"))
-        elif main.params or main.result:
-            self.report(main, "main must take no parameters and return nothing")
+    def exposes(self, t: TypeName, what: str) -> None:
+        """A pub declaration must not mention a private type of its own
+        module in its signature, fields or payloads: code in other modules
+        could get hold of a value whose type it cannot even name."""
+        if t.module is None and not getattr(self.types.get(t.name), "pub", True):
+            self.report(t, f"pub {what} uses the private type '{t.name}'; declare it with 'pub type {t.name}'")
+        for arg in t.args:
+            self.exposes(arg, what)
 
-    def type_decls(self, decls: list[StructDecl | EnumDecl]) -> None:
-        # First create one object per type, so types can refer to each
-        # other, and to themselves, in any order.
-        for d in decls:
-            d.type = (StructType if isinstance(d, StructDecl) else EnumType)(d.name, d.line, d.col)
+    def declare_types(self, program: Program) -> None:
+        # Every type gets its object before any field is looked at, so
+        # types can refer to each other, and to themselves, in any order.
+        for d in program.types:
+            cls = StructType if isinstance(d, StructDecl) else EnumType
+            d.type = cls(d.name, d.line, d.col, module=self.module.name, pub=d.pub)
             if d.name in PRIMITIVES or d.name in GENERICS:
                 self.report(d, f"'{d.name}' is a built-in type and cannot be redefined")
             elif d.name in self.types:
                 first = self.types[d.name]
                 self.report(d, f"type '{d.name}' is already defined at {first.line}:{first.col}")  # type: ignore[attr-defined]
-            else:
+            elif not self.taken(d, "type"):
                 self.types[d.name] = d.type
-        # Then fill in their fields and variants.
-        for d in decls:
+
+    def define_types(self, program: Program) -> None:
+        """Fill in the types' fields and variants."""
+        for d in program.types:
+            what = f"{'struct' if isinstance(d, StructDecl) else 'enum'} '{d.name}'"
+            if d.pub:
+                for t in [f.type for f in d.fields] if isinstance(d, StructDecl) else \
+                        [t for v in d.variants for t in v.payload]:
+                    self.exposes(t, what)
             if isinstance(d, StructDecl):
                 if not d.fields:
                     self.report(d, f"struct '{d.name}' needs at least one field")
@@ -178,12 +243,18 @@ class Checker:
                     return ERROR
                 return self.table.map(*args)
             return self.table.instance(t.name, args)
-        known = PRIMITIVES.get(t.name) or self.types.get(t.name)
+        if t.module is not None:
+            module = self.module_in_type(t, t.module)
+            known = module and self.module_type(t, module, t.name)
+            if known is None:
+                return ERROR
+        else:
+            known = PRIMITIVES.get(t.name) or self.types.get(t.name)
         if known is None:
             self.report(t, f"unknown type '{t.name}'")
             return ERROR
         if t.args:
-            self.report(t, f"'{t.name}' takes no type arguments")
+            self.report(t, f"'{known}' takes no type arguments")
         return known
 
     def function(self, f: FnDecl) -> None:
@@ -206,6 +277,68 @@ class Checker:
                 f"missing return: '{f.name}' returns {f.sig.result}, "
                 "but the end of its body can be reached",
             ))
+
+    # ---- Modules ----
+
+    def module_named(self, e: Expr) -> Module | None:
+        """The module `e` names, if it is the name of an imported module
+        and no variable shadows it."""
+        if isinstance(e, Name) and not self.lookup_local(e.name):
+            return self.module.imports.get(e.name)
+        return None
+
+    def module_in_type(self, node: object, name: str) -> Module | None:
+        """The module before the `.` in a type or struct literal: `lexer.Token`."""
+        module = self.module.imports.get(name)
+        if module is None:
+            if name in self.types:
+                self.report(node, f"'{name}' is a type, not a module")
+            else:
+                self.report(node, f"unknown module '{name}'; is `import {name}` missing?")
+        return module
+
+    def module_type(self, node: object, module: Module, name: str) -> Type | None:
+        """The pub type `module.name` (None once the reason is reported)."""
+        t = module.types.get(name)
+        if t is None:
+            if name in module.fns or name in module.std:
+                self.report(node, f"'{module.name}.{name}' is a function, not a type")
+            else:
+                self.report(node, f"module '{module.name}' has no type '{name}'")
+            return None
+        if not t.pub:  # type: ignore[attr-defined]
+            self.private(node, module, "type", name)
+            return None
+        return t
+
+    def module_fn(self, node: object, module: Module, name: str) -> FnDecl | str | None:
+        """The pub function `module.name`, or the name of a standard
+        module's function (None once the reason is reported)."""
+        if name in module.std:
+            return name
+        f = module.fns.get(name)
+        if f is None:
+            if name in module.types:
+                self.report(node, f"'{module.name}.{name}' is a type, not a function")
+            else:
+                self.report(node, f"module '{module.name}' has no function '{name}'")
+            return None
+        if not f.pub:
+            self.private(node, module, "function", name)
+            return None
+        return f
+
+    def private(self, node: object, module: Module, what: str, name: str) -> None:
+        self.report(node, f"{what} '{name}' is private to module '{module.name}'; "
+                          f"declare it with 'pub' in {module.path} to use it here")
+
+    def std_hint(self, name: str) -> str:
+        """`; it is maps.get` for a name that lives in a standard module."""
+        for module, fns in STD_MODULES.items():
+            if name in fns:
+                hint = f"; it is {module}.{name}"
+                return hint + ("" if module in self.module.imports else f", after `import {module}`")
+        return ""
 
     def check_name_allowed(self, node: object) -> None:
         """`None`, `Some`, `Ok` and `Err` cannot name variables: in a pattern
@@ -265,7 +398,7 @@ class Checker:
             elif t is STR:
                 elem = BYTE
             elif isinstance(t, MapType):
-                self.report(s.iterable, "a map cannot be looped over directly; loop over keys(m) instead")
+                self.report(s.iterable, "a map cannot be looped over directly; loop over maps.keys(m) instead")
             elif t is not ERROR:
                 self.report(s.iterable, f"cannot loop over {t}; 'for ... in' needs an array, a Str or a range")
             self.check_name_allowed(s)
@@ -427,6 +560,14 @@ class Checker:
                 return False
             return ok
         assert isinstance(p, PVariant)
+        if self.variant_pattern(p, t, bindings):
+            return True
+        # The names inside a broken pattern are still bound, with type
+        # ERROR, so their uses in the arm do not each report an error too.
+        bind_quietly(p, bindings)
+        return False
+
+    def variant_pattern(self, p: PVariant, t: Type, bindings: dict[str, Local]) -> bool:
         written = f"{p.enum}.{p.variant}" if p.enum else p.variant
         if p.enum is None:
             family = BUILTIN_VARIANTS[p.variant]
@@ -436,12 +577,19 @@ class Checker:
                 return False
             enum = t
         else:
-            found = self.types.get(p.enum)
+            if p.module is not None:
+                module = self.module_in_type(p, p.module)
+                found = module and self.module_type(p, module, p.enum)
+                if found is None:
+                    return False
+                written = f"{p.module}.{written}"
+            else:
+                found = self.types.get(p.enum)
             if found is None:
                 self.report(p, f"unknown type '{p.enum}'")
                 return False
             if not isinstance(found, EnumType):
-                self.report(p, f"'{p.enum}' is a struct, not an enum; match on its fields instead")
+                self.report(p, f"'{found}' is a struct, not an enum; match on its fields instead")
                 return False
             if t is not found:
                 if t is not ERROR:
@@ -501,7 +649,9 @@ class Checker:
             return local
         if name.name in self.fns:
             return self.fns[name.name]
-        if name.name in BUILTINS:
+        if name.name in self.module.imports:
+            self.report(name, f"'{name.name}' is a module, not a value")
+        elif name.name in PRELUDE:
             self.report(name, f"'{name.name}' is a function; call it as {name.name}(...)")
         elif name.name == "None":
             self.report(name, "cannot tell which Option this None is; give it a type, "
@@ -514,7 +664,7 @@ class Checker:
             # Reported at its first use in each function only: a misspelt
             # name used ten times is still one mistake.
             self.undefined.add(name.name)
-            self.report(name, f"undefined name '{name.name}'")
+            self.report(name, f"undefined name '{name.name}'{self.std_hint(name.name)}")
         return None
 
     def check(self, e: Expr, want: Type | None, message: Callable[[str], str]) -> None:
@@ -579,8 +729,8 @@ class Checker:
         """Infer the type of an expression that must produce a value."""
         ty = self.infer(e)
         if ty is NO_VALUE:
-            assert isinstance(e, Call) and isinstance(e.callee, Name)
-            self.report(e, f"{e.callee.name}(...) does not produce a value")
+            assert isinstance(e, Call)
+            self.report(e, f"{written(e.callee)}(...) does not produce a value")
             return ERROR
         return ty
 
@@ -724,17 +874,41 @@ class Checker:
             self.check(en.value, value, lambda found: f"the values of this map are {value}, but this is {found}")
         return self.table.map(key, value)
 
-    def enum_named(self, e: Expr) -> EnumType | None:
+    def enum_named(self, e: Expr) -> Type | None:
         """The enum `e` names, if `e` is the name of an enum type that no
-        variable shadows (as in `TokenKind.Plus`)."""
+        variable shadows (as in `TokenKind.Plus`), or a pub enum of an
+        imported module (`lexer.TokenKind.Plus`). ERROR when `e` is
+        `module.Name` but Name is no pub type there (reported)."""
         if isinstance(e, Name) and not self.lookup_local(e.name):
             t = self.types.get(e.name)
             if isinstance(t, EnumType):
                 return t
+        if isinstance(e, Field):
+            module = self.module_named(e.obj)
+            if module is not None:
+                t = self.module_type(e, module, e.name)
+                if t is None:
+                    return ERROR
+                if isinstance(t, EnumType):
+                    return t
         return None
 
     def field(self, e: Field) -> Type:
+        module = self.module_named(e.obj)
+        if module is not None:
+            # `lexer.next` or `lexer.Token` as a value: functions and types
+            # are not values, so this is wrong; say which it is.
+            what = module.types.get(e.name) or module.fns.get(e.name) or (e.name in module.std) or None
+            if what is None:
+                self.report(e, f"module '{module.name}' has no '{e.name}'")
+            elif isinstance(what, (StructType, EnumType)):
+                self.report(e, f"'{module.name}.{e.name}' is a type, not a value")
+            else:
+                self.report(e, f"'{module.name}.{e.name}' is a function; call it as {module.name}.{e.name}(...)")
+            return ERROR
         enum = self.enum_named(e.obj)
+        if enum is ERROR:
+            return ERROR
         if enum is not None:
             variant = enum.variant(e.name)
             if variant is None:
@@ -759,12 +933,20 @@ class Checker:
         return t.fields[e.name]
 
     def struct_lit(self, e: StructLit) -> Type:
-        t = self.types.get(e.name)
+        name = f"{e.module}.{e.name}" if e.module else e.name
+        t: Type | None
+        if e.module is not None:
+            module = self.module_in_type(e, e.module)
+            t = module and self.module_type(e, module, e.name)
+            if t is None:
+                t = ERROR
+        else:
+            t = self.types.get(e.name)
         if not isinstance(t, StructType):
             if t is None:
                 self.report(e, f"unknown type '{e.name}'")
-            else:
-                self.report(e, f"'{e.name}' is an enum; build its values with {e.name}.Variant")
+            elif t is not ERROR:
+                self.report(e, f"'{name}' is an enum; build its values with {name}.Variant")
             for f in e.fields:
                 self.infer(f.value)
             return ERROR
@@ -810,7 +992,7 @@ class Checker:
             return ERROR
         if isinstance(target, str) and target in BUILTINS:
             call.target = target
-            return self.builtin(call, target)
+            return self.builtin(call, target, written(call.callee))
         if target == "Some":
             # Some(x) is an Option of whatever x is. None, Ok and Err get
             # their types from a context instead; see check().
@@ -835,15 +1017,16 @@ class Checker:
             return enum
 
         f = target
-        sig = self.sigs[f.name]
+        sig = f.sig
         call.target = f
-        self.arity(call, f.name, len(sig.params))
+        name = written(call.callee)
+        self.arity(call, name, len(sig.params))
         for i, arg in enumerate(call.args, start=1):
             if i > len(sig.params):
                 self.infer(arg)
                 continue
             want = sig.params[i - 1]
-            self.check(arg, want, lambda found: f"argument {i} of '{f.name}' must be {want}, found {found}")
+            self.check(arg, want, lambda found: f"argument {i} of '{name}' must be {want}, found {found}")
         # Even after an argument error, the call has the declared result
         # type, so the expression around it can still be checked.
         return sig.result
@@ -869,7 +1052,12 @@ class Checker:
         variant, an (EnumType, Variant), or None once the reason is reported."""
         callee = call.callee
         if isinstance(callee, Field):
+            module = self.module_named(callee.obj)
+            if module is not None:
+                return self.module_fn(callee, module, callee.name)
             enum = self.enum_named(callee.obj)
+            if enum is ERROR:
+                return None
             if enum is not None:
                 variant = enum.variant(callee.name)
                 if variant is None:
@@ -883,16 +1071,19 @@ class Checker:
         if local:
             self.report(callee, f"'{callee.name}' is a variable of type {local.ty}, not a function")
             return None
-        if callee.name in BUILTINS or callee.name in BUILTIN_VARIANTS:
+        if callee.name in PRELUDE or callee.name in BUILTIN_VARIANTS:
             return callee.name
         if callee.name in self.fns:
             return self.fns[callee.name]
+        if callee.name in self.module.imports:
+            self.report(callee, f"'{callee.name}' is a module; call its functions as {callee.name}.name(...)")
+            return None
         if callee.name in self.types:
             self.report(callee, f"'{callee.name}' is a type; build a value with {callee.name} {{ ... }}")
             return None
         if callee.name not in self.undefined:  # first use in this function only
             self.undefined.add(callee.name)
-            self.report(callee, f"undefined function '{callee.name}'")
+            self.report(callee, f"undefined function '{callee.name}'{self.std_hint(callee.name)}")
         return None
 
     def arity(self, call: Call, name: str, expected: int) -> bool:
@@ -901,10 +1092,11 @@ class Checker:
             return False
         return True
 
-    def builtin(self, call: Call, name: str) -> Type | None:
-        """A call to a built-in function (see BUILTINS)."""
+    def builtin(self, call: Call, name: str, written: str) -> Type | None:
+        """A call to a built-in function (see BUILTINS), written as `written`:
+        `len` or `maps.get`."""
         want = {"print": 1, "len": 1, "int": 1, "byte": 1, "keys": 1}.get(name, 2)
-        if not self.arity(call, name, want):
+        if not self.arity(call, written, want):
             for arg in call.args:
                 self.infer(arg)
             return {"print": NO_VALUE, "push": NO_VALUE, "remove": NO_VALUE, "len": INT, "int": INT,
@@ -939,7 +1131,7 @@ class Checker:
         t = self.place(args[0], "remove from") if name == "remove" else self.value(args[0])
         if not isinstance(t, MapType):
             if t is not ERROR:
-                self.report(args[0], f"{name} needs a map, not {t}")
+                self.report(args[0], f"{written} needs a map, not {t}")
             for arg in args[1:]:
                 self.infer(arg)
             return {"has": BOOL, "remove": NO_VALUE}.get(name, ERROR)
@@ -951,6 +1143,24 @@ class Checker:
         if name == "get":
             return self.table.option(t.value)
         return NO_VALUE
+
+
+def bind_quietly(p: Pattern, bindings: dict[str, Local]) -> None:
+    """Bind every name in `p` that is not bound yet, with type ERROR."""
+    if isinstance(p, PBind) and p.name not in bindings:
+        p.local = bindings[p.name] = Local(p.name, ERROR, "match binding", p.line, p.col)
+    elif isinstance(p, PVariant):
+        for sub in p.args or []:
+            bind_quietly(sub, bindings)
+
+
+def written(callee: Expr) -> str:
+    """A callee as written: `f`, `lexer.next`, `Expr.Add`."""
+    if isinstance(callee, Field):
+        return f"{written(callee.obj)}.{callee.name}"
+    if isinstance(callee, Name):
+        return callee.name
+    return "this"
 
 
 def describe_target(target: Expr) -> str:

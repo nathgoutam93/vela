@@ -1,0 +1,81 @@
+// Three modules each declare Token and next; each is its own. Types and
+// variants of other modules are written module.Name, in types, struct
+// literals, constructors and patterns.
+// out: box' 6
+// out: box'' 12
+// out: tock
+// out: tick
+// out: 3
+// out: 9 6 1
+// out: main 7
+// out: 5
+// out: 2
+import counter
+import maps
+import shapes
+
+type Token = struct {
+    text: Str
+}
+
+fn next(t: Token) -> Token {
+    return Token { text: t.text + "!" }
+}
+
+fn describe(s: shapes.Shape) -> Str {
+    return match s {
+        shapes.Shape.Square(_) => "square"
+        shapes.Shape.Rect(w, h) => if_wide(w, h)
+        shapes.Shape.Dot => "dot"
+    }
+}
+
+fn if_wide(w: Int, h: Int) -> Str {
+    if w > h {
+        return "wide"
+    }
+    return "tall"
+}
+
+fn sizes(shapes: [shapes.Shape]) -> Int {
+    // The parameter is named like the module, and shadows it here: inside
+    // this function, `shapes` is the array.
+    return len(shapes)
+}
+
+fn main() {
+    let t = shapes.Token { name: "box", size: 3 }
+    let u = shapes.next(t)
+    print(u.name + " " + digit(u.size))
+    let w = shapes.next(u)
+    print(w.name + " " + digits(w.size))
+
+    let c = counter.next(counter.Token.Tick)
+    print(counter.get(c))
+    print(counter.get(counter.next(c)))
+
+    let all = [shapes.Shape.Square(3), shapes.Shape.Rect(3, 2), shapes.Shape.Dot]
+    print(sizes(all))
+    print(digit(shapes.area(all[0])) + " " + digit(shapes.area(all[1])) + " " + digit(shapes.area(all[2])))
+
+    let mine = next(next(Token { text: "main" }))
+    print(mine.text[0..4] + " " + digit(len(mine.text) + 1))
+
+    let m = ["a": 5]
+    match maps.get(m, "a") {
+        Some(v) => print(v)
+        None => print(0)
+    }
+    print(len(describe(shapes.Shape.Rect(1, 2))) - len(describe(shapes.Shape.Dot)) + 1)
+}
+
+fn digit(n: Int) -> Str {
+    return "0123456789"[n..n + 1]
+}
+
+fn digits(n: Int) -> Str {
+    if n < 10 {
+        return digit(n)
+    }
+    return digits(n / 10) + digit(n % 10)
+}

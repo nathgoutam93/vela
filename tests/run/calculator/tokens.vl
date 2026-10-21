@@ -1,0 +1,35 @@
+// The tokens of the calculator's language.
+import text
+
+pub type Kind = enum {
+    Num(Int)
+    Name(Str)
+    Plus
+    Minus
+    Star
+    Slash
+    LParen
+    RParen
+    Equals
+    End
+}
+
+pub type Token = struct {
+    kind: Kind
+    col: Int
+}
+
+pub fn describe(k: Kind) -> Str {
+    return match k {
+        Kind.Num(n) => "number " + text.from_int(n)
+        Kind.Name(name) => "name " + name
+        Kind.Plus => "'+'"
+        Kind.Minus => "'-'"
+        Kind.Star => "'*'"
+        Kind.Slash => "'/'"
+        Kind.LParen => "'('"
+        Kind.RParen => "')'"
+        Kind.Equals => "'='"
+        Kind.End => "end of line"
+    }
+}

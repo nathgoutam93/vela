@@ -1,0 +1,59 @@
+// Text to tokens.
+import text
+import tokens
+
+pub fn tokenize(src: Str) -> Result[[tokens.Token], Str] {
+    let mut out: [tokens.Token] = []
+    let mut i = 0
+    for i < len(src) {
+        let c = src[i]
+        let col = i + 1
+        if c == ' ' {
+            i = i + 1
+        } else if is_digit(c) {
+            let mut n = 0
+            for i < len(src) && is_digit(src[i]) {
+                n = n * 10 + int(src[i] - '0')
+                i = i + 1
+            }
+            push(out, tokens.Token { kind: tokens.Kind.Num(n), col: col })
+        } else if is_letter(c) {
+            let start = i
+            for i < len(src) && (is_letter(src[i]) || is_digit(src[i])) {
+                i = i + 1
+            }
+            push(out, tokens.Token { kind: tokens.Kind.Name(src[start..i]), col: col })
+        } else {
+            let kind: Option[tokens.Kind] = match c {
+                '+' => Some(tokens.Kind.Plus)
+                '-' => Some(tokens.Kind.Minus)
+                '*' => Some(tokens.Kind.Star)
+                '/' => Some(tokens.Kind.Slash)
+                '(' => Some(tokens.Kind.LParen)
+                ')' => Some(tokens.Kind.RParen)
+                '=' => Some(tokens.Kind.Equals)
+                _ => None
+            }
+            match kind {
+                Some(k) => push(out, tokens.Token { kind: k, col: col })
+                None => return error(col, "unexpected character '" + src[i..i + 1] + "'")
+            }
+            i = i + 1
+        }
+    }
+    push(out, tokens.Token { kind: tokens.Kind.End, col: len(src) + 1 })
+    return Ok(out)
+}
+
+fn is_digit(c: Byte) -> Bool {
+    return c >= '0' && c <= '9'
+}
+
+fn is_letter(c: Byte) -> Bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
+}
+
+// parser.vl has a private `error` too; each module's is its own.
+fn error(col: Int, message: Str) -> Result[[tokens.Token], Str] {
+    return Err("column " + text.from_int(col) + ": " + message)
+}

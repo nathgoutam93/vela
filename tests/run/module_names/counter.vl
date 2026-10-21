@@ -1,0 +1,24 @@
+// Imported by both main.vl and shapes.vl, and loaded once.
+pub type Token = enum {
+    Tick
+    Tock
+}
+
+pub fn one() -> Int {
+    return 1
+}
+
+pub fn next(t: Token) -> Token {
+    return match t {
+        Token.Tick => Token.Tock
+        Token.Tock => Token.Tick
+    }
+}
+
+// Not reserved any more: the map functions live in the maps module.
+pub fn get(t: Token) -> Str {
+    return match t {
+        Token.Tick => "tick"
+        Token.Tock => "tock"
+    }
+}

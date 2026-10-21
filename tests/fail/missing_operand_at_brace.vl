@@ -1,0 +1,12 @@
+// An expression cut short by the `}` that closes its block is one error. The
+// `}` still closes the block (before M6 the parser swallowed it and then
+// also reported a missing `}` at the end of the file).
+// err: missing_operand_at_brace.vl:8:1: error: expected expression, found '}'
+// err: missing_operand_at_brace.vl:11:14: error: expected ',' or ')' in argument list, found newline
+fn f() -> Int {
+    return 1 +
+}
+
+fn main() {
+    print(f()
+}

@@ -8,7 +8,9 @@
                                                also fails a test that leaks memory
     python3 run_tests.py --compiler "./vela1"  another compiler (Stage 1, from M8)
 
-A test is one .vl file. Comment lines at the very top hold its expectations:
+A test is one .vl file, or a directory holding a program of several files
+whose main file is main.vl. Comment lines at the very top of the .vl file
+(main.vl for a directory) hold its expectations:
 
     // out: <text>    a line the program prints on stdout (repeat for more lines)
     // err: <text>    a line on stderr: the compiler's in tests/fail,
@@ -162,7 +164,13 @@ def run_dump_test(compiler: list[str], path: Path, expect: Expectations,
 
 
 def find_tests(filters: list[str]) -> list[Path]:
-    tests = sorted(p for kind in KINDS for p in (TESTS / kind).rglob("*.vl"))
+    tests = []
+    for kind in KINDS:
+        for p in sorted((TESTS / kind).iterdir()):
+            if p.is_dir():
+                tests.append(p / "main.vl")  # a program of several files
+            elif p.suffix == ".vl":
+                tests.append(p)
     if filters:
         tests = [t for t in tests if any(f in str(t.relative_to(TESTS)) for f in filters)]
     return tests

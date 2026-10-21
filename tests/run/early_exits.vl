@@ -7,6 +7,8 @@
 // out: 2
 // out: ab
 // out: done
+import maps
+
 fn first_long(words: [Str]) -> Str {
     for w in words {
         let doubled = w + w
@@ -36,7 +38,7 @@ fn find(words: [Str], want: Byte) -> Option[Str] {
     let mut i = 0
     for i < len(words) {
         let w = words[i]
-        match get(["k": w], "k") {
+        match maps.get(["k": w], "k") {
             Some(v) => {
                 if v[0] == want {
                     return Some("found " + v)

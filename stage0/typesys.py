@@ -16,7 +16,9 @@ Every type is represented by exactly one object, so types are compared with
 - ERROR is the type of an expression whose error is already reported.
 
 A type prints the way it is written in source: Int, Token, Option[Int],
-Result[Int, Str], [Int], Map[Str, Int].
+Result[Int, Str], [Int], Map[Str, Int]. A type from another module prints
+with its module's name, lexer.Token, as code outside lexer.vl writes it;
+`viewpoint` says which module's code is being looked at.
 """
 from __future__ import annotations
 
@@ -46,6 +48,17 @@ BOOL = PrimType("Bool")
 STR = PrimType("Str")
 ERROR = ErrorType()
 
+class Viewpoint:
+    module = ""  # the module whose code the checker is in; its own types print unqualified
+
+
+viewpoint = Viewpoint()
+
+
+def qualified(module: str, name: str) -> str:
+    return f"{module}.{name}" if module and module != viewpoint.module else name
+
+
 PRIMITIVES = {"Int": INT, "Byte": BYTE, "Bool": BOOL, "Str": STR}
 GENERICS = {"Option": 1, "Result": 2, "Map": 2}  # built-in generic types: name -> argument count
 MAP_KEYS = (INT, BYTE, BOOL, STR)  # the types a map can be keyed by
@@ -73,10 +86,12 @@ class StructType(Type):
     name: str
     line: int
     col: int
+    module: str = ""  # the module it is declared in, "" for the main one
+    pub: bool = False
     fields: dict[str, Type] = field(default_factory=dict)  # in declaration order
 
     def __str__(self) -> str:
-        return self.name
+        return qualified(self.module, self.name)
 
 
 @dataclass(eq=False)
@@ -91,12 +106,14 @@ class EnumType(Type):
     name: str  # the user's name, or "Option" / "Result"
     line: int
     col: int
+    module: str = ""  # the module it is declared in; "" for the main one and the built-ins
+    pub: bool = False
     args: tuple[Type, ...] = ()  # (T,) for Option[T], (T, E) for Result[T, E]
     variants: list[Variant] = field(default_factory=list)
 
     def __str__(self) -> str:
         if not self.args:
-            return self.name
+            return qualified(self.module, self.name)
         return f"{self.name}[{', '.join(str(a) for a in self.args)}]"
 
     def variant(self, name: str) -> Variant | None:
@@ -153,7 +170,7 @@ class TypeTable:
             return ERROR
         key = (name, args)
         if key not in self.instances:
-            enum = EnumType(name, 0, 0, args)
+            enum = EnumType(name, 0, 0, args=args)
             if name == "Option":
                 enum.add_variant("None", [])
                 enum.add_variant("Some", [args[0]])

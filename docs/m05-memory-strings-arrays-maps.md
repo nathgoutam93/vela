@@ -372,3 +372,8 @@ Recorded in the roadmap:
 3. **`m[k]` panics on a missing key**, as in Python, while `get(m, k)`
    returns an Option. Rust and Go choose differently (Go returns a zero
    value). Keep the panic?
+
+**Answered after M5:** the map functions move into a module (M6 makes
+them `maps.has`, `maps.get`, `maps.remove` and `maps.keys`, after
+`import maps`; see `m06-modules.md`); `push` keeps changing its first
+argument; `m[k]` keeps panicking on a missing key.

@@ -12,6 +12,8 @@
 // out: cherry
 // out: 3
 // out: 8
+import maps
+
 fn show(o: Option[Int]) {
     match o {
         Some(v) => print(v)
@@ -23,21 +25,21 @@ fn main() {
     let mut fruit = ["apple": 1, "banana": 2]
     print(fruit["banana"])
     print(fruit["apple"])
-    print(has(fruit, "apple"))
-    print(has(fruit, "kiwi"))
+    print(maps.has(fruit, "apple"))
+    print(maps.has(fruit, "kiwi"))
     fruit["cherry"] = 3
     print(len(fruit))
     fruit["apple"] = 10
-    show(get(fruit, "apple"))
-    show(get(fruit, "kiwi"))
-    remove(fruit, "apple")
+    show(maps.get(fruit, "apple"))
+    show(maps.get(fruit, "kiwi"))
+    maps.remove(fruit, "apple")
     print(len(fruit))
-    for k in keys(fruit) {
+    for k in maps.keys(fruit) {
         print(k)
     }
     let mut counts: Map[Byte, Int] = [:]
     for c in "hello world" {
-        if has(counts, c) {
+        if maps.has(counts, c) {
             counts[c] = counts[c] + 1
         } else {
             counts[c] = 1

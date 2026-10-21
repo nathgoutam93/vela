@@ -1,0 +1,11 @@
+// A panic in an imported module reports that module's file.
+// out: 2
+// err: stats.vl:2:20: panic: division by zero
+// exit: 101
+import stats
+
+fn main() {
+    print(stats.mean([1, 2, 3]))
+    let none: [Int] = []
+    print(stats.mean(none))
+}

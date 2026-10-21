@@ -7,6 +7,8 @@
 // out: on 1
 // out: mat 1
 // out: and 1
+import maps
+
 fn split(text: Str) -> [Str] {
     let mut words: [Str] = []
     let mut start = 0
@@ -26,13 +28,13 @@ fn main() {
     print(len(words))
     let mut counts: Map[Str, Int] = [:]
     for w in words {
-        let before = match get(counts, w) {
+        let before = match maps.get(counts, w) {
             Some(n) => n
             None => 0
         }
         counts[w] = before + 1
     }
-    for w in keys(counts) {
+    for w in maps.keys(counts) {
         print(w + " " + digits(counts[w]))
     }
 }

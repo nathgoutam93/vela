@@ -1,0 +1,128 @@
+// Tokens to a syntax tree, by recursive descent:
+//
+//     line  = [ NAME "=" ] sum END
+//     sum   = term { ( "+" | "-" ) term }
+//     term  = unary { ( "*" | "/" ) unary }
+//     unary = "-" unary | NUM | NAME | "(" sum ")"
+import ast
+import text
+import tokens
+
+// How far a parse got: the tree, and the position of the next token.
+type Step = struct {
+    expr: ast.Expr
+    pos: Int
+}
+
+pub fn parse(toks: [tokens.Token]) -> Result[ast.Line, Str] {
+    let mut start = 0
+    let mut target: Option[Str] = None
+    match toks[0].kind {
+        tokens.Kind.Name(name) => {
+            if is_equals(toks[1]) {
+                target = Some(name)
+                start = 2
+            }
+        }
+        _ => {}
+    }
+    match sum(toks, start) {
+        Err(e) => return Err(e)
+        Ok(step) => {
+            match toks[step.pos].kind {
+                tokens.Kind.End => {}
+                _ => return Err(error(toks[step.pos], "expected an operator or the end of the line"))
+            }
+            return match target {
+                Some(name) => Ok(ast.Line.Assign(name, step.expr))
+                None => Ok(ast.Line.Show(step.expr))
+            }
+        }
+    }
+}
+
+fn is_equals(t: tokens.Token) -> Bool {
+    return match t.kind {
+        tokens.Kind.Equals => true
+        _ => false
+    }
+}
+
+fn sum(toks: [tokens.Token], pos: Int) -> Result[Step, Str] {
+    let mut left = Step { expr: ast.Expr.Num(0), pos: 0 }
+    match term(toks, pos) {
+        Err(e) => return Err(e)
+        Ok(step) => left = step
+    }
+    for {
+        let op: Option[ast.Op] = match toks[left.pos].kind {
+            tokens.Kind.Plus => Some(ast.Op.Add)
+            tokens.Kind.Minus => Some(ast.Op.Sub)
+            _ => None
+        }
+        match op {
+            None => return Ok(left)
+            Some(o) => {
+                match term(toks, left.pos + 1) {
+                    Err(e) => return Err(e)
+                    Ok(right) => left = Step { expr: ast.Expr.Bin(o, left.expr, right.expr), pos: right.pos }
+                }
+            }
+        }
+    }
+}
+
+fn term(toks: [tokens.Token], pos: Int) -> Result[Step, Str] {
+    let mut left = Step { expr: ast.Expr.Num(0), pos: 0 }
+    match unary(toks, pos) {
+        Err(e) => return Err(e)
+        Ok(step) => left = step
+    }
+    for {
+        let op: Option[ast.Op] = match toks[left.pos].kind {
+            tokens.Kind.Star => Some(ast.Op.Mul)
+            tokens.Kind.Slash => Some(ast.Op.Div)
+            _ => None
+        }
+        match op {
+            None => return Ok(left)
+            Some(o) => {
+                match unary(toks, left.pos + 1) {
+                    Err(e) => return Err(e)
+                    Ok(right) => left = Step { expr: ast.Expr.Bin(o, left.expr, right.expr), pos: right.pos }
+                }
+            }
+        }
+    }
+}
+
+fn unary(toks: [tokens.Token], pos: Int) -> Result[Step, Str] {
+    let t = toks[pos]
+    match t.kind {
+        tokens.Kind.Minus => {
+            match unary(toks, pos + 1) {
+                Err(e) => return Err(e)
+                Ok(inner) => return Ok(Step { expr: ast.Expr.Neg(inner.expr), pos: inner.pos })
+            }
+        }
+        tokens.Kind.Num(n) => return Ok(Step { expr: ast.Expr.Num(n), pos: pos + 1 })
+        tokens.Kind.Name(name) => return Ok(Step { expr: ast.Expr.Var(name), pos: pos + 1 })
+        tokens.Kind.LParen => {
+            match sum(toks, pos + 1) {
+                Err(e) => return Err(e)
+                Ok(inner) => {
+                    match toks[inner.pos].kind {
+                        tokens.Kind.RParen => return Ok(Step { expr: inner.expr, pos: inner.pos + 1 })
+                        _ => return Err(error(toks[inner.pos], "expected ')'"))
+                    }
+                }
+            }
+        }
+        _ => return Err(error(t, "expected a number, a name or '('"))
+    }
+}
+
+// lexer.vl has a private `error` too; each module's is its own.
+fn error(t: tokens.Token, message: Str) -> Str {
+    return "column " + text.from_int(t.col) + ": " + message + ", found " + tokens.describe(t.kind)
+}

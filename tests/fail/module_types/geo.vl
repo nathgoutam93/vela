@@ -1,0 +1,22 @@
+pub type Point = struct {
+    x: Int
+    y: Int
+}
+
+pub type Dir = enum {
+    North
+    South
+    Step(Int)
+}
+
+type Hidden = enum {
+    A
+}
+
+pub fn walk(d: Dir) -> Int {
+    return 0
+}
+
+fn len(s: Str) -> Int {
+    return 0
+}

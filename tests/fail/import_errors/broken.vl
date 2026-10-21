@@ -1,0 +1,3 @@
+pub fn ok() -> Int {
+    return 1 +
+}

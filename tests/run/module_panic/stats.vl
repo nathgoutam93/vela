@@ -1,0 +1,11 @@
+pub fn mean(xs: [Int]) -> Int {
+    return sum(xs) / len(xs)
+}
+
+fn sum(xs: [Int]) -> Int {
+    let mut total = 0
+    for x in xs {
+        total = total + x
+    }
+    return total
+}

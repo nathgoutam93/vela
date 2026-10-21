@@ -1,0 +1,38 @@
+pub type Point = struct {
+    x: Int
+    y: Int
+}
+
+type Secret = struct {
+    code: Int
+}
+
+pub type Color = enum {
+    Red
+    Green
+}
+
+pub fn origin() -> Point {
+    return Point { x: 0, y: 0 }
+}
+
+fn hidden() -> Int {
+    return 42
+}
+
+pub fn leak() -> Secret {
+    return Secret { code: hidden() }
+}
+
+pub fn leak_in_option(s: Option[Secret]) -> Int {
+    return 0
+}
+
+pub type Wrapper = struct {
+    inner: Secret
+}
+
+pub type Holder = enum {
+    Holds([Secret])
+    Empty
+}

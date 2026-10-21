@@ -1,0 +1,40 @@
+// The syntax tree of one line.
+import text
+
+pub type Op = enum {
+    Add
+    Sub
+    Mul
+    Div
+}
+
+pub type Expr = enum {
+    Num(Int)
+    Var(Str)
+    Neg(Expr)
+    Bin(Op, Expr, Expr)
+}
+
+pub type Line = enum {
+    Assign(Str, Expr)
+    Show(Expr)
+}
+
+// The expression with every operation in parentheses.
+pub fn show(e: Expr) -> Str {
+    return match e {
+        Expr.Num(n) => text.from_int(n)
+        Expr.Var(name) => name
+        Expr.Neg(x) => "(-" + show(x) + ")"
+        Expr.Bin(op, l, r) => "(" + show(l) + " " + symbol(op) + " " + show(r) + ")"
+    }
+}
+
+fn symbol(op: Op) -> Str {
+    return match op {
+        Op.Add => "+"
+        Op.Sub => "-"
+        Op.Mul => "*"
+        Op.Div => "/"
+    }
+}

@@ -12,7 +12,7 @@ milestone has a walkthrough in [`docs/`](docs/).
 ## Usage
 
 ```
-python3 stage0/main.py run hello.vl       # compile and run
+python3 stage0/main.py run hello.vl       # compile and run (imports are found next to it)
 python3 stage0/main.py build hello.vl     # produce ./hello
 python3 stage0/main.py c hello.vl         # show the generated C
 python3 stage0/main.py tokens hello.vl    # show the tokens
@@ -34,10 +34,11 @@ run_tests.py the golden-test runner
 
 ## Status
 
-M0 to M5 are done: the driver and test runner, expressions, variables,
+M0 to M6 are done: the driver and test runner, expressions, variables,
 functions and control flow, a type checker that reports every error in one
-run, structs, enums, `match` and `Option`/`Result`, and reference-counted
-strings, arrays and maps. See `docs/` for a walkthrough of each milestone.
+run, structs, enums, `match` and `Option`/`Result`, reference-counted
+strings, arrays and maps, and programs of several files (`import`, `pub`).
+See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
 
 ```

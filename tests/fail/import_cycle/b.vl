@@ -1,0 +1,5 @@
+import a
+
+pub fn fb() -> Int {
+    return 2
+}

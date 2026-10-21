@@ -1,0 +1,48 @@
+// Working out a syntax tree's value.
+import ast
+import maps
+
+pub fn value(e: ast.Expr, vars: Map[Str, Int]) -> Result[Int, Str] {
+    match e {
+        ast.Expr.Num(n) => return Ok(n)
+        ast.Expr.Var(name) => {
+            match maps.get(vars, name) {
+                Some(v) => return Ok(v)
+                None => return Err("undefined name " + name)
+            }
+        }
+        ast.Expr.Neg(x) => {
+            match value(x, vars) {
+                Ok(v) => return Ok(-v)
+                Err(m) => return Err(m)
+            }
+        }
+        ast.Expr.Bin(op, l, r) => {
+            let mut a = 0
+            match value(l, vars) {
+                Ok(v) => a = v
+                Err(m) => return Err(m)
+            }
+            let mut b = 0
+            match value(r, vars) {
+                Ok(v) => b = v
+                Err(m) => return Err(m)
+            }
+            return apply(op, a, b)
+        }
+    }
+}
+
+fn apply(op: ast.Op, a: Int, b: Int) -> Result[Int, Str] {
+    match op {
+        ast.Op.Add => return Ok(a + b)
+        ast.Op.Sub => return Ok(a - b)
+        ast.Op.Mul => return Ok(a * b)
+        ast.Op.Div => {
+            if b == 0 {
+                return Err("division by zero")
+            }
+            return Ok(a / b)
+        }
+    }
+}

@@ -1,0 +1,36 @@
+// Types from another module in patterns, struct literals and annotations.
+// Messages name them as this file writes them: geo.Point, geo.Dir. A
+// built-in function cannot be redefined in any module.
+// err: geo.vl:20:4: error: 'len' is a built-in function and cannot be redefined
+// err: main.vl:20:13: error: missing field 'y' in this 'geo.Point' value
+// err: main.vl:21:37: error: 'geo.Point' has no field 'z'
+// err: main.vl:22:13: error: 'geo.Dir' is an enum; build its values with geo.Dir.Variant
+// err: main.vl:23:17: error: type 'Hidden' is private to module 'geo'; declare it with 'pub' in geo.vl to use it here
+// err: main.vl:24:13: error: module 'geo' has no type 'Nope'
+// err: main.vl:27:9: error: 'geo.Point' is a struct, not an enum; match on its fields instead
+// err: main.vl:28:9: error: 'geo.Dir' has no variant 'East'
+// err: main.vl:29:9: error: geo.Dir.Step carries 1 value; write geo.Dir.Step(_) to ignore it
+// err: main.vl:30:9: error: unknown module 'nope'; is `import nope` missing?
+// err: main.vl:33:26: error: 'n' is declared as Int, but its value is geo.Dir
+// err: main.vl:34:22: error: argument 1 of 'geo.walk' must be geo.Dir, found geo.Point
+// err: main.vl:35:12: error: 'geo.Point' takes no type arguments
+import geo
+
+fn main() {
+    let p = geo.Point { x: 1 }
+    let q = geo.Point { x: 1, y: 2, z: 3 }
+    let r = geo.Dir { x: 1 }
+    let s = geo.Hidden.A
+    let t = geo.Nope { x: 1 }
+    let d = geo.Dir.Step(1)
+    match d {
+        geo.Point.North => print(1)
+        geo.Dir.East => print(2)
+        geo.Dir.Step => print(3)
+        nope.Dir.North => print(4)
+        _ => print(5)
+    }
+    let n: Int = geo.Dir.North
+    let w = geo.walk(geo.Point { x: 1, y: 2 })
+    let m: geo.Point[Int] = p
+}

@@ -1,0 +1,12 @@
+// Numbers as text. M7 brings a string builder; until then, digits are
+// joined one at a time.
+
+pub fn from_int(n: Int) -> Str {
+    if n < 0 {
+        return "-" + from_int(-n)
+    }
+    if n < 10 {
+        return "0123456789"[n..n + 1]
+    }
+    return from_int(n / 10) + from_int(n % 10)
+}

@@ -1,0 +1,19 @@
+// Loading errors from several files come out together: a missing file, a
+// module imported twice, an import after a declaration, and syntax errors
+// in two imported files.
+// err: also_broken.vl:1:8: error: cannot find module 'missing_too': there is no file missing_too.vl
+// err: also_broken.vl:4:13: error: expected expression, found ')'
+// err: broken.vl:3:1: error: expected expression, found '}'
+// err: main.vl:10:8: error: cannot find module 'nowhere': there is no file nowhere.vl
+// err: main.vl:12:8: error: 'broken' is already imported
+// err: main.vl:19:1: error: imports must come before all declarations
+import nowhere
+import broken
+import broken
+import also_broken
+
+fn main() {
+    print(broken.ok())
+}
+
+import late

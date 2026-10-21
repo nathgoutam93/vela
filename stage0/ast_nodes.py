@@ -30,12 +30,14 @@ def checked() -> Any:
 
 @dataclass
 class TypeName:
-    """A type in the source: `Int`, `Token`, `Option[Int]`, `Map[Str, Int]`.
-    An array type `[T]` has the name "[]" and T as its one argument."""
+    """A type in the source: `Int`, `Token`, `Option[Int]`, `Map[Str, Int]`,
+    `lexer.Token`. An array type `[T]` has the name "[]" and T as its one
+    argument."""
     name: str
     args: list[TypeName]
     line: int
     col: int
+    module: str | None = None  # `lexer` in `lexer.Token`
 
 
 # ---- Expressions ----
@@ -179,11 +181,13 @@ class FieldInit:
 
 @dataclass
 class StructLit:
-    """`Token { kind: TokenKind.Plus, text: "+", line: 1 }`."""
+    """`Token { kind: TokenKind.Plus, text: "+", line: 1 }`, or
+    `lexer.Token { ... }` for a type from another module."""
     name: str
     fields: list[FieldInit]
     line: int
     col: int
+    module: str | None = None
     ty: Any = checked()
 
 
@@ -224,12 +228,13 @@ class PRange:
 
 @dataclass
 class PVariant:
-    """`Expr.Add(l, r)`, `TokenKind.Plus`, `Some(x)`, `None`."""
+    """`Expr.Add(l, r)`, `TokenKind.Plus`, `lexer.TokenKind.Plus`, `Some(x)`, `None`."""
     enum: str | None  # None for the built-in variants Some, None, Ok, Err
     variant: str
     args: list[Pattern] | None  # None when written without parentheses
     line: int
     col: int
+    module: str | None = None
     ref: Any = checked()  # (EnumType, Variant)
 
 
@@ -384,7 +389,9 @@ class FnDecl:
     body: Block
     line: int  # the name's position
     col: int
+    pub: bool = False
     sig: Any = checked()  # the checker's Signature: resolved parameter and result types
+    module: Any = checked()  # the name of the module it belongs to, "" for the main file
 
 
 @dataclass
@@ -401,6 +408,7 @@ class StructDecl:
     fields: list[FieldDecl]
     line: int
     col: int
+    pub: bool = False
     type: Any = checked()  # the StructType
 
 
@@ -418,14 +426,24 @@ class EnumDecl:
     variants: list[VariantDecl]
     line: int
     col: int
+    pub: bool = False
     type: Any = checked()  # the EnumType
 
 
 @dataclass
+class Import:
+    """`import lexer`: the module in lexer.vl, or a standard module."""
+    name: str
+    line: int
+    col: int
+
+
+@dataclass
 class Program:
+    """One file."""
+    imports: list[Import]
     types: list[StructDecl | EnumDecl]
     fns: list[FnDecl]
-    table: Any = checked()  # the checker's TypeTable: every Option and Result used
 
 
 # ---- `vela ast` ----
@@ -436,27 +454,34 @@ class Program:
 # block's statements always go on their own lines).
 
 def dump(program: Program) -> str:
-    items = [sx_type_decl(t) for t in program.types] + [sx_fn(f) for f in program.fns]
+    items = [["import", i.name] for i in program.imports]
+    items += [sx_type_decl(t) for t in program.types] + [sx_fn(f) for f in program.fns]
     return "".join("\n".join(render(x)) + "\n" for x in items)
+
+
+def qualified(module: str | None, name: str) -> str:
+    return f"{module}.{name}" if module else name
 
 
 def sx_type(t: TypeName) -> str:
     if t.name == "[]":
         return f"[{sx_type(t.args[0])}]"
+    name = qualified(t.module, t.name)
     if not t.args:
-        return t.name
-    return f"{t.name}[{', '.join(sx_type(a) for a in t.args)}]"
+        return name
+    return f"{name}[{', '.join(sx_type(a) for a in t.args)}]"
 
 
 def sx_type_decl(d: StructDecl | EnumDecl) -> list:
+    pub = ["pub"] if d.pub else []
     if isinstance(d, StructDecl):
-        return ["struct", d.name, *[[f.name, sx_type(f.type)] for f in d.fields]]
-    return ["enum", d.name, *[[v.name, *[sx_type(t) for t in v.payload]] for v in d.variants]]
+        return [*pub, "struct", d.name, *[[f.name, sx_type(f.type)] for f in d.fields]]
+    return [*pub, "enum", d.name, *[[v.name, *[sx_type(t) for t in v.payload]] for v in d.variants]]
 
 
 def sx_fn(f: FnDecl) -> list:
     params = [[p.name, sx_type(p.type)] for p in f.params]
-    head = ["fn", f.name, params]
+    head = [*(["pub"] if f.pub else []), "fn", f.name, params]
     if f.result:
         head.append(sx_type(f.result))
     return [*head, sx_stmt(f.body)]
@@ -511,7 +536,7 @@ def sx_pattern(p: Pattern) -> Any:
     if isinstance(p, PRange):
         return ["..=", sx_expr(p.lo), sx_expr(p.hi)]
     if isinstance(p, PVariant):
-        name = f"{p.enum}.{p.variant}" if p.enum else p.variant
+        name = qualified(p.module, f"{p.enum}.{p.variant}" if p.enum else p.variant)
         if p.args is None:
             return name
         return [name, *[sx_pattern(x) for x in p.args]]
@@ -546,7 +571,7 @@ def sx_expr(e: Expr) -> Any:
     if isinstance(e, MapLit):
         return ["map", *[[sx_expr(en.key), sx_expr(en.value)] for en in e.entries]]
     if isinstance(e, StructLit):
-        return ["struct", e.name, *[[f.name, sx_expr(f.value)] for f in e.fields]]
+        return ["struct", qualified(e.module, e.name), *[[f.name, sx_expr(f.value)] for f in e.fields]]
     if isinstance(e, Match):
         return ["match", sx_expr(e.scrutinee), *[sx_arm(a, stmt=False) for a in e.arms]]
     raise AssertionError(f"unknown expression {e!r}")

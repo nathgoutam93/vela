@@ -1,0 +1,78 @@
+// A calculator in seven files: M6's "a 5-file program builds and runs".
+// main imports lexer, parser, eval, ast and text; lexer and parser both
+// import tokens, which imports text. Each module is loaded once.
+// out: > x = 6 * 7
+// out: x = 42
+// out: > y = x - (2 + 3) * 4
+// out: y = 22
+// out: > y
+// out: y is 22
+// out: > -x + y * 2
+// out: ((-x) + (y * 2)) is 2
+// out: > x = x + 1
+// out: x = 43
+// out: > big = x * x * x
+// out: big = 79507
+// out: > x / (y - 22)
+// out: error: division by zero
+// out: > z + 1
+// out: error: undefined name z
+// out: > 1 +
+// out: error: column 4: expected a number, a name or '(', found end of line
+// out: > 2 $ 3
+// out: error: column 3: unexpected character '$'
+// out: > (1 + 2
+// out: error: column 7: expected ')', found end of line
+// out: > 1 2
+// out: error: column 3: expected an operator or the end of the line, found number 2
+import ast
+import eval
+import lexer
+import parser
+import text
+
+fn main() {
+    let lines = [
+        "x = 6 * 7",
+        "y = x - (2 + 3) * 4",
+        "y",
+        "-x + y * 2",
+        "x = x + 1",
+        "big = x * x * x",
+        "x / (y - 22)",
+        "z + 1",
+        "1 +",
+        "2 $ 3",
+        "(1 + 2",
+        "1 2",
+    ]
+    let mut vars: Map[Str, Int] = [:]
+    for line in lines {
+        print("> " + line)
+        match read(line) {
+            Err(m) => print("error: " + m)
+            Ok(ast.Line.Assign(name, e)) => {
+                match eval.value(e, vars) {
+                    Ok(v) => {
+                        vars[name] = v
+                        print(name + " = " + text.from_int(v))
+                    }
+                    Err(m) => print("error: " + m)
+                }
+            }
+            Ok(ast.Line.Show(e)) => {
+                match eval.value(e, vars) {
+                    Ok(v) => print(ast.show(e) + " is " + text.from_int(v))
+                    Err(m) => print("error: " + m)
+                }
+            }
+        }
+    }
+}
+
+fn read(line: Str) -> Result[ast.Line, Str] {
+    match lexer.tokenize(line) {
+        Err(m) => return Err(m)
+        Ok(toks) => return parser.parse(toks)
+    }
+}

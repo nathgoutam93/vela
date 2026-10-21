@@ -17,7 +17,10 @@ so it takes as much room as its largest member, not all of them together.
         } as;
     };
 
-Option[T] and Result[T, E] are generated the same way, once for each T
+Names. A type from the main module is `t_Name` in C. One from an imported
+module has the module's name mixed in, so that two modules can both have a
+Token: lexer's is `t_5lexer_Token` (see `mangle`). Option[T] and
+Result[T, E] are generated the same way, once for each T
 (and E) the program uses: Option[Int] becomes `Option_Int`. Generating a
 separate copy of a generic type per argument is called monomorphization.
 Arrays and maps are not generated: every [T] is a `vela_array *` and every
@@ -42,6 +45,20 @@ from typesys import BOOL, BYTE, INT, STR, ArrayType, EnumType, MapType, StructTy
 PRIMITIVE_C = {INT: "int64_t", BYTE: "uint8_t", BOOL: "bool", STR: "vela_str"}
 RUNTIME_DESCRIPTORS = {INT: "&vela_type_int", BYTE: "&vela_type_byte", BOOL: "&vela_type_bool",
                        STR: "&vela_type_str"}
+
+
+def mangle(module: str, name: str) -> str:
+    """The C name of `name` in `module`: `next` in the main module stays
+    `next`; in lexer it becomes `5lexer_next`.
+
+    Joining with a plain `_` would be ambiguous: module `a_b` with `c`, and
+    module `a` with `b_c`, would both be `a_b_c`. The length in front says
+    exactly where the module's name ends, so two different (module, name)
+    pairs never get the same C name. And since a Vela name never starts
+    with a digit, a mangled name never equals a main-module name. C++ and
+    Rust compilers mangle with the same trick (`_ZN5lexer4nextE`).
+    """
+    return f"{len(module)}{module}_{name}" if module else name
 
 
 class Layout:
@@ -76,7 +93,7 @@ class Layout:
     def base_name(self, t: Type) -> str:
         if isinstance(t, EnumType) and t.builtin:
             return t.name + "".join("_" + self.suffix(a) for a in t.args)
-        return "t_" + t.name  # type: ignore[attr-defined]
+        return "t_" + mangle(t.module, t.name)  # type: ignore[attr-defined]
 
     def suffix(self, t: Type) -> str:
         """How a type argument reads inside a generated name: Int, Token, Option_Int."""
@@ -88,7 +105,7 @@ class Layout:
             return f"Map_{self.suffix(t.key)}_{self.suffix(t.value)}"
         if isinstance(t, EnumType) and t.builtin:
             return self.base_name(t)
-        return t.name  # type: ignore[attr-defined]
+        return mangle(t.module, t.name)  # type: ignore[attr-defined]
 
     def c_type(self, t: Type | None) -> str:
         if t is None:

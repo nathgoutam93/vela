@@ -1,0 +1,16 @@
+// Syntax mistakes around import and pub.
+// err: module_syntax.vl:6:5: error: expected 'fn' or 'type' after 'pub', found keyword 'let'
+// err: module_syntax.vl:9:5: error: imports go at the top of the file, before all declarations
+// err: module_syntax.vl:10:9: error: expected a name after 'let', found keyword 'pub'
+// err: module_syntax.vl:13:5: error: expected 'fn' or 'type' after 'pub', found keyword 'import'
+pub let x = 1
+
+fn main() {
+    import lib
+    let pub = 2
+}
+
+pub import other
+
+fn f() {
+}
