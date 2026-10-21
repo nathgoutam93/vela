@@ -34,9 +34,10 @@ run_tests.py the golden-test runner
 
 ## Status
 
-M0 to M3 are done: the driver and test runner, expressions, variables,
-functions and control flow, and a type checker that reports every error in
-one run. See `docs/` for a walkthrough of each milestone.
+M0 to M4 are done: the driver and test runner, expressions, variables,
+functions and control flow, a type checker that reports every error in one
+run, and structs, enums, `match` and `Option`/`Result`. See `docs/` for a
+walkthrough of each milestone.
 
 ```
 fn fib(n: Int) -> Int {

@@ -1,0 +1,64 @@
+// Structs and enums are values: assigning or passing one copies it, so
+// changing the copy never changes the original. That holds for boxed
+// fields too: writing through one copies the box first.
+// out: 1
+// out: 99
+// out: 1
+// out: 2
+// out: 5
+// out: 2
+// out: 7
+// out: 2
+type Point = struct { x: Int, y: Int }
+
+type Node = struct {
+    value: Int
+    next: Option[Node]
+}
+
+type Holder = struct {
+    inner: Inner
+}
+
+type Inner = struct {
+    n: Int
+    back: Option[Holder]
+}
+
+fn bump(p: Point) -> Int {
+    let mut q = p
+    q.x = 99
+    return q.x
+}
+
+fn main() {
+    let a = Point { x: 1, y: 2 }
+    let mut b = a
+    b.x = 99
+    print(a.x)
+    print(b.x)
+    bump(a)
+    print(a.x)
+
+    // Node's next field is boxed (Node contains Option[Node]).
+    let first = Node { value: 1, next: Some(Node { value: 2, next: None }) }
+    let mut copy = first
+    copy.next = Some(Node { value: 5, next: None })
+    print(second(first))
+    print(second(copy))
+
+    // Holder's inner field is boxed, and here a write goes through it.
+    let h = Holder { inner: Inner { n: 2, back: None } }
+    let mut h2 = h
+    h2.inner.n = 7
+    print(h.inner.n)
+    print(h2.inner.n)
+    print(h.inner.n)
+}
+
+fn second(n: Node) -> Int {
+    return match n.next {
+        Some(next) => next.value
+        None => -1
+    }
+}

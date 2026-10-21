@@ -1,0 +1,46 @@
+// The parser alone: names are not resolved, so `Shape.Circle` is still a
+// field access, and `-2` outside a pattern is unary minus applied to 2.
+// dump: ast
+// out: (struct Point (x Int) (y Int))
+// out: (enum Shape (Dot) (Circle Point Int) (Many Option[Shape]))
+// out: (fn area ((s Shape)) Result[Int, Str]
+// out:   (block
+// out:     (return (match s (=> Shape.Dot (call Ok 0)) (=> (Shape.Circle _ r) (call Ok (* r r))) (=> (Shape.Many (Some inner)) (call area inner)) (=> (Shape.Many None) (call Err "empty"))))))
+// out: (fn main ()
+// out:   (block
+// out:     (let mut p Point (struct Point (x 1) (y (- 2))))
+// out:     (= (. p x) (. (. q r) s))
+// out:     (match (call (. Shape Circle) p 3) (=> 0 (return)) (=> -1 (break))
+// out:       (=> true
+// out:         (block
+// out:           (call print "t")))
+// out:       (=> x (call f x)))
+// out:     (if (== (. p x) (struct Point (x 1) (y 2))) (block))))
+type Point = struct { x: Int, y: Int }
+type Shape = enum {
+    Dot
+    Circle(Point, Int)
+    Many(Option[Shape])
+}
+
+fn area(s: Shape) -> Result[Int, Str] {
+    return match s {
+        Shape.Dot => Ok(0)
+        Shape.Circle(_, r) => Ok(r * r)
+        Shape.Many(Some(inner)) => area(inner)
+        Shape.Many(None) => Err("empty")
+    }
+}
+
+fn main() {
+    let mut p: Point = Point { x: 1, y: -2 }
+    p.x = q.r.s
+    match Shape.Circle(p, 3) {
+        0 => return
+        -1 => break
+        true => { print("t") }
+        x => f(x)
+    }
+    if p.x == (Point { x: 1, y: 2 }) {
+    }
+}

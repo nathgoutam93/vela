@@ -1,0 +1,9 @@
+// Syntax errors in type declarations; each skips to the next declaration.
+// err: type_decl_syntax.vl:5:10: error: expected 'struct' or 'enum' after 'type A =', found identifier 'union'
+// err: type_decl_syntax.vl:6:21: error: expected ':' and a type after field 'x', found identifier 'Int'
+// err: type_decl_syntax.vl:7:26: error: expected ',' or a new line in the struct, found identifier 'y'
+type A = union { x: Int }
+type B = struct { x Int }
+type C = struct { x: Int y: Int }
+fn main() {
+}

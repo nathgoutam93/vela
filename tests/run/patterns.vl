@@ -1,0 +1,77 @@
+// Patterns: nested variants, literals (Int, Bool, Str), `_` and bindings.
+// out: zero
+// out: negative one
+// out: other
+// out: yes
+// out: no
+// out: plus
+// out: unknown
+// out: nothing
+// out: some zero
+// out: 7
+// out: ok big
+// out: 3
+// out: err
+fn int_name(n: Int) -> Str {
+    return match n {
+        0 => "zero"
+        -1 => "negative one"
+        _ => "other"
+    }
+}
+
+fn bool_name(b: Bool) -> Str {
+    return match b {
+        true => "yes"
+        false => "no"
+    }
+}
+
+fn op_name(s: Str) -> Str {
+    return match s {
+        "+" => "plus"
+        "-" => "minus"
+        other => "unknown"
+    }
+}
+
+fn describe2(o: Option[Int]) {
+    match o {
+        None => print("nothing")
+        Some(0) => print("some zero")
+        Some(n) => print(n)
+    }
+}
+
+fn nested(r: Result[Option[Int], Str]) {
+    match r {
+        Ok(Some(n)) => {
+            if n > 100 {
+                print("ok big")
+            } else {
+                print(n)
+            }
+        }
+        Ok(None) => print("ok none")
+        Err(_) => print("err")
+    }
+}
+
+fn main() {
+    print(int_name(0))
+    print(int_name(-1))
+    print(int_name(5))
+    print(bool_name(true))
+    print(bool_name(false))
+    print(op_name("+"))
+    print(op_name("*"))
+    describe2(None)
+    describe2(Some(0))
+    describe2(Some(7))
+    let big: Result[Option[Int], Str] = Ok(Some(500))
+    nested(big)
+    let small: Result[Option[Int], Str] = Ok(Some(3))
+    nested(small)
+    let bad: Result[Option[Int], Str] = Err("bad")
+    nested(bad)
+}

@@ -1,0 +1,36 @@
+// Mistakes building enum values, Option and Result included.
+// err: enum_errors.vl:21:18: error: 'Expr' has no variant 'Foo'
+// err: enum_errors.vl:22:18: error: Expr.Num carries 1 value; write Expr.Num(...)
+// err: enum_errors.vl:23:18: error: Expr.Leaf carries no values; write it without parentheses
+// err: enum_errors.vl:24:18: error: Expr.Add carries 2 values, got 1
+// err: enum_errors.vl:25:22: error: value 1 of Expr.Num must be Int, found Bool
+// err: enum_errors.vl:27:13: error: Expr values cannot be compared with '=='; use match, or compare their fields
+// err: enum_errors.vl:28:13: error: cannot tell which Option this None is; give it a type, as in `let x: Option[Int] = None`
+// err: enum_errors.vl:29:13: error: cannot tell which Result this Ok(...) is; give it a type, as in `let r: Result[Int, Str] = Ok(...)`
+// err: enum_errors.vl:30:18: error: 'i' is declared as Int, but its value is None
+// err: enum_errors.vl:31:31: error: value 1 of Some must be Int, found Bool
+// err: enum_errors.vl:32:9: error: 'None' is a variant of Option and cannot be used as a name
+// err: enum_errors.vl:33:35: error: value 1 of Err must be Str, found Int
+// err: enum_errors.vl:35:13: error: Option[Int] values cannot be compared with '=='; use match, or compare their fields
+type Expr = enum {
+    Num(Int)
+    Add(Expr, Expr)
+    Leaf
+}
+fn main() {
+    let a = Expr.Foo
+    let b = Expr.Num
+    let c = Expr.Leaf(1)
+    let d = Expr.Add(Expr.Num(1))
+    let e = Expr.Num(true)
+    let f = Expr.Num(1)
+    print(f == f)
+    let g = None
+    let h = Ok(1)
+    let i: Int = None
+    let j: Option[Int] = Some(true)
+    let None = 1
+    let k: Result[Int, Str] = Err(1)
+    let o = Some(1)
+    print(o == o)
+}

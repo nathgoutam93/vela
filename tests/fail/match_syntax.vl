@@ -1,0 +1,13 @@
+// Syntax errors inside a match or a struct value skip to its closing brace.
+// err: match_syntax.vl:7:17: error: expected '=>' after the pattern, found identifier 'print'
+// err: match_syntax.vl:10:9: error: expected a pattern, found '+'
+// err: match_syntax.vl:12:26: error: expected ',' or a new line in the 'Point' value, found identifier 'y'
+fn main() {
+    match 1 {
+        Some(x) print(x)
+    }
+    match 2 {
+        + => 1
+    }
+    let p = Point { x: 1 y: 2 }
+}

@@ -1,0 +1,36 @@
+// Structs: literals in any field order, field access, nested structs,
+// passing to and returning from functions, assigning to fields.
+// out: 3
+// out: 4
+// out: 7
+// out: 10
+// out: 20
+// out: 1
+// out: true
+fn main() {
+    let p = Point { y: 4, x: 3 }
+    print(p.x)
+    print(p.y)
+    print(sum(p))
+    let mut r = Rect { corner: Point { x: 10, y: 20 }, wide: 1, tall: 1 }
+    print(r.corner.x)
+    print(r.corner.y)
+    r.corner.x = r.wide
+    print(r.corner.x)
+    print(moved(p, 1).x == 4)
+}
+
+type Point = struct {
+    x: Int
+    y: Int
+}
+
+type Rect = struct { corner: Point, wide: Int, tall: Int }
+
+fn sum(p: Point) -> Int {
+    return p.x + p.y
+}
+
+fn moved(p: Point, dx: Int) -> Point {
+    return Point { x: p.x + dx, y: p.y }
+}

@@ -30,14 +30,14 @@ BOOL_WORDS = frozenset({"true", "false"})
 
 # Two-byte operators are tried before one-byte ones (maximal munch), so `==`
 # is one token, not two `=`.
-OPERATORS_2 = frozenset({"==", "!=", "<=", ">=", "&&", "||", "..", "->"})
-OPERATORS_1 = frozenset("()+-*/%,;=<>!{}:")
+OPERATORS_2 = frozenset({"==", "!=", "<=", ">=", "&&", "||", "..", "->", "=>"})
+OPERATORS_1 = frozenset("()+-*/%,;=<>!{}:.[]")
 
 # The newline rule: after a line's last token, insert `;` if that token is
-# one of these. Go's list also has `++ -- ]`; ours gains `]` with arrays and
-# `?` in M7, because `let n = parse(x)?` ends a statement with it.
+# one of these. Go's list also has `++ --`; ours gains `?` in M7, because
+# `let n = parse(x)?` ends a statement with it.
 ENDS_STATEMENT = frozenset(
-    {"ident", "int", "bool", "str", ")", "}", "break", "continue", "return"}
+    {"ident", "int", "bool", "str", ")", "]", "}", "break", "continue", "return"}
 )
 
 # Escapes allowed in string literals and the byte each stands for.

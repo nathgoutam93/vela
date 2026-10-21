@@ -1,0 +1,10 @@
+// A match terminates only if every arm does.
+// err: missing_return_match.vl:8:1: error: missing return: 'f' returns Int, but the end of its body can be reached
+fn f(o: Option[Int]) -> Int {
+    match o {
+        Some(x) => return x
+        None => print(0)
+    }
+}
+fn main() {
+}

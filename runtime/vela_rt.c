@@ -12,6 +12,12 @@ void vela_panic(const char *loc, const char *msg) {
     exit(101);
 }
 
+void *vela_alloc(size_t size) {
+    void *p = malloc(size);
+    if (p == NULL) vela_panic("vela runtime", "out of memory");
+    return p;
+}
+
 bool vela_str_eq(vela_str a, vela_str b) {
     return a.len == b.len && memcmp(a.data, b.data, (size_t)a.len) == 0;
 }

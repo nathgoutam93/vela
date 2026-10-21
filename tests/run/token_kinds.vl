@@ -1,0 +1,69 @@
+// The lexer fragment from the roadmap, without string building (M5): an
+// enum without payloads, a struct holding one, == on enum values, and a
+// match statement whose arms continue a loop.
+// out: identifier
+// out: x
+// out: number
+// out: 42
+// out: plus
+// out: end of file
+// out: true
+// out: false
+// out: 2
+type TokenKind = enum {
+    Ident,
+    Number,
+    Plus,
+    Eof,
+}
+
+type Token = struct {
+    kind: TokenKind,
+    text: Str,
+    line: Int,
+}
+
+fn describe(t: Token) -> Str {
+    return match t.kind {
+        TokenKind.Ident => "identifier",
+        TokenKind.Number => "number",
+        TokenKind.Plus => "plus",
+        TokenKind.Eof => "end of file",
+    }
+}
+
+fn show(t: Token) {
+    print(describe(t))
+    match t.kind {
+        TokenKind.Ident => print(t.text)
+        TokenKind.Number => print(t.text)
+        _ => {}
+    }
+}
+
+fn main() {
+    show(Token { kind: TokenKind.Ident, text: "x", line: 1 })
+    show(Token { kind: TokenKind.Number, text: "42", line: 1 })
+    show(Token { kind: TokenKind.Plus, text: "+", line: 1 })
+    let eof = Token { kind: TokenKind.Eof, text: "", line: 2 }
+    show(eof)
+    print(eof.kind == TokenKind.Eof)
+    print(eof.kind != TokenKind.Eof)
+    let mut count = 0
+    for i in 0..4 {
+        let k = if_number(i)
+        match k {
+            TokenKind.Number => {}
+            _ => continue
+        }
+        count = count + 1
+    }
+    print(count)
+}
+
+fn if_number(i: Int) -> TokenKind {
+    if i % 2 == 0 {
+        return TokenKind.Number
+    }
+    return TokenKind.Plus
+}

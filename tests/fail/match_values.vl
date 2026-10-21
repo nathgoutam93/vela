@@ -1,0 +1,25 @@
+// A match used as a value, and the names its patterns bind.
+// err: match_values.vl:11:18: error: this arm is Str, but the first arm is Int
+// err: match_values.vl:14:17: error: print(...) does not produce a value
+// err: match_values.vl:15:18: error: print(...) does not produce a value
+// err: match_values.vl:20:13: error: cannot assign to match binding 'n'
+// err: match_values.vl:24:11: error: undefined name 'n'
+fn main() {
+    let b = true
+    let x = match b {
+        true => 1
+        false => "one"
+    }
+    let y = match b {
+        true => print(1)
+        false => print(2)
+    }
+    let o = Some(1)
+    match o {
+        Some(n) => {
+            n = 2
+        }
+        None => {}
+    }
+    print(n)
+}

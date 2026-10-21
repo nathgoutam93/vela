@@ -13,8 +13,8 @@ as Vela `enum`s with a payload per variant, and the `isinstance` chains in
 the checker and code generator will become `match`.
 
 Fields declared with `checked()` start empty and are filled in by the
-checker: the type of each expression, and what each name refers to. The
-code generator reads them.
+checker: the type of each expression (a typesys.Type), and what each name
+refers to. The code generator reads them.
 """
 from __future__ import annotations
 
@@ -26,6 +26,17 @@ def checked() -> Any:
     return field(default=None, repr=False, compare=False)
 
 
+# ---- Types as written ----
+
+@dataclass
+class TypeName:
+    """A type in the source: `Int`, `Token`, `Option[Int]`, `Result[Int, Str]`."""
+    name: str
+    args: list[TypeName]
+    line: int
+    col: int
+
+
 # ---- Expressions ----
 
 @dataclass
@@ -33,7 +44,7 @@ class IntLit:
     value: int
     line: int
     col: int
-    ty: str | None = checked()
+    ty: Any = checked()
 
 
 @dataclass
@@ -41,7 +52,7 @@ class BoolLit:
     value: bool
     line: int
     col: int
-    ty: str | None = checked()
+    ty: Any = checked()
 
 
 @dataclass
@@ -49,7 +60,7 @@ class StrLit:
     value: bytes  # escapes already decoded
     line: int
     col: int
-    ty: str | None = checked()
+    ty: Any = checked()
 
 
 @dataclass
@@ -57,8 +68,8 @@ class Name:
     name: str
     line: int
     col: int
-    ty: str | None = checked()
-    ref: Any = checked()  # the checker's Local, or a FnDecl
+    ty: Any = checked()
+    ref: Any = checked()  # the checker's Local, a FnDecl, or a (EnumType, Variant) for None
 
 
 @dataclass
@@ -67,7 +78,7 @@ class Unary:
     operand: Expr
     line: int
     col: int
-    ty: str | None = checked()
+    ty: Any = checked()
 
 
 @dataclass
@@ -77,7 +88,7 @@ class Binary:
     right: Expr
     line: int
     col: int
-    ty: str | None = checked()
+    ty: Any = checked()
 
 
 @dataclass
@@ -86,10 +97,100 @@ class Call:
     args: list[Expr]
     line: int  # the callee's position
     col: int
-    ty: str | None = checked()  # None for a call that returns nothing
+    ty: Any = checked()  # None for a call that returns nothing
+    # What is called: a FnDecl, the name of a built-in, or a
+    # (EnumType, Variant) when the call builds an enum value.
+    target: Any = checked()
 
 
-Expr = IntLit | BoolLit | StrLit | Name | Unary | Binary | Call
+@dataclass
+class Field:
+    """`obj.name`: a struct field, or an enum variant such as `TokenKind.Plus`."""
+    obj: Expr
+    name: str
+    line: int  # the name after the dot
+    col: int
+    ty: Any = checked()
+    variant: Any = checked()  # (EnumType, Variant) when this names a variant
+
+
+@dataclass
+class FieldInit:
+    name: str
+    value: Expr
+    line: int
+    col: int
+
+
+@dataclass
+class StructLit:
+    """`Token { kind: TokenKind.Plus, text: "+", line: 1 }`."""
+    name: str
+    fields: list[FieldInit]
+    line: int
+    col: int
+    ty: Any = checked()
+
+
+# ---- Patterns ----
+
+@dataclass
+class PWild:
+    """`_`: matches anything, binds nothing."""
+    line: int
+    col: int
+
+
+@dataclass
+class PBind:
+    """A name: matches anything and binds it."""
+    name: str
+    line: int
+    col: int
+    local: Any = checked()
+
+
+@dataclass
+class PLit:
+    """A literal: `0`, `-1`, `true`, `"+"`."""
+    value: IntLit | BoolLit | StrLit
+    line: int
+    col: int
+
+
+@dataclass
+class PVariant:
+    """`Expr.Add(l, r)`, `TokenKind.Plus`, `Some(x)`, `None`."""
+    enum: str | None  # None for the built-in variants Some, None, Ok, Err
+    variant: str
+    args: list[Pattern] | None  # None when written without parentheses
+    line: int
+    col: int
+    ref: Any = checked()  # (EnumType, Variant)
+
+
+Pattern = PWild | PBind | PLit | PVariant
+
+
+@dataclass
+class Arm:
+    pattern: Pattern
+    body: Any  # an Expr in a match expression; a Block or Stmt in a match statement
+    line: int
+    col: int
+
+
+@dataclass
+class Match:
+    """A match used as an expression: every arm's body is an expression."""
+    scrutinee: Expr
+    arms: list[Arm]
+    line: int
+    col: int
+    ty: Any = checked()
+
+
+Expr = IntLit | BoolLit | StrLit | Name | Unary | Binary | Call | Field | StructLit | Match
 
 
 # ---- Statements ----
@@ -110,6 +211,7 @@ class ExprStmt:
 class Let:
     name: str
     mutable: bool
+    type: TypeName | None  # `let x: Int = ...`
     value: Expr
     line: int  # the name's position
     col: int
@@ -118,7 +220,7 @@ class Let:
 
 @dataclass
 class Assign:
-    target: Expr
+    target: Expr  # a variable, or a field path such as `p.pos.x`
     value: Expr
     line: int  # the `=`
     col: int
@@ -174,17 +276,19 @@ class Return:
     col: int
 
 
-Stmt = Block | ExprStmt | Let | Assign | If | For | ForRange | Break | Continue | Return
-
-
-# ---- Declarations ----
-
 @dataclass
-class TypeName:
-    name: str
+class MatchStmt:
+    """A match used as a statement: each arm's body is a block or a statement."""
+    scrutinee: Expr
+    arms: list[Arm]
     line: int
     col: int
 
+
+Stmt = Block | ExprStmt | Let | Assign | If | For | ForRange | Break | Continue | Return | MatchStmt
+
+
+# ---- Declarations ----
 
 @dataclass
 class Param:
@@ -207,8 +311,44 @@ class FnDecl:
 
 
 @dataclass
+class FieldDecl:
+    name: str
+    type: TypeName
+    line: int
+    col: int
+
+
+@dataclass
+class StructDecl:
+    name: str
+    fields: list[FieldDecl]
+    line: int
+    col: int
+    type: Any = checked()  # the StructType
+
+
+@dataclass
+class VariantDecl:
+    name: str
+    payload: list[TypeName]
+    line: int
+    col: int
+
+
+@dataclass
+class EnumDecl:
+    name: str
+    variants: list[VariantDecl]
+    line: int
+    col: int
+    type: Any = checked()  # the EnumType
+
+
+@dataclass
 class Program:
+    types: list[StructDecl | EnumDecl]
     fns: list[FnDecl]
+    table: Any = checked()  # the checker's TypeTable: every Option and Result used
 
 
 # ---- `vela ast` ----
@@ -219,14 +359,27 @@ class Program:
 # block's statements always go on their own lines).
 
 def dump(program: Program) -> str:
-    return "".join("\n".join(render(sx_fn(f))) + "\n" for f in program.fns)
+    items = [sx_type_decl(t) for t in program.types] + [sx_fn(f) for f in program.fns]
+    return "".join("\n".join(render(x)) + "\n" for x in items)
+
+
+def sx_type(t: TypeName) -> str:
+    if not t.args:
+        return t.name
+    return f"{t.name}[{', '.join(sx_type(a) for a in t.args)}]"
+
+
+def sx_type_decl(d: StructDecl | EnumDecl) -> list:
+    if isinstance(d, StructDecl):
+        return ["struct", d.name, *[[f.name, sx_type(f.type)] for f in d.fields]]
+    return ["enum", d.name, *[[v.name, *[sx_type(t) for t in v.payload]] for v in d.variants]]
 
 
 def sx_fn(f: FnDecl) -> list:
-    params = [[p.name, p.type.name] for p in f.params]
+    params = [[p.name, sx_type(p.type)] for p in f.params]
     head = ["fn", f.name, params]
     if f.result:
-        head.append(f.result.name)
+        head.append(sx_type(f.result))
     return [*head, sx_stmt(f.body)]
 
 
@@ -236,7 +389,10 @@ def sx_stmt(s: Stmt) -> Any:
     if isinstance(s, ExprStmt):
         return sx_expr(s.expr)
     if isinstance(s, Let):
-        return ["let mut" if s.mutable else "let", s.name, sx_expr(s.value)]
+        head = ["let mut" if s.mutable else "let", s.name]
+        if s.type:
+            head.append(sx_type(s.type))
+        return [*head, sx_expr(s.value)]
     if isinstance(s, Assign):
         return ["=", sx_expr(s.target), sx_expr(s.value)]
     if isinstance(s, If):
@@ -254,7 +410,29 @@ def sx_stmt(s: Stmt) -> Any:
         return ["continue"]
     if isinstance(s, Return):
         return ["return", *([sx_expr(s.value)] if s.value else [])]
+    if isinstance(s, MatchStmt):
+        return ["match", sx_expr(s.scrutinee), *[sx_arm(a, stmt=True) for a in s.arms]]
     raise AssertionError(f"unknown statement {s!r}")
+
+
+def sx_arm(a: Arm, stmt: bool) -> list:
+    body = sx_stmt(a.body) if stmt else sx_expr(a.body)
+    return ["=>", sx_pattern(a.pattern), body]
+
+
+def sx_pattern(p: Pattern) -> Any:
+    if isinstance(p, PWild):
+        return "_"
+    if isinstance(p, PBind):
+        return p.name
+    if isinstance(p, PLit):
+        return sx_expr(p.value)
+    if isinstance(p, PVariant):
+        name = f"{p.enum}.{p.variant}" if p.enum else p.variant
+        if p.args is None:
+            return name
+        return [name, *[sx_pattern(x) for x in p.args]]
+    raise AssertionError(f"unknown pattern {p!r}")
 
 
 def sx_expr(e: Expr) -> Any:
@@ -272,6 +450,12 @@ def sx_expr(e: Expr) -> Any:
         return [e.op, sx_expr(e.left), sx_expr(e.right)]
     if isinstance(e, Call):
         return ["call", sx_expr(e.callee), *[sx_expr(a) for a in e.args]]
+    if isinstance(e, Field):
+        return [".", sx_expr(e.obj), e.name]
+    if isinstance(e, StructLit):
+        return ["struct", e.name, *[[f.name, sx_expr(f.value)] for f in e.fields]]
+    if isinstance(e, Match):
+        return ["match", sx_expr(e.scrutinee), *[sx_arm(a, stmt=False) for a in e.arms]]
     raise AssertionError(f"unknown expression {e!r}")
 
 

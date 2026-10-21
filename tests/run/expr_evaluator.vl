@@ -1,0 +1,120 @@
+// M4 done-when: an expression-tree evaluator. Expr is recursive, so its
+// Expr fields are boxed automatically; evaluation reports division by zero
+// as an Err instead of panicking.
+// out: 2
+// out: 10
+// out: -7
+// out: division by zero
+// out: 2
+// out: *
+// out: 3
+// out: +
+// out: -
+// out: 4
+// out: 3
+type Expr = enum {
+    Num(Int)
+    Add(Expr, Expr)
+    Mul(Expr, Expr)
+    Div(Expr, Expr)
+    Neg(Expr)
+}
+
+fn eval(e: Expr) -> Result[Int, Str] {
+    match e {
+        Expr.Num(n) => return Ok(n)
+        Expr.Neg(x) => return match eval(x) {
+            Ok(v) => Ok(-v)
+            Err(msg) => Err(msg)
+        }
+        Expr.Add(a, b) => return both(eval(a), eval(b), "+")
+        Expr.Mul(a, b) => return both(eval(a), eval(b), "*")
+        Expr.Div(a, b) => return both(eval(a), eval(b), "/")
+    }
+}
+
+fn both(left: Result[Int, Str], right: Result[Int, Str], op: Str) -> Result[Int, Str] {
+    match left {
+        Err(msg) => return Err(msg)
+        Ok(l) => match right {
+            Err(msg) => return Err(msg)
+            Ok(r) => {
+                if op == "+" { return Ok(l + r) }
+                if op == "*" { return Ok(l * r) }
+                if r == 0 { return Err("division by zero") }
+                return Ok(l / r)
+            }
+        }
+    }
+}
+
+fn show(r: Result[Int, Str]) {
+    match r {
+        Ok(v) => print(v)
+        Err(msg) => print(msg)
+    }
+}
+
+// Printing needs string building (M5), so the tree is printed one piece
+// per line.
+fn print_expr(e: Expr) {
+    match e {
+        Expr.Num(n) => print(n)
+        Expr.Neg(x) => {
+            print("-")
+            print_expr(x)
+        }
+        Expr.Add(a, b) => print_binary(a, "+", b)
+        Expr.Mul(a, b) => print_binary(a, "*", b)
+        Expr.Div(a, b) => print_binary(a, "/", b)
+    }
+}
+
+fn print_binary(a: Expr, op: Str, b: Expr) {
+    print_expr(a)
+    print(op)
+    print_expr(b)
+}
+
+// A constant-folding pass would match nested shapes; this one recognises
+// x * 1 and 0 + x.
+fn simplify(e: Expr) -> Expr {
+    return match e {
+        Expr.Mul(x, Expr.Num(1)) => simplify(x)
+        Expr.Add(Expr.Num(0), x) => simplify(x)
+        Expr.Add(a, b) => Expr.Add(simplify(a), simplify(b))
+        Expr.Mul(a, b) => Expr.Mul(simplify(a), simplify(b))
+        Expr.Div(a, b) => Expr.Div(simplify(a), simplify(b))
+        Expr.Neg(x) => Expr.Neg(simplify(x))
+        Expr.Num(n) => Expr.Num(n)
+    }
+}
+
+fn depth(e: Expr) -> Int {
+    return match e {
+        Expr.Num(_) => 1
+        Expr.Neg(x) => 1 + depth(x)
+        Expr.Add(a, b) => 1 + max(depth(a), depth(b))
+        Expr.Mul(a, b) => 1 + max(depth(a), depth(b))
+        Expr.Div(a, b) => 1 + max(depth(a), depth(b))
+    }
+}
+
+fn max(a: Int, b: Int) -> Int {
+    if a > b {
+        return a
+    }
+    return b
+}
+
+fn main() {
+    let two = Expr.Num(2)
+    let e = Expr.Add(Expr.Mul(two, Expr.Num(3)), Expr.Neg(Expr.Num(4)))
+    show(eval(e))
+    show(eval(Expr.Mul(Expr.Add(Expr.Num(0), Expr.Num(10)), Expr.Num(1))))
+    show(eval(Expr.Neg(Expr.Add(Expr.Num(3), Expr.Num(4)))))
+    show(eval(Expr.Div(e, Expr.Add(Expr.Num(1), Expr.Num(-1)))))
+    let s = simplify(Expr.Mul(Expr.Add(Expr.Num(0), e), Expr.Num(1)))
+    print_expr(s)
+    print(depth(s))
+}

@@ -4,6 +4,7 @@
 #define VELA_RT_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 // A Vela Str: immutable bytes and their length. Not NUL-terminated, since a
@@ -22,6 +23,10 @@ bool vela_str_eq(vela_str a, vela_str b);
 // Stops the program: prints "<loc>: panic: <msg>" to stderr, exits with 101.
 // `loc` is the Vela source position, "file.vl:line:col".
 _Noreturn void vela_panic(const char *loc, const char *msg);
+
+// Heap memory for boxed values (fields of recursive types). Panics when
+// memory runs out. Nothing is freed until M5 adds reference counting.
+void *vela_alloc(size_t size);
 
 // print(x): the value, then a newline.
 void vela_print_int(int64_t x);

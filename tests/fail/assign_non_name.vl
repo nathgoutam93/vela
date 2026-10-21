@@ -1,4 +1,4 @@
-// err: assign_non_name.vl:3:5: error: only a variable can be assigned to
+// err: assign_non_name.vl:3:5: error: only a variable or one of its fields can be assigned to
 fn main() {
     1 = 2
 }

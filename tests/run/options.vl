@@ -1,0 +1,43 @@
+// Option values: Some, None, and None's type coming from the context.
+// out: 3
+// out: none
+// out: 30
+// out: none
+// out: 1
+// out: 2
+fn find(xs_first: Int, xs_second: Int, want: Int) -> Option[Int] {
+    if xs_first == want {
+        return Some(0)
+    }
+    if xs_second == want {
+        return Some(1)
+    }
+    return None
+}
+
+fn show(o: Option[Int]) {
+    match o {
+        Some(v) => print(v)
+        None => print("none")
+    }
+}
+
+fn double(o: Option[Int]) -> Option[Int] {
+    return match o {
+        Some(v) => Some(v * 2)
+        None => None
+    }
+}
+
+fn main() {
+    let a = Some(3)
+    show(a)
+    let b: Option[Int] = None
+    show(b)
+    show(double(Some(15)))
+    show(double(None))
+    show(find(4, 5, 5))
+    let mut c = Some(1)
+    c = Some(2)
+    show(c)
+}

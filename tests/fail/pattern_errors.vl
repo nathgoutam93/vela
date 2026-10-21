@@ -1,0 +1,36 @@
+// Patterns that cannot match the value's type, or are written wrongly.
+// err: pattern_errors.vl:17:9: error: this pattern is Bool, but the value being matched is Int
+// err: pattern_errors.vl:18:9: error: pattern None matches Option values, but the value being matched is Int
+// err: pattern_errors.vl:22:9: error: Expr.Num carries 1 value; write Expr.Num(_) to ignore it
+// err: pattern_errors.vl:23:9: error: Expr.Leaf carries no values; write it without parentheses
+// err: pattern_errors.vl:24:9: error: Expr.Add carries 2 values, but this pattern has 1
+// err: pattern_errors.vl:25:21: error: 'y' is bound twice in this pattern
+// err: pattern_errors.vl:26:9: error: 'Expr' has no variant 'Nope'
+// err: pattern_errors.vl:27:9: error: unknown type 'Foo'
+// err: pattern_errors.vl:28:9: error: 'Point' is a struct, not an enum; match on its fields instead
+// err: pattern_errors.vl:33:9: error: pattern Expr.Leaf matches Expr values, but the value being matched is Option[Int]
+type Expr = enum { Num(Int), Add(Expr, Expr), Leaf }
+type Point = struct { x: Int }
+fn main() {
+    let e = Expr.Leaf
+    match 5 {
+        true => print(1)
+        None => print(2)
+        _ => print(3)
+    }
+    match e {
+        Expr.Num => print(1)
+        Expr.Leaf(x) => print(2)
+        Expr.Add(x) => print(3)
+        Expr.Add(y, y) => print(4)
+        Expr.Nope => print(5)
+        Foo.Bar => print(6)
+        Point.X => print(7)
+        _ => print(8)
+    }
+    let o = Some(1)
+    match o {
+        Expr.Leaf => print(1)
+        _ => print(2)
+    }
+}

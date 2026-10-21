@@ -1,0 +1,19 @@
+// M4 tokens: `.`, `[`, `]` and `=>`; a line ending in `]` ends a statement.
+// dump: tokens
+// out: 18:1 ident x
+// out: 18:2 .
+// out: 18:3 ident y
+// out: 18:4 [
+// out: 18:5 ident a
+// out: 18:6 ]
+// out: 18:8 =>
+// out: 18:11 ident z
+// out: 18:12 ; (newline)
+// out: 19:1 ident T
+// out: 19:2 [
+// out: 19:3 ident Int
+// out: 19:6 ]
+// out: 19:7 ; (newline)
+// out: 20:1 eof
+x.y[a] => z
+T[Int]

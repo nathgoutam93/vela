@@ -1,0 +1,68 @@
+// A list built from Option: each node holds the rest of the list.
+// out: 4
+// out: 10
+// out: 4
+// out: 3
+// out: 2
+// out: 1
+// out: true
+// out: false
+type List = struct {
+    head: Int
+    tail: Option[List]
+}
+
+fn push(value: Int, rest: Option[List]) -> Option[List] {
+    return Some(List { head: value, tail: rest })
+}
+
+fn length(l: Option[List]) -> Int {
+    return match l {
+        None => 0
+        Some(node) => 1 + length(node.tail)
+    }
+}
+
+fn total(l: Option[List]) -> Int {
+    let mut sum = 0
+    let mut rest = l
+    for {
+        match rest {
+            None => break
+            Some(node) => {
+                sum = sum + node.head
+                rest = node.tail
+            }
+        }
+    }
+    return sum
+}
+
+fn print_all(l: Option[List]) {
+    match l {
+        None => return
+        Some(node) => {
+            print(node.head)
+            print_all(node.tail)
+        }
+    }
+}
+
+fn contains(l: Option[List], x: Int) -> Bool {
+    return match l {
+        None => false
+        Some(node) => node.head == x || contains(node.tail, x)
+    }
+}
+
+fn main() {
+    let mut list: Option[List] = None
+    for i in 1..5 {
+        list = push(i, list)
+    }
+    print(length(list))
+    print(total(list))
+    print_all(list)
+    print(contains(list, 3))
+    print(contains(list, 9))
+}

@@ -1,2 +1,2 @@
-// err: top_level_statement.vl:2:1: error: expected 'fn', found identifier 'print'; only functions can be declared at the top level, and statements go inside them
+// err: top_level_statement.vl:2:1: error: expected 'fn' or 'type', found identifier 'print'; only functions and types can be declared at the top level, and statements go inside functions
 print(1)

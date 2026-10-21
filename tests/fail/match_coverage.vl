@@ -1,0 +1,56 @@
+// Exhaustiveness and redundancy. Each missing case is named, with `_` for
+// parts that do not matter; Int needs a `_` arm.
+// err: match_coverage.vl:15:12: error: match is not exhaustive: Expr.Neg(_) is not covered
+// err: match_coverage.vl:20:5: error: match is not exhaustive: Some(_) is not covered
+// err: match_coverage.vl:26:5: error: match is not exhaustive: add a '_' arm for the Int values not listed
+// err: match_coverage.vl:32:5: error: match is not exhaustive: false is not covered
+// err: match_coverage.vl:39:9: error: this arm can never match: the arms above it cover every value it would
+// err: match_coverage.vl:45:9: error: this arm can never match: the arms above it cover every value it would
+// err: match_coverage.vl:50:5: error: match is not exhaustive: Expr.Neg(Expr.Num(_)) is not covered
+type Expr = enum {
+    Num(Int)
+    Neg(Expr)
+}
+fn a(e: Expr) -> Int {
+    return match e {
+        Expr.Num(n) => n
+    }
+}
+fn b(o: Option[Int]) {
+    match o {
+        Some(0) => print(0)
+        None => print(1)
+    }
+}
+fn c(n: Int) {
+    match n {
+        0 => print(0)
+        1 => print(1)
+    }
+}
+fn d(x: Bool) {
+    match x {
+        true => print(1)
+    }
+}
+fn e(o: Option[Int]) {
+    match o {
+        _ => print(0)
+        Some(x) => print(x)
+    }
+}
+fn f(n: Int) {
+    match n {
+        1 => print(1)
+        1 => print(2)
+        _ => print(3)
+    }
+}
+fn g(e: Expr) {
+    match e {
+        Expr.Neg(Expr.Neg(x)) => print(1)
+        Expr.Num(_) => print(2)
+    }
+}
+fn main() {
+}
