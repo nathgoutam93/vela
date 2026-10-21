@@ -1,2 +1,4 @@
 // out: 3
-	print(	1	+	2	)
+fn main() {
+    	print(	1	+	2	)
+}

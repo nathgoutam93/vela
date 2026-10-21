@@ -1,2 +1,4 @@
-// err: empty_parens.vl:2:8: error: expected expression, found ')'
-print(())
+// err: empty_parens.vl:3:12: error: expected expression, found ')'
+fn main() {
+    print(())
+}

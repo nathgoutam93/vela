@@ -1,0 +1,7 @@
+// err: arity_user.vl:6:11: error: add expects 2 arguments, got 1
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+fn main() {
+    print(add(1))
+}

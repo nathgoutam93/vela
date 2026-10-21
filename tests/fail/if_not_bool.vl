@@ -1,0 +1,5 @@
+// err: if_not_bool.vl:3:8: error: the condition of 'if' must be Bool, found Int
+fn main() {
+    if 1 {
+    }
+}

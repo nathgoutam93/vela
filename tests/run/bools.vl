@@ -1,0 +1,23 @@
+// out: true
+// out: false
+// out: false
+// out: true
+// out: true
+// out: false
+// out: true
+// out: true
+// out: false
+// out: true
+fn main() {
+    print(true)
+    print(false)
+    print(!true)
+    print(!!true)
+    print(true == true)
+    print(true != true)
+    print(false == false)
+    let t = 1 < 2
+    print(t && !false)
+    print(t && false || false)
+    print(false || t)
+}

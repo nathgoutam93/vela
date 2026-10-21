@@ -45,7 +45,14 @@ TESTS = ROOT / "tests"
 KINDS = ("run", "fail", "dump")
 
 # Generated C must compile without a single warning; the test suite enforces it.
-STRICT_CFLAGS = "-Wall -Wextra -Werror -pedantic"
+# The exceptions are warnings about the Vela program rather than about the
+# code generator: Vela allows unused variables and parameters, `x == x` and
+# `x = x`, so C must too. (gcc ignores -Wno-self-assign, which is clang's.)
+STRICT_CFLAGS = (
+    "-Wall -Wextra -Werror -pedantic"
+    " -Wno-unused-variable -Wno-unused-parameter -Wno-unused-but-set-variable"
+    " -Wno-tautological-compare -Wno-self-assign"
+)
 
 HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump):(.*)$")
 COMPILE_TIMEOUT = 60

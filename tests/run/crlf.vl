@@ -1,5 +1,7 @@
 // Windows line endings: \r is whitespace.
 // out: 1
 // out: 2
-print(1)
-print(2)
+fn main() {
+    print(1)
+    print(2)
+}

@@ -1,4 +1,6 @@
 // The smallest Int divided by -1 does not fit in an Int.
-// err: panic_div_overflow.vl:4:34: panic: integer overflow
+// err: panic_div_overflow.vl:5:38: panic: integer overflow
 // exit: 101
-print((-9223372036854775807 - 1) / -1)
+fn main() {
+    print((-9223372036854775807 - 1) / -1)
+}

@@ -1,2 +1,4 @@
-// err: print_has_no_value.vl:2:11: error: print(...) does not produce a value
-print(1 + print(2))
+// err: print_has_no_value.vl:3:15: error: print(...) does not produce a value
+fn main() {
+    print(1 + print(2))
+}

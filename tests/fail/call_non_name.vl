@@ -1,2 +1,4 @@
-// err: call_non_name.vl:2:7: error: only a named function can be called
-print(5(1))
+// err: call_non_name.vl:3:11: error: only a named function can be called
+fn main() {
+    print(5(1))
+}

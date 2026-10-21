@@ -8,12 +8,14 @@
 // out: 1
 // out: -1
 // out: 0
-print(7 / 2)
-print(-7 / 2)
-print(7 / -2)
-print(-7 / -2)
-print(7 % 3)
-print(-7 % 3)
-print(7 % -3)
-print(-7 % -3)
-print(6 % 3)
+fn main() {
+    print(7 / 2)
+    print(-7 / 2)
+    print(7 / -2)
+    print(-7 / -2)
+    print(7 % 3)
+    print(-7 % 3)
+    print(7 % -3)
+    print(-7 % -3)
+    print(6 % 3)
+}

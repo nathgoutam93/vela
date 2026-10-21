@@ -1,0 +1,4 @@
+// err: type_add_bool.vl:3:13: error: operator '+' needs Int operands, found Int and Bool
+fn main() {
+    print(1 + true)
+}

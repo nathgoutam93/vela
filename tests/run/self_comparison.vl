@@ -1,0 +1,17 @@
+// Comparing or assigning a variable to itself is pointless but legal, and the
+// generated C must still compile under the test suite's -Werror.
+// out: false
+// out: true
+// out: true
+// out: false
+// out: true
+fn main() {
+    let mut x = 1
+    let b = true
+    print(x > x)
+    print(x == x)
+    x = x
+    print(b == b)
+    print(b != true)
+    print(x <= 9223372036854775807)
+}

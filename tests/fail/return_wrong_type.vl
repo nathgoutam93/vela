@@ -1,0 +1,6 @@
+// err: return_wrong_type.vl:3:12: error: 'f' returns Int, but this is Bool
+fn f() -> Int {
+    return true
+}
+fn main() {
+}

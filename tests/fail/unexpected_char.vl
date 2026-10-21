@@ -1,2 +1,4 @@
-// err: unexpected_char.vl:2:9: error: unexpected character '$'
-print(1 $ 2)
+// err: unexpected_char.vl:3:13: error: unexpected character '$'
+fn main() {
+    print(1 $ 2)
+}

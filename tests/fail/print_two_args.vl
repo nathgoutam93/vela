@@ -1,2 +1,4 @@
-// err: print_two_args.vl:2:1: error: print expects 1 argument, got 2
-print(1, 2)
+// err: print_two_args.vl:3:5: error: print expects 1 argument, got 2
+fn main() {
+    print(1, 2)
+}

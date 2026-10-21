@@ -1,0 +1,22 @@
+// A panic deep in a call reports the operator's position in the source.
+// fib_iter(92) needs fib(93) on its last step, which does not fit in an Int.
+// out: 2880067194370816120
+// err: panic_in_function.vl:11:22: panic: integer overflow
+// exit: 101
+fn fib_iter(n: Int) -> Int {
+    let mut a = 0
+    let mut b = 1
+    let mut i = 0
+    for i < n {
+        let next = a + b
+        a = b
+        b = next
+        i = i + 1
+    }
+    return a
+}
+
+fn main() {
+    print(fib_iter(90))
+    print(fib_iter(92))
+}

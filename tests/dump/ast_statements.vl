@@ -1,0 +1,47 @@
+// dump: ast
+// out: (fn add ((a Int) (b Int)) Int
+// out:   (block
+// out:     (return (+ a b))))
+// out: (fn main ()
+// out:   (block
+// out:     (let x 1)
+// out:     (let mut y "two\n")
+// out:     (= y "three")
+// out:     (if (< x 2)
+// out:       (block
+// out:         (call print x))
+// out:       (if (== x 3) (block)
+// out:         (block
+// out:           (return))))
+// out:     (for (< x 10)
+// out:       (block
+// out:         (break)))
+// out:     (for
+// out:       (block
+// out:         (continue)))
+// out:     (for i (.. 0 (call add 1 2))
+// out:       (block
+// out:         (block
+// out:           (let z true))))))
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+
+fn main() {
+    let x = 1
+    let mut y = "two\n"
+    y = "three"
+    if x < 2 {
+        print(x)
+    } else if x == 3 {
+    } else {
+        return
+    }
+    for x < 10 { break }
+    for {
+        continue
+    }
+    for i in 0..add(1, 2) {
+        { let z = true }
+    }
+}

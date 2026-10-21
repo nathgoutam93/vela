@@ -1,0 +1,6 @@
+// err: continue_outside_loop.vl:3:5: error: 'continue' is only allowed inside a loop
+fn f() {
+    continue
+}
+fn main() {
+}

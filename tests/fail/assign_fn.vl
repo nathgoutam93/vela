@@ -1,0 +1,4 @@
+// err: assign_fn.vl:3:5: error: cannot assign to function 'main'
+fn main() {
+    main = 1
+}

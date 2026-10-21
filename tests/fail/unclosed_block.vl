@@ -1,0 +1,3 @@
+// err: unclosed_block.vl:4:1: error: expected '}' to close the block, found end of file
+fn main() {
+    print(1)

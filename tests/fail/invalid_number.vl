@@ -1,2 +1,4 @@
-// err: invalid_number.vl:2:7: error: invalid number '12abc'
-print(12abc)
+// err: invalid_number.vl:3:11: error: invalid number '12abc'
+fn main() {
+    print(12abc)
+}

@@ -1,0 +1,33 @@
+// A function that returns a value must not reach the end of its body.
+// Both branches of an if/else returning counts, and so does a `for` with no
+// condition and no break, because it can only be left by returning.
+// out: -1
+// out: 0
+// out: 1
+// out: 16
+fn sign(n: Int) -> Int {
+    if n < 0 {
+        return -1
+    } else if n == 0 {
+        return 0
+    } else {
+        return 1
+    }
+}
+
+fn first_power_of_two_above(n: Int) -> Int {
+    let mut p = 1
+    for {
+        if p > n {
+            return p
+        }
+        p = p * 2
+    }
+}
+
+fn main() {
+    print(sign(-5))
+    print(sign(0))
+    print(sign(7))
+    print(first_power_of_two_above(10))
+}

@@ -1,0 +1,32 @@
+// An else-if condition runs only when the conditions before it were false.
+// out: 1
+// out: one
+// out: 1
+// out: 2
+// out: two
+// out: 1
+// out: 2
+// out: 3
+// out: other
+fn is(n: Int, want: Int) -> Bool {
+    print(want)
+    return n == want
+}
+
+fn describe(n: Int) {
+    if is(n, 1) {
+        print("one")
+    } else if is(n, 2) {
+        print("two")
+    } else if is(n, 3) && false {
+        print("three")
+    } else {
+        print("other")
+    }
+}
+
+fn main() {
+    describe(1)
+    describe(2)
+    describe(3)
+}

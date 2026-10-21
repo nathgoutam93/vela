@@ -1,0 +1,5 @@
+// err: redefine_print.vl:2:4: error: 'print' is a built-in function and cannot be redefined
+fn print(x: Int) {
+}
+fn main() {
+}

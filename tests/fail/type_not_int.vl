@@ -1,0 +1,4 @@
+// err: type_not_int.vl:3:11: error: operator '!' needs Bool, found Int
+fn main() {
+    print(!1)
+}

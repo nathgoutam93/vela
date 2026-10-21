@@ -1,0 +1,38 @@
+// Block scoping and shadowing. Each local gets its own C name, so the
+// C compiler never confuses an inner `x` with an outer one.
+// out: 1
+// out: 2
+// out: 11
+// out: 2
+// out: 1
+// out: 100
+// out: 7
+// out: 0
+// out: 1
+// out: 2
+fn main() {
+    let x = 1
+    print(x)
+    let x_2 = 2
+    {
+        print(x_2)
+        let x = x + 10
+        print(x)
+        let x_2 = x_2
+        print(x_2)
+    }
+    print(x)
+    if true {
+        let x = 100
+        print(x)
+    }
+    let mut total = 0
+    for i in 0..3 {
+        let i = i * 2
+        total = total + i + 1
+    }
+    print(total - 2)
+    for i in 0..3 {
+        print(i)
+    }
+}

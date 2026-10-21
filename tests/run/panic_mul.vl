@@ -1,3 +1,5 @@
-// err: panic_mul.vl:3:18: panic: integer overflow
+// err: panic_mul.vl:4:22: panic: integer overflow
 // exit: 101
-print(4294967296 * 4294967296)
+fn main() {
+    print(4294967296 * 4294967296)
+}

@@ -1,0 +1,4 @@
+// err: unknown_escape.vl:3:13: error: unknown escape '\q'; use \n \t \r \0 \\ or \"
+fn main() {
+    print("a\q")
+}

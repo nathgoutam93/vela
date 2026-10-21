@@ -1,0 +1,4 @@
+// err: main_returns.vl:2:4: error: main must take no parameters and return nothing
+fn main() -> Int {
+    return 0
+}

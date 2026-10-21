@@ -1,9 +1,11 @@
 // out: 1
 // out: 2
 // out: 3
+fn main() {
 
-// A comment on its own line.
-print(1) // a comment after a statement still ends it
-// print(99)
-print(2)// no space needed
-print(3) // non-ASCII is fine in comments: × ÷ — ✓
+    // A comment on its own line.
+    print(1) // a comment after a statement still ends it
+    // print(99)
+    print(2)// no space needed
+    print(3) // non-ASCII is fine in comments: × ÷ — ✓
+}

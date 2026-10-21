@@ -1,0 +1,4 @@
+// err: break_outside_loop.vl:3:5: error: 'break' is only allowed inside a loop
+fn main() {
+    break
+}

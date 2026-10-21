@@ -1,0 +1,5 @@
+// err: param_missing_type.vl:2:7: error: expected ':' and a type after parameter 'a', found ')'
+fn f(a) {
+}
+fn main() {
+}

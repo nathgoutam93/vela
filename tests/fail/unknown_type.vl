@@ -1,0 +1,5 @@
+// err: unknown_type.vl:2:9: error: unknown type 'Float'
+fn f(x: Float) {
+}
+fn main() {
+}

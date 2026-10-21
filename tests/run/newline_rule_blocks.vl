@@ -1,0 +1,9 @@
+// `}` ends a line, so `} else {` must share a line; a block may hold
+// several statements on one line separated by `;`.
+// out: 1
+// out: 2
+// out: 3
+fn main() {
+    if 1 < 2 { print(1); print(2) } else { print(0) }
+    for i in 0..1 { print(3) };
+}

@@ -1,6 +1,8 @@
 // out: 7
 // out: 0
 // out: 1234567890
-print(7)
-print(0)
-print(1234567890)
+fn main() {
+    print(7)
+    print(0)
+    print(1234567890)
+}

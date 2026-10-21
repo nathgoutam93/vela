@@ -1,0 +1,6 @@
+// err: return_missing_value.vl:3:5: error: 'f' returns Int, so 'return' needs a value
+fn f() -> Int {
+    return
+}
+fn main() {
+}

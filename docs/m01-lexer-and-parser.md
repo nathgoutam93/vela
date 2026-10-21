@@ -545,3 +545,7 @@ Changes to the plan:
 3. **`print` and newlines:** keep `print` as "value plus newline" until
    string building exists (M5/M7), or add a separate non-newline variant
    later?
+
+**Answered after M1:** use `fn main`; the runtime panic is enough for
+constant overflow; `print` keeps its newline. M2 implements the first
+(see `m02-functions-and-control-flow.md`).

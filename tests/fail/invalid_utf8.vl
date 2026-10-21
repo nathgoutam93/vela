@@ -1,0 +1,4 @@
+// err: invalid_utf8.vl:3:12: error: string literal is not valid UTF-8
+fn main() {
+    print("ÿ")
+}

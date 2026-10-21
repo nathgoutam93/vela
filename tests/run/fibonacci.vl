@@ -1,0 +1,43 @@
+// M2 done-when: recursive and iterative Fibonacci.
+// out: 0
+// out: 1
+// out: 1
+// out: 2
+// out: 3
+// out: 5
+// out: 8
+// out: 13
+// out: 21
+// out: 34
+// out: 55
+// out: 89
+// out: 144
+// out: 233
+// out: 377
+// out: 2880067194370816120
+// out: 4660046610375530309
+fn fib(n: Int) -> Int {
+    if n < 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn fib_iter(n: Int) -> Int {
+    let mut a = 0
+    let mut b = 1
+    for i in 0..n {
+        let next = a + b
+        a = b
+        b = next
+    }
+    return a
+}
+
+fn main() {
+    for i in 0..15 {
+        print(fib(i))
+    }
+    print(fib_iter(90))
+    print(fib_iter(91))
+}

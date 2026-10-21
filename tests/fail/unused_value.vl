@@ -1,3 +1,5 @@
-// err: unused_value.vl:3:3: error: this value is not used; only a call can stand alone as a statement
-print(1)
-1 + 2
+// err: unused_value.vl:4:7: error: this value is not used; only a call can stand alone as a statement
+fn main() {
+    print(1)
+    1 + 2
+}

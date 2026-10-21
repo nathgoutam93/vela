@@ -1,0 +1,9 @@
+// The rule looks at the shape of the code, not at values.
+// err: missing_return_if_true.vl:7:1: error: missing return: 'one' returns Int, but the end of its body can be reached
+fn one() -> Int {
+    if true {
+        return 1
+    }
+}
+fn main() {
+}

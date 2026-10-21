@@ -1,3 +1,5 @@
-// err: panic_div_zero.vl:3:9: panic: division by zero
+// err: panic_div_zero.vl:4:13: panic: division by zero
 // exit: 101
-print(1 / (2 - 2))
+fn main() {
+    print(1 / (2 - 2))
+}

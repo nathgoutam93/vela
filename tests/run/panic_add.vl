@@ -1,7 +1,9 @@
 // Output printed before a panic still appears.
 // out: 1
-// err: panic_add.vl:6:27: panic: integer overflow
+// err: panic_add.vl:7:31: panic: integer overflow
 // exit: 101
-print(1)
-print(9223372036854775807 + 1)
-print(2)
+fn main() {
+    print(1)
+    print(9223372036854775807 + 1)
+    print(2)
+}

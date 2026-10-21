@@ -4,7 +4,7 @@ The lexer works on bytes, not Unicode characters. Stage 1 will be written in
 Vela, where a Str is bytes and indexing gives a Byte, so it will scan source
 byte by byte. Both stages must report the same line:column for every token,
 so columns count bytes, starting at 1. Non-ASCII bytes are only allowed
-inside comments.
+inside comments and string literals.
 
 Statements end at newlines using Go's rule: the lexer inserts a `;` token
 at the end of any line whose last token could end a statement.
@@ -21,12 +21,24 @@ KEYWORDS = frozenset(
     "fn let mut if else match for in return break continue type import".split()
 )
 
-PUNCTUATION = frozenset("()+-*/%,;")
+# `true` and `false` are literals, not keywords, but they are just as
+# reserved: the lexer turns them into `bool` tokens, never names.
+BOOL_WORDS = frozenset({"true", "false"})
+
+# Two-byte operators are tried before one-byte ones (maximal munch), so `==`
+# is one token, not two `=`.
+OPERATORS_2 = frozenset({"==", "!=", "<=", ">=", "&&", "||", "..", "->"})
+OPERATORS_1 = frozenset("()+-*/%,;=<>!{}:")
 
 # The newline rule: after a line's last token, insert `;` if that token is
-# one of these. Go's list also has string literals and `++ -- ] }`; ours
-# will grow the same way as tokens are added (`]`, `}`, Str, and `?` in M7).
-ENDS_STATEMENT = frozenset({"ident", "int", ")", "break", "continue", "return"})
+# one of these. Go's list also has `++ -- ]`; ours gains `]` with arrays and
+# `?` in M7, because `let n = parse(x)?` ends a statement with it.
+ENDS_STATEMENT = frozenset(
+    {"ident", "int", "bool", "str", ")", "}", "break", "continue", "return"}
+)
+
+# Escapes allowed in string literals and the byte each stands for.
+ESCAPES = {"n": 0x0A, "t": 0x09, "r": 0x0D, "0": 0x00, "\\": 0x5C, '"': 0x22}
 
 INT_MAX = 2**63 - 1
 
@@ -35,10 +47,11 @@ EOF = -1  # what peek() returns past the end; not a byte value, unlike 0
 
 @dataclass(frozen=True)
 class Token:
-    kind: str  # "ident", "int", "eof", a keyword, or a punctuation symbol
+    kind: str  # "ident", "int", "bool", "str", "eof", a keyword, or an operator
     text: str  # source text; for an inserted `;`, "\n" or "" (end of file)
     line: int
     col: int
+    value: bytes | None = None  # a string literal's bytes, escapes decoded
 
 
 def tokenize(src: bytes) -> list[Token]:
@@ -72,8 +85,8 @@ class Lexer:
     def col(self, pos: int) -> int:
         return pos - self.line_start + 1
 
-    def add(self, kind: str, text: str, start: int) -> None:
-        self.tokens.append(Token(kind, text, self.line, self.col(start)))
+    def add(self, kind: str, text: str, start: int, value: bytes | None = None) -> None:
+        self.tokens.append(Token(kind, text, self.line, self.col(start), value))
 
     def error(self, start: int, message: str) -> CompileError:
         return CompileError(self.line, self.col(start), message)
@@ -105,11 +118,10 @@ class Lexer:
                 self.number()
             elif is_ident_start(c):
                 self.identifier()
-            elif chr(c) in PUNCTUATION:
-                self.add(chr(c), chr(c), self.pos)
-                self.pos += 1
+            elif c == ord('"'):
+                self.string()
             else:
-                raise self.unexpected(c)
+                self.operator(c)
 
     def number(self) -> None:
         start = self.pos
@@ -135,13 +147,65 @@ class Lexer:
         while is_ident_char(self.peek()):
             self.pos += 1
         text = self.src[start:self.pos].decode("ascii")
-        self.add(text if text in KEYWORDS else "ident", text, start)
+        if text in KEYWORDS:
+            self.add(text, text, start)
+        elif text in BOOL_WORDS:
+            self.add("bool", text, start)
+        else:
+            self.add("ident", text, start)
+
+    def string(self) -> None:
+        start = self.pos
+        self.pos += 1  # the opening quote
+        value = bytearray()
+        while True:
+            c = self.peek()
+            if c == EOF or c == ord("\n"):
+                raise self.error(start, "string literal is not closed before the end of the line")
+            self.pos += 1
+            if c == ord('"'):
+                break
+            if c == ord("\\"):
+                escape = self.peek()
+                if escape == EOF or chr(escape) not in ESCAPES:
+                    shown = "" if escape in (EOF, ord("\n")) else chr(escape)
+                    raise self.error(
+                        self.pos - 1,
+                        f"unknown escape '\\{shown}'; use \\n \\t \\r \\0 \\\\ or \\\"",
+                    )
+                value.append(ESCAPES[chr(escape)])
+                self.pos += 1
+            elif c < 0x20 and c != ord("\t"):
+                raise self.error(self.pos - 1, f"control byte 0x{c:02x} in string literal; use an escape")
+            else:
+                value.append(c)
+        raw = self.src[start + 1:self.pos - 1]
+        try:
+            raw.decode("utf-8")
+        except UnicodeDecodeError as e:
+            raise self.error(start + 1 + e.start, "string literal is not valid UTF-8") from None
+        text = self.src[start:self.pos].decode("utf-8")
+        self.add("str", text, start, bytes(value))
+
+    def operator(self, c: int) -> None:
+        two = self.src[self.pos:self.pos + 2].decode("latin-1")
+        if two in OPERATORS_2:
+            self.add(two, two, self.pos)
+            self.pos += 2
+        elif chr(c) in OPERATORS_1:
+            self.add(chr(c), chr(c), self.pos)
+            self.pos += 1
+        else:
+            raise self.unexpected(c)
 
     def unexpected(self, c: int) -> CompileError:
         if c >= 0x80:
             return self.error(
-                self.pos, f"unexpected byte 0x{c:02x}; non-ASCII text is only allowed in comments"
+                self.pos,
+                f"unexpected byte 0x{c:02x}; non-ASCII text is only allowed in comments and strings",
             )
+        if chr(c) in "&|":
+            return self.error(self.pos, f"unexpected character '{chr(c)}'; did you mean '{chr(c) * 2}'?")
         if 0x21 <= c <= 0x7E:
             return self.error(self.pos, f"unexpected character '{chr(c)}'")
         return self.error(self.pos, f"unexpected control byte 0x{c:02x}")
@@ -153,6 +217,10 @@ def describe(tok: Token) -> str:
         return f"identifier '{tok.text}'"
     if tok.kind == "int":
         return f"integer {tok.text}"
+    if tok.kind == "bool":
+        return tok.text
+    if tok.kind == "str":
+        return f"string {tok.text}"
     if tok.kind == "eof":
         return "end of file"
     if tok.kind == ";":
@@ -166,7 +234,7 @@ def dump(tokens: list[Token]) -> str:
     """One token per line, `line:col kind [text]`; what `vela tokens` prints."""
     lines = []
     for tok in tokens:
-        if tok.kind in ("ident", "int"):
+        if tok.kind in ("ident", "int", "bool", "str"):
             shown = f"{tok.kind} {tok.text}"
         elif tok.kind == ";" and tok.text != ";":
             shown = "; (newline)" if tok.text == "\n" else "; (end of file)"

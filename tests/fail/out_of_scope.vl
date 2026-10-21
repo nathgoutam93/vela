@@ -1,0 +1,7 @@
+// err: out_of_scope.vl:6:11: error: undefined name 'y'
+fn main() {
+    if true {
+        let y = 1
+    }
+    print(y)
+}

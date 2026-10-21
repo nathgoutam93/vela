@@ -1,3 +1,5 @@
-// err: panic_neg.vl:3:7: panic: integer overflow
+// err: panic_neg.vl:4:11: panic: integer overflow
 // exit: 101
-print(-(-9223372036854775807 - 1))
+fn main() {
+    print(-(-9223372036854775807 - 1))
+}

@@ -1,3 +1,5 @@
-// err: unclosed_group.vl:2:13: error: expected ')' to match '(' at 2:7, found newline
-print((1 + 2
-)
+// err: unclosed_group.vl:3:17: error: expected ')' to match '(' at 3:11, found newline
+fn main() {
+    print((1 + 2
+    )
+}

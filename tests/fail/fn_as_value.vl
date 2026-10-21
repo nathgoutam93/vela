@@ -1,0 +1,4 @@
+// err: fn_as_value.vl:3:13: error: 'main' is a function; call it as main(...)
+fn main() {
+    let f = main
+}

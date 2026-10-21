@@ -1,0 +1,4 @@
+// err: return_value_in_void.vl:3:12: error: 'main' does not return a value, so 'return' cannot have one
+fn main() {
+    return 5
+}

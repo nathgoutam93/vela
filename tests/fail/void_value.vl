@@ -1,0 +1,6 @@
+// err: void_value.vl:5:13: error: nothing(...) does not produce a value
+fn nothing() {
+}
+fn main() {
+    let x = nothing()
+}

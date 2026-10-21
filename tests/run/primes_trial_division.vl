@@ -1,0 +1,52 @@
+// Primes below 100 by trial division, using for, break and && together.
+// out: 2
+// out: 3
+// out: 5
+// out: 7
+// out: 11
+// out: 13
+// out: 17
+// out: 19
+// out: 23
+// out: 29
+// out: 31
+// out: 37
+// out: 41
+// out: 43
+// out: 47
+// out: 53
+// out: 59
+// out: 61
+// out: 67
+// out: 71
+// out: 73
+// out: 79
+// out: 83
+// out: 89
+// out: 97
+fn is_prime(n: Int) -> Bool {
+    if n < 2 {
+        return false
+    }
+    let mut d = 2
+    for d * d <= n {
+        if n % d == 0 {
+            return false
+        }
+        d = d + 1
+    }
+    return true
+}
+
+fn main() {
+    let mut n = 0
+    for {
+        if n >= 100 {
+            break
+        }
+        if is_prime(n) {
+            print(n)
+        }
+        n = n + 1
+    }
+}

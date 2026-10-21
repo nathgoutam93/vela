@@ -1,0 +1,30 @@
+// Functions without a result, early return, and ignoring a result.
+// out: start
+// out: 1
+// out: 2
+// out: done
+// out: done
+// out: done
+// out: 42
+fn count_to(n: Int) {
+    let mut i = 1
+    for {
+        if i > n {
+            return
+        }
+        print(i)
+        i = i + 1
+    }
+}
+
+fn noisy() -> Int {
+    print("done")
+    return 42
+}
+
+fn main() {
+    print("start")
+    count_to(2)
+    noisy()
+    print(noisy() - noisy() + 42 - 0 * 0)
+}

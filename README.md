@@ -34,8 +34,20 @@ run_tests.py the golden-test runner
 
 ## Status
 
-M0 (driver, test runner) and M1 (integer arithmetic and `print`) are done:
+M0 (driver, test runner), M1 (expressions) and M2 (variables, functions,
+control flow) are done:
 
 ```
-print(1 + 2 * 3)   // prints 7
+fn fib(n: Int) -> Int {
+    if n < 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn main() {
+    for i in 0..10 {
+        print(fib(i))
+    }
+}
 ```

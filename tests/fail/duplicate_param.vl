@@ -1,0 +1,5 @@
+// err: duplicate_param.vl:2:14: error: parameter 'a' is already declared
+fn f(a: Int, a: Int) {
+}
+fn main() {
+}

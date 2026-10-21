@@ -1,0 +1,6 @@
+// err: assign_loop_var.vl:4:9: error: cannot assign to loop variable 'i'
+fn main() {
+    for i in 0..3 {
+        i = 5
+    }
+}

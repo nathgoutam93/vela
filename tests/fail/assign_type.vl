@@ -1,0 +1,5 @@
+// err: assign_type.vl:4:9: error: cannot assign Str to 'x', which is Int
+fn main() {
+    let mut x = 1
+    x = "one"
+}

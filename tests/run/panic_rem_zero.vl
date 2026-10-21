@@ -1,3 +1,5 @@
-// err: panic_rem_zero.vl:3:9: panic: division by zero
+// err: panic_rem_zero.vl:4:13: panic: division by zero
 // exit: 101
-print(5 % 0)
+fn main() {
+    print(5 % 0)
+}

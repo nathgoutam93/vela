@@ -1,2 +1,4 @@
-// err: undefined_name.vl:2:11: error: undefined name 'x'
-print(1 + x)
+// err: undefined_name.vl:3:15: error: undefined name 'x'
+fn main() {
+    print(1 + x)
+}

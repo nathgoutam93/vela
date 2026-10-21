@@ -1,0 +1,4 @@
+// err: str_ordering.vl:3:15: error: operator '<' needs Int operands, found Str and Str
+fn main() {
+    print("a" < "b")
+}

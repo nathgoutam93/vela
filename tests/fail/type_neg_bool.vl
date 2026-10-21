@@ -1,0 +1,4 @@
+// err: type_neg_bool.vl:3:11: error: operator '-' needs Int, found Bool
+fn main() {
+    print(-true)
+}

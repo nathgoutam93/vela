@@ -1,0 +1,34 @@
+// String literals: escapes, UTF-8, equality, passing and returning.
+// out: hello, world
+// out:
+// out: tab:	here
+// out: quote:"q" backslash:\
+// out: naïve café ✓
+// out: true
+// out: false
+// out: true
+// out: true
+// out: second
+// out: line one
+// out: line two
+fn pick(first: Bool) -> Str {
+    if first {
+        return "first"
+    }
+    return "second"
+}
+
+fn main() {
+    print("hello, world")
+    print("")
+    print("tab:\there")
+    print("quote:\"q\" backslash:\\")
+    print("naïve café ✓")
+    print("abc" == "abc")
+    print("abc" == "abd")
+    print("abc" != "ab")
+    let s = "x"
+    print(s == "x")
+    print(pick(false))
+    print("line one\nline two")
+}

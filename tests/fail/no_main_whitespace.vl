@@ -1,0 +1,4 @@
+// err: no_main_whitespace.vl:1:1: error: the program has no main function; execution starts at fn main()
+
+  
+	

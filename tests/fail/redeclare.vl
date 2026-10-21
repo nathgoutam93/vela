@@ -1,0 +1,5 @@
+// err: redeclare.vl:4:9: error: 'x' is already declared in this block, at 3:9
+fn main() {
+    let x = 1
+    let x = 2
+}

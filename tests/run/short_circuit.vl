@@ -1,0 +1,27 @@
+// && and || evaluate their right side only when it can change the result.
+// out: left
+// out: false
+// out: left
+// out: right
+// out: true
+// out: left
+// out: true
+// out: left
+// out: right
+// out: false
+fn left(b: Bool) -> Bool {
+    print("left")
+    return b
+}
+
+fn right(b: Bool) -> Bool {
+    print("right")
+    return b
+}
+
+fn main() {
+    print(left(false) && right(true))
+    print(left(true) && right(true))
+    print(left(true) || right(false))
+    print(left(false) || right(false))
+}

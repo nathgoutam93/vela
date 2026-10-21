@@ -1,0 +1,4 @@
+// err: if_missing_brace.vl:3:13: error: expected '{' after the 'if' condition, found identifier 'print'
+fn main() {
+    if true print(1)
+}

@@ -1,0 +1,45 @@
+// M2 tokens: two-byte operators, strings, bools, braces; `}` and `true` end a line.
+// dump: tokens
+// out: 42:1 fn
+// out: 42:4 ident f
+// out: 42:5 (
+// out: 42:6 ident a
+// out: 42:7 :
+// out: 42:9 ident Int
+// out: 42:12 )
+// out: 42:14 ->
+// out: 42:17 ident Bool
+// out: 42:22 {
+// out: 43:5 return
+// out: 43:12 ident a
+// out: 43:14 <=
+// out: 43:17 int 1
+// out: 43:19 &&
+// out: 43:22 str "x\n"
+// out: 43:28 !=
+// out: 43:31 str "y"
+// out: 43:35 ||
+// out: 43:38 !
+// out: 43:39 bool true
+// out: 43:43 ; (newline)
+// out: 44:1 }
+// out: 44:2 ; (newline)
+// out: 45:1 for
+// out: 45:5 ident i
+// out: 45:7 in
+// out: 45:10 int 0
+// out: 45:11 ..
+// out: 45:13 int 2
+// out: 45:15 {
+// out: 45:17 ident x
+// out: 45:19 =
+// out: 45:21 ident i
+// out: 45:23 >
+// out: 45:25 int 0
+// out: 45:27 }
+// out: 45:28 ; (newline)
+// out: 46:1 eof
+fn f(a: Int) -> Bool {
+    return a <= 1 && "x\n" != "y" || !true
+}
+for i in 0..2 { x = i > 0 }

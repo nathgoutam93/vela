@@ -1,0 +1,5 @@
+// err: assign_immutable.vl:4:5: error: cannot assign to 'x', which was declared with 'let'; use 'let mut' to allow changes
+fn main() {
+    let x = 1
+    x = 2
+}

@@ -1,0 +1,5 @@
+// err: for_not_bool.vl:3:9: error: the condition of 'for' must be Bool, found Int
+fn main() {
+    for 0 {
+    }
+}

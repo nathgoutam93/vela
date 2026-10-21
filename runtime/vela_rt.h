@@ -3,14 +3,30 @@
 #ifndef VELA_RT_H
 #define VELA_RT_H
 
+#include <stdbool.h>
 #include <stdint.h>
+
+// A Vela Str: immutable bytes and their length. Not NUL-terminated, since a
+// Str may contain "\0". Literals point at C string constants; heap strings
+// with reference counting arrive in M5.
+typedef struct {
+    const uint8_t *data;
+    int64_t len;
+} vela_str;
+
+// The Str for a C string literal of `n` bytes.
+#define VELA_STR(literal, n) ((vela_str){(const uint8_t *)(literal), (n)})
+
+bool vela_str_eq(vela_str a, vela_str b);
 
 // Stops the program: prints "<loc>: panic: <msg>" to stderr, exits with 101.
 // `loc` is the Vela source position, "file.vl:line:col".
 _Noreturn void vela_panic(const char *loc, const char *msg);
 
-// print(x) for an Int: the number and a newline.
+// print(x): the value, then a newline.
 void vela_print_int(int64_t x);
+void vela_print_bool(bool x);
+void vela_print_str(vela_str x);
 
 // Int arithmetic. Signed overflow is undefined behaviour in C, so it must
 // never happen in generated code: each operation checks first and panics.

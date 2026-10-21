@@ -5,12 +5,14 @@
 // out: 3
 // out: 4
 // out: 5
-print(1 +
-    2 +
-    3)
-print(
-    10,
-)
+fn main() {
+    print(1 +
+        2 +
+        3)
+    print(
+        10,
+    )
 
-print(3); print(4)
-;; print(5);
+    print(3); print(4)
+    ;; print(5);
+}

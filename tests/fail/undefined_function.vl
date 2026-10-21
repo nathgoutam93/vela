@@ -1,2 +1,4 @@
-// err: undefined_function.vl:2:1: error: undefined function 'prnt'
-prnt(1)
+// err: undefined_function.vl:3:5: error: undefined function 'prnt'
+fn main() {
+    prnt(1)
+}

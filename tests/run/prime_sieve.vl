@@ -1,0 +1,48 @@
+// M2 done-when: a sieve of Eratosthenes. Arrays arrive in M5, so the table of
+// crossed-out numbers is the bits of one Int: bit k set means k is not prime.
+// That limits the sieve to 2..62, the bits an Int can hold.
+// out: 2
+// out: 3
+// out: 5
+// out: 7
+// out: 11
+// out: 13
+// out: 17
+// out: 19
+// out: 23
+// out: 29
+// out: 31
+// out: 37
+// out: 41
+// out: 43
+// out: 47
+// out: 53
+// out: 59
+// out: 61
+fn pow2(k: Int) -> Int {
+    let mut p = 1
+    for i in 0..k {
+        p = p * 2
+    }
+    return p
+}
+
+fn is_crossed(table: Int, k: Int) -> Bool {
+    return table / pow2(k) % 2 == 1
+}
+
+fn main() {
+    let mut table = 0
+    for n in 2..63 {
+        if !is_crossed(table, n) {
+            print(n)
+            let mut multiple = n * n
+            for multiple < 63 {
+                if !is_crossed(table, multiple) {
+                    table = table + pow2(multiple)
+                }
+                multiple = multiple + n
+            }
+        }
+    }
+}

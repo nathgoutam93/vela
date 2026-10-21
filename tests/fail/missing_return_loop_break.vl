@@ -1,0 +1,9 @@
+// err: missing_return_loop_break.vl:7:1: error: missing return: 'f' returns Int, but the end of its body can be reached
+fn f() -> Int {
+    for {
+        break
+    }
+    // without the break, the loop would never end and this would be fine
+}
+fn main() {
+}
