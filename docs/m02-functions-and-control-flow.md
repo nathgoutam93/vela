@@ -440,10 +440,21 @@ before the expectation was changed.
 
 The suite passes with gcc and clang, and with gcc plus
 `-fsanitize=undefined,address`. clang's sanitizer runtime is not installed
-in my environment, so clang has not been run with sanitizers. I also fuzzed
-the front end with 100,000 random programs (no crashes), and compiled 400
-random programs that pass the checker with strict gcc flags. All 400 were
-accepted.
+in my environment, so clang has not been run with sanitizers.
+
+Outside the suite, I ran two random tests (the scripts were throwaway and
+are not in the repo):
+
+- **Front-end fuzzing:** 100,000 random token sequences. Every one either
+  compiled or gave a `CompileError`; none crashed the compiler.
+- **Random well-typed programs:** a small generator wrote 300 programs
+  with several functions, nested `if`/`for`, `break`/`continue`, `&&`/`||`,
+  shadowing and calls. Each was compiled with the strict flags plus gcc's
+  sanitizers, then run. All 300 compiled. 267 ran cleanly and 33 hit a
+  Vela panic (mostly division by zero), with no sanitizer reports. Built
+  with gcc and with clang, all 300 printed byte-identical output and exit
+  codes, which is the left-to-right evaluation guarantee holding in
+  practice. This generator found the `x == x` warning issue in section 7.
 
 ## 9. What real compilers do differently
 
