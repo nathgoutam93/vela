@@ -1,0 +1,2 @@
+// err: empty_parens.vl:2:8: error: expected expression, found ')'
+print(())

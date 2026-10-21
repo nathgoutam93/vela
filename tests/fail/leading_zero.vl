@@ -1,0 +1,2 @@
+// err: leading_zero.vl:2:7: error: integer literal '007' has a leading zero
+print(007)

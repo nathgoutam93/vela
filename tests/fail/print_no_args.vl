@@ -1,0 +1,2 @@
+// err: print_no_args.vl:2:1: error: print expects 1 argument, got 0
+print()

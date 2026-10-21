@@ -1,0 +1,16 @@
+// A line ending in an operator, `(` or `,` continues on the next line.
+// Explicit `;` separates statements on one line; empty statements are fine.
+// out: 6
+// out: 10
+// out: 3
+// out: 4
+// out: 5
+print(1 +
+    2 +
+    3)
+print(
+    10,
+)
+
+print(3); print(4)
+;; print(5);

@@ -1,0 +1,3 @@
+// err: panic_rem_zero.vl:3:9: panic: division by zero
+// exit: 101
+print(5 % 0)

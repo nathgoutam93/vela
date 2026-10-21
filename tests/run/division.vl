@@ -1,0 +1,19 @@
+// Division truncates toward zero; the remainder takes the dividend's sign.
+// out: 3
+// out: -3
+// out: -3
+// out: 3
+// out: 1
+// out: -1
+// out: 1
+// out: -1
+// out: 0
+print(7 / 2)
+print(-7 / 2)
+print(7 / -2)
+print(-7 / -2)
+print(7 % 3)
+print(-7 % 3)
+print(7 % -3)
+print(-7 % -3)
+print(6 % 3)

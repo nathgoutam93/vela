@@ -12,6 +12,8 @@ A test is one .vl file. Comment lines at the very top hold its expectations:
     // err: <text>    a line on stderr: the compiler's in tests/fail,
     //                the program's in tests/run
     // exit: <n>      the program's exit code (default 0)
+    // dump: <what>   tests/dump only: `tokens` or `ast`, the dump that the
+    //                `out:` lines are compared against
 
 The directory a test lives in decides what is checked:
 
@@ -19,6 +21,7 @@ The directory a test lives in decides what is checked:
                   exit code must match exactly
     tests/fail/   the compiler must reject it with exit code 1, and its
                   stderr must match exactly
+    tests/dump/   `vela tokens` or `vela ast` must print exactly the `out:` lines
 
 The compiler runs inside the test's directory and is given the bare file
 name, so messages read `name.vl:3:7: ...` wherever the repo is checked out.
@@ -39,12 +42,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 TESTS = ROOT / "tests"
-KINDS = ("run", "fail")
+KINDS = ("run", "fail", "dump")
 
 # Generated C must compile without a single warning; the test suite enforces it.
 STRICT_CFLAGS = "-Wall -Wextra -Werror -pedantic"
 
-HEADER_LINE = re.compile(r"//\s*(out|err|exit):(.*)$")
+HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump):(.*)$")
 COMPILE_TIMEOUT = 60
 RUN_TIMEOUT = 10
 
@@ -54,6 +57,7 @@ class Expectations:
     out: list[str] = field(default_factory=list)
     err: list[str] = field(default_factory=list)
     exit: int = 0
+    dump: str | None = None
 
 
 def read_expectations(path: Path) -> Expectations:
@@ -72,8 +76,10 @@ def read_expectations(path: Path) -> Expectations:
             expect.out.append(value)
         elif key == "err":
             expect.err.append(value)
-        else:
+        elif key == "exit":
             expect.exit = int(value)
+        else:
+            expect.dump = value.strip()
     return expect
 
 
@@ -89,6 +95,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
     """Run one test. Returns a list of problems; empty means it passed."""
     kind = path.relative_to(TESTS).parts[0]
     expect = read_expectations(path)
+    if kind == "dump":
+        return run_dump_test(compiler, path, expect, env)
     with tempfile.TemporaryDirectory(prefix="vela-test-") as tmp:
         exe = Path(tmp) / "program"
         try:
@@ -122,6 +130,23 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         if ran.returncode != expect.exit:
             problems.append(f"exit code: expected {expect.exit}, got {ran.returncode}")
         return problems
+
+
+def run_dump_test(compiler: list[str], path: Path, expect: Expectations,
+                  env: dict[str, str]) -> list[str]:
+    if expect.dump not in ("tokens", "ast"):
+        return ["a dump test needs `// dump: tokens` or `// dump: ast`"]
+    try:
+        dumped = subprocess.run(
+            [*compiler, expect.dump, path.name],
+            cwd=path.parent, env=env, capture_output=True, text=True,
+            timeout=COMPILE_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return [f"compiler took longer than {COMPILE_TIMEOUT}s"]
+    if dumped.returncode != 0:
+        return [f"compiler exited with {dumped.returncode}:", *dumped.stderr.splitlines()]
+    return compare(f"{expect.dump} dump", expect.out, dumped.stdout)
 
 
 def find_tests(filters: list[str]) -> list[Path]:

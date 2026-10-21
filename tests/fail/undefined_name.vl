@@ -1,0 +1,2 @@
+// err: undefined_name.vl:2:11: error: undefined name 'x'
+print(1 + x)

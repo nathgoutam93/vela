@@ -1,0 +1,3 @@
+// err: unclosed_group.vl:2:13: error: expected ')' to match '(' at 2:7, found newline
+print((1 + 2
+)

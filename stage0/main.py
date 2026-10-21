@@ -4,6 +4,8 @@
     python3 stage0/main.py build hello.vl [-o hello]   compile to an executable
     python3 stage0/main.py run hello.vl [args...]      compile to a temp file, run it
     python3 stage0/main.py c hello.vl                  print the generated C
+    python3 stage0/main.py tokens hello.vl             print the token stream
+    python3 stage0/main.py ast hello.vl                print the syntax tree
 
 Exit codes: 0 success, 1 the program has errors, 2 bad command line,
 70 internal compiler error (a bug in Vela, not in the program).
@@ -22,7 +24,11 @@ import tempfile
 import traceback
 from pathlib import Path
 
+import ast_nodes
+import checker
 import codegen_c
+import lexer
+import parser
 from errors import CompileError
 
 RUNTIME_DIR = Path(__file__).resolve().parent.parent / "runtime"
@@ -40,21 +46,10 @@ class InternalError(Exception):
 
 
 def compile_to_c(source: bytes, filename: str) -> str:
-    """Run the front end and code generator: Vela source in, C source out."""
-    reject_non_empty(source)
-    return codegen_c.generate()
-
-
-def reject_non_empty(source: bytes) -> None:
-    """M0 placeholder for the front end: only whitespace is a valid program."""
-    line, col = 1, 1
-    for byte in source:
-        if byte == ord("\n"):
-            line, col = line + 1, 1
-        elif byte in b" \t\r":
-            col += 1
-        else:
-            raise CompileError(line, col, "M0 only compiles the empty program")
+    """The whole compiler: Vela source in, C source out. No files, no processes."""
+    program = parser.parse(lexer.tokenize(source))
+    checker.check(program)
+    return codegen_c.generate(program, filename)
 
 
 def read_source(path: str) -> bytes:
@@ -120,6 +115,17 @@ def cmd_c(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tokens(args: argparse.Namespace) -> int:
+    sys.stdout.write(lexer.dump(lexer.tokenize(read_source(args.file))))
+    return 0
+
+
+def cmd_ast(args: argparse.Namespace) -> int:
+    program = parser.parse(lexer.tokenize(read_source(args.file)))
+    sys.stdout.write(ast_nodes.dump(program))
+    return 0
+
+
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="vela", description="Vela stage 0 compiler")
     commands = ap.add_subparsers(dest="command", required=True)
@@ -137,6 +143,14 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = commands.add_parser("c", help="print the generated C")
     p.add_argument("file")
     p.set_defaults(func=cmd_c)
+
+    p = commands.add_parser("tokens", help="print the tokens the lexer produces")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_tokens)
+
+    p = commands.add_parser("ast", help="print the syntax tree the parser produces")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_ast)
 
     return ap.parse_args(argv)
 

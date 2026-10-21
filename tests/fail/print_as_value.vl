@@ -1,0 +1,2 @@
+// err: print_as_value.vl:2:7: error: 'print' is a function; call it as print(...)
+print(print)

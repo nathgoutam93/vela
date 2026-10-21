@@ -1,0 +1,2 @@
+// err: non_ascii.vl:2:9: error: unexpected byte 0xc3; non-ASCII text is only allowed in comments
+print(2 × 3)

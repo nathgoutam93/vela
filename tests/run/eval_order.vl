@@ -1,0 +1,4 @@
+// Operands are evaluated left to right, so the first division panics.
+// err: eval_order.vl:4:9: panic: division by zero
+// exit: 101
+print(1 / 0 + 2 / 0)

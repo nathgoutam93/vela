@@ -1,0 +1,13 @@
+// Unary minus binds tighter than any binary operator.
+// out: -5
+// out: 5
+// out: -6
+// out: -6
+// out: 1
+// out: -7
+print(-5)
+print(-(-5))
+print(-2 * 3)
+print(2 * -3)
+print(-2 - -3)
+print(- -(-7))

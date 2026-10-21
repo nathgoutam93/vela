@@ -1,0 +1,2 @@
+// err: int_too_large.vl:2:8: error: integer literal 9223372036854775808 does not fit in Int (max 9223372036854775807)
+print(-9223372036854775808)

@@ -1,0 +1,2 @@
+// err: unexpected_char.vl:2:9: error: unexpected character '$'
+print(1 $ 2)

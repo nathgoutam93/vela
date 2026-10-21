@@ -1,0 +1,2 @@
+// err: unclosed_call_eof.vl:3:1: error: expected expression, found end of file
+print(

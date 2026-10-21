@@ -1,0 +1,2 @@
+// err: call_non_name.vl:2:7: error: only a named function can be called
+print(5(1))

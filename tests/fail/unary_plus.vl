@@ -1,0 +1,2 @@
+// err: unary_plus.vl:2:7: error: expected expression, found '+'
+print(+1)

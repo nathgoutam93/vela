@@ -1,0 +1,3 @@
+// err: panic_sub.vl:3:28: panic: integer overflow
+// exit: 101
+print(-9223372036854775807 - 2)

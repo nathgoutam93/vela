@@ -1,0 +1,2 @@
+// err: control_byte.vl:2:7: error: unexpected control byte 0x07
+print(1)

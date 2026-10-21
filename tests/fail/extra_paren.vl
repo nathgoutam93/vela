@@ -1,0 +1,2 @@
+// err: extra_paren.vl:2:9: error: expected newline or ';' after statement, found ')'
+print(1))

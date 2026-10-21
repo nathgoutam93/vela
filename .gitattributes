@@ -1,0 +1,3 @@
+*.vl text eol=lf
+# Deliberately uses Windows line endings.
+tests/run/crlf.vl -text

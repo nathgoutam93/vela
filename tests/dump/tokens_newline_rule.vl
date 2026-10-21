@@ -1,0 +1,26 @@
+// The lexer inserts `;` after a line whose last token is a name, a number,
+// `)` or break/continue/return. Header comments are skipped like any other.
+// dump: tokens
+// out: 21:1 ident print
+// out: 21:6 (
+// out: 21:7 int 1
+// out: 21:9 +
+// out: 22:5 int 2
+// out: 22:6 )
+// out: 22:7 ; (newline)
+// out: 23:1 return
+// out: 23:7 ; (newline)
+// out: 24:1 fn
+// out: 24:4 ident x
+// out: 24:5 ;
+// out: 24:7 ident y
+// out: 24:19 ; (newline)
+// out: 26:1 int 7
+// out: 26:2 ; (end of file)
+// out: 26:2 eof
+print(1 +
+    2)
+return
+fn x; y // comment
+
+7

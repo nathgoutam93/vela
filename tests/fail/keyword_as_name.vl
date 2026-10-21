@@ -1,0 +1,3 @@
+// All 13 keywords are reserved from M1, even before they mean anything.
+// err: keyword_as_name.vl:3:7: error: expected expression, found keyword 'match'
+print(match)

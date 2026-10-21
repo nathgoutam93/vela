@@ -1,0 +1,3 @@
+// err: panic_mul.vl:3:18: panic: integer overflow
+// exit: 101
+print(4294967296 * 4294967296)

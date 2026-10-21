@@ -1,0 +1,3 @@
+// No newline at the end of this file.
+// err: missing_paren_eof.vl:3:8: error: expected ',' or ')' in argument list, found end of file
+print(1
