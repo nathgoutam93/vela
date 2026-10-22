@@ -1,0 +1,2243 @@
+// Stage 1 checker: a port of stage0/checker.py, which explains the rules.
+// Every message, and the order in which types are created, matches Stage 0.
+//
+// Stage 0 writes its findings onto the syntax tree. Here they go into
+// arrays indexed by node id (ty, refs, breaks), and the checker's state is
+// one `mut` value threaded through every function.
+//
+// Stage 0 passes messages as functions of the type found (`lambda found:
+// ...`). Vela has no function values, so a message is a Msg: the text
+// before and after where the type goes.
+import ast
+import errors
+import maps
+import match_check
+import modules
+import strings
+import types
+
+pub type Local = struct {
+    name: Str
+    ty: Int
+    kind: Str  // "let", "let mut", "parameter", "mut parameter", "loop variable" or "match binding"
+    line: Int
+    col: Int
+}
+
+pub type FnInfo = struct {
+    decl: ast.FnDecl
+    module: Int  // index into the program's modules
+    params: [Int]  // ERROR where a type name was unknown
+    mutable: [Bool]
+    result: Int  // types.NOTHING() when it returns nothing
+    param_locals: [Int]
+}
+
+// What a name, call, field, pattern or declaration refers to.
+pub type Ref = enum {
+    NoRef
+    Local(Int)
+    Function(Int)
+    Builtin(Str)  // "print", "maps.get", ...
+    Variant(Int, Int)  // the enum's type, the variant's index
+}
+
+pub type Checked = struct {
+    errors: [errors.CompileError]  // sorted
+    table: types.Table
+    modules: [modules.Module]
+    fns: [FnInfo]  // every function, in program order
+    decls: [Int]  // the type of every type declaration, in program order
+    locals: [Local]
+    ty: [Int]  // each expression's type, by node id
+    refs: [Ref]  // by node id
+    breaks: [Bool]  // by node id: whether a `for` loop has a break
+}
+
+type Loop = struct {
+    id: Int
+    is_for: Bool  // a plain `for`, not `for ... in`
+}
+
+type Msg = struct {
+    before: Str
+    after: Str
+}
+
+type Checker = struct {
+    errors: [errors.CompileError]
+    table: types.Table
+    modules: [modules.Module]
+    order: [Int]
+    current: Int  // the module being checked
+    fns: [FnInfo]
+    decls: [Int]
+    locals: [Local]
+    ty: [Int]
+    refs: [Ref]
+    breaks: [Bool]
+    scopes: [Map[Str, Int]]  // local ids, innermost last
+    current_fn: Int  // the function being checked
+    loops: [Loop]
+    undefined: [Str]  // unknown names already reported in this function
+}
+
+pub fn check(loaded: modules.Loaded) -> Checked {
+    let mut ty: [Int] = []
+    let mut refs: [Ref] = []
+    let mut breaks: [Bool] = []
+    for _ in 0..loaded.node_count {
+        push(mut ty, -2)
+        push(mut refs, Ref.NoRef)
+        push(mut breaks, false)
+    }
+    let mut c = Checker {
+        errors: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
+        fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
+        undefined: [],
+    }
+    program(mut c)
+    return Checked {
+        errors: errors.sorted(c.errors), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
+        locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks,
+    }
+}
+
+// ---- Small helpers ----
+
+fn plural(n: Int, word: Str) -> Str {
+    if n == 1 {
+        return strings.from_int(n) + " " + word
+    }
+    return strings.from_int(n) + " " + word + "s"
+}
+
+fn report(c: mut Checker, line: Int, col: Int, message: Str) {
+    let e = errors.CompileError { path: c.modules[c.current].path, line: line, col: col, message: message }
+    errors.add(mut c.errors, e)
+}
+
+fn report_at(c: mut Checker, e: ast.Expr, message: Str) {
+    report(mut c, e.line, e.col, message)
+}
+
+// A type as this module's code writes it.
+fn show(c: Checker, t: Int) -> Str {
+    return types.show(c.table, t, c.modules[c.current].name)
+}
+
+fn msg(before: Str, after: Str) -> Msg {
+    return Msg { before: before, after: after }
+}
+
+fn say(m: Msg, found: Str) -> Str {
+    return m.before + found + m.after
+}
+
+fn module_types(c: Checker) -> Map[Str, Int] {
+    return c.modules[c.current].types
+}
+
+fn module_fns(c: Checker) -> Map[Str, Int] {
+    return c.modules[c.current].fns
+}
+
+fn is_builtin_variant(name: Str) -> Bool {
+    return name == "None" || name == "Some" || name == "Ok" || name == "Err"
+}
+
+// Option for None and Some, Result for Ok and Err.
+fn variant_family(name: Str) -> Str {
+    if name == "None" || name == "Some" {
+        return "Option"
+    }
+    return "Result"
+}
+
+fn is_prelude(name: Str) -> Bool {
+    return name == "print" || name == "len" || name == "push" || name == "int" || name == "byte"
+}
+
+fn set_ty(c: mut Checker, e: ast.Expr, t: Int) {
+    c.ty[e.id] = t
+}
+
+// ---- Declarations ----
+
+// Each step is done for every module before the next starts: every type
+// gets an id, then fields and signatures are worked out, then bodies.
+fn program(c: mut Checker) {
+    let mut decl_start: [Int] = []
+    for m in c.order {
+        c.current = m
+        push(mut decl_start, len(c.decls))
+        declare_types(mut c)
+    }
+    for k in 0..len(c.order) {
+        c.current = c.order[k]
+        define_types(mut c, decl_start[k])
+    }
+    let mut fn_start: [Int] = []
+    for m in c.order {
+        c.current = m
+        push(mut fn_start, len(c.fns))
+        signatures(mut c)
+    }
+    for k in 0..len(c.order) {
+        c.current = c.order[k]
+        let decls = c.modules[c.current].program.fns
+        for i in 0..len(decls) {
+            function(mut c, fn_start[k] + i)
+        }
+    }
+    c.current = c.order[len(c.order) - 1]  // the main module
+    match maps.get(module_fns(c), "main") {
+        None => report(mut c, 1, 1, "the program has no main function; execution starts at fn main()")
+        Some(id) => {
+            let main = c.fns[id].decl
+            let mut has_result = false
+            match main.result {
+                Some(_) => has_result = true
+                None => {}
+            }
+            if len(main.params) > 0 || has_result {
+                report(mut c, main.line, main.col, "main must take no parameters and return nothing")
+            }
+        }
+    }
+}
+
+// Report a top-level name that clashes with an imported module.
+fn taken(c: mut Checker, name: Str, line: Int, col: Int, what: Str) -> Bool {
+    if maps.has(c.modules[c.current].imports, name) {
+        report(mut c, line, col, what + " '" + name + "' has the same name as an imported module")
+        return true
+    }
+    return false
+}
+
+fn declare_types(c: mut Checker) {
+    let m = c.current
+    for d in c.modules[m].program.types {
+        let id = types.add_user(mut c.table, d.is_struct, d.name, c.modules[m].name, d.public, d.line, d.col)
+        push(mut c.decls, id)
+        if types.primitive(d.name) >= 0 || types.generic_arity(d.name) >= 0 {
+            report(mut c, d.line, d.col, "'" + d.name + "' is a built-in type and cannot be redefined")
+        } else if maps.has(module_types(c), d.name) {
+            let first = types.get(c.table, module_types(c)[d.name])
+            report(mut c, d.line, d.col, "type '" + d.name + "' is already defined at " +
+                strings.from_int(first.line) + ":" + strings.from_int(first.col))
+        } else if !taken(mut c, d.name, d.line, d.col, "type") {
+            c.modules[m].types[d.name] = id
+        }
+    }
+}
+
+// Fill in the types' fields and variants.
+fn define_types(c: mut Checker, first_decl: Int) {
+    let decls = c.modules[c.current].program.types
+    for k in 0..len(decls) {
+        let d = decls[k]
+        let id = c.decls[first_decl + k]
+        let mut what = "enum '" + d.name + "'"
+        if d.is_struct {
+            what = "struct '" + d.name + "'"
+        }
+        if d.public {
+            if d.is_struct {
+                for f in d.fields {
+                    exposes(mut c, f.ty, what)
+                }
+            } else {
+                for v in d.variants {
+                    for t in v.payload {
+                        exposes(mut c, t, what)
+                    }
+                }
+            }
+        }
+        if d.is_struct {
+            if len(d.fields) == 0 {
+                report(mut c, d.line, d.col, "struct '" + d.name + "' needs at least one field")
+            }
+            for f in d.fields {
+                let existing = types.field_index(c.table, id, f.name)
+                if existing >= 0 {
+                    report(mut c, f.line, f.col, "field '" + f.name + "' is already declared in '" + d.name + "'")
+                }
+                let ft = resolve_type(mut c, f.ty)
+                // As with a Python dict: a repeated name keeps its first
+                // place and takes the later type.
+                if existing >= 0 {
+                    c.table.types[id].fields[existing].ty = ft
+                } else {
+                    push(mut c.table.types[id].fields, types.FieldInfo { name: f.name, ty: ft })
+                }
+            }
+        } else {
+            if len(d.variants) == 0 {
+                report(mut c, d.line, d.col, "enum '" + d.name + "' needs at least one variant")
+            }
+            for v in d.variants {
+                if types.variant_index(c.table, id, v.name) >= 0 {
+                    report(mut c, v.line, v.col, "variant '" + v.name + "' is already declared in '" + d.name + "'")
+                    continue
+                }
+                let mut payload: [Int] = []
+                for t in v.payload {
+                    push(mut payload, resolve_type(mut c, t))
+                }
+                push(mut c.table.types[id].variants, types.Variant { name: v.name, payload: payload })
+            }
+        }
+    }
+}
+
+// A pub declaration must not mention a private type of its own module.
+fn exposes(c: mut Checker, t: ast.TypeName, what: Str) {
+    if t.module == "" {
+        match maps.get(module_types(c), t.name) {
+            Some(id) => {
+                if !types.get(c.table, id).public {
+                    report(mut c, t.line, t.col, "pub " + what + " uses the private type '" + t.name +
+                        "'; declare it with 'pub type " + t.name + "'")
+                }
+            }
+            None => {}
+        }
+    }
+    for a in t.args {
+        exposes(mut c, a, what)
+    }
+}
+
+fn signatures(c: mut Checker) {
+    let m = c.current
+    for f in c.modules[m].program.fns {
+        let mut params: [Int] = []
+        let mut mutable: [Bool] = []
+        for p in f.params {
+            push(mut params, resolve_type(mut c, p.ty))
+            push(mut mutable, p.mutable)
+        }
+        let mut result = types.NOTHING()
+        match f.result {
+            Some(t) => result = resolve_type(mut c, t)
+            None => {}
+        }
+        push(mut c.fns, FnInfo { decl: f, module: m, params: params, mutable: mutable, result: result,
+                                 param_locals: [] })
+        let id = len(c.fns) - 1
+        if f.public {
+            for p in f.params {
+                exposes(mut c, p.ty, "function '" + f.name + "'")
+            }
+            match f.result {
+                Some(t) => exposes(mut c, t, "function '" + f.name + "'")
+                None => {}
+            }
+        }
+        if is_prelude(f.name) {
+            report(mut c, f.line, f.col, "'" + f.name + "' is a built-in function and cannot be redefined")
+        } else if maps.has(module_fns(c), f.name) {
+            let first = c.fns[module_fns(c)[f.name]].decl
+            report(mut c, f.line, f.col, "function '" + f.name + "' is already defined at " +
+                strings.from_int(first.line) + ":" + strings.from_int(first.col))
+        } else if !taken(mut c, f.name, f.line, f.col, "function") {
+            c.modules[m].fns[f.name] = id
+        }
+        // The body is checked even when the name is rejected.
+    }
+}
+
+// The type a TypeName in the source stands for (ERROR if unknown).
+fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
+    if t.name == "[]" {
+        let elem = resolve_type(mut c, t.args[0])
+        return types.array(mut c.table, elem)
+    }
+    let want = types.generic_arity(t.name)
+    if want >= 0 {
+        if len(t.args) != want {
+            let example = match t.name {
+                "Option" => "Option[Int]"
+                "Result" => "Result[Int, Str]"
+                _ => "Map[Str, Int]"
+            }
+            report(mut c, t.line, t.col, t.name + " needs " + plural(want, "type argument") + ", as in " + example)
+            return types.ERROR()
+        }
+        let mut args: [Int] = []
+        for a in t.args {
+            push(mut args, resolve_type(mut c, a))
+        }
+        if t.name == "Map" {
+            if !types.is_map_key(args[0]) && args[0] != types.ERROR() {
+                let k = t.args[0]
+                report(mut c, k.line, k.col, "Map keys must be Int, Byte, Bool or Str, not " + show(c, args[0]))
+                return types.ERROR()
+            }
+            return types.map(mut c.table, args[0], args[1])
+        }
+        return types.instance(mut c.table, t.name, args)
+    }
+    let mut known = -1
+    if t.module != "" {
+        let module = module_in_type(mut c, t.line, t.col, t.module)
+        if module < 0 {
+            return types.ERROR()
+        }
+        known = module_type(mut c, t.line, t.col, module, t.name)
+        if known < 0 {
+            return types.ERROR()
+        }
+    } else {
+        known = types.primitive(t.name)
+        if known < 0 {
+            match maps.get(module_types(c), t.name) {
+                Some(id) => known = id
+                None => {}
+            }
+        }
+    }
+    if known < 0 {
+        report(mut c, t.line, t.col, "unknown type '" + t.name + "'")
+        return types.ERROR()
+    }
+    if len(t.args) > 0 {
+        report(mut c, t.line, t.col, "'" + show(c, known) + "' takes no type arguments")
+    }
+    return known
+}
+
+fn new_local(c: mut Checker, name: Str, ty: Int, kind: Str, line: Int, col: Int) -> Int {
+    push(mut c.locals, Local { name: name, ty: ty, kind: kind, line: line, col: col })
+    return len(c.locals) - 1
+}
+
+fn function(c: mut Checker, id: Int) {
+    c.current_fn = id
+    c.undefined = []
+    let f = c.fns[id].decl
+    // Parameters and the body's top-level `let`s share one scope.
+    let mut scope: Map[Str, Int] = [:]
+    let mut locals: [Int] = []
+    for i in 0..len(f.params) {
+        let p = f.params[i]
+        if maps.has(scope, p.name) {
+            report(mut c, p.line, p.col, "parameter '" + p.name + "' is already declared")
+        }
+        check_name_allowed(mut c, p.name, p.line, p.col)
+        let mut kind = "parameter"
+        if p.mutable {
+            kind = "mut parameter"
+        }
+        let local = new_local(mut c, p.name, c.fns[id].params[i], kind, p.line, p.col)
+        scope[p.name] = local
+        push(mut locals, local)
+    }
+    c.fns[id].param_locals = locals
+    c.scopes = [scope]
+    for s in f.body.stmts {
+        stmt(mut c, s)
+    }
+    match f.result {
+        Some(_) => {
+            if !terminates_block(c, f.body) {
+                report(mut c, f.body.end_line, f.body.end_col, "missing return: '" + f.name + "' returns " +
+                    show(c, c.fns[id].result) + ", but the end of its body can be reached")
+            }
+        }
+        None => {}
+    }
+}
+
+// `None`, `Some`, `Ok` and `Err` cannot name variables.
+fn check_name_allowed(c: mut Checker, name: Str, line: Int, col: Int) {
+    if is_builtin_variant(name) {
+        report(mut c, line, col, "'" + name + "' is a variant of " + variant_family(name) + " and cannot be used as a name")
+    }
+}
+
+// ---- Modules ----
+
+// The module `e` names, if it is the name of an imported module and no
+// variable shadows it; -1 otherwise.
+fn module_named(c: Checker, e: ast.Expr) -> Int {
+    match e.kind {
+        ast.ExprKind.Name(name) => {
+            if lookup_local(c, name) >= 0 {
+                return -1
+            }
+            match maps.get(c.modules[c.current].imports, name) {
+                Some(m) => return m
+                None => return -1
+            }
+        }
+        _ => return -1
+    }
+}
+
+// The module before the `.` in a type or struct literal: `lexer.Token`.
+fn module_in_type(c: mut Checker, line: Int, col: Int, name: Str) -> Int {
+    match maps.get(c.modules[c.current].imports, name) {
+        Some(m) => return m
+        None => {}
+    }
+    if maps.has(module_types(c), name) {
+        report(mut c, line, col, "'" + name + "' is a type, not a module")
+    } else {
+        report(mut c, line, col, "unknown module '" + name + "'; is `import " + name + "` missing?")
+    }
+    return -1
+}
+
+fn has_std(m: modules.Module, name: Str) -> Bool {
+    for f in m.std {
+        if f == name {
+            return true
+        }
+    }
+    return false
+}
+
+// The pub type `module.name`, or -1 once the reason is reported.
+fn module_type(c: mut Checker, line: Int, col: Int, module: Int, name: Str) -> Int {
+    let m = c.modules[module]
+    match maps.get(m.types, name) {
+        None => {
+            if maps.has(m.fns, name) || has_std(m, name) {
+                report(mut c, line, col, "'" + m.name + "." + name + "' is a function, not a type")
+            } else {
+                report(mut c, line, col, "module '" + m.name + "' has no type '" + name + "'")
+            }
+            return -1
+        }
+        Some(t) => {
+            if !types.get(c.table, t).public {
+                private(mut c, line, col, module, "type", name)
+                return -1
+            }
+            return t
+        }
+    }
+}
+
+// The pub function `module.name`, or a built-in module's function; NoRef
+// once the reason is reported.
+fn module_fn(c: mut Checker, line: Int, col: Int, module: Int, name: Str) -> Ref {
+    let m = c.modules[module]
+    if has_std(m, name) {
+        return Ref.Builtin(m.name + "." + name)
+    }
+    match maps.get(m.fns, name) {
+        None => {
+            if maps.has(m.types, name) {
+                report(mut c, line, col, "'" + m.name + "." + name + "' is a type, not a function")
+            } else {
+                report(mut c, line, col, "module '" + m.name + "' has no function '" + name + "'")
+            }
+            return Ref.NoRef
+        }
+        Some(f) => {
+            if !c.fns[f].decl.public {
+                private(mut c, line, col, module, "function", name)
+                return Ref.NoRef
+            }
+            return Ref.Function(f)
+        }
+    }
+}
+
+fn private(c: mut Checker, line: Int, col: Int, module: Int, what: Str, name: Str) {
+    let m = c.modules[module]
+    report(mut c, line, col, what + " '" + name + "' is private to module '" + m.name +
+        "'; declare it with 'pub' in " + m.path + " to use it here")
+}
+
+// `; it is maps.get` for a name that lives in a built-in module.
+fn std_hint(c: Checker, name: Str) -> Str {
+    for module in ["maps", "files", "os", "strings"] {
+        let fns = match module {
+            "maps" => ["has", "get", "remove", "keys"]
+            "files" => ["read", "write"]
+            "os" => ["args", "exit", "eprint"]
+            _ => ["builder", "add", "add_byte", "add_int", "build", "from_int"]
+        }
+        for f in fns {
+            if f == name {
+                let hint = "; it is " + module + "." + name
+                if maps.has(c.modules[c.current].imports, module) {
+                    return hint
+                }
+                return hint + ", after `import " + module + "`"
+            }
+        }
+    }
+    return ""
+}
+
+// ---- Statements ----
+
+fn push_scope(c: mut Checker, scope: Map[Str, Int]) {
+    push(mut c.scopes, scope)
+}
+
+fn pop_scope(c: mut Checker) {
+    c.scopes = c.scopes[0..len(c.scopes) - 1]
+}
+
+fn block(c: mut Checker, b: ast.Block) {
+    push_scope(mut c, [:])
+    for s in b.stmts {
+        stmt(mut c, s)
+    }
+    pop_scope(mut c)
+}
+
+fn stmt(c: mut Checker, s: ast.Stmt) {
+    match s.kind {
+        ast.StmtKind.Block(b) => block(mut c, b)
+        ast.StmtKind.ExprStmt(e) => {
+            let mut call = e
+            match e.kind {
+                ast.ExprKind.Try(inner) => call = inner
+                _ => {}
+            }
+            let mut is_call = false
+            match call.kind {
+                ast.ExprKind.Call(_, _) => is_call = true
+                _ => {}
+            }
+            if !is_call {
+                // `1 + 2` on a line by itself computes a value and throws it away.
+                report_at(mut c, e, "this value is not used; only a call can stand alone as a statement")
+            }
+            infer(mut c, e)  // a call's result may be ignored
+        }
+        ast.StmtKind.Let(name, mutable, annotation, value) => let_stmt(mut c, s, name, mutable, annotation, value)
+        ast.StmtKind.Assign(target, value) => assign(mut c, target, value)
+        ast.StmtKind.If(cond, then, otherwise) => {
+            condition(mut c, cond, "if")
+            block(mut c, then)
+            match otherwise {
+                ast.Else.ElseIf(s2) => stmt(mut c, s2)
+                ast.Else.ElseBlock(b) => block(mut c, b)
+                ast.Else.NoElse => {}
+            }
+        }
+        ast.StmtKind.For(cond, body) => {
+            c.breaks[s.id] = false
+            match cond {
+                Some(e) => condition(mut c, e, "for")
+                None => {}
+            }
+            loop_body(mut c, s.id, true, body)
+        }
+        ast.StmtKind.ForRange(name, start, end, body) => {
+            for bound in [start, end] {
+                check_expr(mut c, bound, types.INT(), msg("a range must be made of Int values, found ", ""))
+            }
+            check_name_allowed(mut c, name, s.line, s.col)
+            let local = new_local(mut c, name, types.INT(), "loop variable", s.line, s.col)
+            c.refs[s.id] = Ref.Local(local)
+            // The loop variable gets a scope of its own around the body.
+            let mut scope: Map[Str, Int] = [:]
+            scope[name] = local
+            push_scope(mut c, scope)
+            loop_body(mut c, s.id, false, body)
+            pop_scope(mut c)
+        }
+        ast.StmtKind.ForEach(name, iterable, body) => {
+            let t = value(mut c, iterable)
+            let mut elem = types.ERROR()
+            if types.is_array(c.table, t) {
+                elem = types.get(c.table, t).args[0]
+            } else if t == types.STR() {
+                elem = types.BYTE()
+            } else if types.is_map(c.table, t) {
+                report_at(mut c, iterable, "a map cannot be looped over directly; loop over maps.keys(m) instead")
+            } else if t != types.ERROR() {
+                report_at(mut c, iterable, "cannot loop over " + show(c, t) +
+                    "; 'for ... in' needs an array, a Str or a range")
+            }
+            check_name_allowed(mut c, name, s.line, s.col)
+            let local = new_local(mut c, name, elem, "loop variable", s.line, s.col)
+            c.refs[s.id] = Ref.Local(local)
+            let mut scope: Map[Str, Int] = [:]
+            scope[name] = local
+            push_scope(mut c, scope)
+            loop_body(mut c, s.id, false, body)
+            pop_scope(mut c)
+        }
+        ast.StmtKind.Break => jump(mut c, s, "break")
+        ast.StmtKind.Continue => jump(mut c, s, "continue")
+        ast.StmtKind.Return(v) => return_stmt(mut c, s, v)
+        ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut c, scrutinee, arms, s.line, s.col, MatchBody.Statements)
+    }
+}
+
+fn jump(c: mut Checker, s: ast.Stmt, word: Str) {
+    let n = len(c.loops)
+    if n == 0 {
+        report(mut c, s.line, s.col, "'" + word + "' is only allowed inside a loop")
+    } else if word == "break" && c.loops[n - 1].is_for {
+        c.breaks[c.loops[n - 1].id] = true
+    }
+}
+
+fn let_stmt(c: mut Checker, s: ast.Stmt, name: Str, mutable: Bool, annotation: Option[ast.TypeName],
+            v: ast.Expr) {
+    // The value is checked before the name exists, so in `let x = x + 1`
+    // the `x` on the right is an outer `x`.
+    let mut ty = types.ERROR()
+    match annotation {
+        Some(t) => {
+            ty = resolve_type(mut c, t)
+            check_expr(mut c, v, ty, msg("'" + name + "' is declared as " + show(c, ty) + ", but its value is ", ""))
+        }
+        None => ty = value(mut c, v)
+    }
+    check_name_allowed(mut c, name, s.line, s.col)
+    let n = len(c.scopes) - 1
+    match maps.get(c.scopes[n], name) {
+        Some(first) => {
+            let l = c.locals[first]
+            report(mut c, s.line, s.col, "'" + name + "' is already declared in this block, at " +
+                strings.from_int(l.line) + ":" + strings.from_int(l.col))
+        }
+        None => {}
+    }
+    let mut kind = "let"
+    if mutable {
+        kind = "let mut"
+    }
+    let local = new_local(mut c, name, ty, kind, s.line, s.col)
+    c.scopes[n][name] = local
+    c.refs[s.id] = Ref.Local(local)
+}
+
+fn loop_body(c: mut Checker, id: Int, is_for: Bool, body: ast.Block) {
+    push(mut c.loops, Loop { id: id, is_for: is_for })
+    block(mut c, body)
+    c.loops = c.loops[0..len(c.loops) - 1]
+}
+
+fn condition(c: mut Checker, cond: ast.Expr, word: Str) {
+    check_expr(mut c, cond, types.BOOL(), msg("the condition of '" + word + "' must be Bool, found ", ""))
+}
+
+fn assign(c: mut Checker, target: ast.Expr, v: ast.Expr) {
+    match target.kind {
+        ast.ExprKind.Name(name) => {
+            if maps.has(module_fns(c), name) && lookup_local(c, name) < 0 {
+                report_at(mut c, target, "cannot assign to function '" + name + "'")
+                value(mut c, v)
+                return
+            }
+        }
+        _ => {}
+    }
+    let ty = place(mut c, target, "assign to")
+    check_expr(mut c, v, ty, msg("cannot assign ", " to " + describe_target(target) + ", which is " + show(c, ty)))
+}
+
+// The expression a field access or index is applied to, if `e` is one.
+fn inner_object(e: ast.Expr) -> Option[ast.Expr] {
+    return match e.kind {
+        ast.ExprKind.Field(obj, _) => Some(obj)
+        ast.ExprKind.Index(obj, _) => Some(obj)
+        _ => None
+    }
+}
+
+fn is_field(e: ast.Expr) -> Bool {
+    return match e.kind {
+        ast.ExprKind.Field(_, _) => true
+        _ => false
+    }
+}
+
+fn is_index(e: ast.Expr) -> Bool {
+    return match e.kind {
+        ast.ExprKind.Index(_, _) => true
+        _ => false
+    }
+}
+
+// The variable at the start of a path like `p.f[i].g`.
+fn root_of(e: ast.Expr) -> ast.Expr {
+    let mut root = e
+    for {
+        match inner_object(root) {
+            Some(obj) => root = obj
+            None => return root
+        }
+    }
+}
+
+// Check a place about to be changed: a `let mut` variable or mut
+// parameter, or a field or element of one. Returns its type.
+fn place(c: mut Checker, target: ast.Expr, verb: Str) -> Int {
+    let root = root_of(target)
+    let mut is_name = false
+    match root.kind {
+        ast.ExprKind.Name(_) => is_name = true
+        _ => {}
+    }
+    if !is_name {
+        report_at(mut c, target, "only a variable, or a field or element of one, can be changed")
+        infer(mut c, target)
+        return types.ERROR()
+    }
+    let ty = infer(mut c, target)
+    if is_field(target) {
+        match c.refs[target.id] {
+            Ref.Variant(_, _) => {
+                report_at(mut c, target, "a variant cannot be assigned to")
+                return types.ERROR()
+            }
+            _ => {}
+        }
+    }
+    let mut node = target
+    for {
+        match inner_object(node) {
+            Some(obj) => {
+                if is_index(node) && c.ty[obj.id] == types.STR() {
+                    report_at(mut c, node, "a Str cannot be changed; build a new one instead, for example with +")
+                    return types.ERROR()
+                }
+                node = obj
+            }
+            None => break
+        }
+    }
+    match c.refs[root.id] {
+        Ref.Local(id) => {
+            let l = c.locals[id]
+            let mut part = ""
+            if is_field(target) {
+                part = "a field of "
+            } else if is_index(target) {
+                part = "an element of "
+            }
+            if l.kind == "let" {
+                report_at(mut c, root, "cannot " + verb + " " + part + "'" + l.name +
+                    "', which was declared with 'let'; use 'let mut' to allow changes")
+            } else if l.kind == "parameter" {
+                report_at(mut c, root, "cannot " + verb + " " + part + "parameter '" + l.name + "'; declare it as `" +
+                    l.name + ": mut " + show(c, l.ty) + "` to change the caller's value, or copy it into a `let mut`")
+            } else if l.kind != "let mut" && l.kind != "mut parameter" {
+                report_at(mut c, root, "cannot " + verb + " " + part + l.kind + " '" + l.name + "'")
+            }
+        }
+        _ => {}
+    }
+    return ty
+}
+
+fn return_stmt(c: mut Checker, s: ast.Stmt, v: Option[ast.Expr]) {
+    let f = c.fns[c.current_fn]
+    let mut has_result = false
+    match f.decl.result {
+        Some(_) => has_result = true
+        None => {}
+    }
+    match v {
+        None => {
+            if has_result {
+                report(mut c, s.line, s.col, "'" + f.decl.name + "' returns " + show(c, f.result) +
+                    ", so 'return' needs a value")
+            }
+        }
+        Some(e) => {
+            if !has_result {
+                report_at(mut c, e, "'" + f.decl.name + "' does not return a value, so 'return' cannot have one")
+                infer(mut c, e)
+            } else {
+                check_expr(mut c, e, f.result, msg("'" + f.decl.name + "' returns " + show(c, f.result) + ", but this is ", ""))
+            }
+        }
+    }
+}
+
+// ---- Match ----
+
+// What a match does with its arms' bodies: run them as statements, check
+// each against a wanted type, or let the first arm decide the type.
+type MatchBody = enum {
+    Statements
+    Check(Int, Msg)
+    Infer
+}
+
+fn arm_value(a: ast.Arm) -> ast.Expr {
+    match a.body {
+        ast.ArmBody.Value(e) => return e
+        ast.ArmBody.Do(_) => {}
+    }
+    return ast.Expr { kind: ast.ExprKind.UnitLit, line: 0, col: 0, id: 0 }  // not reached
+}
+
+// Check a match: its patterns, each arm's body, and that the arms cover
+// every value without a useless one. Returns the type of a match
+// expression whose first arm decides (Infer).
+fn match_arms(c: mut Checker, scrutinee: ast.Expr, arms: [ast.Arm], line: Int, col: Int, body: MatchBody) -> Int {
+    let t = value(mut c, scrutinee)
+    let mut patterns_ok = t != types.ERROR()
+    let mut first = -3  // no arm seen yet
+    for a in arms {
+        let mut bindings: Map[Str, Int] = [:]
+        let ok = pattern(mut c, a.pattern, t, mut bindings)
+        patterns_ok = patterns_ok && ok
+        push_scope(mut c, bindings)
+        match body {
+            MatchBody.Statements => {
+                match a.body {
+                    ast.ArmBody.Do(s) => stmt(mut c, s)
+                    ast.ArmBody.Value(e) => infer(mut c, e)
+                }
+            }
+            MatchBody.Check(want, m) => check_expr(mut c, arm_value(a), want, m)
+            MatchBody.Infer => {
+                if first == -3 {
+                    first = value(mut c, arm_value(a))
+                } else {
+                    check_expr(mut c, arm_value(a), first, msg("this arm is ", ", but the first arm is " + show(c, first)))
+                }
+            }
+        }
+        pop_scope(mut c)
+    }
+    if patterns_ok {
+        coverage(mut c, arms, t, line, col)
+    }
+    if first == -3 {
+        return types.ERROR()
+    }
+    return first
+}
+
+fn coverage(c: mut Checker, arms: [ast.Arm], t: Int, line: Int, col: Int) {
+    let mut rows: [[match_check.SPat]] = []
+    for a in arms {
+        let row = [simplify(c, a.pattern)]
+        match match_check.useful(c.table, rows, row, [t]) {
+            None => report(mut c, a.pattern.line, a.pattern.col,
+                           "this arm can never match: the arms above it cover every value it would")
+            Some(_) => {}
+        }
+        push(mut rows, row)
+    }
+    match match_check.useful(c.table, rows, [match_check.SPat.Wild], [t]) {
+        Some(missing) => {
+            let example = match_check.render(c.table, missing[0], t, c.modules[c.current].name)
+            if example == "_" {
+                report(mut c, line, col, "match is not exhaustive: add a '_' arm for the " + show(c, t) +
+                    " values not listed")
+            } else {
+                report(mut c, line, col, "match is not exhaustive: " + example + " is not covered")
+            }
+        }
+        None => {}
+    }
+}
+
+// A pattern as the usefulness algorithm sees it.
+fn simplify(c: Checker, p: ast.Pattern) -> match_check.SPat {
+    match p.kind {
+        ast.PatternKind.Wild => return match_check.SPat.Wild
+        ast.PatternKind.Bind(_) => return match_check.SPat.Wild
+        ast.PatternKind.Lit(e) => {
+            match e.kind {
+                ast.ExprKind.IntLit(n) => return match_check.SPat.Ctor(match_check.Key.Interval(n, n), [])
+                ast.ExprKind.ByteLit(n) => return match_check.SPat.Ctor(match_check.Key.Interval(n, n), [])
+                ast.ExprKind.BoolLit(b) => return match_check.SPat.Ctor(match_check.Key.Bool(b), [])
+                ast.ExprKind.StrLit(s) => return match_check.SPat.Ctor(match_check.Key.Str(s), [])
+                _ => return match_check.SPat.Wild
+            }
+        }
+        ast.PatternKind.Range(lo, hi) => {
+            return match_check.SPat.Ctor(match_check.Key.Interval(literal_value(lo), literal_value(hi)), [])
+        }
+        ast.PatternKind.Variant(_, _, _, _, args) => {
+            let mut subs: [match_check.SPat] = []
+            for a in args {
+                push(mut subs, simplify(c, a))
+            }
+            match c.refs[p.id] {
+                Ref.Variant(_, v) => return match_check.SPat.Ctor(match_check.Key.Variant(v), subs)
+                _ => return match_check.SPat.Wild
+            }
+        }
+    }
+}
+
+fn literal_value(e: ast.Expr) -> Int {
+    return match e.kind {
+        ast.ExprKind.IntLit(n) => n
+        ast.ExprKind.ByteLit(n) => n
+        _ => 0
+    }
+}
+
+// Check that pattern `p` can match a value of type `t`, collecting the
+// names it binds. Returns false if an error was reported.
+fn pattern(c: mut Checker, p: ast.Pattern, t: Int, bindings: mut Map[Str, Int]) -> Bool {
+    match p.kind {
+        ast.PatternKind.Wild => return true
+        ast.PatternKind.Bind(name) => {
+            if maps.has(bindings, name) {
+                report(mut c, p.line, p.col, "'" + name + "' is bound twice in this pattern")
+                return false
+            }
+            let local = new_local(mut c, name, t, "match binding", p.line, p.col)
+            bindings[name] = local
+            c.refs[p.id] = Ref.Local(local)
+            return true
+        }
+        ast.PatternKind.Lit(e) => return pattern_literal(mut c, e, t, p)
+        ast.PatternKind.Range(lo, hi) => {
+            let ok = pattern_literal(mut c, lo, t, p) && pattern_literal(mut c, hi, t, p)
+            if ok && t != types.INT() && t != types.BYTE() && t != types.ERROR() {
+                report(mut c, p.line, p.col, "a range pattern matches Int or Byte values, but the value being matched is " +
+                    show(c, t))
+                return false
+            }
+            if ok && literal_value(lo) > literal_value(hi) {
+                report(mut c, p.line, p.col, "this range is empty: " + strings.from_int(literal_value(lo)) +
+                    " is greater than " + strings.from_int(literal_value(hi)))
+                return false
+            }
+            return ok
+        }
+        ast.PatternKind.Variant(_, _, _, _, _) => {
+            if variant_pattern(mut c, p, t, mut bindings) {
+                return true
+            }
+            // The names inside a broken pattern are still bound, with type
+            // ERROR, so their uses in the arm do not each report an error.
+            bind_quietly(mut c, p, mut bindings)
+            return false
+        }
+    }
+}
+
+fn variant_pattern(c: mut Checker, p: ast.Pattern, t: Int, bindings: mut Map[Str, Int]) -> Bool {
+    let mut module = ""
+    let mut enum_name = ""
+    let mut variant = ""
+    let mut parens = false
+    let mut args: [ast.Pattern] = []
+    match p.kind {
+        ast.PatternKind.Variant(m, e, v, has_parens, xs) => {
+            module = m
+            enum_name = e
+            variant = v
+            parens = has_parens
+            args = xs
+        }
+        _ => {}
+    }
+    let mut written = variant
+    if enum_name != "" {
+        written = enum_name + "." + variant
+    }
+    let mut enum = -1
+    if enum_name == "" {
+        let family = variant_family(variant)
+        if !(types.is_builtin_enum(c.table, t) && types.get(c.table, t).name == family) {
+            if t != types.ERROR() {
+                report(mut c, p.line, p.col, "pattern " + written + " matches " + family +
+                    " values, but the value being matched is " + show(c, t))
+            }
+            return false
+        }
+        enum = t
+    } else {
+        let mut found = -1
+        if module != "" {
+            let m = module_in_type(mut c, p.line, p.col, module)
+            if m < 0 {
+                return false
+            }
+            found = module_type(mut c, p.line, p.col, m, enum_name)
+            if found < 0 {
+                return false
+            }
+            written = module + "." + written
+        } else {
+            match maps.get(module_types(c), enum_name) {
+                Some(id) => found = id
+                None => {}
+            }
+        }
+        if found < 0 {
+            report(mut c, p.line, p.col, "unknown type '" + enum_name + "'")
+            return false
+        }
+        if !types.is_enum(c.table, found) {
+            report(mut c, p.line, p.col, "'" + show(c, found) + "' is a struct, not an enum; match on its fields instead")
+            return false
+        }
+        if t != found {
+            if t != types.ERROR() {
+                report(mut c, p.line, p.col, "pattern " + written + " matches " + show(c, found) +
+                    " values, but the value being matched is " + show(c, t))
+            }
+            return false
+        }
+        enum = found
+    }
+    let vi = types.variant_index(c.table, enum, variant)
+    if vi < 0 {
+        report(mut c, p.line, p.col, "'" + show(c, enum) + "' has no variant '" + variant + "'")
+        return false
+    }
+    c.refs[p.id] = Ref.Variant(enum, vi)
+    let payload = types.get(c.table, enum).variants[vi].payload
+    let n = len(payload)
+    if !parens {
+        if n > 0 {
+            let mut blanks = "_"
+            for _ in 1..n {
+                blanks = blanks + ", _"
+            }
+            let mut them = "them"
+            if n == 1 {
+                them = "it"
+            }
+            report(mut c, p.line, p.col, written + " carries " + plural(n, "value") + "; write " + written + "(" +
+                blanks + ") to ignore " + them)
+            return false
+        }
+        return true
+    }
+    if n == 0 {
+        report(mut c, p.line, p.col, written + " carries no values; write it without parentheses")
+        return false
+    }
+    if len(args) != n {
+        report(mut c, p.line, p.col, written + " carries " + plural(n, "value") + ", but this pattern has " +
+            strings.from_int(len(args)))
+        return false
+    }
+    let mut ok = true
+    for i in 0..n {
+        let sub_ok = pattern(mut c, args[i], payload[i], mut bindings)
+        ok = ok && sub_ok
+    }
+    return ok
+}
+
+// A literal in a pattern; an Int literal matching a Byte is a Byte.
+fn pattern_literal(c: mut Checker, lit: ast.Expr, t: Int, p: ast.Pattern) -> Bool {
+    match lit.kind {
+        ast.ExprKind.IntLit(n) => {
+            if t == types.BYTE() {
+                if n < 0 || n > 255 {
+                    report(mut c, p.line, p.col, strings.from_int(n) + " does not fit in a Byte (0 to 255)")
+                    return false
+                }
+                set_ty(mut c, lit, types.BYTE())
+                return true
+            }
+        }
+        _ => {}
+    }
+    let lit_t = infer(mut c, lit)
+    if t != types.ERROR() && lit_t != t {
+        report(mut c, p.line, p.col, "this pattern is " + show(c, lit_t) + ", but the value being matched is " + show(c, t))
+        return false
+    }
+    return true
+}
+
+// Bind every name in `p` that is not bound yet, with type ERROR.
+fn bind_quietly(c: mut Checker, p: ast.Pattern, bindings: mut Map[Str, Int]) {
+    match p.kind {
+        ast.PatternKind.Bind(name) => {
+            if !maps.has(bindings, name) {
+                let local = new_local(mut c, name, types.ERROR(), "match binding", p.line, p.col)
+                bindings[name] = local
+                c.refs[p.id] = Ref.Local(local)
+            }
+        }
+        ast.PatternKind.Variant(_, _, _, _, args) => {
+            for sub in args {
+                bind_quietly(mut c, sub, mut bindings)
+            }
+        }
+        _ => {}
+    }
+}
+
+// ---- Expressions ----
+
+fn lookup_local(c: Checker, name: Str) -> Int {
+    let mut i = len(c.scopes) - 1
+    for i >= 0 {
+        match maps.get(c.scopes[i], name) {
+            Some(id) => return id
+            None => {}
+        }
+        i = i - 1
+    }
+    return -1
+}
+
+fn was_undefined(c: Checker, name: Str) -> Bool {
+    for n in c.undefined {
+        if n == name {
+            return true
+        }
+    }
+    return false
+}
+
+// What a name used as a value refers to; NoRef once the error is reported.
+fn resolve(c: mut Checker, e: ast.Expr, name: Str) -> Ref {
+    let local = lookup_local(c, name)
+    if local >= 0 {
+        return Ref.Local(local)
+    }
+    match maps.get(module_fns(c), name) {
+        Some(f) => return Ref.Function(f)
+        None => {}
+    }
+    if maps.has(c.modules[c.current].imports, name) {
+        report_at(mut c, e, "'" + name + "' is a module, not a value")
+    } else if is_prelude(name) {
+        report_at(mut c, e, "'" + name + "' is a function; call it as " + name + "(...)")
+    } else if name == "None" {
+        report_at(mut c, e, "cannot tell which Option this None is; give it a type, as in `let x: Option[Int] = None`")
+    } else if is_builtin_variant(name) {
+        report_at(mut c, e, name + " carries a value; write " + name + "(...)")
+    } else if maps.has(module_types(c), name) {
+        report_at(mut c, e, "'" + name + "' is a type, not a value")
+    } else if !was_undefined(c, name) {
+        // Reported at its first use in each function only.
+        push(mut c.undefined, name)
+        report_at(mut c, e, "undefined name '" + name + "'" + std_hint(c, name))
+    }
+    return Ref.NoRef
+}
+
+// Check that `e` has the type `want`; `m` explains if not.
+fn check_expr(c: mut Checker, e: ast.Expr, want: Int, m: Msg) {
+    let wants_builtin = types.is_builtin_enum(c.table, want)
+    let mut want_name = ""
+    if wants_builtin {
+        want_name = types.get(c.table, want).name
+    }
+    match e.kind {
+        ast.ExprKind.Name(name) => {
+            if name == "None" && lookup_local(c, "None") < 0 {
+                // None has no type of its own; the context gives it one.
+                if wants_builtin && want_name == "Option" {
+                    set_ty(mut c, e, want)
+                    c.refs[e.id] = Ref.Variant(want, types.variant_index(c.table, want, "None"))
+                } else if want != types.ERROR() {
+                    report_at(mut c, e, say(m, "None"))
+                }
+                return
+            }
+        }
+        ast.ExprKind.Call(callee, args) => {
+            match callee.kind {
+                ast.ExprKind.Name(name) => {
+                    if is_builtin_variant(name) {
+                        if wants_builtin && want_name == variant_family(name) {
+                            construct(mut c, e, args, want, types.variant_index(c.table, want, name), name)
+                            return
+                        }
+                        if name != "Some" || want == types.ERROR() {
+                            // Ok(...) and Err(...) cannot be inferred, and a
+                            // Some that cannot fit gets one error, not two.
+                            for a in args {
+                                infer(mut c, a)
+                            }
+                            if want != types.ERROR() {
+                                report_at(mut c, e, say(m, name + "(...)"))
+                            }
+                            return
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        ast.ExprKind.IntLit(n) => {
+            if want == types.BYTE() {
+                // A number is an Int unless the context wants a Byte.
+                if n >= 0 && n <= 255 {
+                    set_ty(mut c, e, types.BYTE())
+                } else {
+                    report_at(mut c, e, strings.from_int(n) + " does not fit in a Byte (0 to 255)")
+                }
+                return
+            }
+        }
+        ast.ExprKind.ArrayLit(elems) => {
+            if types.is_array(c.table, want) || len(elems) == 0 {
+                if types.is_array(c.table, want) {
+                    set_ty(mut c, e, want)
+                    let elem = types.get(c.table, want).args[0]
+                    for x in elems {
+                        check_expr(mut c, x, elem, msg("the elements of " + show(c, want) + " are " + show(c, elem) +
+                            ", but this is ", ""))
+                    }
+                } else if want != types.ERROR() {
+                    report_at(mut c, e, say(m, "an array"))
+                }
+                return
+            }
+        }
+        ast.ExprKind.MapLit(entries) => {
+            if types.is_map(c.table, want) || len(entries) == 0 {
+                if types.is_map(c.table, want) {
+                    set_ty(mut c, e, want)
+                    let k = types.get(c.table, want).args[0]
+                    let v = types.get(c.table, want).args[1]
+                    for en in entries {
+                        check_expr(mut c, en.key, k, msg("the keys of " + show(c, want) + " are " + show(c, k) +
+                            ", but this is ", ""))
+                        check_expr(mut c, en.value, v, msg("the values of " + show(c, want) + " are " + show(c, v) +
+                            ", but this is ", ""))
+                    }
+                } else if want != types.ERROR() {
+                    report_at(mut c, e, say(m, "a map"))
+                }
+                return
+            }
+        }
+        ast.ExprKind.Match(scrutinee, arms) => {
+            // Each arm is checked against what the context wants.
+            set_ty(mut c, e, want)
+            match_arms(mut c, scrutinee, arms, e.line, e.col, MatchBody.Check(want, m))
+            return
+        }
+        _ => {}
+    }
+    let found = value(mut c, e)
+    if found != want && found != types.ERROR() && want != types.ERROR() {
+        report_at(mut c, e, say(m, show(c, found)))
+    }
+}
+
+// Infer the type of an expression that must produce a value.
+fn value(c: mut Checker, e: ast.Expr) -> Int {
+    let ty = infer(mut c, e)
+    if ty == types.NOTHING() {
+        let mut callee = e
+        match e.kind {
+            ast.ExprKind.Call(f, _) => callee = f
+            _ => {}
+        }
+        report_at(mut c, e, written(callee) + "(...) does not produce a value")
+        return types.ERROR()
+    }
+    return ty
+}
+
+// Work out an expression's type, record it, return it.
+fn infer(c: mut Checker, e: ast.Expr) -> Int {
+    let t = infer_type(mut c, e)
+    set_ty(mut c, e, t)
+    return t
+}
+
+fn infer_type(c: mut Checker, e: ast.Expr) -> Int {
+    match e.kind {
+        ast.ExprKind.IntLit(_) => return types.INT()
+        ast.ExprKind.ByteLit(_) => return types.BYTE()
+        ast.ExprKind.BoolLit(_) => return types.BOOL()
+        ast.ExprKind.StrLit(_) => return types.STR()
+        ast.ExprKind.UnitLit => return types.UNIT()
+        ast.ExprKind.Name(name) => {
+            match resolve(mut c, e, name) {
+                Ref.Local(id) => {
+                    c.refs[e.id] = Ref.Local(id)
+                    return c.locals[id].ty
+                }
+                Ref.Function(_) => {
+                    report_at(mut c, e, "'" + name + "' is a function; call it as " + name + "(...)")
+                    return types.ERROR()
+                }
+                _ => return types.ERROR()
+            }
+        }
+        ast.ExprKind.Unary(op, operand) => {
+            let mut want = types.BOOL()
+            if op == "-" {
+                want = types.INT()
+            }
+            let ty = value(mut c, operand)
+            if ty != want && ty != types.ERROR() {
+                report_at(mut c, e, "operator '" + op + "' needs " + show(c, want) + ", found " + show(c, ty))
+            }
+            return want  // the result type is known even if the operand was wrong
+        }
+        ast.ExprKind.Binary(op, l, r) => return binary(mut c, e, op, l, r)
+        ast.ExprKind.Call(callee, args) => return call(mut c, e, callee, args)
+        ast.ExprKind.Field(obj, name) => return field(mut c, e, obj, name)
+        ast.ExprKind.StructLit(module, name, fields) => return struct_lit(mut c, e, module, name, fields)
+        ast.ExprKind.Match(scrutinee, arms) => return match_arms(mut c, scrutinee, arms, e.line, e.col, MatchBody.Infer)
+        ast.ExprKind.Index(obj, i) => return index(mut c, e, obj, i)
+        ast.ExprKind.Try(inner) => return try_expr(mut c, e, inner)
+        ast.ExprKind.MutArg(p) => {
+            report_at(mut c, e, "`mut` only goes before an argument for a mut parameter")
+            return infer(mut c, p)
+        }
+        ast.ExprKind.Slice(obj, lo, hi) => return slice(mut c, e, obj, lo, hi)
+        ast.ExprKind.ArrayLit(elems) => return array_lit(mut c, e, elems)
+        ast.ExprKind.MapLit(entries) => return map_lit(mut c, e, entries)
+    }
+}
+
+fn is_int_lit(e: ast.Expr) -> Bool {
+    return match e.kind {
+        ast.ExprKind.IntLit(_) => true
+        _ => false
+    }
+}
+
+// The operands' types. A literal number next to a Byte is a Byte.
+fn operands(c: mut Checker, l: ast.Expr, r: ast.Expr) -> [Int] {
+    if is_int_lit(l) && !is_int_lit(r) {
+        let right = value(mut c, r)
+        return [literal_like(mut c, l, right), right]
+    }
+    let left = value(mut c, l)
+    if is_int_lit(r) {
+        return [left, literal_like(mut c, r, left)]
+    }
+    return [left, value(mut c, r)]
+}
+
+fn literal_like(c: mut Checker, lit: ast.Expr, other: Int) -> Int {
+    if other == types.BYTE() {
+        check_expr(mut c, lit, types.BYTE(), msg("", ""))  // reports only an out-of-range number
+        return types.BYTE()
+    }
+    return value(mut c, lit)
+}
+
+fn is_arithmetic(op: Str) -> Bool {
+    return op == "+" || op == "-" || op == "*" || op == "/" || op == "%"
+}
+
+fn is_ordering(op: Str) -> Bool {
+    return op == "<" || op == "<=" || op == ">" || op == ">="
+}
+
+// Whether `==` works on values of `t`.
+fn comparable(c: Checker, t: Int) -> Bool {
+    let ti = types.get(c.table, t)
+    if ti.tag == types.Tag.Prim {
+        return true
+    }
+    return ti.tag == types.Tag.Enum && len(ti.args) == 0 && types.c_like(c.table, t)
+}
+
+fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Int {
+    let ops = operands(mut c, l, r)
+    let left = ops[0]
+    let right = ops[1]
+    let mut result = types.BOOL()
+    if is_arithmetic(op) {
+        result = types.INT()
+        if left == types.INT() || left == types.BYTE() || left == types.STR() && op == "+" {
+            result = left
+        }
+    }
+    if left == types.ERROR() || right == types.ERROR() {
+        return result  // the operand's error is already reported
+    }
+    let int = types.INT()
+    let byte = types.BYTE()
+    if op == "==" || op == "!=" {
+        if left != right {
+            report_at(mut c, e, "cannot compare " + show(c, left) + " with " + show(c, right))
+        } else if !comparable(c, left) {
+            report_at(mut c, e, show(c, left) + " values cannot be compared with '" + op +
+                "'; use match, or compare their fields")
+        }
+    } else if op == "&&" || op == "||" {
+        if left != types.BOOL() || right != types.BOOL() {
+            report_at(mut c, e, "operator '" + op + "' needs Bool operands, found " + show(c, left) + " and " + show(c, right))
+        }
+    } else if op == "+" && (left == types.STR() || right == types.STR()) {
+        if left != right {
+            report_at(mut c, e, "operator '+' joins two Strs, found " + show(c, left) + " and " + show(c, right))
+        }
+    } else if is_ordering(op) && left == types.STR() && right == types.STR() {
+        // Strs are ordered byte by byte
+    } else if left != right || left != int && left != byte {
+        let both_numbers = (left == int || left == byte) && (right == int || right == byte)
+        if (left == byte || right == byte) && both_numbers {
+            report_at(mut c, e, "operator '" + op + "' needs two Bytes or two Ints, found " + show(c, left) + " and " +
+                show(c, right) + "; convert with int() or byte()")
+        } else if is_ordering(op) {
+            report_at(mut c, e, "operator '" + op + "' needs two Ints, two Bytes or two Strs, found " + show(c, left) +
+                " and " + show(c, right))
+        } else {
+            report_at(mut c, e, "operator '" + op + "' needs Int operands, found " + show(c, left) + " and " + show(c, right))
+        }
+    }
+    // The result type is known even when the operands were wrong.
+    return result
+}
+
+fn index(c: mut Checker, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Int {
+    let t = value(mut c, obj)
+    if types.is_array(c.table, t) || t == types.STR() {
+        check_expr(mut c, i, types.INT(), msg("an index must be Int, found ", ""))
+        if t == types.STR() {
+            return types.BYTE()
+        }
+        return types.get(c.table, t).args[0]
+    }
+    if types.is_map(c.table, t) {
+        let k = types.get(c.table, t).args[0]
+        check_expr(mut c, i, k, msg("the keys of " + show(c, t) + " are " + show(c, k) + ", but this is ", ""))
+        return types.get(c.table, t).args[1]
+    }
+    if t != types.ERROR() {
+        report_at(mut c, e, show(c, t) + " cannot be indexed; only arrays, Strs and maps can")
+    }
+    infer(mut c, i)
+    return types.ERROR()
+}
+
+// `x?`: the value inside an Ok or Some, or the function returns the Err or
+// None at once.
+fn try_expr(c: mut Checker, e: ast.Expr, inner: ast.Expr) -> Int {
+    let t = value(mut c, inner)
+    if t == types.ERROR() {
+        return types.ERROR()
+    }
+    if !types.is_builtin_enum(c.table, t) {
+        report_at(mut c, e, "'?' needs a Result or an Option, found " + show(c, t))
+        return types.ERROR()
+    }
+    let f = c.fns[c.current_fn]
+    let result = f.result
+    let name = f.decl.name
+    let mut returns = "returns nothing"
+    if result != types.NOTHING() {
+        returns = "returns " + show(c, result)
+    }
+    let ti = types.get(c.table, t)
+    let kind = ti.name  // "Result" or "Option"
+    if result == types.ERROR() {
+        // the unknown result type is already reported
+    } else if !(types.is_builtin_enum(c.table, result) && types.get(c.table, result).name == kind) {
+        let mut passes = "None"
+        let mut must = "an Option"
+        if kind == "Result" {
+            passes = "an Err"
+            must = "a Result"
+        }
+        report_at(mut c, e, "'?' returns " + passes + " from '" + name + "', so '" + name + "' must return " + must +
+            ", but it " + returns)
+    } else if kind == "Result" {
+        let theirs = types.get(c.table, result).args[1]
+        let ours = ti.args[1]
+        if theirs != ours && theirs != types.ERROR() && ours != types.ERROR() {
+            report_at(mut c, e, "'?' would return this " + show(c, t) + "'s error, which is " + show(c, ours) +
+                ", but '" + name + "' returns " + show(c, result))
+        }
+    }
+    return ti.args[0]
+}
+
+fn slice(c: mut Checker, e: ast.Expr, obj: ast.Expr, lo: ast.Expr, hi: ast.Expr) -> Int {
+    let t = value(mut c, obj)
+    for bound in [lo, hi] {
+        check_expr(mut c, bound, types.INT(), msg("the bounds of a slice must be Int, found ", ""))
+    }
+    if types.is_array(c.table, t) || t == types.STR() || t == types.ERROR() {
+        return t
+    }
+    report_at(mut c, e, show(c, t) + " cannot be sliced; only arrays and Strs can")
+    return types.ERROR()
+}
+
+fn array_lit(c: mut Checker, e: ast.Expr, elems: [ast.Expr]) -> Int {
+    if len(elems) == 0 {
+        report_at(mut c, e, "cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`")
+        return types.ERROR()
+    }
+    let first = value(mut c, elems[0])
+    for x in elems[1..len(elems)] {
+        check_expr(mut c, x, first, msg("the elements of an array must all be " + show(c, first) + ", but this is ", ""))
+    }
+    return types.array(mut c.table, first)
+}
+
+fn map_lit(c: mut Checker, e: ast.Expr, entries: [ast.MapEntry]) -> Int {
+    if len(entries) == 0 {
+        report_at(mut c, e, "cannot tell what this [:] holds; give it a type, as in `let m: Map[Str, Int] = [:]`")
+        return types.ERROR()
+    }
+    let mut k = value(mut c, entries[0].key)
+    let v = value(mut c, entries[0].value)
+    if !types.is_map_key(k) && k != types.ERROR() {
+        report_at(mut c, entries[0].key, "Map keys must be Int, Byte, Bool or Str, not " + show(c, k))
+        k = types.ERROR()
+    }
+    for en in entries[1..len(entries)] {
+        check_expr(mut c, en.key, k, msg("the keys of this map are " + show(c, k) + ", but this is ", ""))
+        check_expr(mut c, en.value, v, msg("the values of this map are " + show(c, v) + ", but this is ", ""))
+    }
+    return types.map(mut c.table, k, v)
+}
+
+// The enum `e` names: an enum type no variable shadows (`TokenKind.Plus`),
+// or a pub enum of an imported module (`lexer.TokenKind.Plus`). -1 if `e`
+// names none; ERROR when `e` is `module.Name` but Name is no pub type there.
+fn enum_named(c: mut Checker, e: ast.Expr) -> Int {
+    match e.kind {
+        ast.ExprKind.Name(name) => {
+            if lookup_local(c, name) < 0 {
+                match maps.get(module_types(c), name) {
+                    Some(t) => {
+                        if types.is_enum(c.table, t) {
+                            return t
+                        }
+                    }
+                    None => {}
+                }
+            }
+        }
+        ast.ExprKind.Field(obj, name) => {
+            let module = module_named(c, obj)
+            if module >= 0 {
+                let t = module_type(mut c, e.line, e.col, module, name)
+                if t < 0 {
+                    return types.ERROR()
+                }
+                if types.is_enum(c.table, t) {
+                    return t
+                }
+            }
+        }
+        _ => {}
+    }
+    return -1
+}
+
+fn field(c: mut Checker, e: ast.Expr, obj: ast.Expr, name: Str) -> Int {
+    let module = module_named(c, obj)
+    if module >= 0 {
+        // `lexer.next` or `lexer.Token` as a value: say which it is.
+        let m = c.modules[module]
+        if maps.has(m.types, name) {
+            report_at(mut c, e, "'" + m.name + "." + name + "' is a type, not a value")
+        } else if maps.has(m.fns, name) || has_std(m, name) {
+            report_at(mut c, e, "'" + m.name + "." + name + "' is a function; call it as " + m.name + "." + name + "(...)")
+        } else {
+            report_at(mut c, e, "module '" + m.name + "' has no '" + name + "'")
+        }
+        return types.ERROR()
+    }
+    let enum = enum_named(mut c, obj)
+    if enum == types.ERROR() {
+        return types.ERROR()
+    }
+    if enum >= 0 {
+        let vi = types.variant_index(c.table, enum, name)
+        if vi < 0 {
+            report_at(mut c, e, "'" + show(c, enum) + "' has no variant '" + name + "'")
+            return types.ERROR()
+        }
+        let n = len(types.get(c.table, enum).variants[vi].payload)
+        if n > 0 {
+            report_at(mut c, e, show(c, enum) + "." + name + " carries " + plural(n, "value") + "; write " +
+                show(c, enum) + "." + name + "(...)")
+            return types.ERROR()
+        }
+        c.refs[e.id] = Ref.Variant(enum, vi)
+        return enum
+    }
+    let t = value(mut c, obj)
+    if t == types.ERROR() {
+        return types.ERROR()
+    }
+    if !types.is_struct(c.table, t) {
+        let mut hint = ""
+        if types.is_enum(c.table, t) {
+            hint = "; use match to look inside it"
+        }
+        report_at(mut c, e, show(c, t) + " has no fields" + hint)
+        return types.ERROR()
+    }
+    let fi = types.field_index(c.table, t, name)
+    if fi < 0 {
+        report_at(mut c, e, "'" + show(c, t) + "' has no field '" + name + "'")
+        return types.ERROR()
+    }
+    return types.get(c.table, t).fields[fi].ty
+}
+
+fn struct_lit(c: mut Checker, e: ast.Expr, module: Str, name: Str, fields: [ast.FieldInit]) -> Int {
+    let mut written = name
+    if module != "" {
+        written = module + "." + name
+    }
+    let mut t = -1
+    if module != "" {
+        let m = module_in_type(mut c, e.line, e.col, module)
+        if m >= 0 {
+            t = module_type(mut c, e.line, e.col, m, name)
+        }
+        if t < 0 {
+            t = types.ERROR()
+        }
+    } else {
+        match maps.get(module_types(c), name) {
+            Some(id) => t = id
+            None => {}
+        }
+    }
+    if t < 0 || !types.is_struct(c.table, t) {
+        if t < 0 {
+            report_at(mut c, e, "unknown type '" + name + "'")
+        } else if t != types.ERROR() {
+            report_at(mut c, e, "'" + written + "' is an enum; build its values with " + written + ".Variant")
+        }
+        for f in fields {
+            infer(mut c, f.value)
+        }
+        return types.ERROR()
+    }
+    let mut seen: [Str] = []
+    for f in fields {
+        let fi = types.field_index(c.table, t, f.name)
+        let mut twice = false
+        for s in seen {
+            if s == f.name {
+                twice = true
+            }
+        }
+        if twice || fi < 0 {
+            if twice {
+                report(mut c, f.line, f.col, "field '" + f.name + "' is given twice")
+            } else {
+                report(mut c, f.line, f.col, "'" + show(c, t) + "' has no field '" + f.name + "'")
+            }
+            infer(mut c, f.value)
+            continue
+        }
+        push(mut seen, f.name)
+        let want = types.get(c.table, t).fields[fi].ty
+        check_expr(mut c, f.value, want, msg("field '" + f.name + "' of '" + show(c, t) + "' is " + show(c, want) +
+            ", but this is ", ""))
+    }
+    let mut missing: [Str] = []
+    for fd in types.get(c.table, t).fields {
+        let mut given = false
+        for s in seen {
+            if s == fd.name {
+                given = true
+            }
+        }
+        if !given {
+            push(mut missing, fd.name)
+        }
+    }
+    if len(missing) > 0 {
+        let mut names = strings.builder()
+        for i in 0..len(missing) {
+            if i > 0 {
+                strings.add(mut names, ", ")
+            }
+            strings.add(mut names, "'" + missing[i] + "'")
+        }
+        let mut word = "fields"
+        if len(missing) == 1 {
+            word = "field"
+        }
+        report_at(mut c, e, "missing " + word + " " + strings.build(names) + " in this '" + show(c, t) + "' value")
+    }
+    return t
+}
+
+// ---- Calls ----
+
+fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr]) -> Int {
+    let target = call_target(mut c, callee)
+    match target {
+        Ref.NoRef => {
+            for a in args {
+                infer(mut c, a)  // still look for errors inside the arguments
+            }
+            return types.ERROR()
+        }
+        Ref.Builtin(name) => {
+            if name == "Some" {
+                // Some(x) is an Option of whatever x is. None, Ok and Err get
+                // their types from a context instead; see check().
+                if len(args) != 1 {
+                    arity(mut c, e, "Some", 1, len(args))
+                    for a in args {
+                        infer(mut c, a)
+                    }
+                    return types.ERROR()
+                }
+                let t = types.option(mut c.table, value(mut c, args[0]))
+                if types.is_enum(c.table, t) {
+                    c.refs[e.id] = Ref.Variant(t, types.variant_index(c.table, t, "Some"))
+                }
+                return t
+            }
+            if is_builtin_variant(name) {  // Ok, Err or None with no context
+                for a in args {
+                    infer(mut c, a)
+                }
+                report_at(mut c, e, "cannot tell which Result this " + name + "(...) is; give it a type, as in " +
+                    "`let r: Result[Int, Str] = " + name + "(...)`")
+                return types.ERROR()
+            }
+            c.refs[e.id] = Ref.Builtin(name)
+            return builtin(mut c, e, name, args, written(callee))
+        }
+        Ref.Variant(enum, vi) => {
+            construct(mut c, e, args, enum, vi, show(c, enum) + "." + types.get(c.table, enum).variants[vi].name)
+            return enum
+        }
+        Ref.Function(id) => {
+            let f = c.fns[id]
+            c.refs[e.id] = Ref.Function(id)
+            let name = written(callee)
+            arity(mut c, e, name, len(f.params), len(args))
+            for i in 0..len(args) {
+                let arg = args[i]
+                let n = strings.from_int(i + 1)
+                if i >= len(f.params) {
+                    infer(mut c, arg)
+                    continue
+                }
+                let want = f.params[i]
+                if f.mutable[i] {
+                    mut_argument(mut c, arg, want, "argument " + n + " of '" + name + "'")
+                } else {
+                    let m = msg("argument " + n + " of '" + name + "' must be " + show(c, want) + ", found ", "")
+                    match arg.kind {
+                        ast.ExprKind.MutArg(p) => {
+                            report_at(mut c, arg, "argument " + n + " of '" + name + "' is not a mut parameter; remove `mut`")
+                            check_expr(mut c, p, want, m)
+                        }
+                        _ => check_expr(mut c, arg, want, m)
+                    }
+                }
+            }
+            exclusive(mut c, args)
+            // Even after an argument error, the call has the declared result type.
+            return f.result
+        }
+        Ref.Local(_) => return types.ERROR()  // not reached
+    }
+}
+
+// An argument the call may change: written `mut place`, where the place
+// may change. Returns its type.
+fn mut_argument(c: mut Checker, arg: ast.Expr, want: Int, what: Str) -> Int {
+    match arg.kind {
+        ast.ExprKind.MutArg(p) => {
+            let t = place(mut c, p, "change")
+            set_ty(mut c, arg, t)
+            if want != types.NOTHING() && t != want && t != types.ERROR() && want != types.ERROR() {
+                report_at(mut c, p, what + " must be " + show(c, want) + ", found " + show(c, t))
+            }
+            return t
+        }
+        _ => {
+            report_at(mut c, arg, what + " is changed by the call; write `mut` before it")
+            let t = infer(mut c, arg)
+            if t == types.NOTHING() {
+                return types.ERROR()
+            }
+            return t
+        }
+    }
+}
+
+// No two `mut` arguments of one call may belong to the same variable.
+fn exclusive(c: mut Checker, args: [ast.Expr]) {
+    let mut seen: [Str] = []
+    for a in args {
+        match a.kind {
+            ast.ExprKind.MutArg(p) => {
+                let root = root_of(p)
+                match root.kind {
+                    ast.ExprKind.Name(name) => {
+                        for s in seen {
+                            if s == name {
+                                report_at(mut c, a, "'" + name + "' is passed as mut twice in this call")
+                            }
+                        }
+                        push(mut seen, name)
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+// A call that builds an enum value: `Expr.Add(a, b)`, `Some(x)`.
+fn construct(c: mut Checker, e: ast.Expr, args: [ast.Expr], enum: Int, vi: Int, written: Str) {
+    c.refs[e.id] = Ref.Variant(enum, vi)
+    set_ty(mut c, e, enum)
+    let payload = types.get(c.table, enum).variants[vi].payload
+    if len(payload) == 0 {
+        report_at(mut c, e, written + " carries no values; write it without parentheses")
+    } else if len(args) != len(payload) {
+        report_at(mut c, e, written + " carries " + plural(len(payload), "value") + ", got " + strings.from_int(len(args)))
+    }
+    for i in 0..len(args) {
+        if i >= len(payload) {
+            infer(mut c, args[i])
+            continue
+        }
+        let want = payload[i]
+        check_expr(mut c, args[i], want, msg("value " + strings.from_int(i + 1) + " of " + written + " must be " +
+            show(c, want) + ", found ", ""))
+    }
+}
+
+// What a call calls: a function, a built-in function or variant (by name),
+// an enum's variant, or NoRef once the reason is reported.
+fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
+    match callee.kind {
+        ast.ExprKind.Field(obj, name) => {
+            let module = module_named(c, obj)
+            if module >= 0 {
+                return module_fn(mut c, callee.line, callee.col, module, name)
+            }
+            let enum = enum_named(mut c, obj)
+            if enum == types.ERROR() {
+                return Ref.NoRef
+            }
+            if enum >= 0 {
+                let vi = types.variant_index(c.table, enum, name)
+                if vi < 0 {
+                    report_at(mut c, callee, "'" + show(c, enum) + "' has no variant '" + name + "'")
+                    return Ref.NoRef
+                }
+                return Ref.Variant(enum, vi)
+            }
+            match obj.kind {
+                ast.ExprKind.Name(m) => {
+                    if lookup_local(c, m) < 0 && !maps.has(module_types(c), m) {
+                        // Vela has no methods, so `x.f(...)` can only call into a module.
+                        report_at(mut c, obj, "unknown module '" + m + "'; is `import " + m + "` missing?")
+                        return Ref.NoRef
+                    }
+                }
+                _ => {}
+            }
+            report_at(mut c, callee, "only a named function can be called")
+            return Ref.NoRef
+        }
+        ast.ExprKind.Name(name) => {
+            let local = lookup_local(c, name)
+            if local >= 0 {
+                report_at(mut c, callee, "'" + name + "' is a variable of type " + show(c, c.locals[local].ty) +
+                    ", not a function")
+                return Ref.NoRef
+            }
+            if is_prelude(name) || is_builtin_variant(name) {
+                return Ref.Builtin(name)
+            }
+            match maps.get(module_fns(c), name) {
+                Some(f) => return Ref.Function(f)
+                None => {}
+            }
+            if maps.has(c.modules[c.current].imports, name) {
+                report_at(mut c, callee, "'" + name + "' is a module; call its functions as " + name + ".name(...)")
+                return Ref.NoRef
+            }
+            if maps.has(module_types(c), name) {
+                report_at(mut c, callee, "'" + name + "' is a type; build a value with " + name + " { ... }")
+                return Ref.NoRef
+            }
+            if !was_undefined(c, name) {  // first use in this function only
+                push(mut c.undefined, name)
+                report_at(mut c, callee, "undefined function '" + name + "'" + std_hint(c, name))
+            }
+            return Ref.NoRef
+        }
+        _ => {
+            report_at(mut c, callee, "only a named function can be called")
+            return Ref.NoRef
+        }
+    }
+}
+
+fn arity(c: mut Checker, e: ast.Expr, name: Str, expected: Int, got: Int) -> Bool {
+    if got != expected {
+        report_at(mut c, e, name + " expects " + plural(expected, "argument") + ", got " + strings.from_int(got))
+        return false
+    }
+    return true
+}
+
+fn is_printable(t: Int) -> Bool {
+    return t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.STR()
+}
+
+// The built-in functions whose types do not depend on their arguments.
+// Their types are made only when they are called, as in Stage 0.
+fn has_signature(name: Str) -> Bool {
+    return name == "files.read" || name == "files.write" || name == "os.args" || name == "os.exit" ||
+        len(name) > 8 && name[0..8] == "strings."
+}
+
+fn signature(c: mut Checker, name: Str) -> [Int] {
+    // The parameter types, then the result type last.
+    let s = types.STR()
+    let b = types.BUILDER()
+    let nothing = types.NOTHING()
+    if name == "files.read" {
+        return [s, types.result(mut c.table, s, s)]
+    }
+    if name == "files.write" {
+        return [s, s, types.result(mut c.table, types.INT(), s)]
+    }
+    if name == "os.args" {
+        return [types.array(mut c.table, s)]
+    }
+    return match name {
+        "os.exit" => [types.INT(), nothing]
+        "strings.builder" => [b]
+        "strings.add" => [b, s, nothing]
+        "strings.add_byte" => [b, types.BYTE(), nothing]
+        "strings.add_int" => [b, types.INT(), nothing]
+        "strings.build" => [b, s]
+        _ => [types.INT(), s]  // strings.from_int
+    }
+}
+
+// A call to a built-in function, written as `written`: one of the
+// prelude's (`len`) or of a built-in module's (`maps.get`, named by `name`).
+fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: Str) -> Int {
+    if has_signature(name) {
+        return fixed_builtin(mut c, e, name, args, written)
+    }
+    let mut want = 2
+    if name == "print" || name == "os.eprint" || name == "len" || name == "int" || name == "byte" || name == "maps.keys" {
+        want = 1
+    }
+    if !arity(mut c, e, written, want, len(args)) {
+        for a in args {
+            infer(mut c, a)
+        }
+        return match name {
+            "print" => types.NOTHING()
+            "os.eprint" => types.NOTHING()
+            "push" => types.NOTHING()
+            "maps.remove" => types.NOTHING()
+            "len" => types.INT()
+            "int" => types.INT()
+            "byte" => types.BYTE()
+            "maps.has" => types.BOOL()
+            _ => types.ERROR()
+        }
+    }
+    if name == "print" || name == "os.eprint" {
+        let t = value(mut c, args[0])
+        if !is_printable(t) && t != types.ERROR() {
+            report_at(mut c, args[0], written + " takes an Int, Byte, Bool or Str, not " + show(c, t))
+        }
+        return types.NOTHING()
+    }
+    if name == "len" {
+        let t = value(mut c, args[0])
+        if !(t == types.STR() || types.is_array(c.table, t) || types.is_map(c.table, t) || t == types.ERROR()) {
+            report_at(mut c, args[0], "len takes a Str, an array or a map, not " + show(c, t))
+        }
+        return types.INT()
+    }
+    if name == "int" {
+        check_expr(mut c, args[0], types.BYTE(), msg("int takes a Byte, found ", ""))
+        return types.INT()
+    }
+    if name == "byte" {
+        check_expr(mut c, args[0], types.INT(), msg("byte takes an Int, found ", ""))
+        return types.BYTE()
+    }
+    if name == "push" {
+        let t = mut_argument(mut c, args[0], types.NOTHING(), "argument 1 of 'push'")
+        if types.is_array(c.table, t) {
+            let elem = types.get(c.table, t).args[0]
+            check_expr(mut c, args[1], elem, msg("the elements of " + show(c, t) + " are " + show(c, elem) + ", but this is ", ""))
+        } else {
+            if t != types.ERROR() {
+                report_at(mut c, args[0], "push needs an array, not " + show(c, t))
+            }
+            infer(mut c, args[1])
+        }
+        return types.NOTHING()
+    }
+    // maps.has, maps.get, maps.remove and maps.keys take a map.
+    let mut t = types.ERROR()
+    if name == "maps.remove" {
+        t = mut_argument(mut c, args[0], types.NOTHING(), "argument 1 of '" + written + "'")
+    } else {
+        t = value(mut c, args[0])
+    }
+    if !types.is_map(c.table, t) {
+        if t != types.ERROR() {
+            report_at(mut c, args[0], written + " needs a map, not " + show(c, t))
+        }
+        for a in args[1..len(args)] {
+            infer(mut c, a)
+        }
+        if name == "maps.has" {
+            return types.BOOL()
+        }
+        if name == "maps.remove" {
+            return types.NOTHING()
+        }
+        return types.ERROR()
+    }
+    let key = types.get(c.table, t).args[0]
+    if name == "maps.keys" {
+        return types.array(mut c.table, key)
+    }
+    check_expr(mut c, args[1], key, msg("the keys of " + show(c, t) + " are " + show(c, key) + ", but this is ", ""))
+    if name == "maps.has" {
+        return types.BOOL()
+    }
+    if name == "maps.get" {
+        return types.option(mut c.table, types.get(c.table, t).args[1])
+    }
+    return types.NOTHING()
+}
+
+fn changes_first(name: Str) -> Bool {
+    return name == "strings.add" || name == "strings.add_byte" || name == "strings.add_int"
+}
+
+fn fixed_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: Str) -> Int {
+    let sig = signature(mut c, name)
+    let n = len(sig) - 1
+    let result = sig[n]
+    if !arity(mut c, e, written, n, len(args)) {
+        for a in args {
+            infer(mut c, a)
+        }
+        return result
+    }
+    for i in 0..n {
+        let want = sig[i]
+        if i == 0 && changes_first(name) {
+            mut_argument(mut c, args[i], want, "argument 1 of '" + written + "'")
+        } else {
+            check_expr(mut c, args[i], want, msg("argument " + strings.from_int(i + 1) + " of '" + written + "' must be " +
+                show(c, want) + ", found ", ""))
+        }
+    }
+    return result
+}
+
+// A callee as written: `f`, `lexer.next`, `Expr.Add`.
+fn written(callee: ast.Expr) -> Str {
+    return match callee.kind {
+        ast.ExprKind.Field(obj, name) => written(obj) + "." + name
+        ast.ExprKind.Name(name) => name
+        _ => "this"
+    }
+}
+
+// `'x'` or `'p.pos.x'`, for messages about assignments.
+fn describe_target(target: ast.Expr) -> Str {
+    let mut parts: [Str] = []
+    let mut node = target
+    for {
+        match node.kind {
+            ast.ExprKind.Field(obj, name) => {
+                push(mut parts, name)
+                node = obj
+            }
+            _ => break
+        }
+    }
+    match node.kind {
+        ast.ExprKind.Name(name) => push(mut parts, name)
+        _ => {}
+    }
+    let mut b = strings.builder()
+    strings.add_byte(mut b, '\'')
+    let mut i = len(parts) - 1
+    for i >= 0 {
+        strings.add(mut b, parts[i])
+        if i > 0 {
+            strings.add_byte(mut b, '.')
+        }
+        i = i - 1
+    }
+    strings.add_byte(mut b, '\'')
+    return strings.build(b)
+}
+
+// ---- Terminating statements (Go's rule; see Stage 0) ----
+
+fn terminates_block(c: Checker, b: ast.Block) -> Bool {
+    let n = len(b.stmts)
+    return n > 0 && terminates(c, b.stmts[n - 1])
+}
+
+fn terminates(c: Checker, s: ast.Stmt) -> Bool {
+    match s.kind {
+        ast.StmtKind.Return(_) => return true
+        ast.StmtKind.ExprStmt(e) => {
+            match e.kind {
+                ast.ExprKind.Call(_, _) => {
+                    match c.refs[e.id] {
+                        Ref.Builtin(name) => return name == "os.exit"  // it never comes back
+                        _ => return false
+                    }
+                }
+                _ => return false
+            }
+        }
+        ast.StmtKind.Block(b) => return terminates_block(c, b)
+        ast.StmtKind.If(_, then, otherwise) => {
+            match otherwise {
+                ast.Else.NoElse => return false
+                ast.Else.ElseBlock(b) => return terminates_block(c, then) && terminates_block(c, b)
+                ast.Else.ElseIf(s2) => return terminates_block(c, then) && terminates(c, s2)
+            }
+        }
+        ast.StmtKind.For(cond, _) => {
+            match cond {
+                Some(_) => return false
+                None => return !c.breaks[s.id]
+            }
+        }
+        ast.StmtKind.MatchStmt(_, arms) => {
+            // Exactly one arm runs, so the match terminates when every arm does.
+            if len(arms) == 0 {
+                return false
+            }
+            for a in arms {
+                match a.body {
+                    ast.ArmBody.Do(body) => {
+                        if !terminates(c, body) {
+                            return false
+                        }
+                    }
+                    ast.ArmBody.Value(_) => return false
+                }
+            }
+            return true
+        }
+        _ => return false
+    }
+}

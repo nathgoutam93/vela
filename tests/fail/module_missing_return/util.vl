@@ -1,0 +1,5 @@
+pub fn half(n: Int) -> Int {
+    if n > 0 {
+        return n / 2
+    }
+}

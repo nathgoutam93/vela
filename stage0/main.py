@@ -4,6 +4,7 @@
     python3 stage0/main.py build hello.vl [-o hello]   compile to an executable
     python3 stage0/main.py run hello.vl [args...]      compile to a temp file, run it
     python3 stage0/main.py c hello.vl                  print the generated C
+    python3 stage0/main.py check hello.vl              report errors only, generate nothing
     python3 stage0/main.py tokens hello.vl             print the token stream
     python3 stage0/main.py ast hello.vl                print the syntax tree
 
@@ -119,6 +120,11 @@ def cmd_c(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    checker.check(modules.load(args.file, read_source(args.file)))
+    return 0
+
+
 def cmd_tokens(args: argparse.Namespace) -> int:
     sys.stdout.write(lexer.dump(lexer.tokenize(read_source(args.file))))
     return 0
@@ -147,6 +153,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p = commands.add_parser("c", help="print the generated C")
     p.add_argument("file")
     p.set_defaults(func=cmd_c)
+
+    p = commands.add_parser("check", help="report the program's errors without generating anything")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_check)
 
     p = commands.add_parser("tokens", help="print the tokens the lexer produces")
     p.add_argument("file")

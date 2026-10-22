@@ -298,6 +298,7 @@ class Checker:
                 f.body.end_line, f.body.end_col,
                 f"missing return: '{f.name}' returns {f.sig.result}, "
                 "but the end of its body can be reached",
+                self.module.path,
             ))
 
     # ---- Modules ----

@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 STAGE0 = [sys.executable, str(ROOT / "stage0" / "main.py")]
 STAGE1 = ROOT / "build" / "vela1"
-COMMANDS = ("tokens", "ast")
+COMMANDS = ("tokens", "ast", "check")
 
 
 def build_stage1() -> None:

@@ -1,0 +1,398 @@
+// Exhaustiveness and redundancy checking for `match`: a port of
+// stage0/exhaustiveness.py, which explains Maranget's usefulness algorithm.
+//
+// One difference: Python's integers have no limit, so Stage 0 cuts Int
+// ranges at `hi + 1` even when hi is the largest Int. Here a piece is
+// described by where it starts, and the last one ends where the range
+// does, so nothing overflows; the pieces are the same.
+import strings
+import types
+
+pub type Key = enum {
+    Variant(Int)  // the variant's index in its enum
+    Bool(Bool)
+    Str(Str)
+    Interval(Int, Int)  // lo and hi, both included
+}
+
+pub type SPat = enum {
+    Wild
+    Ctor(Key, [SPat])
+}
+
+type Ctor = struct {
+    key: Key
+    payload: [Int]
+}
+
+fn same_key(a: Key, b: Key) -> Bool {
+    match a {
+        Key.Variant(x) => {
+            match b {
+                Key.Variant(y) => return x == y
+                _ => return false
+            }
+        }
+        Key.Bool(x) => {
+            match b {
+                Key.Bool(y) => return x == y
+                _ => return false
+            }
+        }
+        Key.Str(x) => {
+            match b {
+                Key.Str(y) => return x == y
+                _ => return false
+            }
+        }
+        Key.Interval(lo, hi) => {
+            match b {
+                Key.Interval(lo2, hi2) => return lo == lo2 && hi == hi2
+                _ => return false
+            }
+        }
+    }
+}
+
+fn int_min() -> Int {
+    return -9223372036854775807 - 1
+}
+
+fn int_max() -> Int {
+    return 9223372036854775807
+}
+
+fn has_domain(t: Int) -> Bool {
+    return t == types.INT() || t == types.BYTE()
+}
+
+fn domain(t: Int) -> Key {
+    if t == types.BYTE() {
+        return Key.Interval(0, 255)
+    }
+    return Key.Interval(int_min(), int_max())
+}
+
+// Every constructor of `t` with its payload types; none for a type with
+// too many to list.
+fn constructors(table: types.Table, t: Int) -> Option[[Ctor]] {
+    if types.is_enum(table, t) {
+        let mut out: [Ctor] = []
+        let vs = types.get(table, t).variants
+        for i in 0..len(vs) {
+            push(mut out, Ctor { key: Key.Variant(i), payload: vs[i].payload })
+        }
+        return Some(out)
+    }
+    if t == types.BOOL() {
+        let none: [Int] = []
+        return Some([Ctor { key: Key.Bool(true), payload: none }, Ctor { key: Key.Bool(false), payload: none }])
+    }
+    return None
+}
+
+fn payload_types(table: types.Table, t: Int, k: Key) -> [Int] {
+    let none: [Int] = []
+    match k {
+        Key.Variant(i) => {
+            if types.is_enum(table, t) {
+                return types.get(table, t).variants[i].payload
+            }
+            return none
+        }
+        _ => return none
+    }
+}
+
+fn wilds(n: Int) -> [SPat] {
+    let mut out: [SPat] = []
+    for _ in 0..n {
+        push(mut out, SPat.Wild)
+    }
+    return out
+}
+
+fn concat(a: [SPat], b: [SPat]) -> [SPat] {
+    let mut out = a
+    for x in b {
+        push(mut out, x)
+    }
+    return out
+}
+
+fn concat_types(a: [Int], b: [Int]) -> [Int] {
+    let mut out = a
+    for x in b {
+        push(mut out, x)
+    }
+    return out
+}
+
+fn rest(row: [SPat]) -> [SPat] {
+    return row[1..len(row)]
+}
+
+// The rows that can match a value built with `k`, with the first column
+// replaced by that constructor's sub-patterns.
+fn specialize(rows: [[SPat]], k: Key, arity: Int) -> [[SPat]] {
+    let mut out: [[SPat]] = []
+    for row in rows {
+        match row[0] {
+            SPat.Wild => push(mut out, concat(wilds(arity), rest(row)))
+            SPat.Ctor(head, args) => {
+                if same_key(head, k) {
+                    push(mut out, concat(args, rest(row)))
+                }
+            }
+        }
+    }
+    return out
+}
+
+// The rows that match any value in the first column, without it.
+fn default_rows(rows: [[SPat]]) -> [[SPat]] {
+    let mut out: [[SPat]] = []
+    for row in rows {
+        match row[0] {
+            SPat.Wild => push(mut out, rest(row))
+            _ => {}
+        }
+    }
+    return out
+}
+
+// A witness for `q` against `rows`: a value `q` matches and no row does,
+// one pattern per column; None if `q` is not useful.
+pub fn useful(table: types.Table, rows: [[SPat]], q: [SPat], ts: [Int]) -> Option[[SPat]] {
+    if len(q) == 0 {
+        if len(rows) == 0 {
+            let none: [SPat] = []
+            return Some(none)
+        }
+        return None
+    }
+    let t = ts[0]
+    if has_domain(t) {
+        return useful_interval(table, rows, q, ts)
+    }
+    match q[0] {
+        SPat.Ctor(k, args) => {
+            let payload = payload_types(table, t, k)
+            let found = useful(table, specialize(rows, k, len(args)), concat(args, rest(q)),
+                               concat_types(payload, ts[1..len(ts)]))?
+            let n = len(args)
+            return Some(concat([SPat.Ctor(k, found[0..n])], found[n..len(found)]))
+        }
+        SPat.Wild => {}
+    }
+    let ctors = constructors(table, t)
+    let mut used: [Key] = []
+    for row in rows {
+        match row[0] {
+            SPat.Ctor(k, _) => push(mut used, k)
+            SPat.Wild => {}
+        }
+    }
+    match ctors {
+        Some(cs) => {
+            if all_used(cs, used) {
+                // The rows mention every constructor, so `_` is useful only if
+                // it is useful for one of them in particular.
+                for c in cs {
+                    let n = len(c.payload)
+                    match useful(table, specialize(rows, c.key, n), concat(wilds(n), rest(q)),
+                                 concat_types(c.payload, ts[1..len(ts)])) {
+                        Some(found) => return Some(concat([SPat.Ctor(c.key, found[0..n])], found[n..len(found)]))
+                        None => {}
+                    }
+                }
+                return None
+            }
+        }
+        None => {}
+    }
+    // Some constructor is never mentioned, so only the rows starting with
+    // `_` can match it.
+    let found = useful(table, default_rows(rows), rest(q), ts[1..len(ts)])?
+    match ctors {
+        None => return Some(concat([SPat.Wild], found))  // an Int or Str no literal covers
+        Some(cs) => {
+            for c in cs {
+                if !is_used(c.key, used) {
+                    return Some(concat([SPat.Ctor(c.key, wilds(len(c.payload)))], found))
+                }
+            }
+            return None
+        }
+    }
+}
+
+fn is_used(k: Key, used: [Key]) -> Bool {
+    for u in used {
+        if same_key(k, u) {
+            return true
+        }
+    }
+    return false
+}
+
+fn all_used(cs: [Ctor], used: [Key]) -> Bool {
+    for c in cs {
+        if !is_used(c.key, used) {
+            return false
+        }
+    }
+    return true
+}
+
+fn bounds(k: Key) -> [Int] {
+    return match k {
+        Key.Interval(lo, hi) => [lo, hi]
+        _ => [0, -1]
+    }
+}
+
+fn add_cut(cuts: mut [Int], x: Int) {
+    for c in cuts {
+        if c == x {
+            return
+        }
+    }
+    push(mut cuts, x)
+}
+
+fn sort_ints(xs: [Int]) -> [Int] {
+    let mut out = xs
+    let mut i = 1
+    for i < len(out) {
+        let x = out[i]
+        let mut j = i - 1
+        for j >= 0 && x < out[j] {
+            out[j + 1] = out[j]
+            j = j - 1
+        }
+        out[j + 1] = x
+        i = i + 1
+    }
+    return out
+}
+
+// `useful` for a first column of Int or Byte values: the target range is
+// cut wherever a row's interval starts or ends inside it, and each piece
+// is tried as one constructor.
+fn useful_interval(table: types.Table, rows: [[SPat]], q: [SPat], ts: [Int]) -> Option[[SPat]] {
+    let mut target = domain(ts[0])
+    match q[0] {
+        SPat.Ctor(k, _) => target = k
+        SPat.Wild => {}
+    }
+    let tb = bounds(target)
+    let lo = tb[0]
+    let hi = tb[1]
+    let mut starts = [lo]
+    for row in rows {
+        match row[0] {
+            SPat.Ctor(k, _) => {
+                let b = bounds(k)
+                if lo < b[0] && b[0] <= hi {
+                    add_cut(mut starts, b[0])
+                }
+                // b[1] + 1 is inside the target only if b[1] < hi, so it cannot overflow.
+                if b[1] < hi && lo < b[1] + 1 {
+                    add_cut(mut starts, b[1] + 1)
+                }
+            }
+            SPat.Wild => {}
+        }
+    }
+    let edges = sort_ints(starts)
+    for i in 0..len(edges) {
+        let mut piece_hi = hi
+        if i + 1 < len(edges) {
+            piece_hi = edges[i + 1] - 1
+        }
+        let piece = Key.Interval(edges[i], piece_hi)
+        let mut matching: [[SPat]] = []
+        for row in rows {
+            match row[0] {
+                SPat.Wild => push(mut matching, rest(row))
+                SPat.Ctor(k, _) => {
+                    let b = bounds(k)
+                    if b[0] <= edges[i] && piece_hi <= b[1] {
+                        push(mut matching, rest(row))
+                    }
+                }
+            }
+        }
+        match useful(table, matching, rest(q), ts[1..len(ts)]) {
+            Some(found) => return Some(concat([SPat.Ctor(piece, [])], found))
+            None => {}
+        }
+    }
+    return None
+}
+
+fn render_number(value: Int, t: Int) -> Str {
+    if t == types.BYTE() && value >= 32 && value < 127 && value != 39 && value != 92 {
+        let mut b = strings.builder()
+        strings.add_byte(mut b, '\'')
+        strings.add_byte(mut b, byte(value))
+        strings.add_byte(mut b, '\'')
+        return strings.build(b)
+    }
+    return strings.from_int(value)
+}
+
+// A witness as Vela source: `Expr.Neg(_)`, `Some(_)`, `false`, `'a'..='z'`,
+// `_`. `viewpoint` is the module the match is in.
+pub fn render(table: types.Table, p: SPat, t: Int, viewpoint: Str) -> Str {
+    match p {
+        SPat.Wild => return "_"
+        SPat.Ctor(k, args) => {
+            match k {
+                Key.Interval(lo, hi) => {
+                    let d = bounds(domain(t))
+                    if lo == d[0] && hi == d[1] {
+                        return "_"
+                    }
+                    // "everything else" reads better than -9223372036854775808..=-1
+                    if t == types.INT() && lo != hi && (lo == d[0] || hi == d[1]) {
+                        return "_"
+                    }
+                    if lo == hi {
+                        return render_number(lo, t)
+                    }
+                    return render_number(lo, t) + "..=" + render_number(hi, t)
+                }
+                Key.Bool(b) => {
+                    if b {
+                        return "true"
+                    }
+                    return "false"
+                }
+                Key.Str(_) => return "_"
+                Key.Variant(i) => {
+                    let v = types.get(table, t).variants[i]
+                    let mut name = v.name
+                    if !types.is_builtin_enum(table, t) {
+                        name = types.show(table, t, viewpoint) + "." + v.name
+                    }
+                    if len(v.payload) == 0 {
+                        return name
+                    }
+                    let mut b = strings.builder()
+                    strings.add(mut b, name)
+                    strings.add_byte(mut b, '(')
+                    for j in 0..len(args) {
+                        if j > 0 {
+                            strings.add(mut b, ", ")
+                        }
+                        strings.add(mut b, render(table, args[j], v.payload[j], viewpoint))
+                    }
+                    strings.add_byte(mut b, ')')
+                    return strings.build(b)
+                }
+            }
+        }
+    }
+}

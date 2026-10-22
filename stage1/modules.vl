@@ -1,0 +1,290 @@
+// Programs made of several files: a port of stage0/modules.py, which
+// explains the rules. Modules are kept in one array and refer to each
+// other by index.
+import ast
+import errors
+import files
+import lexer
+import maps
+import parser
+import strings
+import types
+
+pub type Module = struct {
+    name: Str  // as other files call it; "" for the main module
+    path: Str  // the file, as messages show it; "" for a built-in module
+    program: ast.Program
+    has_program: Bool  // false for a built-in module, or a file that did not lex
+    imports: Map[Str, Int]  // module indexes, by the name imported as
+    std: [Str]  // the functions of a built-in module
+    is_std: Bool
+    // Filled in by the checker: the module's own declarations by name.
+    types: Map[Str, Int]  // type ids
+    fns: Map[Str, Int]  // function ids
+}
+
+pub type Loaded = struct {
+    modules: [Module]  // every module, built-in ones included
+    order: [Int]  // the program's files, dependencies first, the main one last
+    errors: [errors.CompileError]  // sorted
+    node_count: Int  // syntax tree ids handed out, across all files
+}
+
+type Loader = struct {
+    directory: Str
+    std_dir: Str
+    modules: [Module]
+    errors: [errors.CompileError]
+    by_path: Map[Str, Int]
+    order: [Int]
+    active: [Int]  // the chain of imports being followed
+    next_id: Int
+}
+
+// The built-in modules and their functions, in Stage 0's order.
+fn builtin_functions(name: Str) -> [Str] {
+    return match name {
+        "maps" => ["has", "get", "remove", "keys"]
+        "files" => ["read", "write"]
+        "os" => ["args", "exit", "eprint"]
+        "strings" => ["builder", "add", "add_byte", "add_int", "build", "from_int"]
+        _ => []
+    }
+}
+
+pub fn is_builtin_module(name: Str) -> Bool {
+    return len(builtin_functions(name)) > 0
+}
+
+fn empty_program() -> ast.Program {
+    return ast.Program { imports: [], types: [], fns: [] }
+}
+
+fn new_module(name: Str, path: Str) -> Module {
+    return Module {
+        name: name, path: path, program: empty_program(), has_program: false, imports: [:], std: [],
+        is_std: false, types: [:], fns: [:],
+    }
+}
+
+// The name to use in messages: the main module has none, so it goes by its
+// file name.
+pub fn label(m: Module) -> Str {
+    if m.name != "" {
+        return m.name
+    }
+    return stem(m.path)
+}
+
+// Load the program whose main file is `path`, with contents `source`.
+// `std_dir` is where the standard modules written in Vela are.
+pub fn load(path: Str, source: Str, std_dir: Str) -> Loaded {
+    let mut ld = Loader {
+        directory: dirname(path), std_dir: std_dir, modules: [], errors: [], by_path: [:], order: [],
+        active: [], next_id: 0,
+    }
+    file(mut ld, "", path, source, path)
+    return Loaded { modules: ld.modules, order: ld.order, errors: errors.sorted(ld.errors), node_count: ld.next_id }
+}
+
+// Lex and parse one file, then load what it imports. Returns its index.
+fn file(ld: mut Loader, name: Str, path: Str, source: Str, shown: Str) -> Int {
+    push(mut ld.modules, new_module(name, shown))
+    let index = len(ld.modules) - 1
+    ld.by_path[normpath(path)] = index
+    // The lexer and parser are each a phase: a file with lexical errors is
+    // not parsed, and its imports are not followed.
+    let lexed = lexer.tokenize(source)
+    if len(lexed.errors) > 0 {
+        add_errors(mut ld, lexed.errors, shown)
+    } else {
+        let parsed = parser.parse(lexed.tokens, ld.next_id)
+        ld.next_id = parsed.next_id
+        add_errors(mut ld, parsed.errors, shown)
+        // The parser recovers, so a file with syntax errors still has imports.
+        ld.modules[index].program = parsed.program
+        ld.modules[index].has_program = true
+        push(mut ld.active, index)
+        for imp in parsed.program.imports {
+            follow(mut ld, index, imp)
+        }
+        ld.active = ld.active[0..len(ld.active) - 1]
+    }
+    push(mut ld.order, index)
+    return index
+}
+
+fn add_errors(ld: mut Loader, errs: [errors.CompileError], path: Str) {
+    for e in errs {
+        let mut with_path = e
+        with_path.path = path
+        errors.add(mut ld.errors, with_path)
+    }
+}
+
+fn report(ld: mut Loader, importer: Int, imp: ast.Import, message: Str) {
+    let e = errors.CompileError { path: ld.modules[importer].path, line: imp.line, col: imp.col, message: message }
+    errors.add(mut ld.errors, e)
+}
+
+fn builtin_module(ld: mut Loader, name: Str) -> Int {
+    for i in 0..len(ld.modules) {
+        if ld.modules[i].is_std && ld.modules[i].name == name {
+            return i
+        }
+    }
+    let mut m = new_module(name, "")
+    m.is_std = true
+    m.std = builtin_functions(name)
+    if name == "strings" {
+        m.types["Builder"] = types.BUILDER()
+    }
+    push(mut ld.modules, m)
+    return len(ld.modules) - 1
+}
+
+fn follow(ld: mut Loader, importer: Int, imp: ast.Import) {
+    if maps.has(ld.modules[importer].imports, imp.name) {
+        report(mut ld, importer, imp, "'" + imp.name + "' is already imported")
+        return
+    }
+    if is_builtin_module(imp.name) {
+        let std = builtin_module(mut ld, imp.name)
+        ld.modules[importer].imports[imp.name] = std
+        return
+    }
+    let mut path = join(ld.directory, imp.name + ".vl")
+    let mut shown = path
+    let mut source = ""
+    let mut have_source = false
+    match files.read(join(ld.std_dir, imp.name + ".vl")) {
+        Ok(text) => {
+            path = join(ld.std_dir, imp.name + ".vl")
+            shown = "std/" + imp.name + ".vl"
+            source = text
+            have_source = true
+        }
+        Err(_) => {}
+    }
+    let mut known = -1
+    match maps.get(ld.by_path, normpath(path)) {
+        Some(k) => known = k
+        None => {}
+    }
+    for i in 0..len(ld.active) {
+        if ld.active[i] == known {
+            let chain = ld.active[i..len(ld.active)]
+            if len(chain) == 1 {
+                report(mut ld, importer, imp, "module '" + imp.name + "' imports itself")
+            } else {
+                let mut names = strings.builder()
+                for m in chain {
+                    strings.add(mut names, label(ld.modules[m]))
+                    strings.add(mut names, " -> ")
+                }
+                strings.add(mut names, label(ld.modules[known]))
+                report(mut ld, importer, imp, "import cycle: " + strings.build(names) +
+                    "; modules cannot import each other, directly or through others")
+            }
+            return
+        }
+    }
+    if known < 0 {
+        if !have_source {
+            match files.read(path) {
+                Ok(text) => source = text
+                Err(_) => {
+                    report(mut ld, importer, imp, "cannot find module '" + imp.name + "': there is no file " + path)
+                    return
+                }
+            }
+        }
+        known = file(mut ld, imp.name, path, source, shown)
+    }
+    ld.modules[importer].imports[imp.name] = known
+}
+
+// ---- Paths, as Python's os.path does them for the cases that occur ----
+
+fn last_slash(path: Str) -> Int {
+    let mut i = len(path) - 1
+    for i >= 0 && path[i] != '/' {
+        i = i - 1
+    }
+    return i
+}
+
+pub fn dirname(path: Str) -> Str {
+    let i = last_slash(path)
+    if i < 0 {
+        return ""
+    }
+    let mut end = i + 1
+    // Trailing slashes go, unless the directory is the root.
+    for end > 1 && path[end - 1] == '/' {
+        end = end - 1
+    }
+    return path[0..end]
+}
+
+pub fn join(dir: Str, name: Str) -> Str {
+    if len(name) > 0 && name[0] == '/' || dir == "" {
+        return name
+    }
+    if dir[len(dir) - 1] == '/' {
+        return dir + name
+    }
+    return dir + "/" + name
+}
+
+// The file name without its last extension: "main" for "src/main.vl".
+pub fn stem(path: Str) -> Str {
+    let name = path[last_slash(path) + 1..len(path)]
+    let mut dot = len(name) - 1
+    for dot > 0 && name[dot] != '.' {
+        dot = dot - 1
+    }
+    if dot <= 0 {
+        return name
+    }
+    return name[0..dot]
+}
+
+// The same path with `.` parts and `x/..` pairs gone, so two spellings of
+// one file give one key.
+pub fn normpath(path: Str) -> Str {
+    let absolute = len(path) > 0 && path[0] == '/'
+    let mut parts: [Str] = []
+    let mut start = 0
+    for i in 0..len(path) + 1 {
+        if i == len(path) || path[i] == '/' {
+            let part = path[start..i]
+            start = i + 1
+            if part == "" || part == "." {
+                continue
+            }
+            if part == ".." && len(parts) > 0 && parts[len(parts) - 1] != ".." {
+                parts = parts[0..len(parts) - 1]
+            } else if part == ".." && absolute {
+                continue
+            } else {
+                push(mut parts, part)
+            }
+        }
+    }
+    let mut b = strings.builder()
+    if absolute {
+        strings.add_byte(mut b, '/')
+    }
+    for i in 0..len(parts) {
+        if i > 0 {
+            strings.add_byte(mut b, '/')
+        }
+        strings.add(mut b, parts[i])
+    }
+    let out = strings.build(b)
+    if out == "" {
+        return "."
+    }
+    return out
+}

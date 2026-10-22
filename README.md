@@ -15,6 +15,7 @@ milestone has a walkthrough in [`docs/`](docs/).
 python3 stage0/main.py run hello.vl       # compile and run (imports are found next to it)
 python3 stage0/main.py build hello.vl     # produce ./hello
 python3 stage0/main.py c hello.vl         # show the generated C
+python3 stage0/main.py check hello.vl     # report errors only
 python3 stage0/main.py tokens hello.vl    # show the tokens
 python3 stage0/main.py ast hello.vl       # show the syntax tree
 python3 run_tests.py                      # run the test suite

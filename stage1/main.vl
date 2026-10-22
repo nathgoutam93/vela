@@ -2,13 +2,16 @@
 //
 //     vela1 tokens FILE    print the token stream
 //     vela1 ast FILE       print the syntax tree
+//     vela1 check FILE     report the program's errors, generate nothing
 //
 // More commands arrive as the rest of the compiler is ported (M8). Exit
 // codes as in Stage 0: 0 success, 1 the program has errors, 2 bad command line.
 import ast
+import checker
 import errors
 import files
 import lexer
+import modules
 import os
 import parser
 
@@ -23,13 +26,15 @@ fn main() {
         tokens(path)
     } else if command == "ast" {
         syntax_tree(path)
+    } else if command == "check" {
+        check(path, std_dir(args[0]))
     } else {
         usage()
     }
 }
 
 fn usage() {
-    os.eprint("usage: vela1 (tokens | ast) FILE")
+    os.eprint("usage: vela1 (tokens | ast | check) FILE")
     os.exit(2)
 }
 
@@ -78,4 +83,27 @@ fn syntax_tree(path: Str) {
     if len(out) > 0 {
         print(out[0..len(out) - 1])
     }
+}
+
+// The standard modules written in Vela: std/ next to the build/ directory
+// the compiler is in.
+fn std_dir(program: Str) -> Str {
+    return modules.join(modules.dirname(modules.dirname(program)), "std")
+}
+
+// Load and check a whole program; returns it checked, or stops with its errors.
+fn checked(path: Str, std: Str) -> checker.Checked {
+    let loaded = modules.load(path, read(path), std)
+    if len(loaded.errors) > 0 {
+        fail(path, loaded.errors)
+    }
+    let result = checker.check(loaded)
+    if len(result.errors) > 0 {
+        fail(path, result.errors)
+    }
+    return result
+}
+
+fn check(path: Str, std: Str) {
+    checked(path, std)
 }

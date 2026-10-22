@@ -1,0 +1,319 @@
+// Vela's types, as in stage0/typesys.py. Stage 0 has one Python object per
+// type; here a type is a number, its index in a Table, so types compare
+// with == like any Int.
+//
+// The built-in types have fixed numbers (ERROR, INT, ...). User structs and
+// enums are added as their declarations are read. Option, Result, array
+// and map types are interned: asked for the same arguments twice, the
+// table gives back the same number. The table remembers the order in which
+// they were first asked for, because the C code generator defines them in
+// that order, and its output must match Stage 0's byte for byte.
+import maps
+import strings
+
+pub type Tag = enum {
+    Error
+    Prim  // Int, Byte, Bool, Str, Unit
+    Std  // strings.Builder
+    Array
+    Map
+    Struct
+    Enum  // a user enum, or Option / Result (which have args)
+}
+
+pub type Variant = struct {
+    name: Str
+    payload: [Int]
+}
+
+pub type FieldInfo = struct {
+    name: Str
+    ty: Int
+}
+
+pub type TypeInfo = struct {
+    tag: Tag
+    name: Str  // "Int", the user's name, "Option" or "Result"
+    module: Str  // the module a user type is declared in; "" for the main one
+    public: Bool
+    line: Int
+    col: Int
+    args: [Int]  // Option[T]: [T]; Result[T, E]: [T, E]; [T]: [T]; Map[K, V]: [K, V]
+    fields: [FieldInfo]  // a struct's, in declaration order
+    variants: [Variant]  // an enum's, in order: the index is the C tag
+}
+
+pub type Table = struct {
+    types: [TypeInfo]
+    index: Map[Str, Int]  // interned types by a key such as "Option 4"
+    instances: [Int]  // Option and Result types, in the order first asked for
+    arrays: [Int]  // the element type of each array type, likewise
+    maps: [Int]  // key and value of each map type, likewise, two per map
+}
+
+pub fn ERROR() -> Int {
+    return 0
+}
+
+pub fn INT() -> Int {
+    return 1
+}
+
+pub fn BYTE() -> Int {
+    return 2
+}
+
+pub fn BOOL() -> Int {
+    return 3
+}
+
+pub fn STR() -> Int {
+    return 4
+}
+
+pub fn UNIT() -> Int {
+    return 5
+}
+
+pub fn BUILDER() -> Int {
+    return 6
+}
+
+// The "type" of a call that returns nothing.
+pub fn NOTHING() -> Int {
+    return -1
+}
+
+fn info(tag: Tag, name: Str) -> TypeInfo {
+    return TypeInfo { tag: tag, name: name, module: "", public: true, line: 0, col: 0, args: [], fields: [],
+                      variants: [] }
+}
+
+pub fn new_table() -> Table {
+    let mut t = Table { types: [], index: [:], instances: [], arrays: [], maps: [] }
+    push(mut t.types, info(Tag.Error, "<error>"))
+    for name in ["Int", "Byte", "Bool", "Str", "Unit"] {
+        push(mut t.types, info(Tag.Prim, name))
+    }
+    let mut builder = info(Tag.Std, "Builder")
+    builder.module = "strings"
+    push(mut t.types, builder)
+    return t
+}
+
+// The built-in types by name, or -1.
+pub fn primitive(name: Str) -> Int {
+    return match name {
+        "Int" => INT()
+        "Byte" => BYTE()
+        "Bool" => BOOL()
+        "Str" => STR()
+        "Unit" => UNIT()
+        _ => -1
+    }
+}
+
+// The built-in generic types and how many type arguments each takes, or -1.
+pub fn generic_arity(name: Str) -> Int {
+    return match name {
+        "Option" => 1
+        "Result" => 2
+        "Map" => 2
+        _ => -1
+    }
+}
+
+pub fn is_map_key(t: Int) -> Bool {
+    return t == INT() || t == BYTE() || t == BOOL() || t == STR()
+}
+
+// A new user struct or enum; its fields or variants are filled in later.
+pub fn add_user(table: mut Table, is_struct: Bool, name: Str, module: Str, public: Bool, line: Int,
+                col: Int) -> Int {
+    let mut t = info(Tag.Enum, name)
+    if is_struct {
+        t.tag = Tag.Struct
+    }
+    t.module = module
+    t.public = public
+    t.line = line
+    t.col = col
+    push(mut table.types, t)
+    return len(table.types) - 1
+}
+
+fn key(name: Str, args: [Int]) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, name)
+    for a in args {
+        strings.add_byte(mut b, ' ')
+        strings.add_int(mut b, a)
+    }
+    return strings.build(b)
+}
+
+pub fn array(table: mut Table, elem: Int) -> Int {
+    if elem == ERROR() {
+        return ERROR()
+    }
+    let k = key("[]", [elem])
+    match maps.get(table.index, k) {
+        Some(t) => return t
+        None => {}
+    }
+    let mut t = info(Tag.Array, "[]")
+    t.args = [elem]
+    push(mut table.types, t)
+    let id = len(table.types) - 1
+    table.index[k] = id
+    push(mut table.arrays, elem)
+    return id
+}
+
+pub fn map(table: mut Table, k: Int, v: Int) -> Int {
+    if k == ERROR() || v == ERROR() {
+        return ERROR()
+    }
+    let name = key("Map", [k, v])
+    match maps.get(table.index, name) {
+        Some(t) => return t
+        None => {}
+    }
+    let mut t = info(Tag.Map, "Map")
+    t.args = [k, v]
+    push(mut table.types, t)
+    let id = len(table.types) - 1
+    table.index[name] = id
+    push(mut table.maps, k)
+    push(mut table.maps, v)
+    return id
+}
+
+pub fn option(table: mut Table, t: Int) -> Int {
+    return instance(mut table, "Option", [t])
+}
+
+pub fn result(table: mut Table, t: Int, e: Int) -> Int {
+    return instance(mut table, "Result", [t, e])
+}
+
+pub fn instance(table: mut Table, name: Str, args: [Int]) -> Int {
+    for a in args {
+        if a == ERROR() {
+            return ERROR()
+        }
+    }
+    let k = key(name, args)
+    match maps.get(table.index, k) {
+        Some(t) => return t
+        None => {}
+    }
+    let mut t = info(Tag.Enum, name)
+    t.args = args
+    if name == "Option" {
+        t.variants = [Variant { name: "None", payload: [] }, Variant { name: "Some", payload: [args[0]] }]
+    } else {
+        t.variants = [Variant { name: "Ok", payload: [args[0]] }, Variant { name: "Err", payload: [args[1]] }]
+    }
+    push(mut table.types, t)
+    let id = len(table.types) - 1
+    table.index[k] = id
+    push(mut table.instances, id)
+    return id
+}
+
+pub fn get(table: Table, t: Int) -> TypeInfo {
+    return table.types[t]
+}
+
+pub fn is_enum(table: Table, t: Int) -> Bool {
+    return t >= 0 && table.types[t].tag == Tag.Enum
+}
+
+pub fn is_struct(table: Table, t: Int) -> Bool {
+    return t >= 0 && table.types[t].tag == Tag.Struct
+}
+
+pub fn is_array(table: Table, t: Int) -> Bool {
+    return t >= 0 && table.types[t].tag == Tag.Array
+}
+
+pub fn is_map(table: Table, t: Int) -> Bool {
+    return t >= 0 && table.types[t].tag == Tag.Map
+}
+
+// Option and Result, which have type arguments; user enums have none.
+pub fn is_builtin_enum(table: Table, t: Int) -> Bool {
+    return is_enum(table, t) && len(table.types[t].args) > 0
+}
+
+// The index of the variant called `name`, or -1.
+pub fn variant_index(table: Table, t: Int, name: Str) -> Int {
+    let vs = table.types[t].variants
+    for i in 0..len(vs) {
+        if vs[i].name == name {
+            return i
+        }
+    }
+    return -1
+}
+
+// The index of the field called `name`, or -1.
+pub fn field_index(table: Table, t: Int, name: Str) -> Int {
+    let fs = table.types[t].fields
+    for i in 0..len(fs) {
+        if fs[i].name == name {
+            return i
+        }
+    }
+    return -1
+}
+
+// No variant carries data, so values compare by variant alone.
+pub fn c_like(table: Table, t: Int) -> Bool {
+    for v in table.types[t].variants {
+        if len(v.payload) > 0 {
+            return false
+        }
+    }
+    return true
+}
+
+// A type as written in the source, seen from module `viewpoint`: a type
+// from another module has that module's name in front.
+pub fn show(table: Table, t: Int, viewpoint: Str) -> Str {
+    let ti = table.types[t]
+    return match ti.tag {
+        Tag.Error => "<error>"
+        Tag.Prim => ti.name
+        Tag.Std => ti.module + "." + ti.name
+        Tag.Array => "[" + show(table, ti.args[0], viewpoint) + "]"
+        Tag.Map => "Map[" + show(table, ti.args[0], viewpoint) + ", " + show(table, ti.args[1], viewpoint) + "]"
+        Tag.Struct => qualified(ti.module, ti.name, viewpoint)
+        Tag.Enum => show_enum(table, ti, viewpoint)
+    }
+}
+
+fn show_enum(table: Table, ti: TypeInfo, viewpoint: Str) -> Str {
+    if len(ti.args) == 0 {
+        return qualified(ti.module, ti.name, viewpoint)
+    }
+    let mut b = strings.builder()
+    strings.add(mut b, ti.name)
+    strings.add_byte(mut b, '[')
+    for i in 0..len(ti.args) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, show(table, ti.args[i], viewpoint))
+    }
+    strings.add_byte(mut b, ']')
+    return strings.build(b)
+}
+
+fn qualified(module: Str, name: Str, viewpoint: Str) -> Str {
+    if module != "" && module != viewpoint {
+        return module + "." + name
+    }
+    return name
+}
