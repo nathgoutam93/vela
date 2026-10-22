@@ -29,8 +29,12 @@ build/vela c hello.vl         # show the generated C
 build/vela check hello.vl     # report errors only (--json for tools)
 build/vela tokens hello.vl    # show the tokens
 build/vela ast hello.vl       # show the syntax tree
+build/vela query type hello.vl:12:7   # what the name there is, in JSON (also def, refs, symbols)
+build/vela lsp                # a language server on stdin and stdout, for editors
 python3 run_tests.py          # run the test suite with build/vela
 ```
+
+For Neovim and VS Code, see [`editors/`](editors/README.md).
 
 After changing `stage1/`, run `sh bootstrap/bootstrap.sh --update`: the
 seed compiles the new source, the new compiler compiles itself twice more,
@@ -44,13 +48,15 @@ then use it.
 stage1/      the compiler, written in Vela
 bootstrap/   the seed (Stage 1 compiled to C) and the bootstrap script
 examples/    larger programs: orders/ prices orders read from CSV
+editors/     Neovim and VS Code support for `vela lsp`
 stage0/      the first compiler, in Python: frozen at M9 as the readable reference
 runtime/     C runtime linked into every program
 std/         standard modules written in Vela
 tests/run/   programs and their expected output
 tests/fail/  programs and the exact errors they must produce
 tests/dump/  expected token and syntax-tree dumps
-tests/cli/   commands such as test, fmt and check --json, and their output
+tests/cli/   commands such as test, fmt, query and check --json, and their output
+tests/lsp_client.py, tests/nvim_test.lua  the language server, driven by a script and by Neovim
 docs/        one walkthrough per milestone
 run_tests.py the golden-test runner
 compare_stages.py  checks that Stage 0 and Stage 1 agree on every file
@@ -71,8 +77,9 @@ and retired Python from the build. M10a added generics
 formatter and JSON errors; M10b added function values (`fn(Int) -> Str`),
 effects (`uses fs, os`), fakes for tests (`with files = ...`), contracts
 (`requires`, `ensures`) and warnings; M10c added closures
-(`fn(x) => x * k`), `Float`, and `std/text.vl`. All of M10 is in Stage 1
-only.
+(`fn(x) => x * k`), `Float`, and `std/text.vl`. M12 added a language
+server (`vela lsp`) and `vela query` for agents, with `std/json.vl` and
+reading from stdin. All of M10 and M12 is in Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
 
