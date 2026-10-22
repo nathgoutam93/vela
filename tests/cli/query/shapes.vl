@@ -1,0 +1,14 @@
+// Shapes and their areas.
+pub type Shape = enum {
+    Circle(Float)  // the radius
+    Rect(Float, Float)
+}
+
+// The area of `s`, in square units.
+pub fn area(s: Shape) -> Float
+    ensures result >= 0.0 {
+    return match s {
+        Shape.Circle(r) => 3.0 * r * r
+        Shape.Rect(w, h) => w * h
+    }
+}

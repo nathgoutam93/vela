@@ -25,8 +25,8 @@ whose main file is main.vl. Comment lines at the very top of the .vl file
     // dump: <what>   tests/dump only: `tokens` or `ast`, the dump that the
     //                `out:` lines are compared against
     // command: <words>  tests/cli only: the compiler's command line; FILE
-    //                stands for the test's file, which goes last if FILE is
-    //                not there
+    //                stands for the test's file (also inside a word, as in
+    //                FILE:3:7), which goes last if FILE is not there
     // stage 1 only   the test uses what Stage 0, frozen at M9, does not
     //                have; --stage0 skips it
 
@@ -46,7 +46,8 @@ The directory a test lives in decides what is checked:
                   NAME.expected again must change nothing
 
 Besides these, the compiler (stage1/main.vl), every examples/*/main.vl and
-every std/*.vl with tests in it must pass `vela test` (with Stage 1 only).
+every std/*.vl with tests in it must pass `vela test`, and the language
+server must pass tests/lsp_client.py, a scripted editor (Stage 1 only).
 
 The compiler runs inside the test's directory and is given the bare file
 name, so messages read `name.vl:3:7: ...` wherever the repo is checked out.
@@ -68,6 +69,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 TESTS = ROOT / "tests"
+LSP_CLIENT = TESTS / "lsp_client.py"
 KINDS = ("run", "fail", "dump", "cli")
 
 # Generated C must compile without a single warning; the test suite enforces it.
@@ -144,6 +146,8 @@ def compare(what: str, expected: list[str], actual: str) -> list[str]:
 
 def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
     """Run one test. Returns a list of problems; empty means it passed."""
+    if path == LSP_CLIENT:
+        return run_lsp_client(compiler, env)
     if not path.is_relative_to(TESTS):
         return run_vela_tests(compiler, path, env)
     kind = path.relative_to(TESTS).parts[0]
@@ -214,8 +218,8 @@ def run_cli_test(compiler: list[str], path: Path, expect: Expectations,
     if not expect.command:
         return ["a cli test needs a `// command:` line"]
     words = expect.command
-    if "FILE" in words:
-        words = [path.name if w == "FILE" else w for w in words]
+    if any("FILE" in w for w in words):
+        words = [w.replace("FILE", path.name) for w in words]
     else:
         words = [*words, path.name]
     expected_file = path.with_suffix(".expected")
@@ -263,11 +267,23 @@ def run_vela_tests(compiler: list[str], path: Path, env: dict[str, str]) -> list
     return []
 
 
+def run_lsp_client(compiler: list[str], env: dict[str, str]) -> list[str]:
+    try:
+        ran = subprocess.run([sys.executable, str(LSP_CLIENT), *compiler], env=env, stdin=subprocess.DEVNULL,
+                             capture_output=True, text=True, timeout=VELA_TEST_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return [f"the lsp client took longer than {VELA_TEST_TIMEOUT}s"]
+    if ran.returncode != 0:
+        return [*ran.stdout.splitlines(), *ran.stderr.splitlines()]
+    return []
+
+
 def find_tests(filters: list[str]) -> list[Path]:
     tests = []
     tests += sorted((ROOT / "examples").glob("*/main.vl"))
     tests.append(ROOT / "stage1" / "main.vl")  # the compiler's own tests
     tests += [p for p in sorted((ROOT / "std").glob("*.vl")) if 'test "' in p.read_text()]
+    tests.append(LSP_CLIENT)
     for kind in KINDS:
         for p in sorted((TESTS / kind).iterdir()):
             if p.is_dir():
@@ -307,7 +323,7 @@ def main() -> int:
     tests = find_tests(args.filters)
     if args.stage0:
         tests = [t for t in tests
-                 if t.is_relative_to(TESTS) and not read_expectations(t).stage1_only and t.relative_to(TESTS).parts[0] != "cli"]
+                 if t.is_relative_to(TESTS) and t.suffix == ".vl" and not read_expectations(t).stage1_only and t.relative_to(TESTS).parts[0] != "cli"]
     if not tests:
         print("no tests found")
         return 1

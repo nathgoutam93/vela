@@ -1,0 +1,5 @@
+import text
+
+pub fn loud() -> Str {
+    return text.title() + "!"
+}

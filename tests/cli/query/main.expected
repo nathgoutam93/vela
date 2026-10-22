@@ -1,0 +1,12 @@
+{
+  "name": "area",
+  "kind": "function",
+  "type": null,
+  "detail": "pub fn area(s: Shape) -> Float\n    ensures result >= 0.0",
+  "doc": "The area of `s`, in square units.",
+  "def": {
+    "file": "shapes.vl",
+    "line": 8,
+    "col": 8
+  }
+}

@@ -1,0 +1,30 @@
+// vela query symbols: a file's outline, with signatures, for an agent to
+// see what a module offers without reading all of it.
+// stage 1 only
+// command: query symbols FILE
+pub type Stack = struct {
+    items: [Int]
+}
+
+type Op = enum {
+    Push(Int)
+    Pop
+}
+
+// The stack after `op`.
+pub fn apply(s: Stack, op: Op) -> Stack {
+    let mut out = s
+    match op {
+        Op.Push(n) => push(mut out.items, n)
+        Op.Pop => out.items = out.items[0..len(out.items) - 1]
+    }
+    return out
+}
+
+fn main() {
+    print(len(apply(Stack { items: [] }, Op.Push(1)).items))
+}
+
+test "push" {
+    assert(len(apply(Stack { items: [] }, Op.Push(1)).items) == 1)
+}

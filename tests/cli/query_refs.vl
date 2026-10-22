@@ -1,0 +1,18 @@
+// vela query refs: every use of a name, its declaration first. Two
+// different `n`s are two different names.
+// stage 1 only
+// command: query refs FILE:9:13
+fn count(xs: [Int]) -> Int {
+    let mut n = 0
+    for x in xs {
+        if x > 0 {
+            n = n + 1
+        }
+    }
+    return n
+}
+
+fn main() {
+    let n = count([1, -2, 3])
+    print(n)
+}

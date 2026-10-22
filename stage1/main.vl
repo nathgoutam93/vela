@@ -11,6 +11,9 @@
 //     vela ast FILE               print the syntax tree
 //     vela fmt [-w | -l] FILE...  print the files formatted; -w rewrites them,
 //                                 -l lists the ones that are not formatted
+//     vela query WHAT ...         answer a question about a program, in JSON
+//                                 (see query.vl)
+//     vela lsp                    a language server, on stdin and stdout
 //
 // Exit codes as in Stage 0: 0 success, 1 the program has errors, 2 bad
 // command line, 70 internal compiler error.
@@ -28,13 +31,19 @@ import errors
 import files
 import format
 import lexer
+import lsp
 import modules
 import os
 import parser
+import query
 import strings
 
 fn main() {
     let args = os.args()
+    if len(args) == 2 && args[1] == "lsp" {
+        lsp.serve(modules.join(root_dir(args[0]), "std"))
+        return
+    }
     if len(args) < 3 {
         usage()
     }
@@ -44,6 +53,10 @@ fn main() {
         return
     }
     let root = root_dir(args[0])
+    if command == "query" {
+        query.command(args[2..len(args)], modules.join(root, "std"))
+        return
+    }
     if command == "check" && args[2] == "--json" {
         if len(args) != 4 {
             usage()
@@ -87,7 +100,7 @@ fn main() {
 }
 
 fn usage() uses os {
-    os.eprint("usage: vela (build | run | test | c | check | tokens | ast | fmt) FILE")
+    os.eprint("usage: vela (build | run | test | c | check | tokens | ast | fmt | query) FILE, or vela lsp")
     os.exit(2)
 }
 

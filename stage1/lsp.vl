@@ -1,0 +1,805 @@
+// `vela lsp`: a language server, so that an editor shows Vela's errors as
+// you type, the type of a name when you point at it, and where a name is
+// declared and used.
+//
+// The Language Server Protocol is JSON-RPC over stdin and stdout. Each
+// message is a header, `Content-Length: N`, a blank line, and N bytes of
+// JSON. The editor sends requests (hover at this position; reply wanted)
+// and notifications (this file changed; no reply); the server replies to
+// requests and sends notifications of its own, the diagnostics.
+//
+// Every change re-checks the whole program the changed file belongs to,
+// from scratch: the compiler checks itself, 11,000 lines, in a tenth of a
+// second, so there is nothing yet to gain from checking only what changed.
+// Open files are read from the editor's buffers, saved or not; others from
+// disk. A file is checked as a program of its own, with what it imports,
+// and its tests; it need not have a main function.
+//
+// Positions: LSP counts lines and characters from 0, and characters in
+// UTF-16 units unless the editor agrees to UTF-8 (bytes), which Neovim
+// and VS Code both offer; Vela counts both from 1, in bytes.
+// stage 1 only (it says `uses`)
+import ast
+import checker
+import errors
+import files
+import format
+import index
+import json
+import lexer
+import maps
+import modules
+import os
+import parser
+import query
+import strings
+
+type Server = struct {
+    std_dir: Str
+    open: Map[Str, Str]  // the open files' texts, by path
+    sources: Map[Str, Str]  // the text of every file of the programs checked, by path
+    analyses: Map[Str, query.Analysis]  // the latest check of each open file, by path
+    indexes: Map[Str, index.Index]  // made from an analysis when first asked for, by path
+    shown: Map[Str, Bool]  // files the editor is showing diagnostics for
+    utf8: Bool  // the editor counts characters in bytes, not UTF-16 units
+    shutting_down: Bool
+}
+
+pub fn serve(std_dir: Str) uses fs, os {
+    let mut s = Server {
+        std_dir: std_dir, open: [:], sources: [:], analyses: [:], indexes: [:], shown: [:], utf8: false,
+        shutting_down: false,
+    }
+    for {
+        match read_message() {
+            Incoming.End => os.exit(1)  // the editor went away without saying exit
+            Incoming.Bad(why) => send(error_reply(json.null(), -32700, why))
+            Incoming.Message(m) => handle(mut s, m)
+        }
+    }
+}
+
+// ---- Messages ----
+
+type Incoming = enum {
+    End
+    Bad(Str)
+    Message(json.Json)
+}
+
+fn read_message() -> Incoming uses os {
+    let mut length = -1
+    for {
+        match os.read_line() {
+            None => return Incoming.End
+            Some(line) => {
+                if line == "" {
+                    break
+                }
+                let colon = find_byte(line, ':')
+                if colon > 0 && lower(line[0..colon]) == "content-length" {
+                    length = to_int(trim(line[colon + 1..len(line)]))
+                }
+            }
+        }
+    }
+    if length < 0 {
+        return Incoming.Bad("a message with no Content-Length header")
+    }
+    let body = os.read(length)
+    if len(body) < length {
+        return Incoming.End
+    }
+    match json.parse(body) {
+        Ok(j) => return Incoming.Message(j)
+        Err(e) => return Incoming.Bad("the message is not JSON: " + e)
+    }
+}
+
+fn send(j: json.Json) {
+    let body = json.show(j)
+    os.write("Content-Length: " + strings.from_int(len(body)) + "\r\n\r\n" + body)
+}
+
+fn reply(id: json.Json, result: json.Json) -> json.Json {
+    return json.object([json.member("jsonrpc", json.string("2.0")), json.member("id", id), json.member("result", result)])
+}
+
+fn error_reply(id: json.Json, code: Int, message: Str) -> json.Json {
+    let e = json.object([json.member("code", json.integer(code)), json.member("message", json.string(message))])
+    return json.object([json.member("jsonrpc", json.string("2.0")), json.member("id", id), json.member("error", e)])
+}
+
+fn notification(method: Str, params: json.Json) -> json.Json {
+    return json.object([
+        json.member("jsonrpc", json.string("2.0")), json.member("method", json.string(method)), json.member("params", params),
+    ])
+}
+
+fn handle(s: mut Server, m: json.Json) uses fs, os {
+    let method = json.str_or(json.get(m, "method"), "")
+    let id = json.get(m, "id")
+    let params = json.get(m, "params")
+    if method == "" {
+        return  // a reply to a request of ours; we make none
+    }
+    if method == "initialize" {
+        send(reply(id, initialize(mut s, params)))
+    } else if method == "shutdown" {
+        s.shutting_down = true
+        send(reply(id, json.null()))
+    } else if method == "exit" {
+        if s.shutting_down {
+            os.exit(0)
+        }
+        os.exit(1)
+    } else if method == "textDocument/didOpen" {
+        let doc = json.get(params, "textDocument")
+        changed(mut s, uri_path(json.str_or(json.get(doc, "uri"), "")), json.str_or(json.get(doc, "text"), ""))
+    } else if method == "textDocument/didChange" {
+        // The whole text each time: the server asked for full sync.
+        let changes = json.items(json.get(params, "contentChanges"))
+        if len(changes) > 0 {
+            let path = uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), ""))
+            changed(mut s, path, json.str_or(json.get(changes[len(changes) - 1], "text"), ""))
+        }
+    } else if method == "textDocument/didClose" {
+        closed(mut s, uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), "")))
+    } else if method == "textDocument/hover" {
+        send(reply(id, hover(mut s, params)))
+    } else if method == "textDocument/definition" {
+        send(reply(id, definition(mut s, params)))
+    } else if method == "textDocument/references" {
+        send(reply(id, references(mut s, params)))
+    } else if method == "textDocument/documentSymbol" {
+        send(reply(id, document_symbols(s, params)))
+    } else if method == "textDocument/formatting" {
+        send(reply(id, formatting(s, params)))
+    } else if !json.is_null(id) {
+        send(error_reply(id, -32601, "vela lsp does not do " + method))
+    }
+    // Any other notification (initialized, didSave, $/cancelRequest, ...) needs nothing.
+}
+
+fn initialize(s: mut Server, params: json.Json) -> json.Json {
+    let offered = json.items(json.get(json.get(json.get(params, "capabilities"), "general"), "positionEncodings"))
+    for e in offered {
+        if json.str_or(e, "") == "utf-8" {
+            s.utf8 = true
+        }
+    }
+    let mut encoding = "utf-16"
+    if s.utf8 {
+        encoding = "utf-8"
+    }
+    let sync = json.object([json.member("openClose", json.boolean(true)), json.member("change", json.integer(1))])
+    let yes = json.boolean(true)
+    let capabilities = json.object([
+        json.member("positionEncoding", json.string(encoding)), json.member("textDocumentSync", sync),
+        json.member("hoverProvider", yes), json.member("definitionProvider", yes),
+        json.member("referencesProvider", yes), json.member("documentSymbolProvider", yes),
+        json.member("documentFormattingProvider", yes),
+    ])
+    let info = json.object([json.member("name", json.string("vela")), json.member("version", json.string("0.12"))])
+    return json.object([json.member("capabilities", capabilities), json.member("serverInfo", info)])
+}
+
+// ---- Checking ----
+
+fn changed(s: mut Server, path: Str, text: Str) uses fs {
+    s.open[path] = text
+    check(mut s, path)
+    // Other open files that use this one see the change too. Those in the
+    // same program were just checked with it.
+    let a = s.analyses[path]
+    for other in maps.keys(s.analyses) {
+        if other == path || !uses_file(s.analyses[other], path) {
+            continue
+        }
+        if root_of(s.analyses[other]) == root_of(a) {
+            s.analyses[other] = a
+            maps.remove(mut s.indexes, other)
+        } else {
+            check(mut s, other)
+        }
+    }
+}
+
+fn closed(s: mut Server, path: Str) uses fs {
+    maps.remove(mut s.open, path)
+    maps.remove(mut s.analyses, path)
+    maps.remove(mut s.indexes, path)
+    if maps.has(s.shown, path) {
+        publish(mut s, path, [])
+    }
+    // Files that used the editor's text of it now read it from disk.
+    for other in maps.keys(s.analyses) {
+        check(mut s, other)
+    }
+}
+
+fn root_of(a: query.Analysis) -> Str {
+    return modules.normpath(a.loaded.modules[0].file)
+}
+
+fn uses_file(a: query.Analysis, path: Str) -> Bool {
+    for m in a.loaded.modules {
+        if !m.is_std && modules.normpath(m.file) == modules.normpath(path) {
+            return true
+        }
+    }
+    return false
+}
+
+fn check(s: mut Server, path: Str) uses fs {
+    if !maps.has(s.open, path) {
+        return
+    }
+    let a = query.program_of(path, s.std_dir, s.open)
+    s.analyses[path] = a
+    let root = a.loaded.modules[0].file
+    maps.remove(mut s.indexes, path)
+    // Each file of the program gets its own errors, none being an answer
+    // too: it clears what the editor showed before. The file checked
+    // always gets an answer; the others only when there is news.
+    let mut by_file: Map[Str, [errors.CompileError]] = [:]
+    for m in a.loaded.modules {
+        if !m.is_std && m.has_program || m.file == path {
+            s.sources[m.file] = m.source
+            by_file[m.file] = []
+        }
+    }
+    for e in a.errors {
+        let f = file_of(a.loaded, e.path, root)
+        let mut list: [errors.CompileError] = []
+        match maps.get(by_file, f) {
+            Some(l) => list = l
+            None => {}
+        }
+        push(mut list, e)
+        by_file[f] = list
+    }
+    for f in maps.keys(by_file) {
+        let errs = by_file[f]
+        if len(errs) > 0 || maps.has(s.shown, f) || modules.normpath(f) == modules.normpath(path) {
+            publish(mut s, f, errs)
+        }
+    }
+}
+
+// The file a message is about: its path is as the program's messages show
+// it ("std/text.vl"), or "" for the file checked.
+fn file_of(loaded: modules.Loaded, shown: Str, root: Str) -> Str {
+    if shown == "" {
+        return root
+    }
+    for m in loaded.modules {
+        if m.path == shown {
+            return m.file
+        }
+    }
+    return shown
+}
+
+fn publish(s: mut Server, file: Str, errs: [errors.CompileError]) {
+    let mut ds: [json.Json] = []
+    for e in errs {
+        let mut severity = 1
+        if e.warning {
+            severity = 2
+        }
+        push(mut ds, json.object([
+            json.member("range", word_range(s, file, e.line, e.col)), json.member("severity", json.integer(severity)),
+            json.member("source", json.string("vela")), json.member("message", json.string(e.message)),
+        ]))
+    }
+    if len(errs) > 0 {
+        s.shown[file] = true
+    } else {
+        maps.remove(mut s.shown, file)
+    }
+    send(notification("textDocument/publishDiagnostics", json.object([
+        json.member("uri", json.string(path_uri(file))), json.member("diagnostics", json.array(ds)),
+    ])))
+}
+
+// The index of the program `path` is the root of, made when first needed.
+fn index_of(s: mut Server, path: Str) -> Option[index.Index] uses fs {
+    match maps.get(s.indexes, path) {
+        Some(ix) => return Some(ix)
+        None => {}
+    }
+    if !maps.has(s.analyses, path) {
+        // Not open: asked about from another file's results. Check it from disk.
+        if !files_exists(path) {
+            return None
+        }
+        s.analyses[path] = query.program_of(path, s.std_dir, s.open)
+    }
+    match s.analyses[path].checked {
+        Some(k) => {
+            let ix = index.build(k)
+            s.indexes[path] = ix
+            return Some(ix)
+        }
+        None => return None  // syntax errors: nothing to say until they are fixed
+    }
+}
+
+fn files_exists(path: Str) -> Bool uses fs {
+    match files.read(path) {
+        Ok(_) => return true
+        Err(_) => return false
+    }
+}
+
+// The use at a request's position, with the index it is in.
+type Found = struct {
+    ix: index.Index
+    use: Int
+}
+
+fn at_position(s: mut Server, params: json.Json) -> Option[Found] uses fs {
+    let path = uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), ""))
+    let pos = json.get(params, "position")
+    let line = json.int_or(json.get(pos, "line"), 0) + 1
+    let col = byte_col(s, path, line, json.int_or(json.get(pos, "character"), 0))
+    match index_of(mut s, path) {
+        Some(ix) => {
+            let u = index.find(ix, path, line, col)
+            if u >= 0 {
+                return Some(Found { ix: ix, use: u })
+            }
+        }
+        None => {}
+    }
+    return None
+}
+
+// ---- Requests ----
+
+fn hover(s: mut Server, params: json.Json) -> json.Json uses fs {
+    match at_position(mut s, params) {
+        Some(f) => {
+            let u = f.ix.occurrences[f.use]
+            let d = f.ix.defs[u.def]
+            let mut text = "```vela\n" + d.detail + "\n```"
+            if u.ty != "" && (d.kind == "field" || d.kind == "function" || d.kind == "variant") && !ends_with(d.detail, u.ty) {
+                text = text + "\n\nhere: `" + u.ty + "`"
+            }
+            if d.doc != "" {
+                text = text + "\n\n" + d.doc
+            }
+            let contents = json.object([json.member("kind", json.string("markdown")), json.member("value", json.string(text))])
+            return json.object([
+                json.member("contents", contents), json.member("range", name_range(s, u.file, u.line, u.col, u.len)),
+            ])
+        }
+        None => return json.null()
+    }
+}
+
+fn definition(s: mut Server, params: json.Json) -> json.Json uses fs {
+    match at_position(mut s, params) {
+        Some(f) => {
+            let d = f.ix.defs[f.ix.occurrences[f.use].def]
+            if d.file != "" {
+                return location(s, d.file, d.line, d.col, len(d.name))
+            }
+        }
+        None => {}
+    }
+    return json.null()
+}
+
+fn references(s: mut Server, params: json.Json) -> json.Json uses fs {
+    let with_declaration = json.bool_or(json.get(json.get(params, "context"), "includeDeclaration"), true)
+    let mut out: [json.Json] = []
+    match at_position(mut s, params) {
+        Some(f) => {
+            let def = f.ix.occurrences[f.use].def
+            let d = f.ix.defs[def]
+            for r in index.references(f.ix, def) {
+                let is_declaration = r.file == d.file && r.line == d.line && r.col == d.col
+                if with_declaration || !is_declaration {
+                    push(mut out, location(s, r.file, r.line, r.col, r.len))
+                }
+            }
+        }
+        None => {}
+    }
+    return json.array(out)
+}
+
+fn location(s: Server, file: Str, line: Int, col: Int, n: Int) -> json.Json {
+    return json.object([json.member("uri", json.string(path_uri(file))), json.member("range", name_range(s, file, line, col, n))])
+}
+
+// The editor's numbers for kinds of symbol.
+fn symbol_kind(kind: Str) -> Int {
+    return match kind {
+        "struct" => 23
+        "enum" => 10
+        "field" => 8
+        "variant" => 22
+        _ => 12  // a function, or a test
+    }
+}
+
+fn document_symbols(s: Server, params: json.Json) -> json.Json {
+    let path = uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), ""))
+    let mut text = ""
+    match maps.get(s.open, path) {
+        Some(t) => text = t
+        None => return json.null()
+    }
+    let lexed = lexer.tokenize(text)
+    if len(lexed.errors) > 0 {
+        return json.null()
+    }
+    let program = parser.parse(lexed.tokens, 0).program
+    let mut out: [json.Json] = []
+    for sym in index.symbols(program) {
+        push(mut out, symbol_json(s, path, sym))
+    }
+    return json.array(out)
+}
+
+fn symbol_json(s: Server, path: Str, sym: index.Symbol) -> json.Json {
+    let mut children: [json.Json] = []
+    for c in sym.children {
+        push(mut children, symbol_json(s, path, c))
+    }
+    let whole = json.object([
+        json.member("start", lsp_position(s, path, sym.line, sym.col)),
+        json.member("end", lsp_position(s, path, sym.end_line, sym.end_col)),
+    ])
+    let mut name_len = len(sym.name)
+    if sym.kind == "test" {
+        name_len = 4  // the `test` keyword
+    }
+    return json.object([
+        json.member("name", json.string(sym.name)), json.member("detail", json.string(sym.detail)),
+        json.member("kind", json.integer(symbol_kind(sym.kind))), json.member("range", whole),
+        json.member("selectionRange", name_range(s, path, sym.line, sym.col, name_len)),
+        json.member("children", json.array(children)),
+    ])
+}
+
+// One edit replacing the whole text, or none when it is formatted already
+// (or does not parse, which the diagnostics say).
+fn formatting(s: Server, params: json.Json) -> json.Json {
+    let path = uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), ""))
+    let mut text = ""
+    match maps.get(s.open, path) {
+        Some(t) => text = t
+        None => return json.null()
+    }
+    match format.format(text) {
+        Ok(out) => {
+            if out == text {
+                return json.array([])
+            }
+            let mut last_line = 1
+            let mut last_start = 0
+            for i in 0..len(text) {
+                if text[i] == '\n' {
+                    last_line = last_line + 1
+                    last_start = i + 1
+                }
+            }
+            let range = json.object([
+                json.member("start", position_json(0, 0)),
+                json.member("end", position_json(last_line - 1, units(s, text[last_start..len(text)]))),
+            ])
+            return json.array([json.object([json.member("range", range), json.member("newText", json.string(out))])])
+        }
+        Err(_) => return json.null()
+    }
+}
+
+// ---- Positions ----
+
+fn position_json(line: Int, character: Int) -> json.Json {
+    return json.object([json.member("line", json.integer(line)), json.member("character", json.integer(character))])
+}
+
+// Line `line` of a file the server has the text of (1-based), or "".
+fn line_text(s: Server, file: Str, line: Int) -> Str {
+    let mut text = ""
+    match maps.get(s.open, file) {
+        Some(t) => text = t
+        None => {
+            match maps.get(s.sources, file) {
+                Some(t) => text = t
+                None => return ""
+            }
+        }
+    }
+    let mut n = 1
+    let mut start = 0
+    for i in 0..len(text) + 1 {
+        if i == len(text) || text[i] == '\n' {
+            if n == line {
+                let mut end = i
+                if end > start && text[end - 1] == '\r' {
+                    end = end - 1
+                }
+                return text[start..end]
+            }
+            n = n + 1
+            start = i + 1
+        }
+    }
+    return ""
+}
+
+// How many characters the editor counts in `s`: bytes, or UTF-16 units,
+// which are one for every character but those beyond U+FFFF, which are two.
+fn units(srv: Server, s: Str) -> Int {
+    if srv.utf8 {
+        return len(s)
+    }
+    return utf16_len(s)
+}
+
+fn utf16_len(s: Str) -> Int {
+    let mut n = 0
+    for c in s {
+        if c < 128 || c >= 192 {  // not a continuation byte: a character starts here
+            n = n + 1
+            if c >= 240 {
+                n = n + 1  // four bytes in UTF-8: two units in UTF-16
+            }
+        }
+    }
+    return n
+}
+
+// The editor's position of Vela's line `line`, byte column `col`.
+fn lsp_position(s: Server, file: Str, line: Int, col: Int) -> json.Json {
+    if s.utf8 {
+        return position_json(line - 1, col - 1)
+    }
+    let text = line_text(s, file, line)
+    let mut end = col - 1
+    if end > len(text) {
+        end = len(text)
+    }
+    return position_json(line - 1, utf16_len(text[0..end]))
+}
+
+// Vela's byte column of the editor's character `character` on line `line`.
+fn byte_col(s: Server, file: Str, line: Int, character: Int) -> Int {
+    if s.utf8 {
+        return character + 1
+    }
+    return utf16_to_byte(line_text(s, file, line), character) + 1
+}
+
+// The byte offset in `text` where UTF-16 unit `units` is.
+fn utf16_to_byte(text: Str, units: Int) -> Int {
+    let mut seen = 0
+    let mut i = 0
+    for i < len(text) && seen < units {
+        let c = text[i]
+        let mut size = 1
+        if c >= 240 {
+            size = 4
+            seen = seen + 2
+        } else {
+            if c >= 224 {
+                size = 3
+            } else if c >= 192 {
+                size = 2
+            }
+            seen = seen + 1
+        }
+        i = i + size
+    }
+    if i > len(text) {
+        return len(text)
+    }
+    return i
+}
+
+fn name_range(s: Server, file: Str, line: Int, col: Int, n: Int) -> json.Json {
+    return json.object([
+        json.member("start", lsp_position(s, file, line, col)), json.member("end", lsp_position(s, file, line, col + n)),
+    ])
+}
+
+// The range of the word an error is at: a name, a number, or one character.
+fn word_range(s: Server, file: Str, line: Int, col: Int) -> json.Json {
+    let text = line_text(s, file, line)
+    let start = col - 1
+    let mut end = start
+    for end < len(text) && is_word_byte(text[end]) {
+        end = end + 1
+    }
+    if end == start && end < len(text) {
+        end = end + 1
+        for end < len(text) && text[end] >= 128 && text[end] < 192 {
+            end = end + 1  // the rest of a UTF-8 character
+        }
+    }
+    let mut line_n = line
+    let mut col_n = col
+    if line_n < 1 {
+        line_n = 1  // a message about the file as a whole
+        col_n = 1
+    }
+    return name_range(s, file, line_n, col_n, end - start)
+}
+
+fn is_word_byte(c: Byte) -> Bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_'
+}
+
+// ---- URIs ----
+
+// "file:///home/a%20b/x.vl" as "/home/a b/x.vl".
+fn uri_path(uri: Str) -> Str {
+    let mut rest = uri
+    if starts_with(uri, "file://") {
+        rest = uri[7..len(uri)]
+    }
+    let mut b = strings.builder()
+    let mut i = 0
+    for i < len(rest) {
+        if rest[i] == '%' && i + 2 < len(rest) && hex_value(rest[i + 1]) >= 0 && hex_value(rest[i + 2]) >= 0 {
+            strings.add_byte(mut b, byte(hex_value(rest[i + 1]) * 16 + hex_value(rest[i + 2])))
+            i = i + 3
+        } else {
+            strings.add_byte(mut b, rest[i])
+            i = i + 1
+        }
+    }
+    return strings.build(b)
+}
+
+fn path_uri(path: Str) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, "file://")
+    for c in path {
+        if is_word_byte(c) || c == '/' || c == '.' || c == '-' || c == '~' {
+            strings.add_byte(mut b, c)
+        } else {
+            strings.add_byte(mut b, '%')
+            strings.add_byte(mut b, hex_upper(int(c) / 16))
+            strings.add_byte(mut b, hex_upper(int(c) % 16))
+        }
+    }
+    return strings.build(b)
+}
+
+fn hex_value(c: Byte) -> Int {
+    if c >= '0' && c <= '9' {
+        return int(c - '0')
+    }
+    if c >= 'a' && c <= 'f' {
+        return int(c - 'a') + 10
+    }
+    if c >= 'A' && c <= 'F' {
+        return int(c - 'A') + 10
+    }
+    return -1
+}
+
+fn hex_upper(n: Int) -> Byte {
+    if n < 10 {
+        return byte(48 + n)
+    }
+    return byte(55 + n)
+}
+
+// ---- Small text helpers ----
+
+fn find_byte(s: Str, b: Byte) -> Int {
+    for i in 0..len(s) {
+        if s[i] == b {
+            return i
+        }
+    }
+    return -1
+}
+
+fn lower(s: Str) -> Str {
+    let mut b = strings.builder()
+    for c in s {
+        if c >= 'A' && c <= 'Z' {
+            strings.add_byte(mut b, c + 32)
+        } else {
+            strings.add_byte(mut b, c)
+        }
+    }
+    return strings.build(b)
+}
+
+fn trim(s: Str) -> Str {
+    let mut start = 0
+    let mut end = len(s)
+    for start < end && (s[start] == ' ' || s[start] == '\t') {
+        start = start + 1
+    }
+    for end > start && (s[end - 1] == ' ' || s[end - 1] == '\t' || s[end - 1] == '\r') {
+        end = end - 1
+    }
+    return s[start..end]
+}
+
+// A non-negative decimal Int, or -1.
+fn to_int(s: Str) -> Int {
+    if len(s) == 0 || len(s) > 12 {
+        return -1
+    }
+    let mut n = 0
+    for c in s {
+        if c < '0' || c > '9' {
+            return -1
+        }
+        n = n * 10 + int(c - '0')
+    }
+    return n
+}
+
+fn starts_with(s: Str, prefix: Str) -> Bool {
+    return len(prefix) <= len(s) && s[0..len(prefix)] == prefix
+}
+
+fn ends_with(s: Str, suffix: Str) -> Bool {
+    return len(suffix) <= len(s) && s[len(s) - len(suffix)..len(s)] == suffix
+}
+
+// ---- Tests ----
+
+test "messages are framed" {
+    let mut out = strings.builder()
+    with stdin = "Content-Length: 13\r\nContent-Type: x\r\n\r\n{\"id\": [1,2]}content-length:2\r\n\r\n{}", stdout = mut out {
+        match read_message() {
+            Incoming.Message(j) => assert(json.show(j) == "{\"id\":[1,2]}")
+            _ => assert(false)
+        }
+        match read_message() {
+            Incoming.Message(j) => send(j)
+            _ => assert(false)
+        }
+        match read_message() {
+            Incoming.End => {}
+            _ => assert(false)
+        }
+    }
+    assert(strings.build(out) == "Content-Length: 2\r\n\r\n{}")
+}
+
+test "bad messages" {
+    // A blank line with no header before it, then a body cut short.
+    with stdin = "Content-Length: 3\r\n\r\n{x}\r\nContent-Length: 10\r\n\r\n{}" {
+        match read_message() {
+            Incoming.Bad(why) => assert(why == "the message is not JSON: line 1, col 2: expected a member name in quotes")
+            _ => assert(false)
+        }
+        match read_message() {
+            Incoming.Bad(why) => assert(why == "a message with no Content-Length header")
+            _ => assert(false)
+        }
+        match read_message() {
+            Incoming.End => {}  // the body is cut short
+            _ => assert(false)
+        }
+    }
+}
+
+test "uris" {
+    assert(uri_path("file:///home/a%20b/x%C3%A9.vl") == "/home/a b/xé.vl")
+    assert(path_uri("/home/a b/xé.vl") == "file:///home/a%20b/x%C3%A9.vl")
+    assert(uri_path(path_uri("/tmp/odd #%?.vl")) == "/tmp/odd #%?.vl")
+}
+
+test "utf-16 positions" {
+    // "é" is two bytes and one unit; "😀" four bytes and two units.
+    let line = "aé😀b"
+    assert(utf16_len(line) == 5)
+    assert(utf16_to_byte(line, 0) == 0 && utf16_to_byte(line, 1) == 1 && utf16_to_byte(line, 2) == 3)
+    assert(utf16_to_byte(line, 4) == 7 && utf16_to_byte(line, 5) == 8 && utf16_to_byte(line, 9) == 8)
+}

@@ -1,0 +1,1085 @@
+// What every name in a checked program refers to: the index behind
+// `vela query` and `vela lsp`.
+//
+// The checker already knows what each name means (Checked.refs, by node
+// id) and what type each expression has (Checked.ty). What it does not
+// keep is where each name is written, which is what an editor asks about:
+// "what is under the cursor at line 12, column 7?". This pass walks every
+// module's syntax tree once more and writes down each occurrence of a name
+// (a Use), with the declaration it refers to (a Def). Hover, go to
+// definition and find references are then lookups in two arrays.
+//
+// The syntax tree has the position of most names, but for a qualified one,
+// `ast.ExprKind.Name` or `Shape.Circle(r)` in a pattern, it has only where
+// the whole starts. The parts are found in the file's tokens: a qualified
+// name is a name, a dot, a name, and so on.
+import ast
+import checker
+import lexer
+import maps
+import modules
+import strings
+import types
+
+pub type Def = struct {
+    name: Str
+    // "function", "test", "parameter", "local", "loop variable", "match
+    // binding", "result", "type", "type parameter", "field", "variant",
+    // "module", "built-in", or a word of the language: "effect", "bound"
+    // or "fake" (what a `with` fakes)
+    kind: Str
+    file: Str  // where it is declared, as read; "" for a built-in or a word
+    line: Int
+    col: Int
+    detail: Str  // how it is declared: `fn f(x: Int) -> Int`, `let mut n: Int`; may be several lines
+    doc: Str  // the comment just above the declaration, without the `//`s
+}
+
+pub type Use = struct {
+    file: Str  // as read
+    line: Int
+    col: Int
+    len: Int  // of the name, in bytes
+    def: Int  // into Index.defs
+    ty: Str  // the type of the value the name stands for here, or "" for a type, module or function
+}
+
+pub type Index = struct {
+    defs: [Def]
+    occurrences: [Use]
+}
+
+type Builder = struct {
+    k: checker.Checked
+    defs: [Def]
+    occurrences: [Use]
+    seen: Map[Str, Bool]  // uses already added, by "file:line:col"
+    locals: Map[Int, Int]  // defs by local id
+    fns: Map[Int, Int]  // by function id
+    decls: Map[Int, Int]  // by the type id of a declaration
+    members: Map[Str, Int]  // fields and variants, by "type id.index"
+    mods: Map[Int, Int]  // by module index
+    builtins: Map[Str, Int]  // by name
+    type_params: Map[Str, Int]  // in scope where the walk is, by name
+    lines: [[Str]]  // each module's source, by line
+    module: Int  // the module being walked
+    tokens: [lexer.Token]  // its tokens
+    token_at: Map[Str, Int]  // their indexes, by "line:col"
+}
+
+pub fn build(k: checker.Checked) -> Index {
+    let mut b = Builder {
+        k: k, defs: [], occurrences: [], seen: [:], locals: [:], fns: [:], decls: [:], members: [:], mods: [:], builtins: [:],
+        type_params: [:], lines: [], module: 0, tokens: [], token_at: [:],
+    }
+    for m in k.modules {
+        push(mut b.lines, source_lines(m.source))
+    }
+    // Every declaration gets its Def first, so a name used before the
+    // declaration it refers to (a function called above it) finds it.
+    for i in 0..len(k.modules) {
+        declare_module(mut b, i)
+    }
+    for t in k.decls {
+        declare_type(mut b, t)
+    }
+    for id in 0..len(k.fns) {
+        declare_fn(mut b, id)
+    }
+    for i in 0..len(k.modules) {
+        if k.modules[i].has_program {
+            walk_module(mut b, i)
+        }
+    }
+    return Index { defs: b.defs, occurrences: b.occurrences }
+}
+
+// ---- Finding things ----
+
+// The use at `line`:`col` of `file` (or just after its end, where a cursor
+// that has typed it sits), or -1.
+pub fn find(ix: Index, file: Str, line: Int, col: Int) -> Int {
+    let want = modules.normpath(file)
+    let mut after = -1
+    for i in 0..len(ix.occurrences) {
+        let u = ix.occurrences[i]
+        if u.line != line || col < u.col || col > u.col + u.len || modules.normpath(u.file) != want {
+            continue
+        }
+        if col < u.col + u.len {
+            return i
+        }
+        after = i
+    }
+    return after
+}
+
+// Every use of def `d`: its declaration first, if it has one, then the
+// others in the order walked.
+pub fn references(ix: Index, d: Int) -> [Use] {
+    let def = ix.defs[d]
+    let mut out: [Use] = []
+    let mut others: [Use] = []
+    for u in ix.occurrences {
+        if u.def != d {
+            continue
+        }
+        if u.line == def.line && u.col == def.col && modules.normpath(u.file) == modules.normpath(def.file) {
+            push(mut out, u)
+        } else {
+            push(mut others, u)
+        }
+    }
+    for u in others {
+        push(mut out, u)
+    }
+    return out
+}
+
+// ---- Defs ----
+
+fn add_def(b: mut Builder, d: Def) -> Int {
+    push(mut b.defs, d)
+    return len(b.defs) - 1
+}
+
+fn def_at(name: Str, kind: Str, file: Str, line: Int, col: Int, detail: Str, doc: Str) -> Def {
+    return Def { name: name, kind: kind, file: file, line: line, col: col, detail: detail, doc: doc }
+}
+
+fn declare_module(b: mut Builder, i: Int) {
+    let m = b.k.modules[i]
+    let name = modules.label(m)
+    if m.is_std {
+        b.mods[i] = add_def(mut b, def_at(name, "module", "", 0, 0, "import " + name, "A built-in module."))
+        return
+    }
+    b.mods[i] = add_def(mut b, def_at(name, "module", m.file, 1, 1, "import " + name + "  // " + m.path,
+        header_comment(b.lines[i])))
+}
+
+// The module a type of the program is declared in, by the name it gives.
+fn module_named(k: checker.Checked, name: Str) -> Int {
+    for i in 0..len(k.modules) {
+        if k.modules[i].name == name && !k.modules[i].is_std && k.modules[i].has_program {
+            return i
+        }
+    }
+    return -1
+}
+
+fn declare_type(b: mut Builder, t: Int) {
+    let info = types.get(b.k.table, t)
+    let mi = module_named(b.k, info.module)
+    if mi < 0 {
+        return
+    }
+    let m = b.k.modules[mi]
+    for decl in m.program.types {
+        if decl.line != info.line || decl.col != info.col {
+            continue
+        }
+        let lines = b.lines[mi]
+        b.decls[t] = add_def(mut b, def_at(decl.name, "type", m.file, decl.line, decl.col, type_detail(decl),
+            comment_above(lines, decl.line)))
+        for i in 0..len(decl.fields) {
+            let f = decl.fields[i]
+            let detail = decl.name + "." + f.name + ": " + ast.type_text(f.ty)
+            b.members[member_key(t, i)] = add_def(mut b, def_at(f.name, "field", m.file, f.line, f.col, detail,
+                joined(comment_above(lines, f.line), trailing_comment(lines, f.line))))
+        }
+        for i in 0..len(decl.variants) {
+            let v = decl.variants[i]
+            b.members[member_key(t, i)] = add_def(mut b, def_at(v.name, "variant", m.file, v.line, v.col,
+                decl.name + "." + variant_text(v), joined(comment_above(lines, v.line), trailing_comment(lines, v.line))))
+        }
+    }
+}
+
+fn member_key(t: Int, i: Int) -> Str {
+    return strings.from_int(t) + "." + strings.from_int(i)
+}
+
+fn declare_fn(b: mut Builder, id: Int) {
+    let f = b.k.fns[id]
+    let m = b.k.modules[f.module]
+    let mut kind = "function"
+    let mut detail = signature(f.decl)
+    if f.is_test {
+        kind = "test"
+        detail = f.decl.name
+    } else {
+        for r in f.decl.requires {
+            detail = detail + "\n    requires " + ast.expr_text(r)
+        }
+        for e in f.decl.ensures {
+            detail = detail + "\n    ensures " + ast.expr_text(e)
+        }
+    }
+    b.fns[id] = add_def(mut b, def_at(f.decl.name, kind, m.file, f.decl.line, f.decl.col, detail,
+        comment_above(b.lines[f.module], f.decl.line)))
+}
+
+fn local_def(b: mut Builder, l: Int) -> Int {
+    match maps.get(b.locals, l) {
+        Some(d) => return d
+        None => {}
+    }
+    let local = b.k.locals[l]
+    let t = show(b, local.ty)
+    let mut kind = local.kind
+    let mut detail = local.name + ": " + t
+    if kind == "let" || kind == "let mut" {
+        detail = kind + " " + detail
+        kind = "local"
+    } else if kind == "mut parameter" {
+        detail = local.name + ": mut " + t
+        kind = "parameter"
+    }
+    let d = add_def(mut b, def_at(local.name, kind, file(b), local.line, local.col, detail, ""))
+    b.locals[l] = d
+    return d
+}
+
+// An effect, a bound or what a `with` fakes: a word of the language, explained.
+fn word_def(b: mut Builder, name: Str) -> Int {
+    let key = "word " + name
+    match maps.get(b.builtins, key) {
+        Some(d) => return d
+        None => {}
+    }
+    let doc = match name {
+        "fs" => "An effect: the function reads or changes files, with the files module (files.read, files.write, " +
+            "files.remove, files.temp_dir), or calls a function that does."
+        "os" => "An effect: the function uses the process's surroundings (os.args, os.exit, os.env, os.run, " +
+            "os.read_line, os.read), or calls a function that does."
+        "Eq" => "A bound: values of the type can be compared with == and !=."
+        "Ord" => "A bound: values of the type can be compared with ==, !=, <, <=, > and >=."
+        "Key" => "A bound: the type can be the key type of a Map."
+        "files" => "In a test's `with`: the files the code sees, a Map[Str, Str] from paths to contents."
+        "args" => "In a test's `with`: what os.args() returns, a [Str]."
+        "env" => "In a test's `with`: the environment variables os.env sees, a Map[Str, Str]."
+        "stdin" => "In a test's `with`: the Str os.read_line and os.read read."
+        "stdout" => "In a test's `with`: a strings.Builder that collects what is printed, written `stdout = mut out`."
+        _ => ""
+    }
+    if doc == "" {
+        return -1
+    }
+    let mut kind = "effect"
+    if name == "Eq" || name == "Ord" || name == "Key" {
+        kind = "bound"
+    } else if name != "fs" && name != "os" {
+        kind = "fake"
+    }
+    let d = add_def(mut b, def_at(name, kind, "", 0, 0, name, doc))
+    b.builtins[key] = d
+    return d
+}
+
+fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
+    match maps.get(b.builtins, name) {
+        Some(d) => return d
+        None => {}
+    }
+    let d = add_def(mut b, def_at(name, "built-in", "", 0, 0, name, "A built-in " + what + "."))
+    b.builtins[name] = d
+    return d
+}
+
+// `fn name[T: Ord](a: Int, b: mut [Str]) -> Str uses fs`, as written.
+pub fn signature(f: ast.FnDecl) -> Str {
+    let mut s = strings.builder()
+    if f.public {
+        strings.add(mut s, "pub ")
+    }
+    strings.add(mut s, "fn " + f.name + type_params_text(f.type_params) + "(")
+    for i in 0..len(f.params) {
+        let p = f.params[i]
+        if i > 0 {
+            strings.add(mut s, ", ")
+        }
+        strings.add(mut s, p.name + ": ")
+        if p.mutable {
+            strings.add(mut s, "mut ")
+        }
+        strings.add(mut s, ast.type_text(p.ty))
+    }
+    strings.add_byte(mut s, ')')
+    match f.result {
+        Some(t) => strings.add(mut s, " -> " + ast.type_text(t))
+        None => {}
+    }
+    for i in 0..len(f.effects) {
+        if i == 0 {
+            strings.add(mut s, " uses ")
+        } else {
+            strings.add(mut s, ", ")
+        }
+        strings.add(mut s, f.effects[i])
+    }
+    return strings.build(s)
+}
+
+fn type_params_text(params: [ast.TypeParam]) -> Str {
+    if len(params) == 0 {
+        return ""
+    }
+    let mut s = strings.builder()
+    strings.add_byte(mut s, '[')
+    for i in 0..len(params) {
+        if i > 0 {
+            strings.add(mut s, ", ")
+        }
+        strings.add(mut s, type_param_text(params[i]))
+    }
+    strings.add_byte(mut s, ']')
+    return strings.build(s)
+}
+
+fn type_param_text(p: ast.TypeParam) -> Str {
+    let mut s = p.name
+    for i in 0..len(p.bounds) {
+        if i == 0 {
+            s = s + ": "
+        } else {
+            s = s + " + "
+        }
+        s = s + p.bounds[i]
+    }
+    return s
+}
+
+// The whole declaration, a member a line, up to a screenful of them.
+pub fn type_detail(t: ast.TypeDecl) -> Str {
+    let mut s = strings.builder()
+    if t.public {
+        strings.add(mut s, "pub ")
+    }
+    strings.add(mut s, "type " + t.name + type_params_text(t.params) + " = ")
+    let mut lines: [Str] = []
+    if t.is_struct {
+        strings.add(mut s, "struct {")
+        for f in t.fields {
+            push(mut lines, f.name + ": " + ast.type_text(f.ty))
+        }
+    } else {
+        strings.add(mut s, "enum {")
+        for v in t.variants {
+            push(mut lines, variant_text(v))
+        }
+    }
+    for i in 0..len(lines) {
+        if i == 30 {
+            strings.add(mut s, "\n    // ...")
+            break
+        }
+        strings.add(mut s, "\n    " + lines[i])
+    }
+    strings.add(mut s, "\n}")
+    return strings.build(s)
+}
+
+fn variant_text(v: ast.VariantDecl) -> Str {
+    if len(v.payload) == 0 {
+        return v.name
+    }
+    let mut s = strings.builder()
+    strings.add(mut s, v.name + "(")
+    for i in 0..len(v.payload) {
+        if i > 0 {
+            strings.add(mut s, ", ")
+        }
+        strings.add(mut s, ast.type_text(v.payload[i]))
+    }
+    strings.add_byte(mut s, ')')
+    return strings.build(s)
+}
+
+// ---- Comments ----
+
+fn source_lines(source: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(source) + 1 {
+        if i == len(source) || source[i] == '\n' {
+            let mut end = i
+            if end > start && source[end - 1] == '\r' {
+                end = end - 1
+            }
+            push(mut out, source[start..end])
+            start = i + 1
+        }
+    }
+    return out
+}
+
+fn trimmed(s: Str) -> Str {
+    let mut i = 0
+    for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+        i = i + 1
+    }
+    return s[i..len(s)]
+}
+
+// "// text" as "text"; "" for a line that is not a comment.
+fn comment_text(line: Str) -> Str {
+    let t = trimmed(line)
+    if len(t) >= 3 && t[0..3] == "// " {
+        return t[3..len(t)]
+    }
+    return t[2..len(t)]  // "//" alone: an empty line of the comment
+}
+
+fn is_comment(line: Str) -> Bool {
+    let t = trimmed(line)
+    return len(t) >= 2 && t[0..2] == "//"
+}
+
+fn join_lines(lines: [Str]) -> Str {
+    let mut s = strings.builder()
+    for i in 0..len(lines) {
+        if i > 0 {
+            strings.add_byte(mut s, '\n')
+        }
+        strings.add(mut s, lines[i])
+    }
+    return strings.build(s)
+}
+
+// The comment lines right above line `line` (1-based), in order.
+fn comment_above(lines: [Str], line: Int) -> Str {
+    let mut first = line  // of the comment, once found
+    for first > 1 && first - 1 <= len(lines) && is_comment(lines[first - 2]) {
+        first = first - 1
+    }
+    let mut out: [Str] = []
+    for n in first..line {
+        push(mut out, comment_text(lines[n - 1]))
+    }
+    return join_lines(out)
+}
+
+fn joined(a: Str, b: Str) -> Str {
+    if a == "" || b == "" {
+        return a + b
+    }
+    return a + "\n" + b
+}
+
+// A comment after the code on line `line`: `x: Int  // the count`.
+fn trailing_comment(lines: [Str], line: Int) -> Str {
+    if line < 1 || line > len(lines) {
+        return ""
+    }
+    let text = lines[line - 1]
+    let mut in_string = false
+    for i in 0..len(text) - 1 {
+        let c = text[i]
+        if c == '"' && (i == 0 || text[i - 1] != '\\') {
+            in_string = !in_string
+        }
+        if !in_string && c == '/' && text[i + 1] == '/' {
+            return trimmed(text[i + 2..len(text)])
+        }
+    }
+    return ""
+}
+
+// The comment a file starts with.
+fn header_comment(lines: [Str]) -> Str {
+    let mut out: [Str] = []
+    for l in lines {
+        if !is_comment(l) {
+            break
+        }
+        push(mut out, comment_text(l))
+    }
+    return join_lines(out)
+}
+
+// ---- Uses ----
+
+fn file(b: Builder) -> Str {
+    return b.k.modules[b.module].file
+}
+
+fn show(b: Builder, t: Int) -> Str {
+    if t < 0 {
+        return ""
+    }
+    return types.show(b.k.table, t, b.k.modules[b.module].name)
+}
+
+fn add_use(b: mut Builder, line: Int, col: Int, name: Str, def: Int, ty: Str) {
+    if def < 0 || line <= 0 {
+        return
+    }
+    let key = file(b) + ":" + strings.from_int(line) + ":" + strings.from_int(col)
+    if maps.has(b.seen, key) {
+        return
+    }
+    b.seen[key] = true
+    push(mut b.occurrences, Use { file: file(b), line: line, col: col, len: len(name), def: def, ty: ty })
+}
+
+// The token `n` names after the one at `line`:`col` in a qualified name
+// (`a.b.c`: 0 is a, 1 is b), or None.
+fn part(b: Builder, line: Int, col: Int, n: Int) -> Option[lexer.Token] {
+    return token_after(b, line, col, 2 * n)
+}
+
+// The token `n` tokens after the one at `line`:`col`, or None.
+fn token_after(b: Builder, line: Int, col: Int, n: Int) -> Option[lexer.Token] {
+    match maps.get(b.token_at, strings.from_int(line) + ":" + strings.from_int(col)) {
+        Some(i) => {
+            if i + n < len(b.tokens) {
+                return Some(b.tokens[i + n])
+            }
+        }
+        None => {}
+    }
+    return None
+}
+
+fn walk_module(b: mut Builder, mi: Int) {
+    b.module = mi
+    let m = b.k.modules[mi]
+    b.tokens = lexer.tokenize(m.source).tokens
+    b.token_at = [:]
+    for i in 0..len(b.tokens) {
+        let t = b.tokens[i]
+        b.token_at[strings.from_int(t.line) + ":" + strings.from_int(t.col)] = i
+    }
+    for imp in m.program.imports {
+        match maps.get(m.imports, imp.name) {
+            Some(target) => add_use(mut b, imp.line, imp.col, imp.name, b.mods[target], "")
+            None => {}
+        }
+    }
+    for t in m.program.types {
+        match maps.get(m.types, t.name) {
+            Some(id) => type_decl(mut b, t, id)
+            None => {}
+        }
+    }
+    for id in 0..len(b.k.fns) {
+        if b.k.fns[id].module == mi {
+            function(mut b, id)
+        }
+    }
+}
+
+fn scope_params(b: mut Builder, params: [ast.TypeParam]) {
+    b.type_params = [:]
+    let m = b.k.modules[b.module]
+    for p in params {
+        let d = add_def(mut b, def_at(p.name, "type parameter", m.file, p.line, p.col, type_param_text(p), ""))
+        b.type_params[p.name] = d
+        add_use(mut b, p.line, p.col, p.name, d, "")
+        // `T: Ord + Key`: the bounds are the names after the `:` and each `+`.
+        for i in 0..len(p.bounds) {
+            qualified_part(mut b, p.line, p.col, i + 1, p.bounds[i], word_def(mut b, p.bounds[i]))
+        }
+    }
+}
+
+fn type_decl(b: mut Builder, t: ast.TypeDecl, id: Int) {
+    match maps.get(b.decls, id) {
+        Some(d) => add_use(mut b, t.line, t.col, t.name, d, "")
+        None => return
+    }
+    scope_params(mut b, t.params)
+    for i in 0..len(t.fields) {
+        let f = t.fields[i]
+        add_use(mut b, f.line, f.col, f.name, member(b, id, i), "")
+        type_name(mut b, f.ty)
+    }
+    for i in 0..len(t.variants) {
+        let v = t.variants[i]
+        add_use(mut b, v.line, v.col, v.name, member(b, id, i), "")
+        for p in v.payload {
+            type_name(mut b, p)
+        }
+    }
+    b.type_params = [:]
+}
+
+fn member(b: Builder, t: Int, i: Int) -> Int {
+    let mut decl = t
+    let origin = types.get(b.k.table, t).origin
+    if origin >= 0 {
+        decl = origin
+    }
+    match maps.get(b.members, member_key(decl, i)) {
+        Some(d) => return d
+        None => return -1
+    }
+}
+
+fn decl_def(b: Builder, t: Int) -> Int {
+    let mut decl = t
+    if t >= 0 {
+        let origin = types.get(b.k.table, t).origin
+        if origin >= 0 {
+            decl = origin
+        }
+    }
+    match maps.get(b.decls, decl) {
+        Some(d) => return d
+        None => return -1
+    }
+}
+
+fn function(b: mut Builder, id: Int) {
+    let f = b.k.fns[id]
+    let d = f.decl
+    if !f.is_test {
+        add_use(mut b, d.line, d.col, d.name, b.fns[id], "")
+    }
+    scope_params(mut b, d.type_params)
+    // `uses fs, os`: the effects are the names after `uses` and each comma.
+    for i in 0..len(d.effects) {
+        match token_after(b, d.effects_line, d.effects_col, 1 + 2 * i) {
+            Some(tok) => {
+                if tok.text == d.effects[i] {
+                    add_use(mut b, tok.line, tok.col, tok.text, word_def(mut b, tok.text), "")
+                }
+            }
+            None => {}
+        }
+    }
+    for i in 0..len(d.params) {
+        let p = d.params[i]
+        if i < len(f.param_locals) {
+            let l = f.param_locals[i]
+            add_use(mut b, p.line, p.col, p.name, local_def(mut b, l), show(b, b.k.locals[l].ty))
+        }
+        type_name(mut b, p.ty)
+    }
+    match d.result {
+        Some(t) => type_name(mut b, t)
+        None => {}
+    }
+    exprs(mut b, d.requires)
+    exprs(mut b, d.ensures)
+    block(mut b, d.body)
+    b.type_params = [:]
+}
+
+// A type as written: `Int`, `[ast.Expr]`, `Map[Str, T]`, `fn(Int) -> Str`.
+fn type_name(b: mut Builder, t: ast.TypeName) {
+    for a in t.args {
+        type_name(mut b, a)
+    }
+    if t.name == "[]" || t.name == "fn" || t.name == "fn->" {
+        return
+    }
+    let m = b.k.modules[b.module]
+    if t.module != "" {
+        let mut target = -1
+        match maps.get(m.imports, t.module) {
+            Some(i) => target = i
+            None => return
+        }
+        add_use(mut b, t.line, t.col, t.module, b.mods[target], "")
+        match part(b, t.line, t.col, 1) {
+            Some(tok) => {
+                let tm = b.k.modules[target]
+                if tm.is_std {
+                    add_use(mut b, tok.line, tok.col, t.name, builtin_def(mut b, t.module + "." + t.name, "type"), "")
+                } else {
+                    match maps.get(tm.types, t.name) {
+                        Some(ty) => add_use(mut b, tok.line, tok.col, t.name, decl_def(b, ty), "")
+                        None => {}
+                    }
+                }
+            }
+            None => {}
+        }
+        return
+    }
+    match maps.get(b.type_params, t.name) {
+        Some(d) => {
+            add_use(mut b, t.line, t.col, t.name, d, "")
+            return
+        }
+        None => {}
+    }
+    if types.primitive(t.name) >= 0 || types.generic_arity(t.name) >= 0 {
+        add_use(mut b, t.line, t.col, t.name, builtin_def(mut b, t.name, "type"), "")
+        return
+    }
+    match maps.get(m.types, t.name) {
+        Some(ty) => add_use(mut b, t.line, t.col, t.name, decl_def(b, ty), "")
+        None => {}
+    }
+}
+
+fn block(b: mut Builder, body: ast.Block) {
+    for s in body.stmts {
+        stmt(mut b, s)
+    }
+}
+
+fn exprs(b: mut Builder, es: [ast.Expr]) {
+    for e in es {
+        expr(mut b, e)
+    }
+}
+
+// A `let`, `for` or pattern that declares local `name` at its position.
+fn declares(b: mut Builder, id: Int, name: Str, line: Int, col: Int) {
+    match b.k.refs[id] {
+        checker.Ref.Local(l) => add_use(mut b, line, col, name, local_def(mut b, l), show(b, b.k.locals[l].ty))
+        _ => {}
+    }
+}
+
+fn stmt(b: mut Builder, s: ast.Stmt) {
+    match s.kind {
+        ast.StmtKind.Block(body) => block(mut b, body)
+        ast.StmtKind.ExprStmt(e) => expr(mut b, e)
+        ast.StmtKind.Let(name, _, annotation, v) => {
+            declares(mut b, s.id, name, s.line, s.col)
+            match annotation {
+                Some(t) => type_name(mut b, t)
+                None => {}
+            }
+            expr(mut b, v)
+        }
+        ast.StmtKind.Assign(target, v) => {
+            expr(mut b, target)
+            expr(mut b, v)
+        }
+        ast.StmtKind.If(cond, then, otherwise) => {
+            expr(mut b, cond)
+            block(mut b, then)
+            match otherwise {
+                ast.Else.NoElse => {}
+                ast.Else.ElseBlock(e) => block(mut b, e)
+                ast.Else.ElseIf(s2) => stmt(mut b, s2)
+            }
+        }
+        ast.StmtKind.For(cond, body) => {
+            match cond {
+                Some(e) => expr(mut b, e)
+                None => {}
+            }
+            block(mut b, body)
+        }
+        ast.StmtKind.ForRange(name, start, end, body) => {
+            declares(mut b, s.id, name, s.line, s.col)
+            expr(mut b, start)
+            expr(mut b, end)
+            block(mut b, body)
+        }
+        ast.StmtKind.ForEach(name, iterable, body) => {
+            declares(mut b, s.id, name, s.line, s.col)
+            expr(mut b, iterable)
+            block(mut b, body)
+        }
+        ast.StmtKind.Break => {}
+        ast.StmtKind.Continue => {}
+        ast.StmtKind.Return(v) => {
+            match v {
+                Some(e) => expr(mut b, e)
+                None => {}
+            }
+        }
+        ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut b, scrutinee, arms)
+        ast.StmtKind.With(items, body) => {
+            for item in items {
+                add_use(mut b, item.line, item.col, item.name, word_def(mut b, item.name), "")
+                expr(mut b, item.value)
+            }
+            block(mut b, body)
+        }
+    }
+}
+
+fn match_arms(b: mut Builder, scrutinee: ast.Expr, arms: [ast.Arm]) {
+    expr(mut b, scrutinee)
+    for a in arms {
+        pattern(mut b, a.pattern)
+        match a.body {
+            ast.ArmBody.Value(e) => expr(mut b, e)
+            ast.ArmBody.Do(s) => stmt(mut b, s)
+        }
+    }
+}
+
+fn pattern(b: mut Builder, p: ast.Pattern) {
+    match p.kind {
+        ast.PatternKind.Bind(name) => declares(mut b, p.id, name, p.line, p.col)
+        ast.PatternKind.Variant(module, enum, variant, _, args) => {
+            let mut n = 0
+            if module != "" {
+                module_part(mut b, module, p.line, p.col)
+                n = 1
+            }
+            match b.k.refs[p.id] {
+                checker.Ref.Variant(t, vi) => {
+                    if enum != "" {
+                        qualified_part(mut b, p.line, p.col, n, enum, decl_def(b, t))
+                        n = n + 1
+                    }
+                    qualified_part(mut b, p.line, p.col, n, variant, variant_def(mut b, t, vi, variant))
+                }
+                _ => {}
+            }
+            for a in args {
+                pattern(mut b, a)
+            }
+        }
+        _ => {}
+    }
+}
+
+// Part `n` of the qualified name starting at `line`:`col`.
+fn qualified_part(b: mut Builder, line: Int, col: Int, n: Int, name: Str, def: Int) {
+    match part(b, line, col, n) {
+        Some(tok) => {
+            if tok.text == name {
+                add_use(mut b, tok.line, tok.col, name, def, "")
+            }
+        }
+        None => {}
+    }
+}
+
+fn module_part(b: mut Builder, name: Str, line: Int, col: Int) {
+    match maps.get(b.k.modules[b.module].imports, name) {
+        Some(target) => add_use(mut b, line, col, name, b.mods[target], "")
+        None => {}
+    }
+}
+
+fn variant_def(b: mut Builder, t: Int, vi: Int, name: Str) -> Int {
+    if types.is_builtin_enum(b.k.table, t) {
+        return builtin_def(mut b, name, "variant, of " + types.get(b.k.table, t).name)
+    }
+    return member(b, t, vi)
+}
+
+fn expr(b: mut Builder, e: ast.Expr) {
+    match e.kind {
+        ast.ExprKind.Name(name) => name_use(mut b, e, name)
+        ast.ExprKind.Field(obj, name) => field(mut b, e, obj, name)
+        ast.ExprKind.Call(callee, args) => {
+            call(mut b, e, callee)
+            exprs(mut b, args)
+        }
+        ast.ExprKind.Unary(_, x) => expr(mut b, x)
+        ast.ExprKind.Binary(_, l, r) => {
+            expr(mut b, l)
+            expr(mut b, r)
+        }
+        ast.ExprKind.Index(obj, i) => {
+            expr(mut b, obj)
+            expr(mut b, i)
+        }
+        ast.ExprKind.Try(x) => expr(mut b, x)
+        ast.ExprKind.MutArg(x) => expr(mut b, x)
+        ast.ExprKind.Slice(obj, lo, hi) => exprs(mut b, [obj, lo, hi])
+        ast.ExprKind.ArrayLit(xs) => exprs(mut b, xs)
+        ast.ExprKind.MapLit(entries) => {
+            for en in entries {
+                expr(mut b, en.key)
+                expr(mut b, en.value)
+            }
+        }
+        ast.ExprKind.StructLit(module, name, fields) => struct_lit(mut b, e, module, name, fields)
+        ast.ExprKind.Match(scrutinee, arms) => match_arms(mut b, scrutinee, arms)
+        ast.ExprKind.Closure(params, result, body, _) => {
+            match maps.get(b.k.closures, e.id) {
+                Some(info) => {
+                    for i in 0..len(params) {
+                        if i < len(info.params) {
+                            let l = info.params[i]
+                            add_use(mut b, params[i].line, params[i].col, params[i].name, local_def(mut b, l),
+                                show(b, b.k.locals[l].ty))
+                        }
+                    }
+                }
+                None => {}
+            }
+            for p in params {
+                match p.ty {
+                    Some(t) => type_name(mut b, t)
+                    None => {}
+                }
+            }
+            match result {
+                Some(t) => type_name(mut b, t)
+                None => {}
+            }
+            block(mut b, body)
+        }
+        _ => {}
+    }
+}
+
+fn name_use(b: mut Builder, e: ast.Expr, name: Str) {
+    match b.k.refs[e.id] {
+        checker.Ref.Local(l) => add_use(mut b, e.line, e.col, name, local_def(mut b, l), show(b, b.k.locals[l].ty))
+        checker.Ref.Function(id) => add_use(mut b, e.line, e.col, name, b.fns[id], show(b, b.k.ty[e.id]))
+        checker.Ref.Variant(t, vi) => add_use(mut b, e.line, e.col, name, variant_def(mut b, t, vi, name), show(b, t))
+        _ => {}
+    }
+}
+
+// The name a callee ends with, which is where the call is: `f` in `f(x)`,
+// `next` in `lexer.next(x)`.
+fn callee_name(callee: ast.Expr) -> Str {
+    return match callee.kind {
+        ast.ExprKind.Name(n) => n
+        ast.ExprKind.Field(_, n) => n
+        _ => ""
+    }
+}
+
+fn call(b: mut Builder, e: ast.Expr, callee: ast.Expr) {
+    let name = callee_name(callee)
+    match b.k.refs[e.id] {
+        checker.Ref.Function(id) => {
+            add_use(mut b, callee.line, callee.col, name, b.fns[id], "")
+            qualifier(mut b, callee, -1)
+        }
+        checker.Ref.Variant(t, vi) => {
+            add_use(mut b, callee.line, callee.col, name, variant_def(mut b, t, vi, name), show(b, b.k.ty[e.id]))
+            qualifier(mut b, callee, t)
+        }
+        checker.Ref.Builtin(written) => {
+            add_use(mut b, callee.line, callee.col, name, builtin_def(mut b, written, "function"), "")
+            qualifier(mut b, callee, -1)
+        }
+        _ => expr(mut b, callee)
+    }
+}
+
+// What comes before the last name of `callee`: a module (`lexer.` in
+// `lexer.next`), or an enum and maybe its module (`ast.ExprKind.` in
+// `ast.ExprKind.Name(n)`) when `enum` is the enum's type.
+fn qualifier(b: mut Builder, callee: ast.Expr, enum: Int) {
+    match callee.kind {
+        ast.ExprKind.Field(obj, _) => {
+            match obj.kind {
+                ast.ExprKind.Name(n) => {
+                    if enum >= 0 && !maps.has(b.k.modules[b.module].imports, n) {
+                        add_use(mut b, obj.line, obj.col, n, decl_def(b, enum), "")
+                    } else {
+                        module_part(mut b, n, obj.line, obj.col)
+                    }
+                }
+                ast.ExprKind.Field(inner, n) => {
+                    if enum >= 0 {
+                        add_use(mut b, obj.line, obj.col, n, decl_def(b, enum), "")
+                    }
+                    match inner.kind {
+                        ast.ExprKind.Name(m) => module_part(mut b, m, inner.line, inner.col)
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+}
+
+fn field(b: mut Builder, e: ast.Expr, obj: ast.Expr, name: Str) {
+    match b.k.refs[e.id] {
+        checker.Ref.Variant(t, vi) => {
+            add_use(mut b, e.line, e.col, name, variant_def(mut b, t, vi, name), show(b, t))
+            qualifier(mut b, e, t)
+            return
+        }
+        checker.Ref.Function(id) => {
+            add_use(mut b, e.line, e.col, name, b.fns[id], show(b, b.k.ty[e.id]))
+            qualifier(mut b, e, -1)
+            return
+        }
+        _ => {}
+    }
+    let ot = b.k.ty[obj.id]
+    if ot >= 0 && types.is_struct(b.k.table, ot) {
+        let fi = types.field_index(b.k.table, ot, name)
+        if fi >= 0 {
+            add_use(mut b, e.line, e.col, name, member(b, ot, fi), show(b, b.k.ty[e.id]))
+        }
+    }
+    expr(mut b, obj)
+}
+
+fn struct_lit(b: mut Builder, e: ast.Expr, module: Str, name: Str, fields: [ast.FieldInit]) {
+    let t = b.k.ty[e.id]
+    let mut n = 0
+    if module != "" {
+        module_part(mut b, module, e.line, e.col)
+        n = 1
+    }
+    if t >= 0 && types.is_struct(b.k.table, t) {
+        qualified_part(mut b, e.line, e.col, n, name, decl_def(b, t))
+        for f in fields {
+            let fi = types.field_index(b.k.table, t, f.name)
+            if fi >= 0 {
+                add_use(mut b, f.line, f.col, f.name, member(b, t, fi), show(b, types.get(b.k.table, t).fields[fi].ty))
+            }
+        }
+    }
+    for f in fields {
+        expr(mut b, f.value)
+    }
+}
+
+// ---- The outline of a file ----
+
+pub type Symbol = struct {
+    name: Str
+    kind: Str  // "function", "test", "struct", "enum", "field" or "variant"
+    detail: Str  // a function's signature, a field's type
+    line: Int
+    col: Int
+    end_line: Int  // where its declaration ends: a function's closing `}`, or its name's end
+    end_col: Int
+    children: [Symbol]  // a type's fields or variants
+}
+
+pub fn symbols(program: ast.Program) -> [Symbol] {
+    let mut out: [Symbol] = []
+    for t in program.types {
+        let mut children: [Symbol] = []
+        for f in t.fields {
+            push(mut children, sym(f.name, "field", ast.type_text(f.ty), f.line, f.col, f.line, f.col + len(f.name)))
+        }
+        for v in t.variants {
+            push(mut children, sym(v.name, "variant", variant_text(v), v.line, v.col, v.line, v.col + len(v.name)))
+        }
+        let mut kind = "struct"
+        if !t.is_struct {
+            kind = "enum"
+        }
+        let mut s = sym(t.name, kind, "", t.line, t.col, t.line, t.col + len(t.name))
+        let n = len(children)
+        if n > 0 {
+            s.end_line = children[n - 1].end_line
+            s.end_col = children[n - 1].end_col
+        }
+        s.children = children
+        push(mut out, s)
+    }
+    for f in program.fns {
+        push(mut out, sym(f.name, "function", signature(f), f.line, f.col, f.body.end_line, f.body.end_col + 1))
+    }
+    for t in program.tests {
+        push(mut out, sym("test " + ast.quote(t.name), "test", "", t.line, t.col, t.body.end_line, t.body.end_col + 1))
+    }
+    return out
+}
+
+fn sym(name: Str, kind: Str, detail: Str, line: Int, col: Int, end_line: Int, end_col: Int) -> Symbol {
+    return Symbol {
+        name: name, kind: kind, detail: detail, line: line, col: col, end_line: end_line, end_col: end_col, children: [],
+    }
+}

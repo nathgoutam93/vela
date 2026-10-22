@@ -1,0 +1,281 @@
+// `vela query`: questions about a program, answered in JSON on stdout, for
+// agents and scripts that would otherwise read the source to find out.
+//
+//     vela query type FILE:LINE:COL   what the name there is, and its type
+//     vela query def FILE:LINE:COL    where it is declared
+//     vela query refs FILE:LINE:COL   everywhere it is used, its declaration first
+//     vela query symbols FILE         the file's types, functions and tests
+//
+// LINE and COL count from 1, in bytes, as the compiler's messages do, so a
+// position from an error message can be asked about as it is.
+//
+// FILE is checked as part of its program: the main.vl next to it, if that
+// imports it (perhaps through other modules), as `vela check main.vl`
+// would; otherwise FILE itself, with what it imports. Either way it need
+// not have a main function, and its tests are checked too.
+//
+// A question with no answer (no name at that position, or a file that
+// does not parse) prints {"error": "..."} and exits with 1.
+// stage 1 only (it says `uses`)
+import ast
+import checker
+import errors
+import files
+import index
+import json
+import lexer
+import maps
+import modules
+import os
+import parser
+import strings
+
+// A program loaded and, unless it has syntax errors, checked.
+pub type Analysis = struct {
+    loaded: modules.Loaded
+    checked: Option[checker.Checked]  // None when loading found errors
+    errors: [errors.CompileError]  // and warnings, sorted
+}
+
+// `path` checked as a program, with `source` as its text and `open` (texts
+// by path) instead of those files. Its tests are checked too, and it need
+// not have a main function.
+pub fn analyze(path: Str, source: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses fs {
+    let loaded = modules.load_open(path, source, std_dir, open)
+    if len(loaded.errors) > 0 {
+        return Analysis { loaded: loaded, checked: None, errors: errors.merged(loaded.errors, loaded.warnings) }
+    }
+    let k = checker.check_program(loaded, true)
+    return Analysis { loaded: loaded, checked: Some(k), errors: errors.merged(k.errors, k.warnings) }
+}
+
+// The program `path` is checked as part of, as above, with `open` (texts by
+// path) read instead of those files.
+pub fn program_of(path: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses fs {
+    let main = modules.join(modules.dirname(path), "main.vl")
+    if modules.normpath(main) != modules.normpath(path) {
+        let mut text = ""
+        let mut found = true
+        match maps.get(open, main) {
+            Some(t) => text = t
+            None => {
+                match files.read(main) {
+                    Ok(t) => text = t
+                    Err(_) => found = false
+                }
+            }
+        }
+        if found {
+            let a = analyze(main, text, std_dir, open)
+            for m in a.loaded.modules {
+                if !m.is_std && modules.normpath(m.file) == modules.normpath(path) {
+                    return a
+                }
+            }
+        }
+    }
+    let mut source = ""
+    match maps.get(open, path) {
+        Some(t) => source = t
+        None => {
+            match files.read(path) {
+                Ok(t) => source = t
+                Err(_) => {}
+            }
+        }
+    }
+    return analyze(path, source, std_dir, open)
+}
+
+pub fn command(args: [Str], std_dir: Str) uses fs, os {
+    if len(args) != 2 {
+        usage()
+    }
+    let what = args[0]
+    if what == "symbols" {
+        let path = args[1]
+        match files.read(path) {
+            Ok(source) => {
+                let lexed = lexer.tokenize(source)
+                if len(lexed.errors) > 0 {
+                    fail("'" + path + "' has syntax errors; `vela check " + path + "` shows them")
+                }
+                let program = parser.parse(lexed.tokens, 0).program
+                print(json.pretty(json.object([
+                    json.member("file", json.string(path)), json.member("symbols", symbols_json(program)),
+                ])))
+            }
+            Err(e) => fail(e)
+        }
+        return
+    }
+    if what != "type" && what != "def" && what != "refs" {
+        usage()
+    }
+    let mut path = ""
+    let mut line = 0
+    let mut col = 0
+    match position(args[1]) {
+        Some(p) => {
+            path = p.path
+            line = p.line
+            col = p.col
+        }
+        None => usage()
+    }
+    let ix = index.build(checked(load(path, std_dir)))
+    let found = index.find(ix, path, line, col)
+    if found < 0 {
+        fail("no name at " + args[1])
+    }
+    let u = ix.occurrences[found]
+    let d = ix.defs[u.def]
+    if what == "type" {
+        print(json.pretty(use_json(u, d)))
+    } else if what == "def" {
+        print(json.pretty(json.object([
+            json.member("name", json.string(d.name)), json.member("kind", json.string(d.kind)), json.member("def", def_place(d)),
+        ])))
+    } else {
+        let mut refs: [json.Json] = []
+        for r in index.references(ix, u.def) {
+            push(mut refs, place(r.file, r.line, r.col))
+        }
+        print(json.pretty(json.object([
+            json.member("name", json.string(d.name)), json.member("kind", json.string(d.kind)),
+            json.member("def", def_place(d)), json.member("refs", json.array(refs)),
+        ])))
+    }
+}
+
+fn usage() uses os {
+    os.eprint("usage: vela query (type | def | refs) FILE:LINE:COL, or vela query symbols FILE")
+    os.exit(2)
+}
+
+fn fail(message: Str) uses os {
+    print(json.show(json.object([json.member("error", json.string(message))])))
+    os.exit(1)
+}
+
+fn load(path: Str, std_dir: Str) -> Analysis uses fs, os {
+    match files.read(path) {
+        Ok(_) => {}
+        Err(e) => fail(e)
+    }
+    return program_of(path, std_dir, [:])
+}
+
+fn checked(a: Analysis) -> checker.Checked uses os {
+    match a.checked {
+        Some(k) => return k
+        None => {
+            let root = a.loaded.modules[0].file
+            fail("the program '" + root + "' has syntax errors; `vela check " + root + "` shows them")
+        }
+    }
+    return checker.check_program(a.loaded, true)  // not reached
+}
+
+type Position = struct {
+    path: Str
+    line: Int
+    col: Int
+}
+
+// "main.vl:12:7"
+fn position(s: Str) -> Option[Position] {
+    let mut colons: [Int] = []
+    for i in 0..len(s) {
+        if s[i] == ':' {
+            push(mut colons, i)
+        }
+    }
+    let n = len(colons)
+    if n < 2 {
+        return None
+    }
+    let a = colons[n - 2]
+    let b = colons[n - 1]
+    match number(s[a + 1..b]) {
+        Some(line) => {
+            match number(s[b + 1..len(s)]) {
+                Some(col) => return Some(Position { path: s[0..a], line: line, col: col })
+                None => {}
+            }
+        }
+        None => {}
+    }
+    return None
+}
+
+fn number(s: Str) -> Option[Int] {
+    if len(s) == 0 || len(s) > 9 {
+        return None
+    }
+    let mut n = 0
+    for c in s {
+        if c < '0' || c > '9' {
+            return None
+        }
+        n = n * 10 + int(c - '0')
+    }
+    return Some(n)
+}
+
+// ---- Answers ----
+
+fn text_or_null(s: Str) -> json.Json {
+    if s == "" {
+        return json.null()
+    }
+    return json.string(s)
+}
+
+pub fn place(file: Str, line: Int, col: Int) -> json.Json {
+    return json.object([
+        json.member("file", json.string(file)), json.member("line", json.integer(line)), json.member("col", json.integer(col)),
+    ])
+}
+
+// Where a def is declared; null for a built-in.
+fn def_place(d: index.Def) -> json.Json {
+    if d.file == "" {
+        return json.null()
+    }
+    return place(d.file, d.line, d.col)
+}
+
+fn use_json(u: index.Use, d: index.Def) -> json.Json {
+    return json.object([
+        json.member("name", json.string(d.name)), json.member("kind", json.string(d.kind)),
+        json.member("type", text_or_null(u.ty)), json.member("detail", json.string(d.detail)),
+        json.member("doc", text_or_null(d.doc)), json.member("def", def_place(d)),
+    ])
+}
+
+pub fn symbols_json(program: ast.Program) -> json.Json {
+    let mut out: [json.Json] = []
+    for s in index.symbols(program) {
+        push(mut out, symbol_json(s))
+    }
+    return json.array(out)
+}
+
+fn symbol_json(s: index.Symbol) -> json.Json {
+    let mut ms = [
+        json.member("name", json.string(s.name)), json.member("kind", json.string(s.kind)),
+        json.member("line", json.integer(s.line)), json.member("col", json.integer(s.col)),
+    ]
+    if s.detail != "" {
+        push(mut ms, json.member("detail", json.string(s.detail)))
+    }
+    if len(s.children) > 0 {
+        let mut children: [json.Json] = []
+        for c in s.children {
+            push(mut children, symbol_json(c))
+        }
+        push(mut ms, json.member("children", json.array(children)))
+    }
+    return json.object(ms)
+}

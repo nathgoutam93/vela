@@ -14,6 +14,8 @@ import types
 pub type Module = struct {
     name: Str  // as other files call it; "" for the main module
     path: Str  // the file, as messages show it; "" for a built-in module
+    file: Str  // the file, as it was read: "/vela/std/text.vl" where path says "std/text.vl"
+    source: Str  // its text
     program: ast.Program
     has_program: Bool  // false for a built-in module, or a file that did not lex
     imports: Map[Str, Int]  // module indexes, by the name imported as
@@ -28,14 +30,17 @@ pub type Loaded = struct {
     modules: [Module]  // every module, built-in ones included
     order: [Int]  // the program's files, dependencies first, the main one last
     errors: [errors.CompileError]  // sorted
+    warnings: [errors.CompileError]  // sorted
     node_count: Int  // syntax tree ids handed out, across all files
 }
 
 type Loader = struct {
     directory: Str
     std_dir: Str
+    open: Map[Str, Str]  // texts to use instead of the files, by normpath
     modules: [Module]
     errors: [errors.CompileError]
+    warnings: [errors.CompileError]
     by_path: Map[Str, Int]
     order: [Int]
     active: [Int]  // the chain of imports being followed
@@ -63,7 +68,7 @@ fn empty_program() -> ast.Program {
 
 fn new_module(name: Str, path: Str) -> Module {
     return Module {
-        name: name, path: path, program: empty_program(), has_program: false, imports: [:], std: [],
+        name: name, path: path, file: path, source: "", program: empty_program(), has_program: false, imports: [:], std: [],
         is_std: false, types: [:], fns: [:],
     }
 }
@@ -80,17 +85,33 @@ pub fn label(m: Module) -> Str {
 // Load the program whose main file is `path`, with contents `source`.
 // `std_dir` is where the standard modules written in Vela are.
 pub fn load(path: Str, source: Str, std_dir: Str) -> Loaded uses fs {
+    return load_open(path, source, std_dir, [:])
+}
+
+// The same, with `open` (texts by path) read instead of those files: an
+// editor's buffers, changed but not saved.
+pub fn load_open(path: Str, source: Str, std_dir: Str, open: Map[Str, Str]) -> Loaded uses fs {
+    let mut texts: Map[Str, Str] = [:]
+    for p in maps.keys(open) {
+        texts[normpath(p)] = open[p]
+    }
     let mut ld = Loader {
-        directory: dirname(path), std_dir: std_dir, modules: [], errors: [], by_path: [:], order: [],
-        active: [], next_id: 0,
+        directory: dirname(path), std_dir: std_dir, open: texts, modules: [], errors: [], warnings: [], by_path: [:],
+        order: [], active: [], next_id: 0,
     }
     file(mut ld, "", path, source, path)
-    return Loaded { modules: ld.modules, order: ld.order, errors: errors.sorted(ld.errors), node_count: ld.next_id }
+    return Loaded {
+        modules: ld.modules, order: ld.order, errors: errors.sorted(ld.errors), warnings: errors.sorted(ld.warnings),
+        node_count: ld.next_id,
+    }
 }
 
 // Lex and parse one file, then load what it imports. Returns its index.
 fn file(ld: mut Loader, name: Str, path: Str, source: Str, shown: Str) -> Int uses fs {
-    push(mut ld.modules, new_module(name, shown))
+    let mut m = new_module(name, shown)
+    m.file = path
+    m.source = source
+    push(mut ld.modules, m)
     let index = len(ld.modules) - 1
     ld.by_path[normpath(path)] = index
     // The lexer and parser are each a phase: a file with lexical errors is
@@ -163,13 +184,14 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
     let mut shown = path
     let mut source = ""
     let mut have_source = false
-    match files.read(path) {
+    match read(ld, path) {
         Ok(text) => {
             source = text
             have_source = true
+            hides_std(mut ld, importer, imp, path)
         }
         Err(_) => {
-            match files.read(join(ld.std_dir, imp.name + ".vl")) {
+            match read(ld, join(ld.std_dir, imp.name + ".vl")) {
                 Ok(text) => {
                     path = join(ld.std_dir, imp.name + ".vl")
                     shown = "std/" + imp.name + ".vl"
@@ -205,7 +227,7 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
     }
     if known < 0 {
         if !have_source {
-            match files.read(path) {
+            match read(ld, path) {
                 Ok(text) => source = text
                 Err(_) => {
                     report(mut ld, importer, imp, "cannot find module '" + imp.name + "': there is no file " + path)
@@ -216,6 +238,35 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
         known = file(mut ld, imp.name, path, source, shown)
     }
     ld.modules[importer].imports[imp.name] = known
+}
+
+fn read(ld: Loader, path: Str) -> Result[Str, Str] uses fs {
+    match maps.get(ld.open, normpath(path)) {
+        Some(text) => return Ok(text)
+        None => return files.read(path)
+    }
+}
+
+// The program's own `name.vl` is used where a standard module of the same
+// name exists: allowed, so that adding to std/ breaks no program, but said,
+// since the program cannot then use the standard one. Said once, at the
+// first import of it.
+fn hides_std(ld: mut Loader, importer: Int, imp: ast.Import, path: Str) uses fs {
+    let std_path = join(ld.std_dir, imp.name + ".vl")
+    if maps.has(ld.by_path, normpath(path)) || normpath(std_path) == normpath(path) {
+        return  // already loaded, or the program is in std/ itself
+    }
+    match read(ld, std_path) {
+        Ok(_) => {
+            let w = errors.CompileError {
+                path: ld.modules[importer].path, line: imp.line, col: imp.col, warning: true,
+                message: "'" + imp.name + "' is this program's " + imp.name + ".vl, which hides the standard module " +
+                    "std/" + imp.name + ".vl; rename the file to use the standard one",
+            }
+            errors.add(mut ld.warnings, w)
+        }
+        Err(_) => {}
+    }
 }
 
 // ---- Paths, as Python's os.path does them for the cases that occur ----

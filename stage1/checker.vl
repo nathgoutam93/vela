@@ -138,6 +138,7 @@ pub fn check_program(loaded: modules.Loaded, for_tests: Bool) -> Checked {
         undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
         in_closures: [], pending: [], defining: -1, expected: -2,
     }
+    c.warnings = loaded.warnings
     program(mut c, for_tests)
     return Checked {
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,

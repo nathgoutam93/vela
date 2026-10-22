@@ -1,0 +1,31 @@
+{
+  "name": "n",
+  "kind": "local",
+  "def": {
+    "file": "query_refs.vl",
+    "line": 6,
+    "col": 13
+  },
+  "refs": [
+    {
+      "file": "query_refs.vl",
+      "line": 6,
+      "col": 13
+    },
+    {
+      "file": "query_refs.vl",
+      "line": 9,
+      "col": 13
+    },
+    {
+      "file": "query_refs.vl",
+      "line": 9,
+      "col": 17
+    },
+    {
+      "file": "query_refs.vl",
+      "line": 12,
+      "col": 12
+    }
+  ]
+}

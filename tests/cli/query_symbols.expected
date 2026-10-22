@@ -1,0 +1,62 @@
+{
+  "file": "query_symbols.vl",
+  "symbols": [
+    {
+      "name": "Stack",
+      "kind": "struct",
+      "line": 5,
+      "col": 10,
+      "children": [
+        {
+          "name": "items",
+          "kind": "field",
+          "line": 6,
+          "col": 5,
+          "detail": "[Int]"
+        }
+      ]
+    },
+    {
+      "name": "Op",
+      "kind": "enum",
+      "line": 9,
+      "col": 6,
+      "children": [
+        {
+          "name": "Push",
+          "kind": "variant",
+          "line": 10,
+          "col": 5,
+          "detail": "Push(Int)"
+        },
+        {
+          "name": "Pop",
+          "kind": "variant",
+          "line": 11,
+          "col": 5,
+          "detail": "Pop"
+        }
+      ]
+    },
+    {
+      "name": "apply",
+      "kind": "function",
+      "line": 15,
+      "col": 8,
+      "detail": "pub fn apply(s: Stack, op: Op) -> Stack"
+    },
+    {
+      "name": "main",
+      "kind": "function",
+      "line": 24,
+      "col": 4,
+      "detail": "fn main()"
+    },
+    {
+      "name": "test \"push\"",
+      "kind": "test",
+      "line": 28,
+      "col": 1
+    }
+  ]
+}
