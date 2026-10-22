@@ -786,8 +786,18 @@ class FunctionGen:
             else:
                 self.emit(f"vela_builder_{name[8:]}({b}, {value});")
             return Value("", None)
-        if name in ("files.read", "files.write"):
+        if name in ("files.read", "files.write", "files.remove", "files.temp_dir", "os.run"):
             return self.file_call(e)
+        if name == "os.env":
+            arg = self.expr(args[0]).c
+            text = self.new_temp()
+            ok = self.new_temp()
+            self.emit(f"vela_str {text} = VELA_STR(\"\", 0);")
+            self.emit(f"bool {ok} = vela_os_env({arg}, &{text});")
+            opt = self.c_type(e.ty)
+            some = f"({opt}){{ .tag = {self.layout.tag(e.ty, 'Some')}, .as.m_Some = {{ ._0 = {text} }} }}"
+            none = f"({opt}){{ .tag = {self.layout.tag(e.ty, 'None')} }}"
+            return self.store(e.ty, f"{ok} ? {some} : {none}")
         if name == "len":
             arg = self.expr(args[0])
             length = f"{arg.c}.len" if arg.ty is STR else f"{arg.c}->len"
@@ -835,20 +845,31 @@ class FunctionGen:
         return self.own(result, opt)
 
     def file_call(self, e: Call) -> Value:
-        """files.read and files.write. The runtime reports success with a
-        bool and fills in the contents or the error message; this builds
-        the Result from them."""
+        """files.read, files.write, files.remove, files.temp_dir and os.run.
+        The runtime reports success with a bool and fills in the result or
+        the error message; this builds the Result from them."""
         args = [self.expr(a).c for a in e.args]
         r = e.ty
-        text = self.new_temp()  # the contents, or the error message
+        text = self.new_temp()  # the result, or the error message
         ok = self.new_temp()
         self.emit(f"vela_str {text} = VELA_STR(\"\", 0);")
         if e.target == "files.read":
             self.emit(f"bool {ok} = vela_files_read({args[0]}, &{text});")
             success = text
-        else:
+        elif e.target == "files.write":
             self.emit(f"bool {ok} = vela_files_write({args[0]}, {args[1]}, &{text});")
             success = f"{args[1]}.len"
+        elif e.target == "files.remove":
+            self.emit(f"bool {ok} = vela_files_remove({args[0]}, &{text});")
+            success = "0"
+        elif e.target == "files.temp_dir":
+            self.emit(f"bool {ok} = vela_files_temp_dir(&{text});")
+            success = text
+        else:  # os.run
+            code = self.new_temp()
+            self.emit(f"int64_t {code} = 0;")
+            self.emit(f"bool {ok} = vela_os_run({args[0]}, &{code}, &{text});")
+            success = code
         rt = self.c_type(r)
         ok_value = f"({rt}){{ .tag = {self.layout.tag(r, 'Ok')}, .as.m_Ok = {{ ._0 = {success} }} }}"
         err_value = f"({rt}){{ .tag = {self.layout.tag(r, 'Err')}, .as.m_Err = {{ ._0 = {text} }} }}"

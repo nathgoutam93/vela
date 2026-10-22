@@ -560,8 +560,8 @@ fn std_hint(c: Checker, name: Str) -> Str {
     for module in ["maps", "files", "os", "strings"] {
         let fns = match module {
             "maps" => ["has", "get", "remove", "keys"]
-            "files" => ["read", "write"]
-            "os" => ["args", "exit", "eprint"]
+            "files" => ["read", "write", "remove", "temp_dir"]
+            "os" => ["args", "exit", "eprint", "run", "env"]
             _ => ["builder", "add", "add_byte", "add_int", "build", "from_int"]
         }
         for f in fns {
@@ -1994,8 +1994,8 @@ fn is_printable(t: Int) -> Bool {
 // The built-in functions whose types do not depend on their arguments.
 // Their types are made only when they are called, as in Stage 0.
 fn has_signature(name: Str) -> Bool {
-    return name == "files.read" || name == "files.write" || name == "os.args" || name == "os.exit" ||
-        len(name) > 8 && name[0..8] == "strings."
+    return len(name) > 6 && name[0..6] == "files." || name == "os.args" || name == "os.exit" ||
+        name == "os.run" || name == "os.env" || len(name) > 8 && name[0..8] == "strings."
 }
 
 fn signature(c: mut Checker, name: Str) -> [Int] {
@@ -2009,8 +2009,21 @@ fn signature(c: mut Checker, name: Str) -> [Int] {
     if name == "files.write" {
         return [s, s, types.result(mut c.table, types.INT(), s)]
     }
+    if name == "files.remove" {
+        return [s, types.result(mut c.table, types.UNIT(), s)]
+    }
+    if name == "files.temp_dir" {
+        return [types.result(mut c.table, s, s)]
+    }
     if name == "os.args" {
         return [types.array(mut c.table, s)]
+    }
+    if name == "os.run" {
+        let command = types.array(mut c.table, s)  // made before the Result, as in Stage 0
+        return [command, types.result(mut c.table, types.INT(), s)]
+    }
+    if name == "os.env" {
+        return [s, types.option(mut c.table, s)]
     }
     return match name {
         "os.exit" => [types.INT(), nothing]

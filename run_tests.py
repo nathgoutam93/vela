@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Run the Vela golden tests against a compiler.
 
-    python3 run_tests.py                       every test, stage 0 compiler
+    python3 run_tests.py                       every test, with build/vela (Stage 1)
+    python3 run_tests.py --stage0              every test, with the Python compiler
     python3 run_tests.py precedence overflow   only tests whose path contains a word
     python3 run_tests.py -v                    also list the tests that pass
     python3 run_tests.py --sanitize            build with AddressSanitizer, which
                                                also fails a test that leaks memory
-    python3 run_tests.py --compiler "./vela1"  another compiler (Stage 1, from M8)
+    python3 run_tests.py --compiler "./vela1"  any other compiler
+
+build/vela is made from the seed by `sh bootstrap/bootstrap.sh`.
 
 A test is one .vl file, or a directory holding a program of several files
 whose main file is main.vl. Comment lines at the very top of the .vl file
@@ -191,7 +194,8 @@ def find_tests(filters: list[str]) -> list[Path]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Run the Vela golden tests.")
     ap.add_argument("filters", nargs="*", help="only run tests whose path contains one of these")
-    ap.add_argument("--compiler", help="command that runs the compiler (default: stage 0)")
+    ap.add_argument("--compiler", help="command that runs the compiler (default: build/vela)")
+    ap.add_argument("--stage0", action="store_true", help="test the Python compiler, stage0/")
     ap.add_argument("-v", "--verbose", action="store_true", help="list passing tests too")
     ap.add_argument("--sanitize", action="store_true",
                     help="build with AddressSanitizer and UBSan; leaks fail the test")
@@ -199,8 +203,13 @@ def main() -> int:
 
     if args.compiler:
         compiler = shlex.split(args.compiler)
-    else:
+    elif args.stage0:
         compiler = [sys.executable, str(ROOT / "stage0" / "main.py")]
+    else:
+        compiler = [str(ROOT / "build" / "vela")]
+        if not Path(compiler[0]).exists():
+            print("build/vela does not exist yet; build it with: sh bootstrap/bootstrap.sh")
+            return 1
     env = dict(os.environ)
     env.setdefault("VELA_CFLAGS", STRICT_CFLAGS)
     if args.sanitize:

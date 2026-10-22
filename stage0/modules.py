@@ -45,8 +45,8 @@ from typesys import BUILDER
 # The built-in modules, the functions in each, and their types.
 STD_MODULES = {
     "maps": frozenset({"has", "get", "remove", "keys"}),
-    "files": frozenset({"read", "write"}),
-    "os": frozenset({"args", "exit", "eprint"}),
+    "files": frozenset({"read", "write", "remove", "temp_dir"}),
+    "os": frozenset({"args", "exit", "eprint", "run", "env"}),
     "strings": frozenset({"builder", "add", "add_byte", "add_int", "build", "from_int"}),
 }
 STD_TYPES = {"strings": {"Builder": BUILDER}}

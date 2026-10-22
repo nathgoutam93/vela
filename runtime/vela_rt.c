@@ -1,6 +1,13 @@
+// os.run needs POSIX (fork, exec, wait), which -std=c11 alone hides.
+#define _POSIX_C_SOURCE 200809L
+
 #include "vela_rt.h"
 
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -500,4 +507,133 @@ vela_str vela_from_int(int64_t n) {
     char buf[24];
     int len = snprintf(buf, sizeof buf, "%" PRId64, n);
     return str_from(buf, (size_t)len);
+}
+
+bool vela_files_remove(vela_str path, vela_str *err) {
+    char *p = c_path(path);
+    if (!p) {
+        *err = file_error("cannot remove", path, "the path contains a zero byte");
+        return false;
+    }
+    int failed = remove(p) != 0 ? errno : 0;
+    free(p);
+    if (failed) {
+        *err = file_error("cannot remove", path, strerror(failed));
+        return false;
+    }
+    return true;
+}
+
+bool vela_files_temp_dir(vela_str *out) {
+    const char *base = getenv("TMPDIR");
+    if (!base || !*base) base = "/tmp";
+    size_t n = strlen(base) + 20;
+    char *dir = vela_alloc(n);
+    snprintf(dir, n, "%s/vela-XXXXXX", base);
+    if (!mkdtemp(dir)) {
+        int e = errno;
+        snprintf(dir, n, "%s", base);
+        *out = file_error("cannot make a directory in", (vela_str){NULL, (const uint8_t *)dir, (int64_t)strlen(dir)},
+                          strerror(e));
+        free(dir);
+        return false;
+    }
+    *out = str_from(dir, strlen(dir));
+    free(dir);
+    return true;
+}
+
+// ---- os.run, os.env ----
+
+static vela_str message(const char *a, vela_str b, const char *c) {
+    size_t n = strlen(a) + (size_t)b.len + strlen(c) + 1;
+    char *buf = vela_alloc(n);
+    int len = snprintf(buf, n, "%s%.*s%s", a, (int)b.len, (const char *)b.data, c);
+    vela_str s = str_from(buf, (size_t)len);
+    free(buf);
+    return s;
+}
+
+bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
+    if (command->len == 0) {
+        *err = str_from("os.run needs a program to run", 29);
+        return false;
+    }
+    vela_str *words = (vela_str *)command->data;
+    char **argv = vela_alloc(sizeof(char *) * (size_t)(command->len + 1));
+    for (int64_t i = 0; i < command->len; i++) {
+        argv[i] = c_path(words[i]);
+        if (!argv[i]) {
+            for (int64_t j = 0; j < i; j++) free(argv[j]);
+            free(argv);
+            *err = message("cannot run ", words[0], ": an argument contains a zero byte");
+            return false;
+        }
+    }
+    argv[command->len] = NULL;
+    // Output still in our buffers must come out before the child's.
+    fflush(stdout);
+    fflush(stderr);
+    // If exec fails, the child sends errno back through this pipe; a
+    // successful exec closes it (close-on-exec), so reading gets nothing.
+    int fds[2];
+    int failed = 0;
+    pid_t pid = -1;
+    if (pipe(fds) != 0) {
+        failed = errno;
+    } else {
+        fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+        pid = fork();
+        if (pid < 0) {
+            failed = errno;
+            close(fds[0]);
+            close(fds[1]);
+        } else if (pid == 0) {
+            close(fds[0]);
+            execvp(argv[0], argv);
+            int e = errno;
+            ssize_t written = write(fds[1], &e, sizeof e);
+            (void)written;
+            _exit(127);
+        } else {
+            close(fds[1]);
+            int e;
+            ssize_t got;
+            do {
+                got = read(fds[0], &e, sizeof e);
+            } while (got < 0 && errno == EINTR);
+            close(fds[0]);
+            int status = 0;
+            while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+            }
+            if (got == (ssize_t)sizeof e) {
+                failed = e;
+            } else if (WIFSIGNALED(status)) {
+                *code = 128 + WTERMSIG(status);  // as a shell reports it
+            } else {
+                *code = WEXITSTATUS(status);
+            }
+        }
+    }
+    for (int64_t i = 0; i < command->len; i++) free(argv[i]);
+    free(argv);
+    if (failed) {
+        size_t n = strlen(strerror(failed)) + 3;
+        char *why = vela_alloc(n);
+        snprintf(why, n, ": %s", strerror(failed));
+        *err = message("cannot run ", words[0], why);
+        free(why);
+        return false;
+    }
+    return true;
+}
+
+bool vela_os_env(vela_str name, vela_str *out) {
+    char *n = c_path(name);
+    if (!n) return false;
+    const char *v = getenv(n);
+    free(n);
+    if (!v) return false;
+    *out = str_from(v, strlen(v));
+    return true;
 }

@@ -6,26 +6,42 @@ milestone has a walkthrough in [`docs/`](docs/).
 
 ## Requirements
 
-- Python 3.10 or newer (standard library only)
-- gcc or clang. The driver uses `cc` by default; set `VELA_CC=clang` to choose
+- gcc or clang, on Linux or macOS. Set `VELA_CC=clang` to choose.
+- Python 3.10 or newer, only for the test scripts and the frozen Stage 0.
+
+## Building
+
+The compiler is written in Vela. `bootstrap/vela1.c` is the C it compiles
+itself to, so a C compiler is enough to build it:
+
+```
+sh bootstrap/bootstrap.sh     # builds build/vela, and checks the fixed point
+```
 
 ## Usage
 
 ```
-python3 stage0/main.py run hello.vl       # compile and run (imports are found next to it)
-python3 stage0/main.py build hello.vl     # produce ./hello
-python3 stage0/main.py c hello.vl         # show the generated C
-python3 stage0/main.py check hello.vl     # report errors only
-python3 stage0/main.py tokens hello.vl    # show the tokens
-python3 stage0/main.py ast hello.vl       # show the syntax tree
-python3 run_tests.py                      # run the test suite
+build/vela run hello.vl       # compile and run (imports are found next to it)
+build/vela build hello.vl     # produce ./hello
+build/vela c hello.vl         # show the generated C
+build/vela check hello.vl     # report errors only
+build/vela tokens hello.vl    # show the tokens
+build/vela ast hello.vl       # show the syntax tree
+python3 run_tests.py          # run the test suite with build/vela
 ```
+
+After changing `stage1/`, run `sh bootstrap/bootstrap.sh --update`: the
+seed compiles the new source, the new compiler compiles itself twice more,
+and the seed is replaced by the result. A change that uses a feature the
+seed does not have yet goes in two steps: add the feature, update the seed,
+then use it.
 
 ## Layout
 
 ```
-stage0/      the compiler in Python (thrown away after bootstrap)
-stage1/      the compiler in Vela; stage1/vela1 runs it
+stage1/      the compiler, written in Vela
+bootstrap/   the seed (Stage 1 compiled to C) and the bootstrap script
+stage0/      the first compiler, in Python: frozen at M9 as the readable reference
 runtime/     C runtime linked into every program
 std/         standard modules written in Vela
 tests/run/   programs and their expected output
@@ -38,14 +54,15 @@ compare_stages.py  checks that Stage 0 and Stage 1 agree on every file
 
 ## Status
 
-M0 to M8 are done: the driver and test runner, expressions, variables,
-functions and control flow, a type checker that reports every error in one
-run, structs, enums, `match` and `Option`/`Result`, reference-counted
-strings, arrays and maps, programs of several files (`import`, `pub`), the
-`?` operator, a standard library for files, arguments, exit codes and
-string building, and Stage 1: the compiler rewritten in Vela, which writes
-the same C as Stage 0 for every program (`python3 compare_stages.py tokens
-ast check c`; `python3 run_tests.py --compiler stage1/vela1`).
+M0 to M9 are done, and Vela compiles itself. The milestones built the driver
+and test runner, expressions, variables, functions and control flow, a type
+checker that reports every error in one run, structs, enums, `match` and
+`Option`/`Result`, reference-counted strings, arrays and maps, programs of
+several files (`import`, `pub`), the `?` operator, a standard library for
+files, arguments, exit codes and string building, and Stage 1: the compiler
+rewritten in Vela, which writes the same C as Stage 0 for every program
+(`python3 compare_stages.py tokens ast check c`). M9 reached the fixed point
+and retired Python from the build.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
 

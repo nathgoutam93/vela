@@ -1217,8 +1217,20 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         }
         return no_value()
     }
-    if name == "files.read" || name == "files.write" {
+    if name == "files.read" || name == "files.write" || name == "files.remove" || name == "files.temp_dir" ||
+            name == "os.run" {
         return file_call(mut g, e, name, args)
+    }
+    if name == "os.env" {
+        let arg = expr(mut g, args[0]).c
+        let text = new_temp(mut g)
+        let ok = new_temp(mut g)
+        emit(mut g, "vela_str " + text + " = VELA_STR(\"\", 0);")
+        emit(mut g, "bool " + ok + " = vela_os_env(" + arg + ", &" + text + ");")
+        let opt = c_type(g, t)
+        let some = "(" + opt + "){ .tag = " + layout.tag(g.l, t, "Some") + ", .as.m_Some = { ._0 = " + text + " } }"
+        let none = "(" + opt + "){ .tag = " + layout.tag(g.l, t, "None") + " }"
+        return store(mut g, t, ok + " ? " + some + " : " + none)
     }
     if name == "len" {
         let arg = expr(mut g, args[0])
@@ -1280,8 +1292,9 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     return own(mut g, result, t)
 }
 
-// files.read and files.write: the runtime reports success with a bool and
-// fills in the contents or the error message; this builds the Result.
+// files.read, files.write, files.remove, files.temp_dir and os.run: the
+// runtime reports success with a bool and fills in the result or the error
+// message; this builds the Result.
 fn file_call(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     let mut cs: [Str] = []
     for a in args {
@@ -1294,9 +1307,19 @@ fn file_call(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     let mut success = text
     if name == "files.read" {
         emit(mut g, "bool " + ok + " = vela_files_read(" + cs[0] + ", &" + text + ");")
-    } else {
+    } else if name == "files.write" {
         emit(mut g, "bool " + ok + " = vela_files_write(" + cs[0] + ", " + cs[1] + ", &" + text + ");")
         success = cs[1] + ".len"
+    } else if name == "files.remove" {
+        emit(mut g, "bool " + ok + " = vela_files_remove(" + cs[0] + ", &" + text + ");")
+        success = "0"
+    } else if name == "files.temp_dir" {
+        emit(mut g, "bool " + ok + " = vela_files_temp_dir(&" + text + ");")
+    } else {
+        let code = new_temp(mut g)
+        emit(mut g, "int64_t " + code + " = 0;")
+        emit(mut g, "bool " + ok + " = vela_os_run(" + cs[0] + ", &" + code + ", &" + text + ");")
+        success = code
     }
     let rt = c_type(g, r)
     let ok_value = "(" + rt + "){ .tag = " + layout.tag(g.l, r, "Ok") + ", .as.m_Ok = { ._0 = " + success + " } }"

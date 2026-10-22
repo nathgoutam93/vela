@@ -163,6 +163,18 @@ _Noreturn void vela_os_exit(int64_t code, const char *loc);
 // contents (read) or, on failure, a message saying what went wrong.
 bool vela_files_read(vela_str path, vela_str *out);
 bool vela_files_write(vela_str path, vela_str data, vela_str *err);
+// files.remove: a file, or an empty directory.
+bool vela_files_remove(vela_str path, vela_str *err);
+// files.temp_dir: a new, empty directory of its own; *out is its path, or why not.
+bool vela_files_temp_dir(vela_str *out);
+
+// os.run(command): runs a program (found on PATH like a shell would) with
+// the program's own stdin, stdout and stderr, waits for it, and sets *code
+// to its exit code, or 128 + the signal number if a signal ended it. False,
+// with a message in *err, if it could not be started at all. POSIX only.
+bool vela_os_run(vela_array *command, int64_t *code, vela_str *err);
+// os.env(name): true, with the value in *out, if the variable is set.
+bool vela_os_env(vela_str name, vela_str *out);
 
 // strings.Builder is an array of bytes (elem = &vela_type_byte); building
 // copies them into a new Str. The builder must already be unique.

@@ -11,6 +11,10 @@ own directory and by its bare name, as run_tests.py does. Their stdout,
 stderr and exit codes must be identical: the same dump, the same errors,
 the same C.
 
+Stage 0 is frozen at M9, so this holds only while the language is the M9
+language. Once Stage 1 gains a feature, files that use it are expected to
+differ; the check is then a regression test for the rest.
+
 VELA1_PREBUILT=1 skips the build and uses build/vela1 as it is: for
 example one built with AddressSanitizer, to check Stage 1 itself.
 """

@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Vela stage 0 compiler driver.
 
+FROZEN at M9. Stage 0 is the compiler written in Python, kept as the
+readable reference implementation of Vela as it was at bootstrap. The
+compiler in use is Stage 1 (stage1/, written in Vela), built from the seed
+by `sh bootstrap/bootstrap.sh`. New language features go into Stage 1
+only; this one changes only to fix a bug.
+
     python3 stage0/main.py build hello.vl [-o hello]   compile to an executable
     python3 stage0/main.py run hello.vl [args...]      compile to a temp file, run it
     python3 stage0/main.py c hello.vl                  print the generated C

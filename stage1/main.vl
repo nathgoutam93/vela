@@ -1,12 +1,19 @@
-// The Stage 1 compiler driver: the Vela version of stage0/main.py.
+// The Vela compiler's command line: the Vela version of stage0/main.py.
 //
-//     vela1 tokens FILE    print the token stream
-//     vela1 ast FILE       print the syntax tree
-//     vela1 check FILE     report the program's errors, generate nothing
-//     vela1 c FILE         print the generated C
+//     vela build FILE [-o EXE]    compile to an executable
+//     vela run FILE [ARGS...]     compile to a temporary executable and run it
+//     vela c FILE                 print the generated C
+//     vela check FILE             report the program's errors, generate nothing
+//     vela tokens FILE            print the token stream
+//     vela ast FILE               print the syntax tree
 //
-// More commands arrive as the rest of the compiler is ported (M8). Exit
-// codes as in Stage 0: 0 success, 1 the program has errors, 2 bad command line.
+// Exit codes as in Stage 0: 0 success, 1 the program has errors, 2 bad
+// command line, 70 internal compiler error.
+//
+// VELA_CC picks the C compiler (default `cc`); VELA_CFLAGS adds flags to its
+// command line, split at spaces. The runtime and the standard modules are
+// found in runtime/ and std/ next to the build/ directory this program is
+// in, or under VELA_ROOT if it is set.
 import ast
 import checker
 import codegen
@@ -16,22 +23,40 @@ import lexer
 import modules
 import os
 import parser
+import strings
 
 fn main() {
     let args = os.args()
-    if len(args) != 3 {
+    if len(args) < 3 {
         usage()
     }
     let command = args[1]
     let path = args[2]
+    let root = root_dir(args[0])
+    if command == "run" {
+        run(path, args[3..len(args)], root)
+    }
+    if command == "build" {
+        let mut out = default_output(path)
+        if len(args) == 5 && (args[3] == "-o" || args[3] == "--output") {
+            out = args[4]
+        } else if len(args) != 3 {
+            usage()
+        }
+        build(path, out, root)
+        return
+    }
+    if len(args) != 3 {
+        usage()
+    }
     if command == "tokens" {
         tokens(path)
     } else if command == "ast" {
         syntax_tree(path)
     } else if command == "check" {
-        check(path, std_dir(args[0]))
+        checked(path, root)
     } else if command == "c" {
-        let out = codegen.generate(checked(path, std_dir(args[0])))
+        let out = codegen.generate(checked(path, root))
         print(out[0..len(out) - 1])
     } else {
         usage()
@@ -39,18 +64,35 @@ fn main() {
 }
 
 fn usage() {
-    os.eprint("usage: vela1 (tokens | ast | check | c) FILE")
+    os.eprint("usage: vela (build | run | c | check | tokens | ast) FILE")
     os.exit(2)
+}
+
+// The directory holding runtime/ and std/.
+fn root_dir(program: Str) -> Str {
+    match os.env("VELA_ROOT") {
+        Some(r) => return r
+        None => {}
+    }
+    return modules.dirname(modules.dirname(program))
+}
+
+fn driver_error(message: Str) {
+    os.eprint("vela: error: " + message)
+    os.exit(1)
+}
+
+fn internal_error(message: Str) {
+    os.eprint("vela: internal compiler error: " + message)
+    os.exit(70)
 }
 
 fn read(path: Str) -> Str {
     match files.read(path) {
         Ok(text) => return text
-        Err(e) => {
-            os.eprint("vela: error: " + e)
-            os.exit(1)
-        }
+        Err(e) => driver_error(e)
     }
+    return ""  // not reached
 }
 
 // Print every error, each with the file it is in, and stop.
@@ -90,15 +132,9 @@ fn syntax_tree(path: Str) {
     }
 }
 
-// The standard modules written in Vela: std/ next to the build/ directory
-// the compiler is in.
-fn std_dir(program: Str) -> Str {
-    return modules.join(modules.dirname(modules.dirname(program)), "std")
-}
-
 // Load and check a whole program; returns it checked, or stops with its errors.
-fn checked(path: Str, std: Str) -> checker.Checked {
-    let loaded = modules.load(path, read(path), std)
+fn checked(path: Str, root: Str) -> checker.Checked {
+    let loaded = modules.load(path, read(path), modules.join(root, "std"))
     if len(loaded.errors) > 0 {
         fail(path, loaded.errors)
     }
@@ -109,6 +145,106 @@ fn checked(path: Str, std: Str) -> checker.Checked {
     return result
 }
 
-fn check(path: Str, std: Str) {
-    checked(path, std)
+// FILE without its extension, as Stage 0 picks it.
+fn default_output(path: Str) -> Str {
+    let dir = modules.dirname(path)
+    let name = modules.stem(path)
+    if dir == "" {
+        return name
+    }
+    return modules.join(dir, name)
+}
+
+// The words of VELA_CFLAGS.
+fn split_flags(flags: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(flags) + 1 {
+        if i == len(flags) || flags[i] == ' ' || flags[i] == '\t' {
+            if i > start {
+                push(mut out, flags[start..i])
+            }
+            start = i + 1
+        }
+    }
+    return out
+}
+
+// Compile a .vl file all the way to a native executable: C into a scratch
+// directory, then the C compiler.
+fn build(path: Str, exe: Str, root: Str) {
+    let c_source = codegen.generate(checked(path, root))
+    let mut tmp = ""
+    match files.temp_dir() {
+        Ok(dir) => tmp = dir
+        Err(e) => driver_error(e)
+    }
+    let c_file = modules.join(tmp, modules.stem(path) + ".c")
+    match files.write(c_file, c_source) {
+        Ok(_) => {}
+        Err(e) => driver_error(e)
+    }
+    let mut cc = "cc"
+    match os.env("VELA_CC") {
+        Some(name) => cc = name
+        None => {}
+    }
+    let mut flags: [Str] = []
+    match os.env("VELA_CFLAGS") {
+        Some(f) => flags = split_flags(f)
+        None => {}
+    }
+    let runtime = modules.join(root, "runtime")
+    let mut command = [cc, "-std=c11", "-O2"]
+    for f in flags {
+        push(mut command, f)
+    }
+    for word in ["-I", runtime, c_file, modules.join(runtime, "vela_rt.c"), "-o", exe] {
+        push(mut command, word)
+    }
+    let result = os.run(command)
+    // The scratch directory goes either way.
+    files.remove(c_file)
+    files.remove(tmp)
+    match result {
+        Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + e + "); install gcc or clang, or set VELA_CC")
+        Ok(code) => {
+            if code != 0 {
+                internal_error("the C compiler rejected the generated code\ncommand: " + join_words(command))
+            }
+        }
+    }
+}
+
+fn join_words(words: [Str]) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(words) {
+        if i > 0 {
+            strings.add_byte(mut b, ' ')
+        }
+        strings.add(mut b, words[i])
+    }
+    return strings.build(b)
+}
+
+// Compile to a temporary executable, run it with `args`, and exit with its code.
+fn run(path: Str, args: [Str], root: Str) {
+    let mut tmp = ""
+    match files.temp_dir() {
+        Ok(dir) => tmp = dir
+        Err(e) => driver_error(e)
+    }
+    let exe = modules.join(tmp, "program")
+    build(path, exe, root)
+    let mut command = [exe]
+    for a in args {
+        push(mut command, a)
+    }
+    let result = os.run(command)
+    files.remove(exe)
+    files.remove(tmp)
+    match result {
+        Ok(code) => os.exit(code)
+        Err(e) => internal_error(e)
+    }
 }

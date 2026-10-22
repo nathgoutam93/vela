@@ -59,6 +59,10 @@ BUILTINS = PRELUDE | {f"{m}.{f}" for m, fns in STD_MODULES.items() for f in fns}
 SIGNATURES: dict[str, Callable[[TypeTable], tuple[list[Type], Type | None]]] = {
     "files.read": lambda t: ([STR], t.result(STR, STR)),  # the contents, or why not
     "files.write": lambda t: ([STR, STR], t.result(INT, STR)),  # the number of bytes written
+    "files.remove": lambda t: ([STR], t.result(UNIT, STR)),
+    "files.temp_dir": lambda t: ([], t.result(STR, STR)),  # a new empty directory's path
+    "os.run": lambda t: ([t.array(STR)], t.result(INT, STR)),  # the exit code
+    "os.env": lambda t: ([STR], t.option(STR)),
     "os.args": lambda t: ([], t.array(STR)),  # the program's name first, as in C and Go
     "os.exit": lambda t: ([INT], NO_VALUE),
     "strings.builder": lambda t: ([], BUILDER),

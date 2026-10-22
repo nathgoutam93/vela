@@ -1,0 +1,54 @@
+// os.run starts a program and waits for it; os.env reads the environment;
+// files.temp_dir and files.remove make and clean up scratch space (M9).
+// out: hello from sh
+// out: 3
+// out: cannot run no-such-program-xyz: No such file or directory
+// out: true
+// out: unset
+// out: wrote
+// out: removed file
+// out: cannot remove
+// out: removed dir
+import files
+import os
+
+fn main() {
+    match os.run(["sh", "-c", "echo hello from sh; exit 3"]) {
+        Ok(code) => print(code)
+        Err(e) => print(e)
+    }
+    match os.run(["no-such-program-xyz"]) {
+        Ok(code) => print(code)
+        Err(e) => print(e)
+    }
+    match os.env("HOME") {
+        Some(h) => print(len(h) > 0)
+        None => print("no HOME")
+    }
+    match os.env("VELA_SURELY_UNSET") {
+        Some(_) => print("set")
+        None => print("unset")
+    }
+    match files.temp_dir() {
+        Ok(d) => {
+            let p = d + "/x.txt"
+            match files.write(p, "hi") {
+                Ok(_) => print("wrote")
+                Err(e) => print(e)
+            }
+            match files.remove(p) {
+                Ok(_) => print("removed file")
+                Err(e) => print(e)
+            }
+            match files.remove(p) {
+                Ok(_) => print("removed again?")
+                Err(e) => print(e[0..13])
+            }
+            match files.remove(d) {
+                Ok(_) => print("removed dir")
+                Err(e) => print(e)
+            }
+        }
+        Err(e) => print(e)
+    }
+}
