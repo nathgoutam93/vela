@@ -47,7 +47,7 @@ fn builtin_functions(name: Str) -> [Str] {
     return match name {
         "maps" => ["has", "get", "remove", "keys"]
         "files" => ["read", "write", "remove", "temp_dir"]
-        "os" => ["args", "exit", "eprint", "run", "env"]
+        "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write"]
         "strings" => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float"]
         _ => []
     }

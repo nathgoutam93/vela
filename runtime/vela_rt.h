@@ -193,6 +193,8 @@ vela_map *vela_fake_env(vela_map *m);
 void vela_fake_env_restore(vela_map *old);
 vela_array **vela_fake_stdout(vela_array **out);
 void vela_fake_stdout_restore(vela_array **old);
+void *vela_fake_stdin(vela_str text);
+void vela_fake_stdin_restore(void *old);
 // os.exit(code): flushes output and ends the program. Like a panic, it
 // does not release the values still in use; the OS takes the memory back.
 _Noreturn void vela_os_exit(int64_t code, const char *loc);
@@ -213,6 +215,14 @@ bool vela_files_temp_dir(vela_str *out);
 bool vela_os_run(vela_array *command, int64_t *code, vela_str *err);
 // os.env(name): true, with the value in *out, if the variable is set.
 bool vela_os_env(vela_str name, vela_str *out);
+// os.read_line(): true, with the next line of stdin in *out (without its
+// "\n" or "\r\n"), unless stdin is at its end. A last line with no newline
+// is still a line.
+bool vela_os_read_line(vela_str *out);
+// os.read(n): the next n bytes of stdin, or fewer if it ends first.
+vela_str vela_os_read(int64_t n, const char *loc);
+// os.write(s): s on stdout as it is, with no newline added.
+void vela_os_write(vela_str s);
 
 // strings.Builder is an array of bytes (elem = &vela_type_byte); building
 // copies them into a new Str. The builder must already be unique.

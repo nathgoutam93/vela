@@ -430,7 +430,7 @@ fn signatures(c: mut Checker) {
             let u = f.effects[i]
             if u != "fs" && u != "os" {
                 report(mut c, f.effects_line, f.effects_col, "unknown effect '" + u + "'; the effects are fs (the files module) " +
-                    "and os (os.args, os.exit, os.env and os.run)")
+                    "and os (os.args, os.exit, os.env, os.run, os.read_line and os.read)")
             }
             for j in 0..i {
                 if f.effects[j] == u {
@@ -741,8 +741,8 @@ fn is_main(c: Checker, id: Int) -> Bool {
 // ---- Effects ----
 //
 // A function that touches the world says how: `uses fs` for the files
-// module, `uses os` for os.args, os.exit, os.env and os.run. Printing is
-// not an effect. A function must declare what it does itself and what the
+// module, `uses os` for os.args, os.exit, os.env, os.run, os.read_line and
+// os.read. Printing is not an effect, and neither is os.write, which prints. A function must declare what it does itself and what the
 // functions it calls declare; main and tests may do anything.
 
 // The effect of a built-in function, or "".
@@ -750,7 +750,8 @@ fn effect_of(name: Str) -> Str {
     if len(name) > 6 && name[0..6] == "files." {
         return "fs"
     }
-    if name == "os.args" || name == "os.exit" || name == "os.env" || name == "os.run" {
+    if name == "os.args" || name == "os.exit" || name == "os.env" || name == "os.run" || name == "os.read_line" ||
+        name == "os.read" {
         return "os"
     }
     return ""
@@ -787,11 +788,11 @@ fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
 
 // ---- With ----
 
-// `with files = m, args = xs, env = m, stdout = mut out { ... }`: in a test,
+// `with files = m, args = xs, env = m, stdin = s, stdout = mut out { ... }`: in a test,
 // the code the block runs sees these instead of the real ones.
 fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block) {
     if !c.fns[c.current_fn].is_test {
-        report(mut c, s.line, s.col, "'with' only works in tests, where it fakes files, args, env or stdout for the code " +
+        report(mut c, s.line, s.col, "'with' only works in tests, where it fakes files, args, env, stdin or stdout for the code " +
             "the test calls")
     }
     let text_map = types.map(mut c.table, types.STR(), types.STR())
@@ -810,6 +811,8 @@ fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block
             check_expr(mut c, w.value, text_map, msg("'with env' needs a Map[Str, Str] from names to values, found ", ""))
         } else if w.name == "args" {
             check_expr(mut c, w.value, words, msg("'with args' needs a [Str], found ", ""))
+        } else if w.name == "stdin" {
+            check_expr(mut c, w.value, types.STR(), msg("'with stdin' needs the Str to read, found ", ""))
         } else if w.name == "stdout" {
             let mut is_place = false
             match w.value.kind {
@@ -827,7 +830,7 @@ fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block
                 report_at(mut c, w.value, "'with stdout' needs a strings.Builder to collect what is printed, found " + show(c, t))
             }
         } else {
-            report(mut c, w.line, w.col, "'with' cannot fake '" + w.name + "'; it fakes files, args, env and stdout")
+            report(mut c, w.line, w.col, "'with' cannot fake '" + w.name + "'; it fakes files, args, env, stdin and stdout")
             infer(mut c, w.value)
         }
     }
@@ -943,7 +946,7 @@ fn std_hint(c: Checker, name: Str) -> Str {
         let fns = match module {
             "maps" => ["has", "get", "remove", "keys"]
             "files" => ["read", "write", "remove", "temp_dir"]
-            "os" => ["args", "exit", "eprint", "run", "env"]
+            "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write"]
             _ => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float"]
         }
         for f in fns {
@@ -3273,7 +3276,8 @@ fn is_printable(t: Int) -> Bool {
 // Their types are made only when they are called, as in Stage 0.
 fn has_signature(name: Str) -> Bool {
     return len(name) > 6 && name[0..6] == "files." || name == "os.args" || name == "os.exit" ||
-        name == "os.run" || name == "os.env" || len(name) > 8 && name[0..8] == "strings."
+        name == "os.run" || name == "os.env" || name == "os.read_line" || name == "os.read" || name == "os.write" ||
+        len(name) > 8 && name[0..8] == "strings."
 }
 
 fn signature(c: mut Checker, name: Str) -> [Int] {
@@ -3303,8 +3307,13 @@ fn signature(c: mut Checker, name: Str) -> [Int] {
     if name == "os.env" {
         return [s, types.option(mut c.table, s)]
     }
+    if name == "os.read_line" {
+        return [types.option(mut c.table, s)]
+    }
     return match name {
         "os.exit" => [types.INT(), nothing]
+        "os.read" => [types.INT(), s]
+        "os.write" => [s, nothing]
         "strings.builder" => [b]
         "strings.add" => [b, s, nothing]
         "strings.add_byte" => [b, types.BYTE(), nothing]

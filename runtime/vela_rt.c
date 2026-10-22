@@ -413,6 +413,28 @@ void vela_fake_stdout_restore(vela_array **old) {
     fake_stdout = old;
 }
 
+// A faked stdin is the text given and how far reading has got through it.
+typedef struct {
+    vela_str text;
+    int64_t pos;
+} fake_input;
+
+static fake_input *fake_stdin = NULL;
+
+void *vela_fake_stdin(vela_str text) {
+    fake_input *old = fake_stdin;
+    fake_stdin = vela_alloc(sizeof(fake_input));
+    fake_stdin->text = text;
+    fake_stdin->pos = 0;
+    return old;
+}
+
+void vela_fake_stdin_restore(void *old) {
+    vela_str_release(fake_stdin->text);
+    free(fake_stdin);
+    fake_stdin = old;
+}
+
 // Printing into the faked stdout: the builder may be shared, so it is made
 // unique first, as any change to a value is.
 static void captured(vela_str s) {
@@ -824,6 +846,87 @@ bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
         return false;
     }
     return true;
+}
+
+// ---- stdin ----
+//
+// Reading flushes stdout first, as C++ ties cin to cout: a prompt printed
+// with os.write is on the screen before the program waits for the answer,
+// and a reply written to a pipe reaches the other end before the next
+// request is read.
+
+// The next `n` bytes of the faked stdin, or fewer at its end: a slice of
+// the faked text, which shares its bytes.
+static vela_str fake_take(int64_t n) {
+    vela_str t = fake_stdin->text;
+    int64_t left = t.len - fake_stdin->pos;
+    if (n > left) n = left;
+    vela_str s = {t.obj, t.data + fake_stdin->pos, n};
+    vela_str_retain(s);
+    fake_stdin->pos += n;
+    return s;
+}
+
+// A line without its "\n", and without the "\r" of a "\r\n".
+static vela_str chomp(vela_str s) {
+    if (s.len > 0 && s.data[s.len - 1] == '\n') s.len--;
+    if (s.len > 0 && s.data[s.len - 1] == '\r') s.len--;
+    return s;
+}
+
+bool vela_os_read_line(vela_str *out) {
+    if (fake_stdin) {
+        vela_str t = fake_stdin->text;
+        if (fake_stdin->pos == t.len) return false;
+        int64_t end = fake_stdin->pos;
+        while (end < t.len && t.data[end] != '\n') end++;
+        if (end < t.len) end++;  // the newline goes with its line
+        *out = chomp(fake_take(end - fake_stdin->pos));
+        return true;
+    }
+    fflush(stdout);
+    size_t cap = 128, len = 0;
+    char *buf = vela_alloc(cap);
+    int c;
+    while ((c = getchar()) != EOF) {
+        if (len == cap) {
+            cap *= 2;
+            buf = vela_realloc(buf, cap);
+        }
+        buf[len++] = (char)c;
+        if (c == '\n') break;
+    }
+    if (len == 0) {
+        free(buf);
+        return false;
+    }
+    *out = chomp(str_from(buf, len));
+    free(buf);
+    return true;
+}
+
+vela_str vela_os_read(int64_t n, const char *loc) {
+    if (n < 0) vela_panic(loc, "os.read of a negative number of bytes");
+    if (fake_stdin) return fake_take(n);
+    fflush(stdout);
+    vela_strobj *obj = vela_alloc(sizeof(vela_strobj) + (size_t)n);
+    obj->rc = 1;
+    size_t got = 0;
+    while (got < (size_t)n) {
+        size_t k = fread(obj->bytes + got, 1, (size_t)n - got, stdin);
+        if (k == 0) break;
+        got += k;
+    }
+    return (vela_str){obj, obj->bytes, (int64_t)got};
+}
+
+void vela_os_write(vela_str s) {
+    if (fake_stdout) {
+        vela_array_unique(fake_stdout);
+        vela_builder_add(*fake_stdout, s);
+        return;
+    }
+    if (s.len) fwrite(s.data, 1, (size_t)s.len, stdout);
 }
 
 bool vela_os_env(vela_str name, vela_str *out) {

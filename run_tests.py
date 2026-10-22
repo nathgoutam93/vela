@@ -20,6 +20,8 @@ whose main file is main.vl. Comment lines at the very top of the .vl file
     //                the program's in tests/run
     // exit: <n>      the program's exit code (default 0)
     // args: <words>  command-line arguments for the program, split like a shell would
+    // in: <text>     a line of the program's stdin (repeat for more lines);
+    //                without any, its stdin is empty
     // dump: <what>   tests/dump only: `tokens` or `ast`, the dump that the
     //                `out:` lines are compared against
     // command: <words>  tests/cli only: the compiler's command line; FILE
@@ -81,7 +83,7 @@ STRICT_CFLAGS = (
 # behaviour, and, when the program exits, any memory it never freed.
 SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all"
 
-HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args|command):(.*)$")
+HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args|command|in):(.*)$")
 STAGE1_ONLY = "// stage 1 only"
 COMPILE_TIMEOUT = 60
 RUN_TIMEOUT = 10
@@ -96,6 +98,7 @@ class Expectations:
     dump: str | None = None
     args: list[str] = field(default_factory=list)
     command: list[str] = field(default_factory=list)
+    stdin: list[str] = field(default_factory=list)
     stage1_only: bool = False
 
 
@@ -124,6 +127,8 @@ def read_expectations(path: Path) -> Expectations:
             expect.args = shlex.split(value)
         elif key == "command":
             expect.command = shlex.split(value)
+        elif key == "in":
+            expect.stdin.append(value)
         else:
             expect.dump = value.strip()
     return expect
@@ -176,7 +181,7 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         try:
             ran = subprocess.run(
                 [str(exe), *expect.args], cwd=workdir, env=env, capture_output=True, text=True,
-                timeout=RUN_TIMEOUT,
+                input="".join(line + "\n" for line in expect.stdin), timeout=RUN_TIMEOUT,
             )
         except subprocess.TimeoutExpired:
             return [f"program ran longer than {RUN_TIMEOUT}s"]
@@ -223,7 +228,7 @@ def run_cli_test(compiler: list[str], path: Path, expect: Expectations,
             shutil.copy(path, workdir / path.name)
         try:
             ran = subprocess.run([*compiler, *words], cwd=workdir, env=env, capture_output=True, text=True,
-                                 timeout=COMPILE_TIMEOUT + RUN_TIMEOUT)
+                                 stdin=subprocess.DEVNULL, timeout=COMPILE_TIMEOUT + RUN_TIMEOUT)
         except subprocess.TimeoutExpired:
             return ["the command took too long"]
         problems = []
@@ -250,7 +255,7 @@ def run_vela_tests(compiler: list[str], path: Path, env: dict[str, str]) -> list
     """`vela test` on an example or a standard module: all its tests must pass."""
     try:
         ran = subprocess.run([*compiler, "test", str(path.relative_to(ROOT))], cwd=ROOT, env=env,
-                             capture_output=True, text=True, timeout=VELA_TEST_TIMEOUT)
+                             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=VELA_TEST_TIMEOUT)
     except subprocess.TimeoutExpired:
         return [f"vela test took longer than {VELA_TEST_TIMEOUT}s"]
     if ran.returncode != 0:

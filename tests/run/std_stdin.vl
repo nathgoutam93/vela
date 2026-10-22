@@ -1,0 +1,44 @@
+// stage 1 only
+// os.read_line and os.read take stdin a line or a count at a time, and
+// os.write prints with no newline. Reading flushes stdout first, so the
+// prompt is out before the program waits.
+// in: Ann
+// in: 3
+// in: a line
+// in: abcdefgh
+// out: name? hello, Ann
+// out: count? 1 2 3
+// out: 6
+// out: abcde|fgh
+// out: |
+// out: at the end: none
+import os
+import strings
+
+fn ask(prompt: Str) -> Str uses os {
+    os.write(prompt)
+    match os.read_line() {
+        Some(line) => return line
+        None => return ""
+    }
+}
+
+fn main() {
+    print("hello, " + ask("name? "))
+    let count = int(ask("count? ")[0] - '0')
+    for i in 1..count + 1 {
+        os.write(strings.from_int(i))
+        if i < 3 {
+            os.write(" ")
+        }
+    }
+    os.write("\n")
+    print(len(ask("")))
+    print(os.read(5) + "|" + os.read(3))
+    // The newline after "abcdefgh" is all that is left, then nothing.
+    print(os.read(1)[0..0] + "|" + os.read(10))
+    match os.read_line() {
+        Some(_) => print("at the end: a line")
+        None => print("at the end: none")
+    }
+}

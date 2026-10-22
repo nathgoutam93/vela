@@ -755,6 +755,8 @@ fn with_code(g: mut Gen, items: [ast.WithItem], body: ast.Block) {
             let mut c_ty = "vela_map *"
             if w.name == "args" {
                 c_ty = "vela_array *"
+            } else if w.name == "stdin" {
+                c_ty = "void *"
             }
             emit(mut g, c_ty + saved + " = vela_fake_" + w.name + "(" + v + ");")
         }
@@ -1693,6 +1695,14 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         }
         return store(mut g, t, func + "(" + strings.build(cs) + ")")
     }
+    if name == "os.read" {
+        let n = expr(mut g, args[0]).c
+        return store(mut g, t, "vela_os_read(" + n + ", " + loc_of(g, e) + ")")
+    }
+    if name == "os.write" {
+        emit(mut g, "vela_os_write(" + expr(mut g, args[0]).c + ");")
+        return no_value()
+    }
     if name == "os.exit" {
         let code = expr(mut g, args[0]).c
         emit(mut g, "vela_os_exit(" + code + ", " + loc_of(g, e) + ");")
@@ -1716,12 +1726,15 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         name == "os.run" {
         return file_call(mut g, e, name, args)
     }
-    if name == "os.env" {
-        let arg = expr(mut g, args[0]).c
+    if name == "os.env" || name == "os.read_line" {
+        let mut call = "vela_os_read_line("
+        if name == "os.env" {
+            call = "vela_os_env(" + expr(mut g, args[0]).c + ", "
+        }
         let text = new_temp(mut g)
         let ok = new_temp(mut g)
         emit(mut g, "vela_str " + text + " = VELA_STR(\"\", 0);")
-        emit(mut g, "bool " + ok + " = vela_os_env(" + arg + ", &" + text + ");")
+        emit(mut g, "bool " + ok + " = " + call + "&" + text + ");")
         let opt = c_type(g, t)
         let some = "(" + opt + "){ .tag = " + layout.tag(g.l, t, "Some") + ", .as.m_Some = { ._0 = " + text + " } }"
         let none = "(" + opt + "){ .tag = " + layout.tag(g.l, t, "None") + " }"
