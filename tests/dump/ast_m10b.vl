@@ -1,0 +1,23 @@
+// The syntax tree of M10b's additions: function types, uses, contracts, with.
+// stage 1 only
+// dump: ast
+// out: (fn apply ((f fn(Int) -> Int) (x Int)) Int (uses os) (requires (> x 0)) (ensures (>= result 0))
+// out:   (block
+// out:     (return (call f x))))
+// out: (test "fakes"
+// out:   (block
+// out:     (with (args (array "a")) (stdout (mut out))
+// out:       (block
+// out:         (call print 1)))))
+fn apply(f: fn(Int) -> Int, x: Int) -> Int
+    uses os
+    requires x > 0
+    ensures result >= 0 {
+    return f(x)
+}
+
+test "fakes" {
+    with args = ["a"], stdout = mut out {
+        print(1)
+    }
+}

@@ -15,6 +15,8 @@
 // Exit codes as in Stage 0: 0 success, 1 the program has errors, 2 bad
 // command line, 70 internal compiler error.
 //
+// stage 1 only (it says `uses`)
+//
 // VELA_CC picks the C compiler (default `cc`); VELA_CFLAGS adds flags to its
 // command line, split at spaces. The runtime and the standard modules are
 // found in runtime/ and std/ next to the build/ directory this program is
@@ -84,13 +86,13 @@ fn main() {
     }
 }
 
-fn usage() {
+fn usage() uses os {
     os.eprint("usage: vela (build | run | test | c | check | tokens | ast | fmt) FILE")
     os.exit(2)
 }
 
 // The directory holding runtime/ and std/.
-fn root_dir(program: Str) -> Str {
+fn root_dir(program: Str) -> Str uses os {
     match os.env("VELA_ROOT") {
         Some(r) => return r
         None => {}
@@ -98,17 +100,17 @@ fn root_dir(program: Str) -> Str {
     return modules.dirname(modules.dirname(program))
 }
 
-fn driver_error(message: Str) {
+fn driver_error(message: Str) uses os {
     os.eprint("vela: error: " + message)
     os.exit(1)
 }
 
-fn internal_error(message: Str) {
+fn internal_error(message: Str) uses os {
     os.eprint("vela: internal compiler error: " + message)
     os.exit(70)
 }
 
-fn read(path: Str) -> Str {
+fn read(path: Str) -> Str uses fs, os {
     match files.read(path) {
         Ok(text) => return text
         Err(e) => driver_error(e)
@@ -117,7 +119,7 @@ fn read(path: Str) -> Str {
 }
 
 // Print every error, each with the file it is in, and stop.
-fn fail(path: Str, errs: [errors.CompileError]) {
+fn fail(path: Str, errs: [errors.CompileError]) uses os {
     for e in errs {
         let mut shown = e
         if shown.path == "" {
@@ -128,7 +130,7 @@ fn fail(path: Str, errs: [errors.CompileError]) {
     os.exit(1)
 }
 
-fn tokens(path: Str) {
+fn tokens(path: Str) uses fs, os {
     let lexed = lexer.tokenize(read(path))
     if len(lexed.errors) > 0 {
         fail(path, lexed.errors)
@@ -138,7 +140,7 @@ fn tokens(path: Str) {
     print(out[0..len(out) - 1])
 }
 
-fn syntax_tree(path: Str) {
+fn syntax_tree(path: Str) uses fs, os {
     let lexed = lexer.tokenize(read(path))
     if len(lexed.errors) > 0 {
         fail(path, lexed.errors)
@@ -154,7 +156,7 @@ fn syntax_tree(path: Str) {
 }
 
 // Load and check a whole program; returns it checked, or stops with its errors.
-fn checked(path: Str, root: Str) -> checker.Checked {
+fn checked(path: Str, root: Str) -> checker.Checked uses fs, os {
     let loaded = modules.load(path, read(path), modules.join(root, "std"))
     if len(loaded.errors) > 0 {
         fail(path, loaded.errors)
@@ -204,12 +206,12 @@ fn split_flags(flags: Str) -> [Str] {
 }
 
 // Compile a .vl file all the way to a native executable.
-fn build(path: Str, exe: Str, root: Str) {
+fn build(path: Str, exe: Str, root: Str) uses fs, os {
     compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root, "-O2")
 }
 
 // The C, or stop with the errors that only writing it found.
-fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str {
+fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str uses os {
     match generated {
         Ok(c) => return c
         Err(errs) => fail(path, errs)
@@ -218,7 +220,7 @@ fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str {
 }
 
 // C into a scratch directory, then the C compiler, optimizing at `opt`.
-fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) {
+fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
@@ -273,7 +275,7 @@ fn join_words(words: [Str]) -> Str {
 }
 
 // Compile to a temporary executable, run it with `args`, and exit with its code.
-fn run(path: Str, args: [Str], root: Str) {
+fn run(path: Str, args: [Str], root: Str) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
@@ -297,7 +299,7 @@ fn run(path: Str, args: [Str], root: Str) {
 // `vela fmt`: every file is formatted, or its errors reported, before the
 // exit code says whether all went well (and with -l, whether all were
 // formatted already).
-fn fmt(args: [Str]) {
+fn fmt(args: [Str]) uses fs, os {
     let mut mode = ""
     let mut paths = args
     if len(args) > 0 && (args[0] == "-w" || args[0] == "-l") {
@@ -351,7 +353,7 @@ fn fmt(args: [Str]) {
 //     ]}
 //
 // It exits 1 when there are errors, as `check` does.
-fn check_json(path: Str, root: Str) {
+fn check_json(path: Str, root: Str) uses fs, os {
     let mut errs: [errors.CompileError] = []
     let mut failed = false
     match files.read(path) {
@@ -439,7 +441,7 @@ fn hex_digit(n: Int) -> Byte {
 
 // `vela test`: build the program's tests into one executable, then run it
 // once per test, so a test that panics fails alone and the rest still run.
-fn test_command(path: Str, words: [Str], root: Str) {
+fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
     let loaded = modules.load(path, read(path), modules.join(root, "std"))
     if len(loaded.errors) > 0 {
         fail(path, loaded.errors)

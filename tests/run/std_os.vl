@@ -1,5 +1,6 @@
 // os: arguments (the program's name first), printing to stderr, and
 // exiting with a code. Everything printed before os.exit appears.
+// stage 1 only (it says `uses`, which Stage 0 cannot read)
 // args: one "two words" 3
 // out: 4
 // out: one
@@ -12,7 +13,7 @@
 // exit: 3
 import os
 
-fn finish(code: Int) {
+fn finish(code: Int) uses os {
     let keep = ["values", "still", "alive"]
     print("done")
     os.exit(code)

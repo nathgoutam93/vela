@@ -79,7 +79,7 @@ pub fn label(m: Module) -> Str {
 
 // Load the program whose main file is `path`, with contents `source`.
 // `std_dir` is where the standard modules written in Vela are.
-pub fn load(path: Str, source: Str, std_dir: Str) -> Loaded {
+pub fn load(path: Str, source: Str, std_dir: Str) -> Loaded uses fs {
     let mut ld = Loader {
         directory: dirname(path), std_dir: std_dir, modules: [], errors: [], by_path: [:], order: [],
         active: [], next_id: 0,
@@ -89,7 +89,7 @@ pub fn load(path: Str, source: Str, std_dir: Str) -> Loaded {
 }
 
 // Lex and parse one file, then load what it imports. Returns its index.
-fn file(ld: mut Loader, name: Str, path: Str, source: Str, shown: Str) -> Int {
+fn file(ld: mut Loader, name: Str, path: Str, source: Str, shown: Str) -> Int uses fs {
     push(mut ld.modules, new_module(name, shown))
     let index = len(ld.modules) - 1
     ld.by_path[normpath(path)] = index
@@ -146,7 +146,7 @@ fn builtin_module(ld: mut Loader, name: Str) -> Int {
     return len(ld.modules) - 1
 }
 
-fn follow(ld: mut Loader, importer: Int, imp: ast.Import) {
+fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
     if maps.has(ld.modules[importer].imports, imp.name) {
         report(mut ld, importer, imp, "'" + imp.name + "' is already imported")
         return

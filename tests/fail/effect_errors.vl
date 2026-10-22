@@ -1,0 +1,69 @@
+// Mistakes with effects, contracts and fakes.
+// stage 1 only
+// err: effect_errors.vl:22:18: error: 'read' uses fs, through files.read, but does not say so; add `uses fs` after its signature
+// err: effect_errors.vl:25:28: warning: 'first' says `uses fs` but uses nothing of it
+// err: effect_errors.vl:32:12: error: effect 'os' is listed twice
+// err: effect_errors.vl:32:12: error: unknown effect 'net'; the effects are fs (the files module) and os (os.args, os.exit, os.env and os.run)
+// err: effect_errors.vl:37:5: error: 'caller' uses os, through 'leave', but does not say so; add `uses os` after its signature
+// err: effect_errors.vl:40:11: warning: 'tidy' says `uses os` but uses nothing of it
+// err: effect_errors.vl:45:14: error: a requires clause must be Bool, found Int
+// err: effect_errors.vl:50:4: error: 'odd' has a parameter called 'result', which its ensures clauses cannot tell from the value it returns; rename the parameter
+// err: effect_errors.vl:56:13: error: undefined name 'result'
+// err: effect_errors.vl:60:13: error: 'first' uses fs, so it cannot be used as a value: function values have no effects
+// err: effect_errors.vl:61:5: error: 'with' only works in tests, where it fakes files, args, env or stdout for the code the test calls
+// err: effect_errors.vl:67:18: error: 'with files' needs a Map[Str, Str] from paths to contents, found [Str]
+// err: effect_errors.vl:67:31: error: 'with env' needs a Map[Str, Str] from names to values, found Int
+// err: effect_errors.vl:67:43: error: 'with stdout' collects what is printed into a strings.Builder variable, written `stdout = mut out`
+// err: effect_errors.vl:67:46: error: 'with' cannot fake 'net'; it fakes files, args, env and stdout
+import files
+import os
+
+fn read(path: Str) -> Result[Str, Str] {
+    return files.read(path)
+}
+
+fn first(path: Str) -> Str uses fs {
+    match read(path) {
+        Ok(t) => return t
+        Err(e) => return e
+    }
+}
+
+fn leave() uses net, os, os {
+    os.exit(1)
+}
+
+fn caller() {
+    leave()
+}
+
+fn tidy() uses os {
+    print("nothing to do")
+}
+
+fn twice(n: Int) -> Int
+    requires n
+    ensures result >= n {
+    return n * 2
+}
+
+fn odd(result: Int) -> Int
+    ensures result > 0 {
+    return result
+}
+
+fn quiet()
+    ensures result == 0 {
+}
+
+fn main() {
+    let f = first
+    with args = ["x"] {
+        tidy()
+    }
+}
+
+test "fakes need the right types" {
+    with files = ["a"], env = 3, stdout = 1, net = 2 {
+    }
+}

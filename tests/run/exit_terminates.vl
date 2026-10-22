@@ -1,10 +1,11 @@
 // A call to os.exit ends a function as `return` does, so no return is
 // missing after it.
+// stage 1 only (it says `uses`, which Stage 0 cannot read)
 // out: 7
 // exit: 4
 import os
 
-fn pick(n: Int) -> Int {
+fn pick(n: Int) -> Int uses os {
     if n > 5 {
         return n
     }

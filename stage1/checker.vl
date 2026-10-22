@@ -691,7 +691,8 @@ fn function(c: mut Checker, id: Int) {
     }
     c.type_scope = [:]
     for u in f.effects {
-        if !maps.has(c.effects_used, u) && !c.fns[id].is_test && !is_main(c, id) {
+        let known = u == "fs" || u == "os"
+        if known && !maps.has(c.effects_used, u) && !c.fns[id].is_test && !is_main(c, id) {
             let w = errors.CompileError {
                 path: c.modules[c.current].path, line: f.effects_line, col: f.effects_col,
                 message: "'" + f.name + "' says `uses " + u + "` but uses nothing of it", warning: true,
@@ -734,8 +735,8 @@ fn effect_of(name: Str) -> Str {
 
 // The function being checked uses `effect`, through the call at `e` to `through`.
 fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
-    if effect == "" {
-        return
+    if effect != "fs" && effect != "os" {
+        return  // none, or an unknown one, already reported where it is declared
     }
     c.effects_used[effect] = true
     let f = c.fns[c.current_fn]
@@ -748,9 +749,7 @@ fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
         }
     }
     c.effects_reported[effect] = true
-    // A warning for now: the compiler's own source cannot say `uses` until
-    // the seed knows the word. The next step makes it an error.
-    warn_at(mut c, e, "'" + f.decl.name + "' uses " + effect + ", through " + through + ", but does not say so; add `uses " +
+    report_at(mut c, e, "'" + f.decl.name + "' uses " + effect + ", through " + through + ", but does not say so; add `uses " +
         effect + "` after its signature")
 }
 
@@ -780,6 +779,17 @@ fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block
         } else if w.name == "args" {
             check_expr(mut c, w.value, words, msg("'with args' needs a [Str], found ", ""))
         } else if w.name == "stdout" {
+            let mut is_place = false
+            match w.value.kind {
+                ast.ExprKind.MutArg(_) => is_place = true
+                _ => {}
+            }
+            if !is_place {
+                report_at(mut c, w.value, "'with stdout' collects what is printed into a strings.Builder variable, " +
+                    "written `stdout = mut out`")
+                infer(mut c, w.value)
+                continue
+            }
             let t = mut_argument(mut c, w.value, types.BUILDER(), "'with stdout'")
             if t != types.BUILDER() && t != types.ERROR() {
                 report_at(mut c, w.value, "'with stdout' needs a strings.Builder to collect what is printed, found " + show(c, t))

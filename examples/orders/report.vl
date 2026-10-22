@@ -13,7 +13,9 @@ pub type Ranked[T] = struct {
 
 // The `n` items with the highest scores, highest first; equal scores keep
 // their order.
-pub fn top[T](items: [T], scores: [Int], n: Int) -> [Ranked[T]] {
+pub fn top[T](items: [T], scores: [Int], n: Int) -> [Ranked[T]]
+    requires len(items) == len(scores) && n >= 0
+    ensures len(result) <= n {
     let mut negated: [Int] = []
     for s in scores {
         push(mut negated, -s)
@@ -38,7 +40,8 @@ pub fn spending(all: [orders.Order]) -> Map[Str, Int] {
 }
 
 // 1234 cents as "12.34".
-pub fn money(cents: Int) -> Str {
+pub fn money(cents: Int) -> Str
+    requires cents >= 0 {
     let mut rest = strings.from_int(cents % 100)
     if len(rest) == 1 {
         rest = "0" + rest
@@ -59,11 +62,16 @@ pub fn pad(s: Str, width: Int, right: Bool) -> Str {
 }
 
 pub fn lines(all: [orders.Order], n: Int) -> [Str] {
-    let mut revenue = 0
-    for o in all {
-        revenue = revenue + orders.total(o)
+    let revenue = lists.sum(lists.map(all, orders.total))
+    let mut out = ["orders:  " + strings.from_int(len(all)), "revenue: " + money(revenue)]
+    match lists.max(lists.map(all, orders.total)) {
+        Some(_) => {
+            let biggest = lists.reverse(lists.sort_by(all, orders.total))[0]
+            push(mut out, "largest: #" + strings.from_int(biggest.id) + " " + biggest.customer + " " + money(orders.total(biggest)))
+        }
+        None => {}
     }
-    let mut out = ["orders:  " + strings.from_int(len(all)), "revenue: " + money(revenue), "top customers:"]
+    push(mut out, "top customers:")
     let spent = spending(all)
     let names = maps.keys(spent)
     let mut amounts: [Int] = []

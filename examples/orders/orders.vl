@@ -1,6 +1,7 @@
 // Orders, their prices, and reading them from CSV. Money is in cents.
 // stage 1 only
 import csv
+import lists
 import maps
 import strings
 
@@ -17,7 +18,13 @@ pub type Order = struct {
     coupon: Option[Str]
 }
 
-pub fn subtotal(o: Order) -> Int {
+fn has_quantity(item: Item) -> Bool {
+    return item.qty > 0
+}
+
+pub fn subtotal(o: Order) -> Int
+    requires lists.all(o.items, has_quantity)
+    ensures result >= 0 {
     let mut total = 0
     for item in o.items {
         total = total + item.cents * item.qty
@@ -27,7 +34,8 @@ pub fn subtotal(o: Order) -> Int {
 
 // SAVE10 takes 10% off, at most 50.00; FLAT5 takes 5.00 off an order of
 // 20.00 or more. Any other coupon does nothing.
-pub fn discount(o: Order) -> Int {
+pub fn discount(o: Order) -> Int
+    ensures result >= 0 && result <= subtotal(o) {
     let sub = subtotal(o)
     match o.coupon {
         Some("SAVE10") => {
@@ -47,7 +55,8 @@ pub fn discount(o: Order) -> Int {
     }
 }
 
-pub fn total(o: Order) -> Int {
+pub fn total(o: Order) -> Int
+    ensures result >= 0 {
     return subtotal(o) - discount(o)
 }
 
@@ -65,6 +74,9 @@ pub fn parse(text: Str) -> Result[[Order], Str] {
         }
         let id = whole(f[0], line + ": the id")?
         let item = Item { sku: f[2], cents: whole(f[3], line + ": the price")?, qty: whole(f[4], line + ": the quantity")? }
+        if item.qty == 0 {
+            return Err(line + ": the quantity must be at least 1")
+        }
         let mut coupon: Option[Str] = None
         if f[5] != "" {
             coupon = Some(f[5])
@@ -128,5 +140,9 @@ test "parse reports the bad line" {
     match parse("header\n1,ada,pen,2x,1,\n") {
         Ok(_) => assert(false)
         Err(e) => assert(e == "line 2: the price must be a whole number, found '2x'")
+    }
+    match parse("header\n1,ada,pen,250,0,\n") {
+        Ok(_) => assert(false)
+        Err(e) => assert(e == "line 2: the quantity must be at least 1")
     }
 }

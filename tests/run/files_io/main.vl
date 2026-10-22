@@ -1,5 +1,6 @@
 // files: reading, writing, reading back, and the errors: a missing file,
 // a directory where a file is expected. Writing replaces a file whole.
+// stage 1 only (it says `uses`, which Stage 0 cannot read)
 // out: 18 bytes, 2 lines
 // out: wrote 5
 // out: hello
@@ -23,14 +24,14 @@ fn lines(text: Str) -> Int {
     return n
 }
 
-fn show_read(path: Str) {
+fn show_read(path: Str) uses fs {
     match files.read(path) {
         Ok(text) => print(text)
         Err(e) => print(e)
     }
 }
 
-fn show_write(path: Str, text: Str) {
+fn show_write(path: Str, text: Str) uses fs {
     match files.write(path, text) {
         Ok(n) => print("wrote " + digits(n))
         Err(e) => print(e)

@@ -1,5 +1,7 @@
 // The orders example: read orders from a CSV file, price them, and print a
-// report of the top customers.
+// report of the top customers. The only function that touches the world is
+// load (`uses fs`); main may do anything; the tests fake the file, the
+// arguments and stdout with `with`.
 //
 //     vela run examples/orders/main.vl examples/orders/orders.csv
 //     vela test examples/orders/main.vl
@@ -8,6 +10,7 @@ import files
 import orders
 import os
 import report
+import strings
 
 fn main() {
     let args = os.args()
@@ -28,7 +31,7 @@ fn main() {
     }
 }
 
-fn load(path: Str) -> Result[[orders.Order], Str] {
+fn load(path: Str) -> Result[[orders.Order], Str] uses fs {
     let text = files.read(path)?
     return orders.parse(text)
 }
@@ -40,9 +43,29 @@ test "the report of a small file" {
             let ls = report.lines(all, 3)
             assert(ls[0] == "orders:  3")
             assert(ls[1] == "revenue: 885.00")
-            assert(ls[3] == "  bo         850.00")
-            assert(ls[4] == "  ada         35.00")
+            assert(ls[2] == "largest: #2 bo 850.00")
+            assert(ls[4] == "  bo         850.00")
+            assert(ls[5] == "  ada         35.00")
         }
         Err(e) => assert(e == "")
+    }
+}
+
+test "main reads the file it is given and prints the report" {
+    let csv = "id,customer,sku,cents,qty,coupon\n1,ada,pen,250,4,\n2,bo,lamp,4500,1,FLAT5\n"
+    let mut out = strings.builder()
+    with files = ["week.csv": csv], args = ["orders", "week.csv"], stdout = mut out {
+        main()
+    }
+    let want = "orders:  2\nrevenue: 50.00\nlargest: #2 bo 40.00\ntop customers:\n  bo          40.00\n  ada         10.00\n"
+    assert(strings.build(out) == want)
+}
+
+test "a missing file is an error from load" {
+    with files = ["other.csv": ""] {
+        match load("week.csv") {
+            Ok(_) => assert(false)
+            Err(e) => assert(e == "cannot read week.csv: No such file or directory")
+        }
     }
 }

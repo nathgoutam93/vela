@@ -1,0 +1,82 @@
+// Contracts and fakes (M10b): requires and ensures checked at run time, and
+// `with` replacing files, args and stdout for the code a test calls.
+// stage 1 only
+// command: test
+// out: PASS  contracts_and_fakes.vl: test "contracts hold"
+// out: FAIL  contracts_and_fakes.vl: test "a broken ensures"
+// out: FAIL  contracts_and_fakes.vl: test "a broken requires"
+// out: PASS  contracts_and_fakes.vl: test "fakes"
+// out: PASS  contracts_and_fakes.vl: test "fakes end with the block"
+// out: 5 tests: 3 passed, 2 failed
+// err: contracts_and_fakes.vl:35:20: panic: ensures of 'bad_half' failed: result >= 0 (left: -2, right: 0)
+// err: contracts_and_fakes.vl:29:16: panic: requires of 'half' failed: n >= 0 (left: -1, right: 0)
+// exit: 1
+import files
+import os
+import strings
+
+fn load(path: Str) -> Result[Str, Str] uses fs {
+    return files.read(path)
+}
+
+fn first_arg() -> Str
+    uses os
+    requires len(os.args()) > 1 {
+    return os.args()[1]
+}
+
+fn half(n: Int) -> Int
+    requires n >= 0
+    ensures result * 2 <= n && result * 2 >= n - 1 {
+    return n / 2
+}
+
+fn bad_half(n: Int) -> Int
+    ensures result >= 0 {
+    return n / 2
+}
+
+fn report(path: Str) uses fs {
+    match load(path) {
+        Ok(text) => print("read " + strings.from_int(len(text)) + " bytes")
+        Err(e) => print(e)
+    }
+    match files.write("out.txt", "saved") {
+        Ok(_) => {}
+        Err(e) => print(e)
+    }
+    match files.read("out.txt") {
+        Ok(t) => print(t)
+        Err(e) => print(e)
+    }
+}
+
+test "contracts hold" {
+    assert(half(7) == 3)
+}
+
+test "a broken ensures" {
+    print(bad_half(-4))
+}
+
+test "a broken requires" {
+    print(half(-1))
+}
+
+test "fakes" {
+    let mut out = strings.builder()
+    with files = ["data.txt": "hello"], args = ["prog", "data.txt"], stdout = mut out {
+        report(first_arg())
+        report("missing.txt")
+        print(1)
+        print(true)
+    }
+    assert(strings.build(out) == "read 5 bytes\nsaved\ncannot read missing.txt: No such file or directory\nsaved\n1\ntrue\n")
+}
+
+test "fakes end with the block" {
+    with args = ["only"] {
+        assert(len(os.args()) == 1)
+    }
+    assert(len(os.args()) == 2)
+}
