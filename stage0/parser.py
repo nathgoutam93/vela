@@ -23,7 +23,7 @@ commas or newlines):
               | "break" | "continue" | "return" [ expr ]
               | block
               | expr [ "=" expr ]
-    expr      = ... | [ NAME "." ] NAME "{" { NAME ":" expr } "}" | expr "." NAME | expr "?"
+    expr      = ... | "(" ")" | [ NAME "." ] NAME "{" { NAME ":" expr } "}" | expr "." NAME | expr "?"
               | expr "[" expr [ ".." expr ] "]"
               | "[" [ expr { "," expr } ] "]" | "[" ":" "]" | "[" expr ":" expr { "," expr ":" expr } "]"
               | "match" expr "{" { pattern "=>" expr } "}"
@@ -50,7 +50,7 @@ from typing import Any, Callable
 from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, EnumDecl, Expr,
     ExprStmt, Field, FieldDecl, FieldInit, FnDecl, For, ForEach, ForRange, If, Import, Index,
-    IntLit, Let, Try,
+    IntLit, Let, Try, UnitLit,
     MapEntry, MapLit, Match, MatchStmt, Name, Param, Pattern, PBind, PLit, Program, PRange,
     PVariant, PWild, Return, Slice, Stmt, StrLit, StructDecl, StructLit, TypeName, Unary,
     VariantDecl,
@@ -605,6 +605,9 @@ class Parser:
             return Name(tok.text, tok.line, tok.col)
         if tok.kind in ("-", "!"):
             return Unary(tok.kind, self.expression(PREFIX), tok.line, tok.col)
+        if tok.kind == "(" and self.peek().kind == ")":
+            self.advance()
+            return UnitLit(tok.line, tok.col)
         if tok.kind == "(":
             inner = self.nested_expression()
             close = self.peek()

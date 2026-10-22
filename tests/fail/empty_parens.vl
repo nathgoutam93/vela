@@ -1,4 +1,5 @@
-// err: empty_parens.vl:3:12: error: expected expression, found ')'
+// `()` is the Unit value (M8), which print does not take.
+// err: empty_parens.vl:4:11: error: print takes an Int, Byte, Bool or Str, not Unit
 fn main() {
     print(())
 }

@@ -1,0 +1,43 @@
+// Unit has one value, `()`. It fills the Ok of a Result when there is
+// nothing to return, and works like any other type in arrays and Options.
+// out: checked 3
+// out: line 2 is empty
+// out: 3
+// out: true
+import strings
+
+fn check(line: Str, n: Int) -> Result[Unit, Str] {
+    if len(line) == 0 {
+        return Err("line " + strings.from_int(n) + " is empty")
+    }
+    return Ok(())
+}
+
+fn check_all(lines: [Str]) -> Result[Int, Str] {
+    let mut n = 0
+    for line in lines {
+        n = n + 1
+        check(line, n)?
+    }
+    return Ok(n)
+}
+
+fn show(r: Result[Int, Str]) {
+    match r {
+        Ok(n) => print("checked " + strings.from_int(n))
+        Err(e) => print(e)
+    }
+}
+
+fn main() {
+    show(check_all(["a", "b", "c"]))
+    show(check_all(["a", "", "c"]))
+    let units: [Unit] = [(), (), ()]
+    print(len(units))
+    let u: Option[Unit] = Some(())
+    let same = units[0] == ()
+    match u {
+        Some(_) => print(same)
+        None => print(false)
+    }
+}

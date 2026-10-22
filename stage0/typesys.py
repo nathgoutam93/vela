@@ -59,6 +59,7 @@ class StdType(Type):
 # array of bytes, so it is reference counted and copied on write like one.
 BUILDER = StdType("strings", "Builder")
 
+UNIT = PrimType("Unit")  # one value, `()`: what an Ok holds when there is no result
 INT = PrimType("Int")
 BYTE = PrimType("Byte")
 BOOL = PrimType("Bool")
@@ -76,7 +77,7 @@ def qualified(module: str, name: str) -> str:
     return f"{module}.{name}" if module and module != viewpoint.module else name
 
 
-PRIMITIVES = {"Int": INT, "Byte": BYTE, "Bool": BOOL, "Str": STR}
+PRIMITIVES = {"Int": INT, "Byte": BYTE, "Bool": BOOL, "Str": STR, "Unit": UNIT}
 GENERICS = {"Option": 1, "Result": 2, "Map": 2}  # built-in generic types: name -> argument count
 MAP_KEYS = (INT, BYTE, BOOL, STR)  # the types a map can be keyed by
 

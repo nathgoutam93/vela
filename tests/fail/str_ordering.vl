@@ -1,4 +1,10 @@
-// err: str_ordering.vl:3:15: error: operator '<' needs Int operands, found Str and Str
+// Ordering works on two Ints, two Bytes or two Strs (Strs since M8), and
+// nothing else.
+// err: str_ordering.vl:7:15: error: operator '<' needs two Ints, two Bytes or two Strs, found Str and Int
+// err: str_ordering.vl:8:16: error: operator '<' needs two Ints, two Bytes or two Strs, found Bool and Bool
+// err: str_ordering.vl:9:15: error: operator '>=' needs two Ints, two Bytes or two Strs, found Str and Byte
 fn main() {
-    print("a" < "b")
+    print("a" < 1)
+    print(true < false)
+    print("a" >= 'a')
 }

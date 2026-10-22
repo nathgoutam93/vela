@@ -38,6 +38,11 @@ typedef struct vela_type {
     bool (*eq)(const void *a, const void *b);
 } vela_type;
 
+// Unit has one value, so it needs no bits; C has no empty types, so it is
+// a byte that is always 0.
+typedef uint8_t vela_unit;
+
+extern const vela_type vela_type_unit;
 extern const vela_type vela_type_int;
 extern const vela_type vela_type_byte;
 extern const vela_type vela_type_bool;
@@ -73,6 +78,9 @@ vela_str vela_str_concat(vela_str a, vela_str b);
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc);
 uint8_t vela_str_at(vela_str s, int64_t i, const char *loc);
 bool vela_str_eq(vela_str a, vela_str b);
+// Byte order: negative, zero or positive, as with memcmp. A Str that is a
+// prefix of another comes first.
+int vela_str_cmp(vela_str a, vela_str b);
 
 // ---- Arrays ----
 typedef struct vela_array {

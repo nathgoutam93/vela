@@ -40,11 +40,11 @@ must release it. For every managed struct and enum this module generates
 """
 from __future__ import annotations
 
-from typesys import BOOL, BUILDER, BYTE, INT, STR, ArrayType, EnumType, MapType, StructType, Type
+from typesys import BOOL, BUILDER, BYTE, INT, STR, UNIT, ArrayType, EnumType, MapType, StructType, Type
 
-PRIMITIVE_C = {INT: "int64_t", BYTE: "uint8_t", BOOL: "bool", STR: "vela_str"}
+PRIMITIVE_C = {INT: "int64_t", BYTE: "uint8_t", BOOL: "bool", STR: "vela_str", UNIT: "vela_unit"}
 RUNTIME_DESCRIPTORS = {INT: "&vela_type_int", BYTE: "&vela_type_byte", BOOL: "&vela_type_bool",
-                       STR: "&vela_type_str"}
+                       STR: "&vela_type_str", UNIT: "&vela_type_unit"}
 
 
 def mangle(module: str, name: str) -> str:

@@ -1,0 +1,46 @@
+// Strs compare byte by byte; a prefix comes before the longer Str. Bytes
+// above 127 (UTF-8) sort after ASCII, as they do in Go and Rust.
+// out: true false true
+// out: true true false
+// out: true false
+// out: true true
+// out: apple apricot banana cherry zebra
+fn sort(words: [Str]) -> [Str] {
+    let mut out = words
+    let mut i = 1
+    for i < len(out) {
+        let w = out[i]
+        let mut j = i - 1
+        for j >= 0 && w < out[j] {
+            out[j + 1] = out[j]
+            j = j - 1
+        }
+        out[j + 1] = w
+        i = i + 1
+    }
+    return out
+}
+
+fn show(a: Bool, b: Bool, c: Bool) {
+    print(fmt(a) + " " + fmt(b) + " " + fmt(c))
+}
+
+fn fmt(b: Bool) -> Str {
+    if b {
+        return "true"
+    }
+    return "false"
+}
+
+fn main() {
+    show("a" < "b", "b" < "a", "abc" < "abd")
+    show("ab" < "abc", "" < "a", "a" < "")
+    print(fmt("abc" <= "abc") + " " + fmt("abc" > "abc"))
+    print(fmt("z" < "é") + " " + fmt("Z" < "a"))
+    let words = sort(["cherry", "apple", "zebra", "banana", "apricot"])
+    let mut line = words[0]
+    for w in words[1..len(words)] {
+        line = line + " " + w
+    }
+    print(line)
+}

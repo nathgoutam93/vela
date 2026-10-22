@@ -68,6 +68,14 @@ class ByteLit:
 
 
 @dataclass
+class UnitLit:
+    """`()`, the one value of type Unit."""
+    line: int
+    col: int
+    ty: Any = checked()
+
+
+@dataclass
 class StrLit:
     value: bytes  # escapes already decoded
     line: int
@@ -269,7 +277,7 @@ class Match:
     ty: Any = checked()
 
 
-Expr = (IntLit | ByteLit | BoolLit | StrLit | Name | Unary | Binary | Call | Field | Index
+Expr = (IntLit | ByteLit | BoolLit | StrLit | UnitLit | Name | Unary | Binary | Call | Field | Index
         | Try | Slice | ArrayLit | MapLit | StructLit | Match)
 
 
@@ -562,6 +570,8 @@ def sx_expr(e: Expr) -> Any:
         return "true" if e.value else "false"
     if isinstance(e, StrLit):
         return quote(e.value)
+    if isinstance(e, UnitLit):
+        return "()"
     if isinstance(e, Name):
         return e.name
     if isinstance(e, Unary):

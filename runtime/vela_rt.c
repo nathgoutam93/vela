@@ -70,6 +70,7 @@ static void release_array(void *v) { vela_array_release(*(vela_array **)v); }
 static void retain_map(void *v) { vela_map_retain(*(vela_map **)v); }
 static void release_map(void *v) { vela_map_release(*(vela_map **)v); }
 
+const vela_type vela_type_unit = {sizeof(vela_unit), NULL, NULL, hash_byte, eq_byte};
 const vela_type vela_type_int = {sizeof(int64_t), NULL, NULL, hash_int, eq_int};
 const vela_type vela_type_byte = {sizeof(uint8_t), NULL, NULL, hash_byte, eq_byte};
 const vela_type vela_type_bool = {sizeof(bool), NULL, NULL, hash_bool, eq_bool};
@@ -114,6 +115,13 @@ uint8_t vela_str_at(vela_str s, int64_t i, const char *loc) {
 
 bool vela_str_eq(vela_str a, vela_str b) {
     return a.len == b.len && (a.len == 0 || memcmp(a.data, b.data, (size_t)a.len) == 0);
+}
+
+int vela_str_cmp(vela_str a, vela_str b) {
+    int64_t n = a.len < b.len ? a.len : b.len;
+    int c = n ? memcmp(a.data, b.data, (size_t)n) : 0;
+    if (c != 0) return c;
+    return (a.len > b.len) - (a.len < b.len);
 }
 
 // ---- Arrays ----

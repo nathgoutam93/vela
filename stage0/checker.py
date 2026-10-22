@@ -35,13 +35,13 @@ from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, Expr,
     ExprStmt, Field, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let, MapLit, Match,
     MatchStmt, Name, Pattern, PBind, PLit, Program, PRange, PVariant, PWild, Return, Slice, Stmt,
-    StrLit, StructDecl, StructLit, Try, TypeName, Unary,
+    StrLit, StructDecl, StructLit, Try, TypeName, Unary, UnitLit,
 )
 from errors import CompileError, ErrorList
 from modules import STD_MODULES, Module
 from typesys import (
     BOOL, BUILDER, BUILTIN_VARIANTS, BYTE, ERROR, GENERICS, INT, MAP_KEYS, PRIMITIVES, STR, ArrayType,
-    EnumType, MapType, StructType, Type, TypeTable, Variant, viewpoint,
+    UNIT, EnumType, MapType, StructType, Type, TypeTable, Variant, viewpoint,
 )
 
 NO_VALUE = None  # the "type" of a call that returns nothing
@@ -73,6 +73,7 @@ CHANGES_FIRST = frozenset({"strings.add", "strings.add_byte", "strings.add_int"}
 PRINTABLE = (INT, BYTE, BOOL, STR)
 
 ARITHMETIC = frozenset({"+", "-", "*", "/", "%"})
+ORDERING = frozenset({"<", "<=", ">", ">="})
 EQUALITY = frozenset({"==", "!="})
 LOGICAL = frozenset({"&&", "||"})
 
@@ -768,6 +769,8 @@ class Checker:
             return BOOL
         if isinstance(e, StrLit):
             return STR
+        if isinstance(e, UnitLit):
+            return UNIT
         if isinstance(e, Name):
             ref = self.resolve(e)
             if ref is None:
@@ -842,10 +845,14 @@ class Checker:
         elif e.op == "+" and STR in (left, right):
             if left is not right:
                 self.report(e, f"operator '+' joins two Strs, found {left} and {right}")
+        elif e.op in ORDERING and left is STR and right is STR:
+            pass  # Strs are ordered byte by byte
         elif left is not right or left not in (INT, BYTE):
             if BYTE in (left, right) and {left, right} <= {INT, BYTE}:
                 self.report(e, f"operator '{e.op}' needs two Bytes or two Ints, found {left} and {right}; "
                                "convert with int() or byte()")
+            elif e.op in ORDERING:
+                self.report(e, f"operator '{e.op}' needs two Ints, two Bytes or two Strs, found {left} and {right}")
             else:
                 self.report(e, f"operator '{e.op}' needs Int operands, found {left} and {right}")
         # The result type is known even when the operands were wrong.

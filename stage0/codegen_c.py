@@ -46,7 +46,7 @@ from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, Expr, ExprStmt,
     Field, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let, MapLit, Match, MatchStmt, Name,
     Pattern, PBind, PLit, PRange, PVariant, PWild, Return, Slice, Stmt, StrLit,
-    StructLit, Try, Unary,
+    StructLit, Try, Unary, UnitLit,
 )
 from c_layout import Layout, mangle
 from checker import Local
@@ -569,6 +569,8 @@ class FunctionGen:
             return Value("true" if e.value else "false", t)
         if isinstance(e, StrLit):
             return Value(f"VELA_STR({c_string(e.value)}, {len(e.value)})", t, static=True)
+        if isinstance(e, UnitLit):
+            return Value("0", t)
         if isinstance(e, Name):
             if isinstance(e.ref, Local):
                 return Value(self.local(e.ref), t)
@@ -738,9 +740,11 @@ class FunctionGen:
                 return self.store(STR, f"vela_str_concat({left}, {right})")
             prefix = "vela_byte_" if operand is BYTE else "vela_"
             return Value(self.scalar(e.ty, f"{prefix}{ARITHMETIC[e.op]}({left}, {right}, {self.loc(e)})"), e.ty)
-        if operand is STR:
+        if operand is STR and e.op in ("==", "!="):
             negate = "!" if e.op == "!=" else ""
             return Value(self.scalar(BOOL, f"{negate}vela_str_eq({left}, {right})"), BOOL)
+        if operand is STR:
+            return Value(self.scalar(BOOL, f"vela_str_cmp({left}, {right}) {e.op} 0"), BOOL)
         if isinstance(operand, EnumType):
             return Value(self.scalar(BOOL, f"{left}.tag {e.op} {right}.tag"), BOOL)
         return Value(self.scalar(BOOL, f"{left} {e.op} {right}"), BOOL)
