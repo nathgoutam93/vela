@@ -261,3 +261,8 @@ C. That C is committed as a seed, and Python is retired.
 3. **Stage 0 after M9.** Delete `stage0/` once the fixed point holds (it
    stays in git history), or keep it as the readable reference
    implementation, frozen?
+
+**Answered after M8:** commit the seed, add `os.run`, and keep Stage 0 as
+the frozen, readable reference. M9 does all three, and adds `os.env`,
+`files.temp_dir` and `files.remove` for the driver (see
+`m09-bootstrap.md`).
