@@ -1,0 +1,234 @@
+// Text: searching, splitting, trimming and parsing Strs. `import text`.
+// stage 1 only
+//
+// Positions are byte indexes, and ASCII is what case and space mean here,
+// as in the `bytes` module: a Str splits at bytes, never inside a UTF-8
+// character unless asked to.
+import bytes
+import strings
+
+// Where `part` first starts in `s`.
+pub fn index_of(s: Str, part: Str) -> Option[Int] {
+    let n = len(part)
+    for i in 0..len(s) - n + 1 {
+        if s[i..i + n] == part {
+            return Some(i)
+        }
+    }
+    return None
+}
+
+pub fn contains(s: Str, part: Str) -> Bool {
+    match index_of(s, part) {
+        Some(_) => return true
+        None => return false
+    }
+}
+
+pub fn starts_with(s: Str, prefix: Str) -> Bool {
+    return len(prefix) <= len(s) && s[0..len(prefix)] == prefix
+}
+
+pub fn ends_with(s: Str, suffix: Str) -> Bool {
+    return len(suffix) <= len(s) && s[len(s) - len(suffix)..len(s)] == suffix
+}
+
+// The pieces of `s` between the `sep`s: "a,,b" is ["a", "", "b"].
+pub fn split(s: Str, sep: Str) -> [Str]
+    requires sep != ""
+    ensures len(result) >= 1 {
+    let mut out: [Str] = []
+    let mut start = 0
+    let mut i = 0
+    for i + len(sep) <= len(s) {
+        if s[i..i + len(sep)] == sep {
+            push(mut out, s[start..i])
+            i = i + len(sep)
+            start = i
+        } else {
+            i = i + 1
+        }
+    }
+    push(mut out, s[start..len(s)])
+    return out
+}
+
+// The lines of `s`, without their "\n" or "\r\n"; no empty last line for a
+// final newline.
+pub fn lines(s: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(s) {
+        if s[i] == '\n' {
+            let mut end = i
+            if end > start && s[end - 1] == '\r' {
+                end = end - 1
+            }
+            push(mut out, s[start..end])
+            start = i + 1
+        }
+    }
+    if start < len(s) {
+        push(mut out, s[start..len(s)])
+    }
+    return out
+}
+
+pub fn join(parts: [Str], sep: Str) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(parts) {
+        if i > 0 {
+            strings.add(mut b, sep)
+        }
+        strings.add(mut b, parts[i])
+    }
+    return strings.build(b)
+}
+
+// `s` without spaces, tabs and line ends at either end.
+pub fn trim(s: Str) -> Str {
+    return trim_end(trim_start(s))
+}
+
+pub fn trim_start(s: Str) -> Str {
+    let mut i = 0
+    for i < len(s) && bytes.is_space(s[i]) {
+        i = i + 1
+    }
+    return s[i..len(s)]
+}
+
+pub fn trim_end(s: Str) -> Str {
+    let mut end = len(s)
+    for end > 0 && bytes.is_space(s[end - 1]) {
+        end = end - 1
+    }
+    return s[0..end]
+}
+
+// `s` with every `old` replaced by `new`, left to right.
+pub fn replace(s: Str, old: Str, new: Str) -> Str
+    requires old != "" {
+    return join(split(s, old), new)
+}
+
+pub fn repeat(s: Str, n: Int) -> Str
+    requires n >= 0 {
+    let mut b = strings.builder()
+    for _ in 0..n {
+        strings.add(mut b, s)
+    }
+    return strings.build(b)
+}
+
+// `s` with spaces in front, to `width` bytes; a longer `s` is left as it is.
+pub fn pad_left(s: Str, width: Int) -> Str {
+    if len(s) >= width {
+        return s
+    }
+    return repeat(" ", width - len(s)) + s
+}
+
+pub fn pad_right(s: Str, width: Int) -> Str {
+    if len(s) >= width {
+        return s
+    }
+    return s + repeat(" ", width - len(s))
+}
+
+pub fn to_upper(s: Str) -> Str {
+    let mut b = strings.builder()
+    for c in s {
+        strings.add_byte(mut b, bytes.to_upper(c))
+    }
+    return strings.build(b)
+}
+
+pub fn to_lower(s: Str) -> Str {
+    let mut b = strings.builder()
+    for c in s {
+        strings.add_byte(mut b, bytes.to_lower(c))
+    }
+    return strings.build(b)
+}
+
+// A whole number in decimal, with an optional "-": None for anything else,
+// or a number too big for an Int.
+pub fn parse_int(s: Str) -> Option[Int] {
+    let mut i = 0
+    let negative = len(s) > 0 && s[0] == '-'
+    if negative {
+        i = 1
+    }
+    if i == len(s) {
+        return None
+    }
+    // Counted downwards, since the most negative Int has no positive twin.
+    let min = -9223372036854775807 - 1
+    let mut n = 0
+    for i < len(s) {
+        let c = s[i]
+        if !bytes.is_digit(c) {
+            return None
+        }
+        let d = int(c - '0')
+        if n < (min + d) / 10 {
+            return None
+        }
+        n = n * 10 - d
+        i = i + 1
+    }
+    if negative {
+        return Some(n)
+    }
+    if n == min {
+        return None
+    }
+    return Some(-n)
+}
+
+fn int_or(o: Option[Int], fallback: Int) -> Int {
+    match o {
+        Some(n) => return n
+        None => return fallback
+    }
+}
+
+test "searching" {
+    assert(int_or(index_of("banana", "na"), -1) == 2)
+    assert(int_or(index_of("banana", "x"), -1) == -1)
+    assert(int_or(index_of("abc", ""), -1) == 0)
+    assert(contains("hello", "ell") && !contains("hello", "olé"))
+    assert(starts_with("vela.vl", "vela") && ends_with("vela.vl", ".vl") && !ends_with("vl", "vela.vl"))
+}
+
+test "split, lines and join" {
+    let parts = split("a,,b", ",")
+    assert(len(parts) == 3 && parts[0] == "a" && parts[1] == "" && parts[2] == "b")
+    assert(len(split("", ",")) == 1)
+    assert(join(split("1 -> 2 -> 3", " -> "), "+") == "1+2+3")
+    let ls = lines("one\r\ntwo\n\nthree\n")
+    assert(len(ls) == 4 && ls[0] == "one" && ls[2] == "" && ls[3] == "three")
+    assert(len(lines("")) == 0)
+}
+
+test "trim, replace, repeat, pad, case" {
+    assert(trim("  \tx y \n") == "x y")
+    assert(replace("a.b.c", ".", "::") == "a::b::c")
+    assert(repeat("ab", 3) == "ababab" && repeat("x", 0) == "")
+    assert(pad_left("7", 3) == "  7" && pad_right("ab", 4) == "ab  " && pad_left("long", 2) == "long")
+    assert(to_upper("Vela 1") == "VELA 1" && to_lower("ÀB") == "Àb")
+}
+
+test "parse_int" {
+    assert(int_or(parse_int("1250"), 0) == 1250)
+    assert(int_or(parse_int("-42"), 0) == -42)
+    assert(int_or(parse_int("9223372036854775807"), 0) == 9223372036854775807)
+    assert(int_or(parse_int("-9223372036854775808"), 0) == -9223372036854775807 - 1)
+    for bad in ["", "-", "12a", "9223372036854775808", " 1", "+1"] {
+        match parse_int(bad) {
+            Some(_) => assert(false)
+            None => {}
+        }
+    }
+}

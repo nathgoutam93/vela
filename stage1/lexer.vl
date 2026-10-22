@@ -3,7 +3,7 @@
 // its tokens and messages are byte for byte the same.
 import errors
 import strings
-import text
+import chars
 
 pub type Kind = enum {
     Ident
@@ -436,7 +436,7 @@ fn string(lx: mut Lexer) {
             if decoded < 0 {
                 let mut shown = ""
                 if e != -1 && e != int('\n') {
-                    shown = text.chr(e)
+                    shown = chars.chr(e)
                 }
                 error(mut lx, lx.pos - 1, "unknown escape '\\" + shown + "'; use \\n \\t \\r \\0 \\\\ or \\\"")
                 continue  // keep scanning the string, so its end is found
@@ -444,17 +444,17 @@ fn string(lx: mut Lexer) {
             strings.add_byte(mut value, byte(decoded))
             lx.pos = lx.pos + 1
         } else if c < 32 && c != int('\t') {
-            error(mut lx, lx.pos - 1, "control byte " + text.hex2(c) + " in string literal; use an escape")
+            error(mut lx, lx.pos - 1, "control byte " + chars.hex2(c) + " in string literal; use an escape")
         } else {
             strings.add_byte(mut value, byte(c))
         }
     }
     let raw = lx.src[start + 1..lx.pos - 1]
-    let bad = text.first_invalid(raw)
+    let bad = chars.first_invalid(raw)
     if bad >= 0 {
         error(mut lx, start + 1 + bad, "string literal is not valid UTF-8")
     }
-    add(mut lx, Kind.Str, text.replace_invalid(lx.src[start..lx.pos]), start, strings.build(value))
+    add(mut lx, Kind.Str, chars.replace_invalid(lx.src[start..lx.pos]), start, strings.build(value))
 }
 
 fn decode_escape(c: Int) -> Int {
@@ -495,7 +495,7 @@ fn byte_literal(lx: mut Lexer) {
     if stop > len(lx.src) {
         stop = len(lx.src)
     }
-    let shown = text.replace_invalid(lx.src[start..stop])
+    let shown = chars.replace_invalid(lx.src[start..stop])
     let mut value = 0
     if len(body) == 2 && body[0] == '\\' {
         let e = int(body[1])
@@ -504,7 +504,7 @@ fn byte_literal(lx: mut Lexer) {
         } else if escape(e) >= 0 {
             value = escape(e)
         } else {
-            error(mut lx, start + 1, "unknown escape '\\" + text.chr(e) + "'; use \\n \\t \\r \\0 \\\\ \\' or \\\"")
+            error(mut lx, start + 1, "unknown escape '\\" + chars.chr(e) + "'; use \\n \\t \\r \\0 \\\\ \\' or \\\"")
             return
         }
     } else if len(body) == 1 && body[0] >= ' ' && body[0] < 127 && body[0] != '\\' {
@@ -562,13 +562,13 @@ fn unexpected(lx: mut Lexer, c: Int) {
         for peek(lx, 0) >= 128 && peek(lx, 0) <= 191 {
             lx.pos = lx.pos + 1
         }
-        error(mut lx, start, "unexpected byte " + text.hex2(c) + "; non-ASCII text is only allowed in comments and strings")
+        error(mut lx, start, "unexpected byte " + chars.hex2(c) + "; non-ASCII text is only allowed in comments and strings")
     } else if c == int('&') || c == int('|') {
-        error(mut lx, start, "unexpected character '" + text.chr(c) + "'; did you mean '" + text.chr(c) + text.chr(c) + "'?")
+        error(mut lx, start, "unexpected character '" + chars.chr(c) + "'; did you mean '" + chars.chr(c) + chars.chr(c) + "'?")
     } else if c >= 33 && c <= 126 {
-        error(mut lx, start, "unexpected character '" + text.chr(c) + "'")
+        error(mut lx, start, "unexpected character '" + chars.chr(c) + "'")
     } else {
-        error(mut lx, start, "unexpected control byte " + text.hex2(c))
+        error(mut lx, start, "unexpected control byte " + chars.hex2(c))
     }
 }
 
