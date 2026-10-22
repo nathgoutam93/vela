@@ -505,3 +505,8 @@ the roadmap's: the example compiles and its tests pass.
      closing the question until Vela has references.
    - Port `run_tests.py` to Vela, now that Vela has `os.run`, `test` and
      generics?
+
+**Answered after M10a:** add function values (without closures), no
+`print` effect, no line wrapping in `vela fmt`, and add the warning. M10b
+does all four (see `m10b-functions-effects-contracts.md`). Question 5
+(floats, cycles, the test runner) is asked again there, as a default.
