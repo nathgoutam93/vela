@@ -1,0 +1,44 @@
+{
+  "name": "vela",
+  "displayName": "Vela",
+  "description": "The Vela language: highlighting, and errors, types, definitions, references, outline and formatting from `vela lsp`.",
+  "version": "0.12.0",
+  "publisher": "vela",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": ["Programming Languages", "Formatters"],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "vela",
+        "aliases": ["Vela"],
+        "extensions": [".vl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "vela",
+        "scopeName": "source.vela",
+        "path": "./syntaxes/vela.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Vela",
+      "properties": {
+        "vela.path": {
+          "type": "string",
+          "default": "vela",
+          "description": "The vela compiler: a command on PATH, or the path of build/vela. The extension runs `vela lsp`."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

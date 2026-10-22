@@ -47,7 +47,8 @@ The directory a test lives in decides what is checked:
 
 Besides these, the compiler (stage1/main.vl), every examples/*/main.vl and
 every std/*.vl with tests in it must pass `vela test`, and the language
-server must pass tests/lsp_client.py, a scripted editor (Stage 1 only).
+server must pass tests/lsp_client.py, a scripted editor, and, if Neovim is
+installed, tests/nvim_test.lua, which drives it from Neovim (Stage 1 only).
 
 The compiler runs inside the test's directory and is given the bare file
 name, so messages read `name.vl:3:7: ...` wherever the repo is checked out.
@@ -57,6 +58,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import difflib
+import json
 import os
 import re
 import shlex
@@ -70,6 +72,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 TESTS = ROOT / "tests"
 LSP_CLIENT = TESTS / "lsp_client.py"
+NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
 # Generated C must compile without a single warning; the test suite enforces it.
@@ -148,6 +151,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
     """Run one test. Returns a list of problems; empty means it passed."""
     if path == LSP_CLIENT:
         return run_lsp_client(compiler, env)
+    if path == NVIM_TEST:
+        return run_nvim_test(compiler, env)
     if not path.is_relative_to(TESTS):
         return run_vela_tests(compiler, path, env)
     kind = path.relative_to(TESTS).parts[0]
@@ -278,12 +283,28 @@ def run_lsp_client(compiler: list[str], env: dict[str, str]) -> list[str]:
     return []
 
 
+def run_nvim_test(compiler: list[str], env: dict[str, str]) -> list[str]:
+    server = [str(Path(compiler[0]).resolve()), *compiler[1:], "lsp"]
+    command = ["nvim", "--headless", "--clean", "--cmd", f"set rtp^={ROOT / 'editors' / 'nvim'}",
+               "--cmd", "let g:vela_command = " + json.dumps(server), "-l", str(NVIM_TEST)]
+    try:
+        ran = subprocess.run(command, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                             timeout=VELA_TEST_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return [f"the Neovim test took longer than {VELA_TEST_TIMEOUT}s"]
+    if ran.returncode != 0 or ran.stdout.strip() != "ok":
+        return [f"nvim exited with {ran.returncode}:", *ran.stdout.splitlines(), *ran.stderr.splitlines()]
+    return []
+
+
 def find_tests(filters: list[str]) -> list[Path]:
     tests = []
     tests += sorted((ROOT / "examples").glob("*/main.vl"))
     tests.append(ROOT / "stage1" / "main.vl")  # the compiler's own tests
     tests += [p for p in sorted((ROOT / "std").glob("*.vl")) if 'test "' in p.read_text()]
     tests.append(LSP_CLIENT)
+    if shutil.which("nvim"):
+        tests.append(NVIM_TEST)
     for kind in KINDS:
         for p in sorted((TESTS / kind).iterdir()):
             if p.is_dir():

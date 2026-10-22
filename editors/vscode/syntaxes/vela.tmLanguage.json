@@ -1,0 +1,66 @@
+{
+  "name": "Vela",
+  "scopeName": "source.vela",
+  "fileTypes": ["vl"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#byte" },
+    { "include": "#number" },
+    { "include": "#declaration" },
+    { "include": "#keyword" },
+    { "include": "#type" },
+    { "include": "#call" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.vela",
+      "match": "//.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.vela",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.vela", "match": "\\\\[nrt0\\\\\"']" }]
+    },
+    "byte": {
+      "name": "string.quoted.single.vela",
+      "match": "'(\\\\[nrt0\\\\\"']|[^\\\\'])'"
+    },
+    "number": {
+      "name": "constant.numeric.vela",
+      "match": "\\b\\d+(\\.\\d+)?([eE][+-]?\\d+)?\\b"
+    },
+    "declaration": {
+      "patterns": [
+        {
+          "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": { "1": { "name": "keyword.other.fn.vela" }, "2": { "name": "entity.name.function.vela" } }
+        },
+        {
+          "match": "\\b(type)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": { "1": { "name": "keyword.other.type.vela" }, "2": { "name": "entity.name.type.vela" } }
+        }
+      ]
+    },
+    "keyword": {
+      "patterns": [
+        { "name": "keyword.control.vela", "match": "\\b(if|else|match|for|in|return|break|continue|with)\\b" },
+        { "name": "keyword.other.vela", "match": "\\b(fn|let|mut|type|import|pub|test|uses|requires|ensures|struct|enum)\\b" },
+        { "name": "constant.language.boolean.vela", "match": "\\b(true|false)\\b" },
+        { "name": "support.function.builtin.vela", "match": "\\b(print|len|push|int|byte|float|assert)\\b(?=\\s*\\()" }
+      ]
+    },
+    "type": {
+      "patterns": [
+        { "name": "support.type.primitive.vela", "match": "\\b(Int|Byte|Bool|Str|Float|Unit|Option|Result|Map)\\b" },
+        { "name": "constant.other.variant.vela", "match": "\\b(Some|None|Ok|Err)\\b" },
+        { "name": "entity.name.type.vela", "match": "\\b[A-Z][A-Za-z0-9_]*\\b" }
+      ]
+    },
+    "call": {
+      "name": "entity.name.function.call.vela",
+      "match": "\\b[a-z_][A-Za-z0-9_]*(?=\\s*\\()"
+    }
+  }
+}
