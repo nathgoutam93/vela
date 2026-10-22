@@ -1,0 +1,956 @@
+// Stage 1 parser: tokens in, a syntax tree out. A port of stage0/parser.py,
+// which explains the grammar and the error recovery.
+//
+// Stage 0 raises an exception for a syntax error and catches it where it
+// recovers. Here a function that can fail returns a Result, `?` passes the
+// error up, and the recovery points (block, program) match on it. The
+// parser's state is a `mut` parameter, so after an error it is exactly
+// where the error left it, as in Stage 0.
+import ast
+import errors
+import lexer
+import strings
+
+type Parser = struct {
+    tokens: [lexer.Token]
+    i: Int
+    errors: [errors.CompileError]
+    // How many `(` and `{` the current statement has opened and not yet
+    // closed, for recovery.
+    open_parens: Int
+    open_braces: Int
+    // True in the head of an `if`, `for` or `match`, where a `{` after a
+    // name opens the body, not a struct literal.
+    no_struct: Bool
+    next_id: Int
+}
+
+pub type Parsed = struct {
+    program: ast.Program  // as far as it could be parsed
+    errors: [errors.CompileError]  // sorted
+    next_id: Int  // the first id not used, for the next file
+}
+
+// `first_id` is the first node id to hand out; a program's files are parsed
+// one after another, and ids are unique in the whole program.
+pub fn parse(tokens: [lexer.Token], first_id: Int) -> Parsed {
+    let mut p = Parser {
+        tokens: tokens, i: 0, errors: [], open_parens: 0, open_braces: 0, no_struct: false, next_id: first_id,
+    }
+    let program = program(mut p)
+    return Parsed { program: program, errors: errors.sorted(p.errors), next_id: p.next_id }
+}
+
+// ---- Binding powers (see Stage 0) ----
+
+// The left binding power of an infix operator, or -1.
+fn left_power(k: lexer.Kind) -> Int {
+    return match k {
+        lexer.Kind.OrOr => 2
+        lexer.Kind.AndAnd => 4
+        lexer.Kind.EqEq => 6
+        lexer.Kind.NotEq => 6
+        lexer.Kind.Lt => 6
+        lexer.Kind.LtEq => 6
+        lexer.Kind.Gt => 6
+        lexer.Kind.GtEq => 6
+        lexer.Kind.Plus => 10
+        lexer.Kind.Minus => 10
+        lexer.Kind.Star => 20
+        lexer.Kind.Slash => 20
+        lexer.Kind.Percent => 20
+        _ => -1
+    }
+}
+
+fn is_comparison(k: lexer.Kind) -> Bool {
+    return left_power(k) == 6
+}
+
+fn starts_expression(k: lexer.Kind) -> Bool {
+    return match k {
+        lexer.Kind.Int => true
+        lexer.Kind.Bool => true
+        lexer.Kind.Str => true
+        lexer.Kind.Byte => true
+        lexer.Kind.LBracket => true
+        lexer.Kind.Ident => true
+        lexer.Kind.Minus => true
+        lexer.Kind.Bang => true
+        lexer.Kind.LParen => true
+        lexer.Kind.Match => true
+        _ => false
+    }
+}
+
+// Unary `-` and `!`: `-a * b` is `(-a) * b`. Calls, fields, indexing and
+// `?` bind tighter still (40).
+fn prefix_power() -> Int {
+    return 30
+}
+
+fn postfix_power() -> Int {
+    return 40
+}
+
+// ---- Tokens ----
+
+fn peek(p: Parser, ahead: Int) -> lexer.Token {
+    let mut i = p.i + ahead
+    if i > len(p.tokens) - 1 {
+        i = len(p.tokens) - 1
+    }
+    return p.tokens[i]
+}
+
+fn advance(p: mut Parser) -> lexer.Token {
+    let tok = p.tokens[p.i]
+    if tok.kind != lexer.Kind.Eof {
+        p.i = p.i + 1
+    }
+    if tok.kind == lexer.Kind.LParen {
+        p.open_parens = p.open_parens + 1
+    } else if tok.kind == lexer.Kind.RParen {
+        p.open_parens = max0(p.open_parens - 1)
+    } else if tok.kind == lexer.Kind.LBrace {
+        p.open_braces = p.open_braces + 1
+    } else if tok.kind == lexer.Kind.RBrace {
+        p.open_braces = max0(p.open_braces - 1)
+    }
+    return tok
+}
+
+fn max0(n: Int) -> Int {
+    if n < 0 {
+        return 0
+    }
+    return n
+}
+
+fn error(tok: lexer.Token, message: Str) -> errors.CompileError {
+    return errors.at(tok.line, tok.col, message)
+}
+
+fn found(tok: lexer.Token) -> Str {
+    return ", found " + lexer.describe(tok)
+}
+
+fn expect(p: mut Parser, kind: lexer.Kind, context: Str) -> Result[lexer.Token, errors.CompileError] {
+    let tok = peek(p, 0)
+    if tok.kind != kind {
+        return Err(error(tok, "expected '" + lexer.kind_name(kind) + "' " + context + found(tok)))
+    }
+    return Ok(advance(mut p))
+}
+
+fn expect_name(p: mut Parser, context: Str) -> Result[lexer.Token, errors.CompileError] {
+    let tok = peek(p, 0)
+    if tok.kind != lexer.Kind.Ident {
+        return Err(error(tok, "expected a name " + context + found(tok)))
+    }
+    return Ok(advance(mut p))
+}
+
+fn id(p: mut Parser) -> Int {
+    p.next_id = p.next_id + 1
+    return p.next_id - 1
+}
+
+fn expr(p: mut Parser, kind: ast.ExprKind, line: Int, col: Int) -> ast.Expr {
+    return ast.Expr { kind: kind, line: line, col: col, id: id(mut p) }
+}
+
+fn stmt(p: mut Parser, kind: ast.StmtKind, line: Int, col: Int) -> ast.Stmt {
+    return ast.Stmt { kind: kind, line: line, col: col, id: id(mut p) }
+}
+
+fn pattern_node(p: mut Parser, kind: ast.PatternKind, line: Int, col: Int) -> ast.Pattern {
+    return ast.Pattern { kind: kind, line: line, col: col, id: id(mut p) }
+}
+
+// The items of a `{ ... }` list are separated by commas or newlines. Before
+// each item: an error at the end of the file.
+fn list_not_ended(p: Parser, what: Str) -> Result[Unit, errors.CompileError] {
+    if peek(p, 0).kind == lexer.Kind.Eof {
+        return Err(error(peek(p, 0), "expected '}' to close the " + what + ", found end of file"))
+    }
+    return Ok(())
+}
+
+// After each item: a separator, or the closing `}`.
+fn list_separator(p: mut Parser, what: Str) -> Result[Unit, errors.CompileError] {
+    let tok = peek(p, 0)
+    if tok.kind == lexer.Kind.Comma || tok.kind == lexer.Kind.Semi {
+        advance(mut p)
+    } else if tok.kind != lexer.Kind.RBrace {
+        return Err(error(tok, "expected ',' or a new line in the " + what + found(tok)))
+    }
+    return Ok(())
+}
+
+// ---- Declarations ----
+
+fn program(p: mut Parser) -> ast.Program {
+    let mut imports: [ast.Import] = []
+    let mut types: [ast.TypeDecl] = []
+    let mut fns: [ast.FnDecl] = []
+    for peek(p, 0).kind != lexer.Kind.Eof {
+        if peek(p, 0).kind == lexer.Kind.Semi {
+            advance(mut p)
+            continue
+        }
+        let start = p.i
+        p.open_parens = 0
+        p.open_braces = 0
+        match declaration(mut p, mut imports, mut types, mut fns) {
+            Ok(_) => {}
+            Err(e) => {
+                errors.add(mut p.errors, e)
+                skip_declaration(mut p, start)
+            }
+        }
+    }
+    return ast.Program { imports: imports, types: types, fns: fns }
+}
+
+fn declaration(p: mut Parser, imports: mut [ast.Import], types: mut [ast.TypeDecl],
+               fns: mut [ast.FnDecl]) -> Result[Unit, errors.CompileError] {
+    let mut tok = peek(p, 0)
+    if tok.kind == lexer.Kind.Import {
+        advance(mut p)
+        if len(types) > 0 || len(fns) > 0 {
+            // Go's rule: the imports are all at the top.
+            return Err(error(tok, "imports must come before all declarations"))
+        }
+        let name = expect_name(mut p, "of a module after 'import'")?
+        push(mut imports, ast.Import { name: name.text, line: name.line, col: name.col })
+        end_of_item(mut p, "import")?
+        return Ok(())
+    }
+    let public = tok.kind == lexer.Kind.Pub
+    if public {
+        advance(mut p)
+        tok = peek(p, 0)
+    }
+    if tok.kind == lexer.Kind.Fn {
+        let mut f = fn_decl(mut p)?
+        f.public = public
+        push(mut fns, f)
+    } else if tok.kind == lexer.Kind.Type {
+        let mut t = type_decl(mut p)?
+        t.public = public
+        push(mut types, t)
+    } else if public {
+        advance(mut p)  // so recovery does not stop at it, if it is `import`
+        return Err(error(tok, "expected 'fn' or 'type' after 'pub'" + found(tok)))
+    } else {
+        return Err(error(tok, "expected 'fn' or 'type'" + found(tok) + "; only functions and types " +
+            "can be declared at the top level, and statements go inside functions"))
+    }
+    end_of_item(mut p, "declaration")?
+    return Ok(())
+}
+
+// After an error at the top level, skip to the next declaration. Braces
+// are counted, so a keyword inside a skipped body does not count.
+fn skip_declaration(p: mut Parser, start: Int) {
+    let mut braces = 0
+    for peek(p, 0).kind != lexer.Kind.Eof {
+        let k = peek(p, 0).kind
+        let starts = k == lexer.Kind.Fn || k == lexer.Kind.Type || k == lexer.Kind.Pub || k == lexer.Kind.Import
+        if starts && braces == 0 && p.i > start {
+            return
+        }
+        if k == lexer.Kind.LBrace {
+            braces = braces + 1
+        } else if k == lexer.Kind.RBrace {
+            braces = max0(braces - 1)
+        }
+        advance(mut p)
+    }
+}
+
+fn end_of_item(p: mut Parser, what: Str) -> Result[Unit, errors.CompileError] {
+    let tok = peek(p, 0)
+    if tok.kind == lexer.Kind.Semi {
+        advance(mut p)
+    } else if tok.kind != lexer.Kind.Eof && tok.kind != lexer.Kind.RBrace {
+        return Err(error(tok, "expected newline or ';' after " + what + found(tok)))
+    }
+    return Ok(())
+}
+
+fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
+    advance(mut p)  // "fn"
+    let name = expect_name(mut p, "after 'fn'")?
+    expect(mut p, lexer.Kind.LParen, "after the function name")?
+    let mut params: [ast.Param] = []
+    for peek(p, 0).kind != lexer.Kind.RParen {
+        let pname = expect_name(mut p, "for a parameter")?
+        expect(mut p, lexer.Kind.Colon, "and a type after parameter '" + pname.text + "'")?
+        let mutable = peek(p, 0).kind == lexer.Kind.Mut
+        if mutable {
+            advance(mut p)
+        }
+        let t = type_name(mut p)?
+        push(mut params, ast.Param { name: pname.text, ty: t, line: pname.line, col: pname.col, mutable: mutable })
+        if peek(p, 0).kind != lexer.Kind.Comma {
+            break
+        }
+        advance(mut p)
+    }
+    let tok = peek(p, 0)
+    if tok.kind != lexer.Kind.RParen {
+        return Err(error(tok, "expected ',' or ')' in parameter list" + found(tok)))
+    }
+    advance(mut p)
+    let mut result: Option[ast.TypeName] = None
+    if peek(p, 0).kind == lexer.Kind.Arrow {
+        advance(mut p)
+        result = Some(type_name(mut p)?)
+    }
+    let body = block(mut p, "to start the body of '" + name.text + "'")?
+    return Ok(ast.FnDecl {
+        name: name.text, params: params, result: result, body: body, line: name.line, col: name.col,
+        public: false,
+    })
+}
+
+fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
+    advance(mut p)  // "type"
+    let name = expect_name(mut p, "after 'type'")?
+    expect(mut p, lexer.Kind.Eq, "after 'type " + name.text + "'")?
+    let kind = peek(p, 0)
+    let mut decl = ast.TypeDecl {
+        name: name.text, is_struct: true, fields: [], variants: [], line: name.line, col: name.col,
+        public: false,
+    }
+    if kind.kind == lexer.Kind.Ident && kind.text == "struct" {
+        advance(mut p)
+        expect(mut p, lexer.Kind.LBrace, "after 'struct'")?
+        for peek(p, 0).kind != lexer.Kind.RBrace {
+            list_not_ended(p, "struct")?
+            let fname = expect_name(mut p, "for a field")?
+            expect(mut p, lexer.Kind.Colon, "and a type after field '" + fname.text + "'")?
+            let t = type_name(mut p)?
+            push(mut decl.fields, ast.FieldDecl { name: fname.text, ty: t, line: fname.line, col: fname.col })
+            list_separator(mut p, "struct")?
+        }
+        advance(mut p)
+        return Ok(decl)
+    }
+    if kind.kind == lexer.Kind.Ident && kind.text == "enum" {
+        advance(mut p)
+        expect(mut p, lexer.Kind.LBrace, "after 'enum'")?
+        decl.is_struct = false
+        for peek(p, 0).kind != lexer.Kind.RBrace {
+            list_not_ended(p, "enum")?
+            push(mut decl.variants, variant_decl(mut p)?)
+            list_separator(mut p, "enum")?
+        }
+        advance(mut p)
+        return Ok(decl)
+    }
+    return Err(error(kind, "expected 'struct' or 'enum' after 'type " + name.text + " ='" + found(kind)))
+}
+
+fn variant_decl(p: mut Parser) -> Result[ast.VariantDecl, errors.CompileError] {
+    let name = expect_name(mut p, "for a variant")?
+    let mut payload: [ast.TypeName] = []
+    if peek(p, 0).kind == lexer.Kind.LParen {
+        advance(mut p)
+        for peek(p, 0).kind != lexer.Kind.RParen {
+            push(mut payload, type_name(mut p)?)
+            if peek(p, 0).kind != lexer.Kind.Comma {
+                break
+            }
+            advance(mut p)
+        }
+        expect(mut p, lexer.Kind.RParen, "after the types of variant '" + name.text + "'")?
+    }
+    return Ok(ast.VariantDecl { name: name.text, payload: payload, line: name.line, col: name.col })
+}
+
+fn type_name(p: mut Parser) -> Result[ast.TypeName, errors.CompileError] {
+    if peek(p, 0).kind == lexer.Kind.LBracket {
+        let open = advance(mut p)
+        let elem = type_name(mut p)?
+        expect(mut p, lexer.Kind.RBracket, "after the element type of an array type")?
+        return Ok(ast.TypeName { name: "[]", args: [elem], line: open.line, col: open.col, module: "" })
+    }
+    let start = expect_name(mut p, "for a type")?
+    let mut tok = start
+    let mut module = ""
+    if peek(p, 0).kind == lexer.Kind.Dot {
+        advance(mut p)
+        module = tok.text
+        tok = expect_name(mut p, "for a type after '" + module + ".'")?
+    }
+    let mut args: [ast.TypeName] = []
+    if peek(p, 0).kind == lexer.Kind.LBracket {
+        advance(mut p)
+        for {
+            push(mut args, type_name(mut p)?)
+            if peek(p, 0).kind != lexer.Kind.Comma {
+                break
+            }
+            advance(mut p)
+        }
+        expect(mut p, lexer.Kind.RBracket, "after the type arguments of '" + tok.text + "'")?
+    }
+    return Ok(ast.TypeName { name: tok.text, args: args, line: start.line, col: start.col, module: module })
+}
+
+// ---- Statements ----
+
+fn block(p: mut Parser, context: Str) -> Result[ast.Block, errors.CompileError] {
+    expect(mut p, lexer.Kind.LBrace, context)?
+    // The block's statements count brackets from zero; the statement the
+    // block belongs to gets its counts back afterwards.
+    let saved_parens = p.open_parens
+    let saved_braces = p.open_braces - 1
+    let mut stmts: [ast.Stmt] = []
+    for peek(p, 0).kind != lexer.Kind.RBrace {
+        let tok = peek(p, 0)
+        if tok.kind == lexer.Kind.Eof {
+            // Every enclosing block hits this too; the error list keeps one
+            // copy. If a statement already failed here, that error says it all.
+            if !errors.has_error_at(p.errors, tok.line, tok.col) {
+                errors.add(mut p.errors, error(tok, "expected '}' to close the block, found end of file"))
+            }
+            p.open_parens = saved_parens
+            p.open_braces = saved_braces
+            return Ok(ast.Block { stmts: stmts, end_line: tok.line, end_col: tok.col })
+        }
+        if tok.kind == lexer.Kind.Semi {
+            advance(mut p)
+            continue
+        }
+        p.open_parens = 0
+        p.open_braces = 0
+        match statement_item(mut p, mut stmts) {
+            Ok(_) => {}
+            Err(e) => {
+                errors.add(mut p.errors, e)
+                skip_statement(mut p)
+            }
+        }
+    }
+    let close = advance(mut p)
+    p.open_parens = saved_parens
+    p.open_braces = saved_braces
+    return Ok(ast.Block { stmts: stmts, end_line: close.line, end_col: close.col })
+}
+
+// A statement and what ends it; the statement is kept even when its end is wrong.
+fn statement_item(p: mut Parser, stmts: mut [ast.Stmt]) -> Result[Unit, errors.CompileError] {
+    push(mut stmts, statement(mut p)?)
+    end_of_item(mut p, "statement")?
+    return Ok(())
+}
+
+// After an error in a statement, skip to just after the next `;` outside
+// any brackets, or to just before the `}` that closes the current block.
+fn skip_statement(p: mut Parser) {
+    let mut parens = p.open_parens
+    let mut braces = p.open_braces
+    for {
+        let tok = peek(p, 0)
+        if tok.kind == lexer.Kind.Eof || tok.kind == lexer.Kind.RBrace && braces == 0 {
+            return
+        }
+        advance(mut p)
+        if tok.kind == lexer.Kind.LParen {
+            parens = parens + 1
+        } else if tok.kind == lexer.Kind.RParen {
+            parens = max0(parens - 1)
+        } else if tok.kind == lexer.Kind.LBrace {
+            braces = braces + 1
+        } else if tok.kind == lexer.Kind.RBrace {
+            braces = braces - 1
+        } else if tok.kind == lexer.Kind.Semi && parens == 0 && braces == 0 {
+            return
+        }
+    }
+}
+
+fn statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
+    let tok = peek(p, 0)
+    let k = tok.kind
+    if k == lexer.Kind.Let {
+        return let_stmt(mut p)
+    }
+    if k == lexer.Kind.If {
+        return if_stmt(mut p)
+    }
+    if k == lexer.Kind.For {
+        return for_stmt(mut p)
+    }
+    if k == lexer.Kind.Match {
+        advance(mut p)
+        let scrutinee = head_expression(mut p)?
+        expect(mut p, lexer.Kind.LBrace, "after the value being matched")?
+        let arms = arms(mut p, true)?
+        return Ok(stmt(mut p, ast.StmtKind.MatchStmt(scrutinee, arms), tok.line, tok.col))
+    }
+    if k == lexer.Kind.LBrace {
+        let b = block(mut p, "")?
+        return Ok(stmt(mut p, ast.StmtKind.Block(b), tok.line, tok.col))
+    }
+    if k == lexer.Kind.Import {
+        return Err(error(tok, "imports go at the top of the file, before all declarations"))
+    }
+    if k == lexer.Kind.Else {
+        // The newline rule put a `;` after the `}`, ending the `if`.
+        return Err(error(tok, "'else' must be on the same line as the '}' before it"))
+    }
+    return simple_statement(mut p)
+}
+
+// A statement that fits in a match arm: return, break, continue, a call,
+// or an assignment.
+fn simple_statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
+    let tok = peek(p, 0)
+    if tok.kind == lexer.Kind.Break {
+        advance(mut p)
+        return Ok(stmt(mut p, ast.StmtKind.Break, tok.line, tok.col))
+    }
+    if tok.kind == lexer.Kind.Continue {
+        advance(mut p)
+        return Ok(stmt(mut p, ast.StmtKind.Continue, tok.line, tok.col))
+    }
+    if tok.kind == lexer.Kind.Return {
+        advance(mut p)
+        let next = peek(p, 0).kind
+        let mut value: Option[ast.Expr] = None
+        if next != lexer.Kind.Semi && next != lexer.Kind.RBrace && next != lexer.Kind.Comma {
+            value = Some(expression(mut p, 0)?)
+        }
+        return Ok(stmt(mut p, ast.StmtKind.Return(value), tok.line, tok.col))
+    }
+    let e = expression(mut p, 0)?
+    if peek(p, 0).kind == lexer.Kind.Eq {
+        let eq = advance(mut p)
+        let value = expression(mut p, 0)?
+        return Ok(stmt(mut p, ast.StmtKind.Assign(e, value), eq.line, eq.col))
+    }
+    return Ok(stmt(mut p, ast.StmtKind.ExprStmt(e), e.line, e.col))
+}
+
+fn let_stmt(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
+    advance(mut p)  // "let"
+    let mutable = peek(p, 0).kind == lexer.Kind.Mut
+    if mutable {
+        advance(mut p)
+    }
+    let mut after = "after 'let'"
+    if mutable {
+        after = "after 'let mut'"
+    }
+    let name = expect_name(mut p, after)?
+    let mut annotation: Option[ast.TypeName] = None
+    if peek(p, 0).kind == lexer.Kind.Colon {
+        advance(mut p)
+        annotation = Some(type_name(mut p)?)
+    }
+    let mut written = "let "
+    if mutable {
+        written = "let mut "
+    }
+    expect(mut p, lexer.Kind.Eq, "after '" + written + name.text + "'")?
+    let value = expression(mut p, 0)?
+    return Ok(stmt(mut p, ast.StmtKind.Let(name.text, mutable, annotation, value), name.line, name.col))
+}
+
+fn if_stmt(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
+    let tok = advance(mut p)  // "if"
+    let cond = head_expression(mut p)?
+    let then = block(mut p, "after the 'if' condition")?
+    let mut otherwise = ast.Else.NoElse
+    if peek(p, 0).kind == lexer.Kind.Else {
+        advance(mut p)
+        if peek(p, 0).kind == lexer.Kind.If {
+            otherwise = ast.Else.ElseIf(if_stmt(mut p)?)
+        } else {
+            otherwise = ast.Else.ElseBlock(block(mut p, "or 'if' after 'else'")?)
+        }
+    }
+    return Ok(stmt(mut p, ast.StmtKind.If(cond, then, otherwise), tok.line, tok.col))
+}
+
+fn for_stmt(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
+    let tok = advance(mut p)  // "for"
+    if peek(p, 0).kind == lexer.Kind.LBrace {
+        let body = block(mut p, "")?
+        return Ok(stmt(mut p, ast.StmtKind.For(None, body), tok.line, tok.col))
+    }
+    if peek(p, 0).kind == lexer.Kind.Ident && peek(p, 1).kind == lexer.Kind.In {
+        let name = advance(mut p)
+        advance(mut p)  // "in"
+        let start = head_expression(mut p)?
+        if peek(p, 0).kind != lexer.Kind.DotDot {
+            let body = block(mut p, "after the value being looped over")?
+            return Ok(stmt(mut p, ast.StmtKind.ForEach(name.text, start, body), name.line, name.col))
+        }
+        advance(mut p)  // ".."
+        let end = head_expression(mut p)?
+        let body = block(mut p, "after the range")?
+        return Ok(stmt(mut p, ast.StmtKind.ForRange(name.text, start, end, body), name.line, name.col))
+    }
+    let cond = head_expression(mut p)?
+    let body = block(mut p, "after the 'for' condition")?
+    return Ok(stmt(mut p, ast.StmtKind.For(Some(cond), body), tok.line, tok.col))
+}
+
+// ---- Match arms and patterns ----
+
+// The arms of a match, after its `{`.
+fn arms(p: mut Parser, is_stmt: Bool) -> Result[[ast.Arm], errors.CompileError] {
+    let mut out: [ast.Arm] = []
+    for peek(p, 0).kind != lexer.Kind.RBrace {
+        list_not_ended(p, "match")?
+        push(mut out, arm(mut p, is_stmt)?)
+        list_separator(mut p, "match")?
+    }
+    advance(mut p)
+    return Ok(out)
+}
+
+fn arm(p: mut Parser, is_stmt: Bool) -> Result[ast.Arm, errors.CompileError] {
+    let pat = pattern(mut p)?
+    let arrow = expect(mut p, lexer.Kind.FatArrow, "after the pattern")?
+    if !is_stmt {
+        let value = nested_expression(mut p)?
+        return Ok(ast.Arm { pattern: pat, body: ast.ArmBody.Value(value), line: arrow.line, col: arrow.col })
+    }
+    let body = arm_statement(mut p)?
+    return Ok(ast.Arm { pattern: pat, body: ast.ArmBody.Do(body), line: arrow.line, col: arrow.col })
+}
+
+// A match statement's arm: a block, a nested match statement, or a simple statement.
+fn arm_statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
+    let next = peek(p, 0)
+    if next.kind == lexer.Kind.LBrace {
+        let b = block(mut p, "")?
+        return Ok(stmt(mut p, ast.StmtKind.Block(b), next.line, next.col))
+    }
+    if next.kind == lexer.Kind.Match {
+        return statement(mut p)
+    }
+    return simple_statement(mut p)
+}
+
+fn is_builtin_variant(name: Str) -> Bool {
+    return name == "None" || name == "Some" || name == "Ok" || name == "Err"
+}
+
+fn pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
+    let tok = peek(p, 0)
+    let k = tok.kind
+    if k == lexer.Kind.Int || k == lexer.Kind.Byte || k == lexer.Kind.Minus && peek(p, 1).kind == lexer.Kind.Int {
+        let lo = number_literal(mut p)?
+        if peek(p, 0).kind == lexer.Kind.DotDot {
+            return Err(error(peek(p, 0), "a range in a pattern includes its end: write ..= instead of .."))
+        }
+        if peek(p, 0).kind != lexer.Kind.DotDotEq {
+            return Ok(pattern_node(mut p, ast.PatternKind.Lit(lo), tok.line, tok.col))
+        }
+        advance(mut p)
+        let next = peek(p, 0).kind
+        if next != lexer.Kind.Int && next != lexer.Kind.Byte && next != lexer.Kind.Minus {
+            return Err(error(peek(p, 0), "expected the end of the range" + found(peek(p, 0))))
+        }
+        let hi = number_literal(mut p)?
+        return Ok(pattern_node(mut p, ast.PatternKind.Range(lo, hi), tok.line, tok.col))
+    }
+    if k == lexer.Kind.Bool {
+        advance(mut p)
+        let lit = expr(mut p, ast.ExprKind.BoolLit(tok.text == "true"), tok.line, tok.col)
+        return Ok(pattern_node(mut p, ast.PatternKind.Lit(lit), tok.line, tok.col))
+    }
+    if k == lexer.Kind.Str {
+        advance(mut p)
+        let lit = expr(mut p, ast.ExprKind.StrLit(tok.value), tok.line, tok.col)
+        return Ok(pattern_node(mut p, ast.PatternKind.Lit(lit), tok.line, tok.col))
+    }
+    if k != lexer.Kind.Ident {
+        return Err(error(tok, "expected a pattern" + found(tok)))
+    }
+    advance(mut p)
+    if tok.text == "_" {
+        return Ok(pattern_node(mut p, ast.PatternKind.Wild, tok.line, tok.col))
+    }
+    let mut module = ""
+    let mut enum = ""
+    let mut variant = tok
+    if peek(p, 0).kind == lexer.Kind.Dot {
+        advance(mut p)
+        enum = tok.text
+        variant = expect_name(mut p, "for a variant after '.'")?
+        if peek(p, 0).kind == lexer.Kind.Dot {  // module.Enum.Variant
+            advance(mut p)
+            module = enum
+            enum = variant.text
+            variant = expect_name(mut p, "for a variant after '.'")?
+        }
+    } else if !is_builtin_variant(tok.text) {
+        return Ok(pattern_node(mut p, ast.PatternKind.Bind(tok.text), tok.line, tok.col))
+    }
+    let mut parens = false
+    let mut args: [ast.Pattern] = []
+    if peek(p, 0).kind == lexer.Kind.LParen {
+        advance(mut p)
+        parens = true
+        for peek(p, 0).kind != lexer.Kind.RParen {
+            push(mut args, pattern(mut p)?)
+            if peek(p, 0).kind != lexer.Kind.Comma {
+                break
+            }
+            advance(mut p)
+        }
+        expect(mut p, lexer.Kind.RParen, "after the patterns of '" + variant.text + "'")?
+    }
+    let kind = ast.PatternKind.Variant(module, enum, variant.text, parens, args)
+    return Ok(pattern_node(mut p, kind, tok.line, tok.col))
+}
+
+// The value of a run of decimal digits that the lexer has checked fits.
+fn digits_value(digits: Str) -> Int {
+    let mut n = 0
+    for c in digits {
+        n = n * 10 + int(c - '0')
+    }
+    return n
+}
+
+// An Int literal (possibly negative) or a Byte literal, in a pattern.
+fn number_literal(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
+    let tok = advance(mut p)
+    if tok.kind == lexer.Kind.Byte {
+        return Ok(expr(mut p, ast.ExprKind.ByteLit(int(tok.value[0])), tok.line, tok.col))
+    }
+    if tok.kind == lexer.Kind.Minus {
+        let num = advance(mut p)
+        if num.kind != lexer.Kind.Int {
+            return Err(error(num, "expected a number after '-'" + found(num)))
+        }
+        return Ok(expr(mut p, ast.ExprKind.IntLit(-digits_value(num.text)), tok.line, tok.col))
+    }
+    return Ok(expr(mut p, ast.ExprKind.IntLit(digits_value(tok.text)), tok.line, tok.col))
+}
+
+// ---- Expressions ----
+
+// The expression before the `{` of an if, for or match body, where struct
+// literals need parentheses.
+fn head_expression(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
+    let saved = p.no_struct
+    p.no_struct = true
+    let e = expression(mut p, 0)
+    p.no_struct = saved
+    return e
+}
+
+// An expression inside brackets, where struct literals are fine again.
+fn nested_expression(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
+    let saved = p.no_struct
+    p.no_struct = false
+    let e = expression(mut p, 0)
+    p.no_struct = saved
+    return e
+}
+
+// An expression whose operators all bind at least `min_bp` tightly.
+fn expression(p: mut Parser, min_bp: Int) -> Result[ast.Expr, errors.CompileError] {
+    let mut left = prefix(mut p)?
+    let mut after_comparison = false
+    for {
+        let tok = peek(p, 0)
+        let k = tok.kind
+        let postfix = postfix_power() >= min_bp
+        if k == lexer.Kind.LParen && postfix {
+            left = call(mut p, left)?
+        } else if k == lexer.Kind.Dot && postfix {
+            advance(mut p)
+            let name = expect_name(mut p, "after '.'")?
+            left = expr(mut p, ast.ExprKind.Field(left, name.text), name.line, name.col)
+        } else if k == lexer.Kind.LBracket && postfix {
+            left = index(mut p, left)?
+        } else if k == lexer.Kind.Question && postfix {
+            advance(mut p)
+            left = expr(mut p, ast.ExprKind.Try(left), tok.line, tok.col)
+        } else if left_power(k) >= 0 && left_power(k) >= min_bp {
+            if is_comparison(k) && after_comparison {
+                return Err(error(tok, "comparisons cannot be chained; use && to combine them, as in a < b && b < c"))
+            }
+            advance(mut p)
+            let right = expression(mut p, left_power(k) + 1)?
+            left = expr(mut p, ast.ExprKind.Binary(lexer.kind_name(k), left, right), tok.line, tok.col)
+            after_comparison = is_comparison(k)
+        } else {
+            return Ok(left)
+        }
+    }
+}
+
+// The start of an expression: a literal, a name, a struct literal, a match,
+// `-x`, `!x`, `()` or `( ... )`.
+fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
+    let tok = peek(p, 0)
+    if !starts_expression(tok.kind) {
+        // Not consumed: in `return 1 +` before a `}`, the `}` still has to
+        // close the block.
+        return Err(error(tok, "expected expression" + found(tok)))
+    }
+    advance(mut p)
+    let k = tok.kind
+    if k == lexer.Kind.Int {
+        return Ok(expr(mut p, ast.ExprKind.IntLit(digits_value(tok.text)), tok.line, tok.col))
+    }
+    if k == lexer.Kind.Bool {
+        return Ok(expr(mut p, ast.ExprKind.BoolLit(tok.text == "true"), tok.line, tok.col))
+    }
+    if k == lexer.Kind.Str {
+        return Ok(expr(mut p, ast.ExprKind.StrLit(tok.value), tok.line, tok.col))
+    }
+    if k == lexer.Kind.Byte {
+        return Ok(expr(mut p, ast.ExprKind.ByteLit(int(tok.value[0])), tok.line, tok.col))
+    }
+    if k == lexer.Kind.LBracket {
+        return collection_lit(mut p, tok)
+    }
+    if k == lexer.Kind.Ident {
+        if peek(p, 0).kind == lexer.Kind.LBrace && !p.no_struct {
+            return struct_lit(mut p, tok, "", tok)
+        }
+        if peek(p, 0).kind == lexer.Kind.Dot && peek(p, 1).kind == lexer.Kind.Ident &&
+                peek(p, 2).kind == lexer.Kind.LBrace && !p.no_struct {
+            advance(mut p)  // "."
+            let name = advance(mut p)
+            return struct_lit(mut p, tok, tok.text, name)
+        }
+        return Ok(expr(mut p, ast.ExprKind.Name(tok.text), tok.line, tok.col))
+    }
+    if k == lexer.Kind.Minus || k == lexer.Kind.Bang {
+        let operand = expression(mut p, prefix_power())?
+        return Ok(expr(mut p, ast.ExprKind.Unary(lexer.kind_name(k), operand), tok.line, tok.col))
+    }
+    if k == lexer.Kind.LParen && peek(p, 0).kind == lexer.Kind.RParen {
+        advance(mut p)
+        return Ok(expr(mut p, ast.ExprKind.UnitLit, tok.line, tok.col))
+    }
+    if k == lexer.Kind.LParen {
+        let inner = nested_expression(mut p)?
+        let close = peek(p, 0)
+        if close.kind != lexer.Kind.RParen {
+            return Err(error(close, "expected ')' to match '(' at " + strings.from_int(tok.line) + ":" +
+                strings.from_int(tok.col) + found(close)))
+        }
+        advance(mut p)
+        return Ok(inner)  // parentheses only group; they leave no node behind
+    }
+    // `match`
+    let scrutinee = head_expression(mut p)?
+    expect(mut p, lexer.Kind.LBrace, "after the value being matched")?
+    let arms = arms(mut p, false)?
+    return Ok(expr(mut p, ast.ExprKind.Match(scrutinee, arms), tok.line, tok.col))
+}
+
+// `obj[i]` or `obj[a..b]`, after `obj`.
+fn index(p: mut Parser, obj: ast.Expr) -> Result[ast.Expr, errors.CompileError] {
+    let open = advance(mut p)  // "["
+    let first = nested_expression(mut p)?
+    if peek(p, 0).kind == lexer.Kind.DotDot {
+        advance(mut p)
+        let end = nested_expression(mut p)?
+        expect(mut p, lexer.Kind.RBracket, "after the slice")?
+        return Ok(expr(mut p, ast.ExprKind.Slice(obj, first, end), open.line, open.col))
+    }
+    expect(mut p, lexer.Kind.RBracket, "after the index")?
+    return Ok(expr(mut p, ast.ExprKind.Index(obj, first), open.line, open.col))
+}
+
+// An array `[a, b]` or a map `[k: v, ...]`, after its `[`.
+fn collection_lit(p: mut Parser, open: lexer.Token) -> Result[ast.Expr, errors.CompileError] {
+    if peek(p, 0).kind == lexer.Kind.Colon && peek(p, 1).kind == lexer.Kind.RBracket {
+        advance(mut p)
+        advance(mut p)
+        return Ok(expr(mut p, ast.ExprKind.MapLit([]), open.line, open.col))
+    }
+    let mut elems: [ast.Expr] = []
+    let mut entries: [ast.MapEntry] = []
+    for peek(p, 0).kind != lexer.Kind.RBracket {
+        if peek(p, 0).kind == lexer.Kind.Eof {
+            return Err(error(peek(p, 0), "expected ']' to close the list, found end of file"))
+        }
+        let item = nested_expression(mut p)?
+        if peek(p, 0).kind == lexer.Kind.Colon && len(elems) == 0 {
+            advance(mut p)
+            let value = nested_expression(mut p)?
+            push(mut entries, ast.MapEntry { key: item, value: value })
+        } else if len(entries) > 0 {
+            return Err(error(peek(p, 0), "expected ':' and a value after this key" + found(peek(p, 0))))
+        } else {
+            push(mut elems, item)
+        }
+        let tok = peek(p, 0)
+        if tok.kind == lexer.Kind.Comma || tok.kind == lexer.Kind.Semi {
+            advance(mut p)
+        } else if tok.kind != lexer.Kind.RBracket {
+            return Err(error(tok, "expected ',' or ']' in the list" + found(tok)))
+        }
+    }
+    advance(mut p)
+    if len(entries) > 0 {
+        return Ok(expr(mut p, ast.ExprKind.MapLit(entries), open.line, open.col))
+    }
+    return Ok(expr(mut p, ast.ExprKind.ArrayLit(elems), open.line, open.col))
+}
+
+// `Name { ... }` or `module.Name { ... }`, from the `{` on. `module` is "" or
+// the module's name, and `start` the literal's first token, where it is
+// reported.
+fn struct_lit(p: mut Parser, start: lexer.Token, module: Str,
+              name: lexer.Token) -> Result[ast.Expr, errors.CompileError] {
+    advance(mut p)  // "{"
+    let mut written = name.text
+    if module != "" {
+        written = module + "." + name.text
+    }
+    let what = "'" + written + "' value"
+    let mut fields: [ast.FieldInit] = []
+    for peek(p, 0).kind != lexer.Kind.RBrace {
+        list_not_ended(p, what)?
+        let fname = expect_name(mut p, "for a field")?
+        expect(mut p, lexer.Kind.Colon, "after field '" + fname.text + "'")?
+        let value = nested_expression(mut p)?
+        push(mut fields, ast.FieldInit { name: fname.text, value: value, line: fname.line, col: fname.col })
+        list_separator(mut p, what)?
+    }
+    advance(mut p)
+    return Ok(expr(mut p, ast.ExprKind.StructLit(module, name.text, fields), start.line, start.col))
+}
+
+fn call(p: mut Parser, callee: ast.Expr) -> Result[ast.Expr, errors.CompileError] {
+    advance(mut p)  // the "("
+    let mut args: [ast.Expr] = []
+    for peek(p, 0).kind != lexer.Kind.RParen {
+        if peek(p, 0).kind == lexer.Kind.Mut {
+            let m = advance(mut p)
+            let place = nested_expression(mut p)?
+            push(mut args, expr(mut p, ast.ExprKind.MutArg(place), m.line, m.col))
+        } else {
+            push(mut args, nested_expression(mut p)?)
+        }
+        if peek(p, 0).kind != lexer.Kind.Comma {
+            break
+        }
+        advance(mut p)
+    }
+    let tok = peek(p, 0)
+    if tok.kind != lexer.Kind.RParen {
+        return Err(error(tok, "expected ',' or ')' in argument list" + found(tok)))
+    }
+    advance(mut p)
+    return Ok(expr(mut p, ast.ExprKind.Call(callee, args), callee.line, callee.col))
+}

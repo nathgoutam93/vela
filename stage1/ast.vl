@@ -1,0 +1,560 @@
+// The syntax tree, as in stage0/ast_nodes.py, and its `vela ast` dump.
+//
+// Stage 0 records the checker's findings on the nodes themselves. Vela
+// values cannot be changed through a shared tree, so instead every
+// expression, statement and pattern gets a number, `id`, unique in its
+// program, and the checker keeps what it finds in arrays indexed by it.
+//
+// Where Stage 0 has `None` for a missing part, this file has "" for a
+// missing name (a module, an enum) and Option for a missing node.
+import strings
+
+pub type TypeName = struct {
+    name: Str  // "[]" for an array type [T], with T as its one argument
+    args: [TypeName]
+    line: Int
+    col: Int
+    module: Str  // `lexer` in `lexer.Token`, or ""
+}
+
+pub type Expr = struct {
+    kind: ExprKind
+    line: Int
+    col: Int
+    id: Int
+}
+
+pub type ExprKind = enum {
+    IntLit(Int)
+    ByteLit(Int)
+    BoolLit(Bool)
+    StrLit(Str)
+    UnitLit
+    Name(Str)
+    Unary(Str, Expr)  // "-" or "!"
+    Binary(Str, Expr, Expr)
+    Call(Expr, [Expr])
+    Field(Expr, Str)
+    Index(Expr, Expr)
+    Try(Expr)
+    MutArg(Expr)
+    Slice(Expr, Expr, Expr)
+    ArrayLit([Expr])
+    MapLit([MapEntry])
+    StructLit(Str, Str, [FieldInit])  // module or "", type name, fields
+    Match(Expr, [Arm])
+}
+
+pub type MapEntry = struct {
+    key: Expr
+    value: Expr
+}
+
+pub type FieldInit = struct {
+    name: Str
+    value: Expr
+    line: Int
+    col: Int
+}
+
+pub type Pattern = struct {
+    kind: PatternKind
+    line: Int
+    col: Int
+    id: Int
+}
+
+pub type PatternKind = enum {
+    Wild
+    Bind(Str)
+    Lit(Expr)
+    Range(Expr, Expr)
+    // module or "", enum or "" (for Some, None, Ok, Err), variant,
+    // whether it has parentheses, and the patterns inside them
+    Variant(Str, Str, Str, Bool, [Pattern])
+}
+
+pub type Arm = struct {
+    pattern: Pattern
+    body: ArmBody
+    line: Int  // the `=>`
+    col: Int
+}
+
+pub type ArmBody = enum {
+    Value(Expr)  // in a match expression
+    Do(Stmt)  // in a match statement: a block or a statement
+}
+
+pub type Stmt = struct {
+    kind: StmtKind
+    line: Int
+    col: Int
+    id: Int
+}
+
+pub type StmtKind = enum {
+    Block(Block)
+    ExprStmt(Expr)
+    Let(Str, Bool, Option[TypeName], Expr)  // name, mutable, annotation, value
+    Assign(Expr, Expr)
+    If(Expr, Block, Else)
+    For(Option[Expr], Block)
+    ForRange(Str, Expr, Expr, Block)
+    ForEach(Str, Expr, Block)
+    Break
+    Continue
+    Return(Option[Expr])
+    MatchStmt(Expr, [Arm])
+}
+
+pub type Else = enum {
+    NoElse
+    ElseBlock(Block)
+    ElseIf(Stmt)  // an If
+}
+
+pub type Block = struct {
+    stmts: [Stmt]
+    end_line: Int  // the closing `}`, where "missing return" is reported
+    end_col: Int
+}
+
+pub type Param = struct {
+    name: Str
+    ty: TypeName
+    line: Int
+    col: Int
+    mutable: Bool
+}
+
+pub type FnDecl = struct {
+    name: Str
+    params: [Param]
+    result: Option[TypeName]
+    body: Block
+    line: Int
+    col: Int
+    public: Bool
+}
+
+pub type FieldDecl = struct {
+    name: Str
+    ty: TypeName
+    line: Int
+    col: Int
+}
+
+pub type VariantDecl = struct {
+    name: Str
+    payload: [TypeName]
+    line: Int
+    col: Int
+}
+
+// A struct (fields) or an enum (variants).
+pub type TypeDecl = struct {
+    name: Str
+    is_struct: Bool
+    fields: [FieldDecl]
+    variants: [VariantDecl]
+    line: Int
+    col: Int
+    public: Bool
+}
+
+pub type Import = struct {
+    name: Str
+    line: Int
+    col: Int
+}
+
+pub type Program = struct {
+    imports: [Import]
+    types: [TypeDecl]
+    fns: [FnDecl]
+}
+
+// ---- `vela ast` ----
+//
+// An S-expression, rendered as in Stage 0: a list stays on one line unless
+// it contains a non-empty block; then its children go on their own lines,
+// indented two spaces, after any leading one-line children (a block's
+// statements always go on their own lines).
+
+type Sx = enum {
+    Atom(Str)
+    List([Sx])
+    Block([Sx])  // its first item is the atom "block"
+}
+
+fn atom(s: Str) -> Sx {
+    return Sx.Atom(s)
+}
+
+fn list(items: [Sx]) -> Sx {
+    return Sx.List(items)
+}
+
+pub fn dump(program: Program) -> Str {
+    let mut items: [Sx] = []
+    for i in program.imports {
+        push(mut items, list([atom("import"), atom(i.name)]))
+    }
+    for t in program.types {
+        push(mut items, sx_type_decl(t))
+    }
+    for f in program.fns {
+        push(mut items, sx_fn(f))
+    }
+    let mut b = strings.builder()
+    for x in items {
+        for line in render(x) {
+            strings.add(mut b, line)
+            strings.add_byte(mut b, '\n')
+        }
+    }
+    return strings.build(b)
+}
+
+fn qualified(module: Str, name: Str) -> Str {
+    if module == "" {
+        return name
+    }
+    return module + "." + name
+}
+
+pub fn type_text(t: TypeName) -> Str {
+    if t.name == "[]" {
+        return "[" + type_text(t.args[0]) + "]"
+    }
+    let name = qualified(t.module, t.name)
+    if len(t.args) == 0 {
+        return name
+    }
+    let mut b = strings.builder()
+    strings.add(mut b, name)
+    strings.add_byte(mut b, '[')
+    for i in 0..len(t.args) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, type_text(t.args[i]))
+    }
+    strings.add_byte(mut b, ']')
+    return strings.build(b)
+}
+
+fn sx_type_decl(d: TypeDecl) -> Sx {
+    let mut items: [Sx] = []
+    if d.public {
+        push(mut items, atom("pub"))
+    }
+    if d.is_struct {
+        push(mut items, atom("struct"))
+        push(mut items, atom(d.name))
+        for f in d.fields {
+            push(mut items, list([atom(f.name), atom(type_text(f.ty))]))
+        }
+    } else {
+        push(mut items, atom("enum"))
+        push(mut items, atom(d.name))
+        for v in d.variants {
+            let mut parts = [atom(v.name)]
+            for t in v.payload {
+                push(mut parts, atom(type_text(t)))
+            }
+            push(mut items, list(parts))
+        }
+    }
+    return list(items)
+}
+
+fn sx_fn(f: FnDecl) -> Sx {
+    let mut params: [Sx] = []
+    for p in f.params {
+        let mut parts = [atom(p.name)]
+        if p.mutable {
+            push(mut parts, atom("mut"))
+        }
+        push(mut parts, atom(type_text(p.ty)))
+        push(mut params, list(parts))
+    }
+    let mut items: [Sx] = []
+    if f.public {
+        push(mut items, atom("pub"))
+    }
+    push(mut items, atom("fn"))
+    push(mut items, atom(f.name))
+    push(mut items, list(params))
+    match f.result {
+        Some(t) => push(mut items, atom(type_text(t)))
+        None => {}
+    }
+    push(mut items, sx_block(f.body))
+    return list(items)
+}
+
+fn sx_block(b: Block) -> Sx {
+    let mut items = [atom("block")]
+    for s in b.stmts {
+        push(mut items, sx_stmt(s))
+    }
+    return Sx.Block(items)
+}
+
+fn sx_stmt(s: Stmt) -> Sx {
+    match s.kind {
+        StmtKind.Block(b) => return sx_block(b)
+        StmtKind.ExprStmt(e) => return sx_expr(e)
+        StmtKind.Let(name, mutable, annotation, value) => {
+            let mut items = [atom("let"), atom(name)]
+            if mutable {
+                items[0] = atom("let mut")
+            }
+            match annotation {
+                Some(t) => push(mut items, atom(type_text(t)))
+                None => {}
+            }
+            push(mut items, sx_expr(value))
+            return list(items)
+        }
+        StmtKind.Assign(target, value) => return list([atom("="), sx_expr(target), sx_expr(value)])
+        StmtKind.If(cond, then, otherwise) => {
+            let mut items = [atom("if"), sx_expr(cond), sx_block(then)]
+            match otherwise {
+                Else.NoElse => {}
+                Else.ElseBlock(b) => push(mut items, sx_block(b))
+                Else.ElseIf(s2) => push(mut items, sx_stmt(s2))
+            }
+            return list(items)
+        }
+        StmtKind.For(cond, body) => {
+            let mut items = [atom("for")]
+            match cond {
+                Some(c) => push(mut items, sx_expr(c))
+                None => {}
+            }
+            push(mut items, sx_block(body))
+            return list(items)
+        }
+        StmtKind.ForRange(name, start, end, body) => {
+            return list([atom("for"), atom(name), list([atom(".."), sx_expr(start), sx_expr(end)]), sx_block(body)])
+        }
+        StmtKind.ForEach(name, iterable, body) => {
+            return list([atom("for"), atom(name), list([atom("in"), sx_expr(iterable)]), sx_block(body)])
+        }
+        StmtKind.Break => return list([atom("break")])
+        StmtKind.Continue => return list([atom("continue")])
+        StmtKind.Return(value) => {
+            match value {
+                Some(v) => return list([atom("return"), sx_expr(v)])
+                None => return list([atom("return")])
+            }
+        }
+        StmtKind.MatchStmt(scrutinee, arms) => return sx_match(scrutinee, arms)
+    }
+}
+
+fn sx_match(scrutinee: Expr, arms: [Arm]) -> Sx {
+    let mut items = [atom("match"), sx_expr(scrutinee)]
+    for a in arms {
+        let body = match a.body {
+            ArmBody.Value(e) => sx_expr(e)
+            ArmBody.Do(s) => sx_stmt(s)
+        }
+        push(mut items, list([atom("=>"), sx_pattern(a.pattern), body]))
+    }
+    return list(items)
+}
+
+fn sx_pattern(p: Pattern) -> Sx {
+    match p.kind {
+        PatternKind.Wild => return atom("_")
+        PatternKind.Bind(name) => return atom(name)
+        PatternKind.Lit(e) => return sx_expr(e)
+        PatternKind.Range(lo, hi) => return list([atom("..="), sx_expr(lo), sx_expr(hi)])
+        PatternKind.Variant(module, enum, variant, parens, args) => {
+            let mut name = variant
+            if enum != "" {
+                name = enum + "." + variant
+            }
+            name = qualified(module, name)
+            if !parens {
+                return atom(name)
+            }
+            let mut items = [atom(name)]
+            for x in args {
+                push(mut items, sx_pattern(x))
+            }
+            return list(items)
+        }
+    }
+}
+
+fn sx_exprs(head: Sx, xs: [Expr]) -> Sx {
+    let mut items = [head]
+    for x in xs {
+        push(mut items, sx_expr(x))
+    }
+    return list(items)
+}
+
+fn sx_expr(e: Expr) -> Sx {
+    match e.kind {
+        ExprKind.IntLit(n) => return atom(strings.from_int(n))
+        ExprKind.ByteLit(n) => return atom(quote_byte(n))
+        ExprKind.BoolLit(b) => {
+            if b {
+                return atom("true")
+            }
+            return atom("false")
+        }
+        ExprKind.StrLit(s) => return atom(quote(s))
+        ExprKind.UnitLit => return atom("()")
+        ExprKind.Name(name) => return atom(name)
+        ExprKind.Unary(op, x) => return list([atom(op), sx_expr(x)])
+        ExprKind.Binary(op, l, r) => return list([atom(op), sx_expr(l), sx_expr(r)])
+        ExprKind.Call(callee, args) => {
+            let mut items = [atom("call"), sx_expr(callee)]
+            for a in args {
+                push(mut items, sx_expr(a))
+            }
+            return list(items)
+        }
+        ExprKind.Field(obj, name) => return list([atom("."), sx_expr(obj), atom(name)])
+        ExprKind.Index(obj, i) => return list([atom("[]"), sx_expr(obj), sx_expr(i)])
+        ExprKind.Try(x) => return list([atom("?"), sx_expr(x)])
+        ExprKind.MutArg(x) => return list([atom("mut"), sx_expr(x)])
+        ExprKind.Slice(obj, lo, hi) => return list([atom("[..]"), sx_expr(obj), sx_expr(lo), sx_expr(hi)])
+        ExprKind.ArrayLit(xs) => return sx_exprs(atom("array"), xs)
+        ExprKind.MapLit(entries) => {
+            let mut items = [atom("map")]
+            for en in entries {
+                push(mut items, list([sx_expr(en.key), sx_expr(en.value)]))
+            }
+            return list(items)
+        }
+        ExprKind.StructLit(module, name, fields) => {
+            let mut items = [atom("struct"), atom(qualified(module, name))]
+            for f in fields {
+                push(mut items, list([atom(f.name), sx_expr(f.value)]))
+            }
+            return list(items)
+        }
+        ExprKind.Match(scrutinee, arms) => return sx_match(scrutinee, arms)
+    }
+}
+
+// A string literal as Vela source would spell it.
+pub fn quote(value: Str) -> Str {
+    let mut b = strings.builder()
+    strings.add_byte(mut b, '"')
+    for c in value {
+        let escaped = unescape(c)
+        if escaped == "" {
+            strings.add_byte(mut b, c)
+        } else {
+            strings.add(mut b, escaped)
+        }
+    }
+    strings.add_byte(mut b, '"')
+    return strings.build(b)
+}
+
+fn unescape(c: Byte) -> Str {
+    return match c {
+        '\n' => "\\n"
+        '\t' => "\\t"
+        '\r' => "\\r"
+        '\0' => "\\0"
+        '\\' => "\\\\"
+        '"' => "\\\""
+        _ => ""
+    }
+}
+
+// A byte literal as Vela source would spell it: 'a', '\n', '\''. A byte no
+// literal spells is written as its number, which a Byte context accepts.
+pub fn quote_byte(value: Int) -> Str {
+    if value == 39 {
+        return "'\\''"
+    }
+    let c = byte(value)
+    let escaped = unescape(c)
+    if escaped != "" && c != '"' {
+        return "'" + escaped + "'"
+    }
+    if value >= 32 && value < 127 {
+        let mut b = strings.builder()
+        strings.add_byte(mut b, '\'')
+        strings.add_byte(mut b, c)
+        strings.add_byte(mut b, '\'')
+        return strings.build(b)
+    }
+    return strings.from_int(value)
+}
+
+fn is_block(x: Sx) -> Bool {
+    return match x {
+        Sx.Block(_) => true
+        _ => false
+    }
+}
+
+// The items of a list or block; an atom has none.
+fn items_of(x: Sx) -> [Sx] {
+    let none: [Sx] = []
+    return match x {
+        Sx.Atom(_) => none
+        Sx.List(items) => items
+        Sx.Block(items) => items
+    }
+}
+
+fn multiline(x: Sx) -> Bool {
+    let items = items_of(x)
+    if is_block(x) && len(items) > 1 {
+        return true
+    }
+    for c in items {
+        if multiline(c) {
+            return true
+        }
+    }
+    return false
+}
+
+fn render(x: Sx) -> [Str] {
+    match x {
+        Sx.Atom(s) => return [s]
+        _ => {}
+    }
+    let items = items_of(x)
+    if !multiline(x) {
+        let mut b = strings.builder()
+        strings.add_byte(mut b, '(')
+        for i in 0..len(items) {
+            if i > 0 {
+                strings.add_byte(mut b, ' ')
+            }
+            strings.add(mut b, render(items[i])[0])
+        }
+        strings.add_byte(mut b, ')')
+        return [strings.build(b)]
+    }
+    let mut lines = ["(" + render(items[0])[0]]
+    let mut i = 1
+    for i < len(items) && !multiline(items[i]) && !is_block(x) {
+        lines[0] = lines[0] + " " + render(items[i])[0]
+        i = i + 1
+    }
+    for child in items[i..len(items)] {
+        for line in render(child) {
+            push(mut lines, "  " + line)
+        }
+    }
+    let last = len(lines) - 1
+    lines[last] = lines[last] + ")"
+    return lines
+}

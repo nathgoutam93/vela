@@ -1,13 +1,16 @@
 // The Stage 1 compiler driver: the Vela version of stage0/main.py.
 //
 //     vela1 tokens FILE    print the token stream
+//     vela1 ast FILE       print the syntax tree
 //
 // More commands arrive as the rest of the compiler is ported (M8). Exit
 // codes as in Stage 0: 0 success, 1 the program has errors, 2 bad command line.
+import ast
 import errors
 import files
 import lexer
 import os
+import parser
 
 fn main() {
     let args = os.args()
@@ -18,13 +21,15 @@ fn main() {
     let path = args[2]
     if command == "tokens" {
         tokens(path)
+    } else if command == "ast" {
+        syntax_tree(path)
     } else {
         usage()
     }
 }
 
 fn usage() {
-    os.eprint("usage: vela1 tokens FILE")
+    os.eprint("usage: vela1 (tokens | ast) FILE")
     os.exit(2)
 }
 
@@ -58,4 +63,19 @@ fn tokens(path: Str) {
     let out = lexer.dump(lexed.tokens)
     // print adds a newline, and the dump already ends with one.
     print(out[0..len(out) - 1])
+}
+
+fn syntax_tree(path: Str) {
+    let lexed = lexer.tokenize(read(path))
+    if len(lexed.errors) > 0 {
+        fail(path, lexed.errors)
+    }
+    let parsed = parser.parse(lexed.tokens, 0)
+    if len(parsed.errors) > 0 {
+        fail(path, parsed.errors)
+    }
+    let out = ast.dump(parsed.program)
+    if len(out) > 0 {
+        print(out[0..len(out) - 1])
+    }
 }

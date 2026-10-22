@@ -481,6 +481,14 @@ class Program:
 # line unless it contains a non-empty block; then its children go on their
 # own lines, indented two spaces, after any leading one-line children (a
 # block's statements always go on their own lines).
+#
+# A block is an SxBlock rather than a plain list, so it is never confused
+# with a list that merely starts with the word, like a field named `block`.
+
+
+class SxBlock(list):
+    pass
+
 
 def dump(program: Program) -> str:
     items = [["import", i.name] for i in program.imports]
@@ -518,7 +526,7 @@ def sx_fn(f: FnDecl) -> list:
 
 def sx_stmt(s: Stmt) -> Any:
     if isinstance(s, Block):
-        return ["block", *[sx_stmt(x) for x in s.stmts]]
+        return SxBlock(["block", *[sx_stmt(x) for x in s.stmts]])
     if isinstance(s, ExprStmt):
         return sx_expr(s.expr)
     if isinstance(s, Let):
@@ -634,7 +642,7 @@ def quote_byte(value: int) -> str:
 def multiline(x: Any) -> bool:
     if not isinstance(x, list):
         return False
-    return (x[:1] == ["block"] and len(x) > 1) or any(multiline(c) for c in x)
+    return (isinstance(x, SxBlock) and len(x) > 1) or any(multiline(c) for c in x)
 
 
 def render(x: Any) -> list[str]:
@@ -644,7 +652,7 @@ def render(x: Any) -> list[str]:
         return ["(" + " ".join(render(c)[0] for c in x) + ")"]
     lines = ["(" + x[0]]
     children = x[1:]
-    while children and not multiline(children[0]) and x[0] != "block":
+    while children and not multiline(children[0]) and not isinstance(x, SxBlock):
         lines[0] += " " + render(children[0])[0]
         children = children[1:]
     for child in children:

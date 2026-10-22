@@ -1,0 +1,14 @@
+// dump: ast
+// A field, a parameter and a struct-literal field named `block` are not
+// blocks; before M8 the dump crashed on this.
+// out: (struct B (block Int))
+// out: (fn f ((block Int))
+// out:   (block
+// out:     (let b (struct B (block 1)))))
+type B = struct {
+    block: Int
+}
+
+fn f(block: Int) {
+    let b = B { block: 1 }
+}
