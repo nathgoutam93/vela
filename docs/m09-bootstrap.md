@@ -387,3 +387,9 @@ and its test passes".
      suggest closing this question until Vela gets reference types.
    - *Porting `run_tests.py` to Vela:* worth doing, or leave the test
      tools in Python?
+
+**Answered after M9:** write the `orders` example myself, split M10,
+`requires`/`ensures` as contextual keywords, and the effects model as
+proposed. M10a is in `m10a-generics-tests-tools.md`; the example is
+`examples/orders/`. Question 5 (floats, reference cycles, porting the
+test runner) is asked again at the end of M10a.

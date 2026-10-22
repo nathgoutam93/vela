@@ -193,7 +193,7 @@ fn split_flags(flags: Str) -> [Str] {
 
 // Compile a .vl file all the way to a native executable.
 fn build(path: Str, exe: Str, root: Str) {
-    compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root)
+    compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root, "-O2")
 }
 
 // The C, or stop with the errors that only writing it found.
@@ -205,8 +205,8 @@ fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str {
     return ""  // not reached
 }
 
-// C into a scratch directory, then the C compiler.
-fn compile(c_source: Str, stem: Str, exe: Str, root: Str) {
+// C into a scratch directory, then the C compiler, optimizing at `opt`.
+fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
@@ -228,7 +228,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str) {
         None => {}
     }
     let runtime = modules.join(root, "runtime")
-    let mut command = [cc, "-std=c11", "-O2"]
+    let mut command = [cc, "-std=c11", opt]
     for f in flags {
         push(mut command, f)
     }
@@ -444,7 +444,9 @@ fn test_command(path: Str, words: [Str], root: Str) {
         Err(e) => driver_error(e)
     }
     let exe = modules.join(tmp, "tests")
-    compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root)
+    // Tests are built often and run briefly, so the C compiler does not
+    // optimize: building the compiler's own tests takes 3 s instead of 20.
+    compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root, "-O0")
     let mut failed = 0
     for i in chosen {
         let f = k.fns[ids[i]]

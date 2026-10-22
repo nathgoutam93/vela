@@ -23,8 +23,10 @@ sh bootstrap/bootstrap.sh     # builds build/vela, and checks the fixed point
 ```
 build/vela run hello.vl       # compile and run (imports are found next to it)
 build/vela build hello.vl     # produce ./hello
+build/vela test hello.vl      # run its `test` blocks (and those of what it imports)
+build/vela fmt -w hello.vl    # format it in place (-l lists unformatted files)
 build/vela c hello.vl         # show the generated C
-build/vela check hello.vl     # report errors only
+build/vela check hello.vl     # report errors only (--json for tools)
 build/vela tokens hello.vl    # show the tokens
 build/vela ast hello.vl       # show the syntax tree
 python3 run_tests.py          # run the test suite with build/vela
@@ -41,12 +43,14 @@ then use it.
 ```
 stage1/      the compiler, written in Vela
 bootstrap/   the seed (Stage 1 compiled to C) and the bootstrap script
+examples/    larger programs: orders/ prices orders read from CSV
 stage0/      the first compiler, in Python: frozen at M9 as the readable reference
 runtime/     C runtime linked into every program
 std/         standard modules written in Vela
 tests/run/   programs and their expected output
 tests/fail/  programs and the exact errors they must produce
 tests/dump/  expected token and syntax-tree dumps
+tests/cli/   commands such as test, fmt and check --json, and their output
 docs/        one walkthrough per milestone
 run_tests.py the golden-test runner
 compare_stages.py  checks that Stage 0 and Stage 1 agree on every file
@@ -62,7 +66,9 @@ several files (`import`, `pub`), the `?` operator, a standard library for
 files, arguments, exit codes and string building, and Stage 1: the compiler
 rewritten in Vela, which writes the same C as Stage 0 for every program
 (`python3 compare_stages.py tokens ast check c`). M9 reached the fixed point
-and retired Python from the build.
+and retired Python from the build. M10a added generics
+(`fn largest[T: Ord]`, `type Box[T]`), `test` blocks with `assert`, a
+formatter and JSON errors, in Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
 
