@@ -35,7 +35,7 @@ from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, Expr,
     ExprStmt, Field, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let, MapLit, Match,
     MatchStmt, Name, Pattern, PBind, PLit, Program, PRange, PVariant, PWild, Return, Slice, Stmt,
-    StrLit, StructDecl, StructLit, Try, TypeName, Unary, UnitLit,
+    MutArg, StrLit, StructDecl, StructLit, Try, TypeName, Unary, UnitLit,
 )
 from errors import CompileError, ErrorList
 from modules import STD_MODULES, Module
@@ -48,8 +48,8 @@ NO_VALUE = None  # the "type" of a call that returns nothing
 
 # The built-in functions. The prelude's are available everywhere and their
 # names are reserved; the others belong to standard modules, as in
-# `maps.get(m, k)`. push and remove change their first argument, so it must
-# be a place that can change: a `let mut` variable, or a part of one.
+# `maps.get(m, k)`. push and maps.remove change their first argument, which
+# is written `mut place`, as for any mut parameter.
 PRELUDE = frozenset({"print", "len", "push", "int", "byte"})
 BUILTINS = PRELUDE | {f"{m}.{f}" for m, fns in STD_MODULES.items() for f in fns}
 
@@ -68,7 +68,7 @@ SIGNATURES: dict[str, Callable[[TypeTable], tuple[list[Type], Type | None]]] = {
     "strings.build": lambda t: ([BUILDER], STR),
     "strings.from_int": lambda t: ([INT], STR),
 }
-# Like push, these change their first argument, which must be a place.
+# Like push, these change their first argument, written `mut place`.
 CHANGES_FIRST = frozenset({"strings.add", "strings.add_byte", "strings.add_int"})
 PRINTABLE = (INT, BYTE, BOOL, STR)
 
@@ -93,6 +93,7 @@ class Local:
 class Signature:
     params: list[Type]  # ERROR where a type name was unknown
     result: Type | None
+    mutable: list[bool]  # which parameters are `mut`
 
 
 def check(program: list[Module]) -> TypeTable:
@@ -181,6 +182,7 @@ class Checker:
             f.sig = Signature(
                 [self.resolve_type(p.type) for p in f.params],
                 self.resolve_type(f.result) if f.result else None,
+                [p.mutable for p in f.params],
             )
             if f.pub:
                 for t in [p.type for p in f.params] + ([f.result] if f.result else []):
@@ -286,7 +288,8 @@ class Checker:
             if p.name in scope:
                 self.report(p, f"parameter '{p.name}' is already declared")
             self.check_name_allowed(p)
-            p.local = scope[p.name] = Local(p.name, ty, "parameter", p.line, p.col)
+            kind = "mut parameter" if p.mutable else "parameter"
+            p.local = scope[p.name] = Local(p.name, ty, kind, p.line, p.col)
         self.scopes = [scope]
         for stmt in f.body.stmts:
             self.stmt(stmt)
@@ -503,7 +506,11 @@ class Checker:
             if ref.kind == "let":
                 self.report(root, f"cannot {verb} {part}'{ref.name}', which was declared with 'let'; "
                                   "use 'let mut' to allow changes")
-            elif ref.kind != "let mut":
+            elif ref.kind == "parameter":
+                self.report(root, f"cannot {verb} {part}parameter '{ref.name}'; declare it as "
+                                  f"`{ref.name}: mut {ref.ty}` to change the caller's value, "
+                                  "or copy it into a `let mut`")
+            elif ref.kind != "let mut" and ref.kind != "mut parameter":
                 self.report(root, f"cannot {verb} {part}{ref.kind} '{ref.name}'")
         return ty
 
@@ -800,6 +807,9 @@ class Checker:
             return self.index(e)
         if isinstance(e, Try):
             return self.try_expr(e)
+        if isinstance(e, MutArg):
+            self.report(e, "`mut` only goes before an argument for a mut parameter")
+            return self.infer(e.place)
         if isinstance(e, Slice):
             return self.slice(e)
         if isinstance(e, ArrayLit):
@@ -1082,10 +1092,44 @@ class Checker:
                 self.infer(arg)
                 continue
             want = sig.params[i - 1]
-            self.check(arg, want, lambda found: f"argument {i} of '{name}' must be {want}, found {found}")
+            if sig.mutable[i - 1]:
+                self.mut_argument(arg, want, f"argument {i} of '{name}'")
+            elif isinstance(arg, MutArg):
+                self.report(arg, f"argument {i} of '{name}' is not a mut parameter; remove `mut`")
+                self.check(arg.place, want, lambda found: f"argument {i} of '{name}' must be {want}, found {found}")
+            else:
+                self.check(arg, want, lambda found: f"argument {i} of '{name}' must be {want}, found {found}")
+        self.exclusive(call)
         # Even after an argument error, the call has the declared result
         # type, so the expression around it can still be checked.
         return sig.result
+
+    def mut_argument(self, arg: Expr, want: Type | None, what: str) -> Type:
+        """An argument the call may change: it must be written `mut place`,
+        and the place must be one that may change. Returns its type."""
+        if not isinstance(arg, MutArg):
+            self.report(arg, f"{what} is changed by the call; write `mut` before it")
+            return self.infer(arg) or ERROR
+        t = self.place(arg.place, "change")
+        arg.ty = t
+        if want is not None and t is not want and ERROR not in (t, want):
+            self.report(arg.place, f"{what} must be {want}, found {t}")
+        return t
+
+    def exclusive(self, call: Call) -> None:
+        """No two `mut` arguments of one call may belong to the same
+        variable: the callee would get two pointers to one value, and a
+        change through one would show through the other."""
+        seen: set[str] = set()
+        for arg in call.args:
+            if isinstance(arg, MutArg):
+                root = arg.place
+                while isinstance(root, (Field, Index)):
+                    root = root.obj
+                if isinstance(root, Name):
+                    if root.name in seen:
+                        self.report(arg, f"'{root.name}' is passed as mut twice in this call")
+                    seen.add(root.name)
 
     def construct(self, call: Call, enum: EnumType, variant: Variant, written: str) -> None:
         """Check a call that builds an enum value: `Expr.Add(a, b)`, `Some(x)`."""
@@ -1185,7 +1229,7 @@ class Checker:
             self.check(args[0], INT, lambda found: f"byte takes an Int, found {found}")
             return BYTE
         if name == "push":
-            t = self.place(args[0], "push onto")
+            t = self.mut_argument(args[0], None, "argument 1 of 'push'")
             if isinstance(t, ArrayType):
                 self.check(args[1], t.elem, lambda found: f"the elements of {t} are {t.elem}, but this is {found}")
             else:
@@ -1194,7 +1238,10 @@ class Checker:
                 self.infer(args[1])
             return NO_VALUE
         # maps.has, maps.get, maps.remove and maps.keys take a map.
-        t = self.place(args[0], "remove from") if name == "maps.remove" else self.value(args[0])
+        if name == "maps.remove":
+            t = self.mut_argument(args[0], None, f"argument 1 of '{written}'")
+        else:
+            t = self.value(args[0])
         if not isinstance(t, MapType):
             if t is not ERROR:
                 self.report(args[0], f"{written} needs a map, not {t}")
@@ -1218,9 +1265,7 @@ class Checker:
             return result
         for i, (arg, want) in enumerate(zip(call.args, params), start=1):
             if i == 1 and name in CHANGES_FIRST:
-                t = self.place(arg, "add to")
-                if t is not want and t is not ERROR:
-                    self.report(arg, f"{written} needs a {want}, not {t}")
+                self.mut_argument(arg, want, f"argument 1 of '{written}'")
             else:
                 self.check(arg, want, lambda found: f"argument {i} of '{written}' must be {want}, found {found}")
         return result

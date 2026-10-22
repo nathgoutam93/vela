@@ -145,6 +145,16 @@ class Index:
 
 
 @dataclass
+class MutArg:
+    """`mut x` as a call argument: the place the callee may change. Only
+    appears directly in a call's argument list."""
+    place: Expr
+    line: int  # the `mut`
+    col: int
+    ty: Any = checked()
+
+
+@dataclass
 class Try:
     """`inner?`: the value inside an Ok or Some, or an early return of the
     Err or None."""
@@ -278,7 +288,7 @@ class Match:
 
 
 Expr = (IntLit | ByteLit | BoolLit | StrLit | UnitLit | Name | Unary | Binary | Call | Field | Index
-        | Try | Slice | ArrayLit | MapLit | StructLit | Match)
+        | Try | MutArg | Slice | ArrayLit | MapLit | StructLit | Match)
 
 
 # ---- Statements ----
@@ -396,6 +406,7 @@ class Param:
     type: TypeName
     line: int
     col: int
+    mutable: bool = False  # `g: mut Gen`: the caller's value, changed in place
     local: Any = checked()
 
 
@@ -498,7 +509,7 @@ def sx_type_decl(d: StructDecl | EnumDecl) -> list:
 
 
 def sx_fn(f: FnDecl) -> list:
-    params = [[p.name, sx_type(p.type)] for p in f.params]
+    params = [[p.name, *(["mut"] if p.mutable else []), sx_type(p.type)] for p in f.params]
     head = [*(["pub"] if f.pub else []), "fn", f.name, params]
     if f.result:
         head.append(sx_type(f.result))
@@ -586,6 +597,8 @@ def sx_expr(e: Expr) -> Any:
         return ["[]", sx_expr(e.obj), sx_expr(e.index)]
     if isinstance(e, Try):
         return ["?", sx_expr(e.inner)]
+    if isinstance(e, MutArg):
+        return ["mut", sx_expr(e.place)]
     if isinstance(e, Slice):
         return ["[..]", sx_expr(e.obj), sx_expr(e.start), sx_expr(e.end)]
     if isinstance(e, ArrayLit):

@@ -10,29 +10,29 @@ pub type Count = struct {
 pub fn render(total: Int, counts: Map[Str, Int], top: Int) -> Str {
     let ranked = rank(counts)
     let mut b = strings.builder()
-    strings.add(b, "words: ")
-    strings.add_int(b, total)
-    strings.add(b, "\ndistinct: ")
-    strings.add_int(b, len(ranked))
-    strings.add(b, "\n")
+    strings.add(mut b, "words: ")
+    strings.add_int(mut b, total)
+    strings.add(mut b, "\ndistinct: ")
+    strings.add_int(mut b, len(ranked))
+    strings.add(mut b, "\n")
     let mut i = 0
     for i < len(ranked) && i < top {
         let c = ranked[i]
-        strings.add(b, "\n")
-        strings.add(b, c.word)
+        strings.add(mut b, "\n")
+        strings.add(mut b, c.word)
         let mut pad = len(c.word)
         for pad < 8 {
-            strings.add_byte(b, ' ')
+            strings.add_byte(mut b, ' ')
             pad = pad + 1
         }
-        strings.add_int(b, c.n)
-        strings.add_byte(b, ' ')
+        strings.add_int(mut b, c.n)
+        strings.add_byte(mut b, ' ')
         for _ in 0..c.n {
-            strings.add_byte(b, '#')
+            strings.add_byte(mut b, '#')
         }
         i = i + 1
     }
-    strings.add(b, "\n")
+    strings.add(mut b, "\n")
     return strings.build(b)
 }
 
@@ -41,7 +41,7 @@ pub fn render(total: Int, counts: Map[Str, Int], top: Int) -> Str {
 fn rank(counts: Map[Str, Int]) -> [Count] {
     let mut out: [Count] = []
     for w in maps.keys(counts) {
-        push(out, Count { word: w, n: counts[w] })
+        push(mut out, Count { word: w, n: counts[w] })
     }
     let mut i = 1
     for i < len(out) {

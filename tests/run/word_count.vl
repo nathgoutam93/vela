@@ -15,7 +15,7 @@ fn split(text: Str) -> [Str] {
     for i in 0..len(text) + 1 {
         if i == len(text) || text[i] == ' ' {
             if i > start {
-                push(words, text[start..i])
+                push(mut words, text[start..i])
             }
             start = i + 1
         }

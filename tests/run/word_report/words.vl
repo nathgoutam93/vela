@@ -11,16 +11,16 @@ pub fn split(text: Str) -> [Str] {
     let mut in_word = false
     for c in text {
         if bytes.is_letter(c) {
-            strings.add_byte(b, bytes.to_lower(c))
+            strings.add_byte(mut b, bytes.to_lower(c))
             in_word = true
         } else if in_word {
-            push(words, strings.build(b))
+            push(mut words, strings.build(b))
             b = strings.builder()
             in_word = false
         }
     }
     if in_word {
-        push(words, strings.build(b))
+        push(mut words, strings.build(b))
     }
     return words
 }

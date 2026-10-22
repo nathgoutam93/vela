@@ -36,18 +36,18 @@ fn main() {
     }
     let mut counts = strings.builder()
     for n in [digits, letters, alnum, upper, lower] {
-        strings.add_int(counts, n)
-        strings.add_byte(counts, ' ')
+        strings.add_int(mut counts, n)
+        strings.add_byte(mut counts, ' ')
     }
-    strings.add_int(counts, space)
+    strings.add_int(mut counts, space)
     print(strings.build(counts))
 
     let text = "Hello, World 123"
     let mut up = strings.builder()
     let mut down = strings.builder()
     for c in text {
-        strings.add_byte(up, bytes.to_upper(c))
-        strings.add_byte(down, bytes.to_lower(c))
+        strings.add_byte(mut up, bytes.to_upper(c))
+        strings.add_byte(mut down, bytes.to_lower(c))
     }
     print(strings.build(up))
     print(strings.build(down))

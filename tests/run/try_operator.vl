@@ -19,9 +19,9 @@ fn digit(c: Byte, s: Str) -> Result[Int, Str] {
         return Ok(int(c - '0'))
     }
     let mut b = strings.builder()
-    strings.add(b, "bad digit '")
-    strings.add_byte(b, c)
-    strings.add(b, "' in \"" + s + "\"")
+    strings.add(mut b, "bad digit '")
+    strings.add_byte(mut b, c)
+    strings.add(mut b, "' in \"" + s + "\"")
     return Err(strings.build(b))
 }
 
@@ -38,7 +38,7 @@ fn total(items: [Str]) -> Result[Str, Str] {
     let mut sum = 0
     let mut seen: [Str] = []
     for item in items {
-        push(seen, item + "!")
+        push(mut seen, item + "!")
         sum = sum + number(item)?
     }
     return Ok("sum is " + strings.from_int(sum))

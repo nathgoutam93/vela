@@ -46,7 +46,7 @@ from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, Expr, ExprStmt,
     Field, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let, MapLit, Match, MatchStmt, Name,
     Pattern, PBind, PLit, PRange, PVariant, PWild, Return, Slice, Stmt, StrLit,
-    StructLit, Try, Unary, UnitLit,
+    MutArg, StructLit, Try, Unary, UnitLit,
 )
 from c_layout import Layout, mangle
 from checker import Local
@@ -98,7 +98,8 @@ def generate(program: list[Module], table: TypeTable) -> str:
 def prototype(f: FnDecl, layout: Layout, names: list[str] | None = None) -> str:
     """`int64_t f_fib(int64_t v_n)`, or with no names, `int64_t f_fib(int64_t)`."""
     params = [
-        layout.c_type(t) + (f" {names[i]}" if names else "") for i, t in enumerate(f.sig.params)
+        layout.c_type(t) + (" *" if f.sig.mutable[i] else "") + (f" {names[i]}" if names else "")
+        for i, t in enumerate(f.sig.params)
     ]
     return f"{layout.c_type(f.sig.result)} {fn_name(f)}({', '.join(params) or 'void'})"
 
@@ -183,6 +184,11 @@ class FunctionGen:
         new, uninitialised `v_x`, whereas Vela's `let x = x` means the outer
         one.
         """
+        name = self.c_name(local)
+        # A mut parameter is a pointer to the caller's value.
+        return f"(*{name})" if local.kind == "mut parameter" else name
+
+    def c_name(self, local: Local) -> str:
         if local not in self.names:
             base = name = f"v_{local.name}"
             n = 2
@@ -275,9 +281,10 @@ class FunctionGen:
         self.push_frame("function")
         names = []
         for p in f.params:
-            # The caller passes each argument owned; the callee releases it.
-            names.append(self.local(p.local))
-            if self.managed(p.local.ty):
+            # The caller passes each argument owned and the callee releases
+            # it, except a mut parameter, which stays the caller's.
+            names.append(self.c_name(p.local))
+            if self.managed(p.local.ty) and not p.mutable:
                 self.frames[-1].items.append((names[-1], p.local.ty))
         for stmt in f.body.stmts:
             self.stmt(stmt)
@@ -589,7 +596,12 @@ class FunctionGen:
                 return self.enum_value(enum, variant, [self.consume(self.expr(a)) for a in e.args])
             if isinstance(e.target, str):
                 return self.builtin(e)
-            args = [self.consume(self.expr(a)) for a in e.args]
+            # The other arguments first, left to right; then the places of
+            # the mut ones, so nothing evaluated in between can move them.
+            args = ["" if isinstance(a, MutArg) else self.consume(self.expr(a)) for a in e.args]
+            for i, a in enumerate(e.args):
+                if isinstance(a, MutArg):
+                    args[i] = "&" + self.place(a.place)
             call = f"{fn_name(e.target)}({', '.join(args)})"
             if t is None:
                 self.emit(call + ";")
@@ -767,8 +779,8 @@ class FunctionGen:
         if name == "strings.builder":
             return self.store(e.ty, "vela_array_new(&vela_type_byte, 0)")
         if name in ("strings.add", "strings.add_byte", "strings.add_int"):
-            value = self.expr(args[1]).c  # the value first, then the place: left to right
-            b = self.writable(args[0])
+            value = self.expr(args[1]).c  # the value first, then the place, as for any mut argument
+            b = self.writable(args[0].place)
             if name == "strings.add_byte":
                 self.emit(f"vela_array_push({b}, {self.addr('uint8_t', value)});")
             else:
@@ -787,7 +799,7 @@ class FunctionGen:
             return Value(self.scalar(BYTE, f"vela_to_byte({arg}, {self.loc(e)})"), BYTE)
         if name == "push":
             value = self.consume(self.expr(args[1]))
-            array = self.writable(args[0])
+            array = self.writable(args[0].place)
             elem = self.c_type(args[0].ty.elem)
             self.emit(f"vela_array_push({array}, {self.addr(elem, value)});")
             return Value("", None)
@@ -796,7 +808,7 @@ class FunctionGen:
         k = self.c_type(mt.key)
         if name == "maps.remove":
             key = self.expr(args[1]).c
-            m = self.writable(args[0])
+            m = self.writable(args[0].place)
             self.emit(f"(void)vela_map_remove({m}, {self.addr(k, key)});")
             return Value("", None)
         m = self.expr(args[0]).c

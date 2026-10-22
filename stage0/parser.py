@@ -13,7 +13,7 @@ commas or newlines):
     typedecl  = "type" NAME "=" ( "struct" "{" { NAME ":" type } "}"
                                 | "enum" "{" { NAME [ "(" type { "," type } ")" ] } "}" )
     fn        = "fn" NAME "(" [ param { "," param } [ "," ] ] ")" [ "->" type ] block
-    param     = NAME ":" type
+    param     = NAME ":" [ "mut" ] type
     type      = [ NAME "." ] NAME [ "[" type { "," type } "]" ] | "[" type "]"
     block     = "{" { statement ";" } "}"
     statement = "let" [ "mut" ] NAME [ ":" type ] "=" expr
@@ -27,6 +27,8 @@ commas or newlines):
               | expr "[" expr [ ".." expr ] "]"
               | "[" [ expr { "," expr } ] "]" | "[" ":" "]" | "[" expr ":" expr { "," expr ":" expr } "]"
               | "match" expr "{" { pattern "=>" expr } "}"
+    args      = [ arg { "," arg } [ "," ] ]         (in a call's parentheses)
+    arg       = [ "mut" ] expr
     pattern   = "_" | NAME | literal [ "..=" literal ]
               | [ [ NAME "." ] NAME "." ] NAME [ "(" pattern { "," pattern } ")" ]
 
@@ -50,7 +52,7 @@ from typing import Any, Callable
 from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, EnumDecl, Expr,
     ExprStmt, Field, FieldDecl, FieldInit, FnDecl, For, ForEach, ForRange, If, Import, Index,
-    IntLit, Let, Try, UnitLit,
+    IntLit, Let, MutArg, Try, UnitLit,
     MapEntry, MapLit, Match, MatchStmt, Name, Param, Pattern, PBind, PLit, Program, PRange,
     PVariant, PWild, Return, Slice, Stmt, StrLit, StructDecl, StructLit, TypeName, Unary,
     VariantDecl,
@@ -229,7 +231,10 @@ class Parser:
         while self.peek().kind != ")":
             pname = self.expect_name("for a parameter")
             self.expect(":", f"and a type after parameter '{pname.text}'")
-            params.append(Param(pname.text, self.type_name(), pname.line, pname.col))
+            mutable = self.peek().kind == "mut"
+            if mutable:
+                self.advance()
+            params.append(Param(pname.text, self.type_name(), pname.line, pname.col, mutable))
             if self.peek().kind != ",":
                 break
             self.advance()
@@ -684,7 +689,11 @@ class Parser:
         self.advance()  # the "("
         args = []
         while self.peek().kind != ")":
-            args.append(self.nested_expression())
+            if self.peek().kind == "mut":
+                mut = self.advance()
+                args.append(MutArg(self.nested_expression(), mut.line, mut.col))
+            else:
+                args.append(self.nested_expression())
             if self.peek().kind != ",":
                 break
             self.advance()

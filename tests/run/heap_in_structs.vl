@@ -40,7 +40,7 @@ fn main() {
     let t = Tree { name: "root", kids: [leaf("a"), leaf("b")] }
     let mut copy = t
     copy.kids[0].name = "renamed"
-    push(copy.kids[1].kids, leaf("c"))
+    push(mut copy.kids[1].kids, leaf("c"))
     print(t.name)
     print(t.kids[1].name)
     print(len(t.kids))

@@ -6,12 +6,12 @@
 fn sieve(limit: Int) -> [Int] {
     let mut crossed: [Bool] = []
     for i in 0..limit + 1 {
-        push(crossed, false)
+        push(mut crossed, false)
     }
     let mut primes: [Int] = []
     for n in 2..limit + 1 {
         if !crossed[n] {
-            push(primes, n)
+            push(mut primes, n)
             let mut m = n * n
             for m <= limit {
                 crossed[m] = true

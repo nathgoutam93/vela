@@ -31,7 +31,7 @@ fn count(t: Tree) -> Int {
 fn main() {
     let mut xs: [Int] = []
     for i in 0..100000 {
-        push(xs, i)
+        push(mut xs, i)
     }
     print(len(xs))
     let mut total = 0
@@ -52,7 +52,7 @@ fn main() {
         if !maps.has(groups, key) {
             groups[key] = []
         }
-        push(groups[key], s[0..i % 7])
+        push(mut groups[key], s[0..i % 7])
     }
     print(len(groups[0]) + len(groups[1]))
     print(len(groups[1]))

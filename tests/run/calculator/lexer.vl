@@ -16,13 +16,13 @@ pub fn tokenize(src: Str) -> Result[[tokens.Token], Str] {
                 n = n * 10 + int(src[i] - '0')
                 i = i + 1
             }
-            push(out, tokens.Token { kind: tokens.Kind.Num(n), col: col })
+            push(mut out, tokens.Token { kind: tokens.Kind.Num(n), col: col })
         } else if is_letter(c) {
             let start = i
             for i < len(src) && (is_letter(src[i]) || is_digit(src[i])) {
                 i = i + 1
             }
-            push(out, tokens.Token { kind: tokens.Kind.Name(src[start..i]), col: col })
+            push(mut out, tokens.Token { kind: tokens.Kind.Name(src[start..i]), col: col })
         } else {
             let kind: Option[tokens.Kind] = match c {
                 '+' => Some(tokens.Kind.Plus)
@@ -35,13 +35,13 @@ pub fn tokenize(src: Str) -> Result[[tokens.Token], Str] {
                 _ => None
             }
             match kind {
-                Some(k) => push(out, tokens.Token { kind: k, col: col })
+                Some(k) => push(mut out, tokens.Token { kind: k, col: col })
                 None => return error(col, "unexpected character '" + src[i..i + 1] + "'")
             }
             i = i + 1
         }
     }
-    push(out, tokens.Token { kind: tokens.Kind.End, col: len(src) + 1 })
+    push(mut out, tokens.Token { kind: tokens.Kind.End, col: len(src) + 1 })
     return Ok(out)
 }
 

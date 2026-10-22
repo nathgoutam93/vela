@@ -1,0 +1,113 @@
+// mut parameters: the callee changes the caller's value in place. The call
+// says so with `mut`. Values passed without `mut` are still copies, so a
+// change through a mut parameter never shows in them.
+// out: 3 lines, 3 temps
+// out: int _t1;
+// out: 2
+// out: 7 2
+// out: [1, 2, 3] [1, 2, 3, 4]
+// out: 10
+// out: abc
+// out: 1 2
+// out: 3 3 3 [1, 2, 3, 3, 3, 3]
+import strings
+
+type Gen = struct {
+    lines: [Str]
+    temps: Int
+}
+
+fn emit(g: mut Gen, line: Str) {
+    push(mut g.lines, line)
+}
+
+fn temp(g: mut Gen) -> Str {
+    g.temps = g.temps + 1
+    let name = "_t" + strings.from_int(g.temps)
+    emit(mut g, "int " + name + ";")  // a mut parameter passed on as mut
+    return name
+}
+
+type Counter = struct {
+    n: Int
+}
+
+fn bump(c: mut Counter, by: Int) {
+    c.n = c.n + by
+}
+
+// Replacing the whole value works too.
+fn reset(c: mut Counter) {
+    c = Counter { n: 0 }
+}
+
+fn show(xs: [Int]) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, "[")
+    for i in 0..len(xs) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add_int(mut b, xs[i])
+    }
+    strings.add(mut b, "]")
+    return strings.build(b)
+}
+
+fn append(xs: mut [Int], x: Int) {
+    push(mut xs, x)
+}
+
+// `ys` may be the very array passed as `xs`: it is a copy all the same.
+fn grow(xs: mut [Int], ys: [Int]) {
+    push(mut xs, len(ys))
+    push(mut xs, len(ys))
+    push(mut xs, ys[len(ys) - 1])
+}
+
+fn swap(a: mut Int, b: mut Int) {
+    let t = a
+    a = b
+    b = t
+}
+
+fn main() {
+    let mut g = Gen { lines: [], temps: 0 }
+    let a = temp(mut g)
+    let b = temp(mut g)
+    emit(mut g, a + " = " + b + ";")
+    g.temps = g.temps + 1
+    print(strings.from_int(len(g.lines)) + " lines, " + strings.from_int(g.temps) + " temps")
+    print(g.lines[0])
+
+    let mut cs = [Counter { n: 1 }, Counter { n: 2 }]
+    bump(mut cs[0], 1)
+    print(cs[0].n)
+    let copy = cs[1]
+    bump(mut cs[1], 5)
+    print(strings.from_int(cs[1].n) + " " + strings.from_int(copy.n))
+
+    let mut xs = [1, 2, 3]
+    let before = xs
+    append(mut xs, len(xs) + 1)  // len(xs) is worked out before xs is lent
+    print(show(before) + " " + show(xs))
+
+    let mut c = Counter { n: 4 }
+    bump(mut c, c.n + 2)
+    print(c.n)
+    reset(mut c)
+
+    let mut words = ["abc"]
+    let w = words[0]
+    push(mut words, w)
+    print(words[1])
+
+    let mut x = 2
+    let mut y = 1
+    swap(mut x, mut y)
+    print(strings.from_int(x) + " " + strings.from_int(y))
+
+    let mut zs = [1, 2, 3]
+    grow(mut zs, zs)
+    print(strings.from_int(zs[3]) + " " + strings.from_int(zs[4]) + " " + strings.from_int(zs[5]) + " " + show(zs))
+}

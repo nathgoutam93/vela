@@ -4,8 +4,8 @@
 // err: heap_type_errors.vl:25:18: error: the elements of an array must all be Int, but this is Str
 // err: heap_type_errors.vl:27:12: error: Int cannot be indexed; only arrays, Strs and maps can
 // err: heap_type_errors.vl:29:6: error: a Str cannot be changed; build a new one instead, for example with +
-// err: heap_type_errors.vl:31:10: error: cannot push onto 'ys', which was declared with 'let'; use 'let mut' to allow changes
-// err: heap_type_errors.vl:33:14: error: the elements of [Int] are Int, but this is Str
+// err: heap_type_errors.vl:31:14: error: cannot change 'ys', which was declared with 'let'; use 'let mut' to allow changes
+// err: heap_type_errors.vl:33:18: error: the elements of [Int] are Int, but this is Str
 // err: heap_type_errors.vl:34:15: error: len takes a Str, an array or a map, not Int
 // err: heap_type_errors.vl:35:19: error: 300 does not fit in a Byte (0 to 255)
 // err: heap_type_errors.vl:37:17: error: operator '+' needs two Bytes or two Ints, found Byte and Int; convert with int() or byte()
@@ -28,9 +28,9 @@ fn main() {
     let s = "abc"
     s[0] = 'x'
     let ys = [1, 2]
-    push(ys, 3)
+    push(mut ys, 3)
     let mut zs = [1]
-    push(zs, "x")
+    push(mut zs, "x")
     print(len(5))
     let b: Byte = 300
     let c = 'a' + 1

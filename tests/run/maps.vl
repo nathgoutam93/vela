@@ -32,7 +32,7 @@ fn main() {
     fruit["apple"] = 10
     show(maps.get(fruit, "apple"))
     show(maps.get(fruit, "kiwi"))
-    maps.remove(fruit, "apple")
+    maps.remove(mut fruit, "apple")
     print(len(fruit))
     for k in maps.keys(fruit) {
         print(k)

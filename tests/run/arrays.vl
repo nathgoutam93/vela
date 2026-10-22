@@ -26,7 +26,7 @@ fn main() {
     print(xs[1])
     xs[1] = 99
     print(xs[1])
-    push(xs, 7)
+    push(mut xs, 7)
     print(len(xs))
     let empty: [Int] = []
     let mut grid: [[Int]] = [[1, 2], [3], []]
@@ -36,8 +36,8 @@ fn main() {
     print(middle[1])
     print(xs[3])
     print(len(grid[2]))
-    push(grid[2], 5)
-    push(grid[2], 6)
+    push(mut grid[2], 5)
+    push(mut grid[2], 6)
     print(len(grid[2]))
     grid[1][0] = sum(empty) + 3
     print(grid[1][0])

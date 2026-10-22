@@ -19,9 +19,9 @@ fn join(xs: [Int], sep: Str) -> Str {
     let mut first = true
     for x in xs {
         if !first {
-            strings.add(b, sep)
+            strings.add(mut b, sep)
         }
-        strings.add_int(b, x)
+        strings.add_int(mut b, x)
         first = false
     }
     return strings.build(b)
@@ -29,30 +29,30 @@ fn join(xs: [Int], sep: Str) -> Str {
 
 fn main() {
     let mut b = strings.builder()
-    strings.add(b, "hello")
-    strings.add_byte(b, ',')
-    strings.add_byte(b, ' ')
-    strings.add(b, "world")
+    strings.add(mut b, "hello")
+    strings.add_byte(mut b, ',')
+    strings.add_byte(mut b, ' ')
+    strings.add(mut b, "world")
     print(strings.build(b))
 
     let mut n = strings.builder()
-    strings.add_int(n, -9223372036854775807 - 1)
-    strings.add(n, " ")
-    strings.add_int(n, 0)
-    strings.add(n, " " + strings.from_int(9223372036854775807))
+    strings.add_int(mut n, -9223372036854775807 - 1)
+    strings.add(mut n, " ")
+    strings.add_int(mut n, 0)
+    strings.add(mut n, " " + strings.from_int(9223372036854775807))
     print(strings.build(n))
 
     let mut a = strings.builder()
-    strings.add(a, "abc")
+    strings.add(mut a, "abc")
     let empty = strings.builder()
     print("[" + strings.build(a) + "] [" + strings.build(empty) + "]")
 
     let mut c = a
-    strings.add(c, "def")
+    strings.add(mut c, "def")
     print(strings.build(a) + "|" + strings.build(c))
 
     let mut d = Doc { title: "t", body: strings.builder() }
-    strings.add(d.body, "one")
+    strings.add(mut d.body, "one")
     let docs = [d, d]
     print(len(strings.build(docs[1].body)))
 
