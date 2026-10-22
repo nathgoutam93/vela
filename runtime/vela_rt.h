@@ -233,6 +233,11 @@ vela_str vela_from_int(int64_t n);
 // The shortest decimal that reads back as exactly x, with ".0" when it
 // would look like an Int: 0.1, 2.5, 3.0, 1e+20, inf, -inf, nan.
 vela_str vela_from_float(double x);
+// strings.parse_float(s): true, with the number in *out, if s is a decimal
+// number as Vela or JSON writes one: an optional "-", digits, an optional
+// fraction and an optional exponent (12, -0.5, 1e-9, 2.5E+3). The nearest
+// Float, as C's strtod rounds it; inf for one too big.
+bool vela_parse_float(vela_str s, double *out);
 // int(x) of a Float: rounded toward zero; a panic for NaN or out of range.
 int64_t vela_float_to_int(double x, const char *loc);
 

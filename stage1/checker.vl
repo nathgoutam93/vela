@@ -947,7 +947,7 @@ fn std_hint(c: Checker, name: Str) -> Str {
             "maps" => ["has", "get", "remove", "keys"]
             "files" => ["read", "write", "remove", "temp_dir"]
             "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write"]
-            _ => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float"]
+            _ => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float", "parse_float"]
         }
         for f in fns {
             if f == name {
@@ -3309,6 +3309,9 @@ fn signature(c: mut Checker, name: Str) -> [Int] {
     }
     if name == "os.read_line" {
         return [types.option(mut c.table, s)]
+    }
+    if name == "strings.parse_float" {
+        return [s, types.option(mut c.table, types.FLOAT())]
     }
     return match name {
         "os.exit" => [types.INT(), nothing]

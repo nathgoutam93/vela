@@ -1,0 +1,42 @@
+// stage 1 only
+// strings.parse_float reads a decimal number, as Vela or JSON writes one,
+// to the nearest Float; anything else is None.
+// out: 0.1
+// out: -2500.0
+// out: 1e-09
+// out: 1.7976931348623157e+308
+// out: inf
+// out: 0.30000000000000004
+// out: none: '' '-' '1.' '.5' '+1' ' 1' '1e' 'inf' 'nan' '0x10' '1_000'
+import strings
+
+fn show(s: Str) {
+    match strings.parse_float(s) {
+        Some(x) => print(x)
+        None => print("none")
+    }
+}
+
+fn main() {
+    for s in ["0.1", "-2.5e3", "1E-9", "1.7976931348623157e308", "1e400"] {
+        show(s)
+    }
+    match strings.parse_float("0.1") {
+        Some(a) => {
+            match strings.parse_float("0.2") {
+                Some(b) => print(a + b)
+                None => {}
+            }
+        }
+        None => {}
+    }
+    let mut b = strings.builder()
+    strings.add(mut b, "none:")
+    for s in ["", "-", "1.", ".5", "+1", " 1", "1e", "inf", "nan", "0x10", "1_000"] {
+        match strings.parse_float(s) {
+            Some(_) => print("parsed " + s)
+            None => strings.add(mut b, " '" + s + "'")
+        }
+    }
+    print(strings.build(b))
+}

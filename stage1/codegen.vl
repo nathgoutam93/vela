@@ -1726,14 +1726,20 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         name == "os.run" {
         return file_call(mut g, e, name, args)
     }
-    if name == "os.env" || name == "os.read_line" {
+    if name == "os.env" || name == "os.read_line" || name == "strings.parse_float" {
         let mut call = "vela_os_read_line("
         if name == "os.env" {
             call = "vela_os_env(" + expr(mut g, args[0]).c + ", "
+        } else if name == "strings.parse_float" {
+            call = "vela_parse_float(" + expr(mut g, args[0]).c + ", "
         }
         let text = new_temp(mut g)
         let ok = new_temp(mut g)
-        emit(mut g, "vela_str " + text + " = VELA_STR(\"\", 0);")
+        if name == "strings.parse_float" {
+            emit(mut g, "double " + text + " = 0;")
+        } else {
+            emit(mut g, "vela_str " + text + " = VELA_STR(\"\", 0);")
+        }
         emit(mut g, "bool " + ok + " = " + call + "&" + text + ");")
         let opt = c_type(g, t)
         let some = "(" + opt + "){ .tag = " + layout.tag(g.l, t, "Some") + ", .as.m_Some = { ._0 = " + text + " } }"

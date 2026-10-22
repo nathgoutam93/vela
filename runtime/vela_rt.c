@@ -473,6 +473,37 @@ vela_str vela_from_float(double x) {
     return str_from(buf, (size_t)len);
 }
 
+bool vela_parse_float(vela_str s, double *out) {
+    // The syntax is checked here, so strtod sees no hex, "inf", "nan" or spaces.
+    int64_t i = 0, n = s.len;
+    const uint8_t *d = s.data;
+    if (i < n && d[i] == '-') i++;
+    int64_t digits = i;
+    while (i < n && d[i] >= '0' && d[i] <= '9') i++;
+    if (i == digits) return false;
+    if (i < n && d[i] == '.') {
+        i++;
+        int64_t fraction = i;
+        while (i < n && d[i] >= '0' && d[i] <= '9') i++;
+        if (i == fraction) return false;
+    }
+    if (i < n && (d[i] == 'e' || d[i] == 'E')) {
+        i++;
+        if (i < n && (d[i] == '+' || d[i] == '-')) i++;
+        int64_t exponent = i;
+        while (i < n && d[i] >= '0' && d[i] <= '9') i++;
+        if (i == exponent) return false;
+    }
+    if (i != n) return false;
+    char small[64];
+    char *buf = n < (int64_t)sizeof small ? small : vela_alloc((size_t)n + 1);
+    memcpy(buf, d, (size_t)n);
+    buf[n] = 0;
+    *out = strtod(buf, NULL);
+    if (buf != small) free(buf);
+    return true;
+}
+
 int64_t vela_float_to_int(double x, const char *loc) {
     // 2^63 is exact as a double; anything at or beyond it does not fit.
     if (isnan(x) || x >= 9223372036854775808.0 || x < -9223372036854775808.0) {

@@ -1,0 +1,752 @@
+// JSON: reading and writing it. `import json`.
+// stage 1 only
+//
+//     match json.parse("{\"id\": 1, \"tags\": [\"a\"]}") {
+//         Ok(doc) => print(json.int_or(json.get(doc, "id"), 0))
+//         Err(e) => print(e)  // "line 1, col 9: expected ..."
+//     }
+//     print(json.show(json.object([json.member("ok", json.boolean(true))])))
+//
+// A number without a fraction or an exponent reads as an Int when it fits
+// one, and as a Float otherwise, as Python's json module does: an id or a
+// line number stays exact. An object keeps its members in the order they
+// were written, duplicates too; `get` finds the last, as JavaScript does.
+// Strs are bytes, so text that is not UTF-8 is written out as it is.
+import strings
+
+pub type Json = enum {
+    Null
+    Bool(Bool)
+    Int(Int)
+    Float(Float)
+    Str(Str)
+    Array([Json])
+    Object([Member])
+}
+
+pub type Member = struct {
+    key: Str
+    value: Json
+}
+
+// ---- Making values ----
+
+pub fn null() -> Json {
+    return Json.Null
+}
+
+pub fn boolean(b: Bool) -> Json {
+    return Json.Bool(b)
+}
+
+pub fn integer(n: Int) -> Json {
+    return Json.Int(n)
+}
+
+pub fn number(x: Float) -> Json {
+    return Json.Float(x)
+}
+
+pub fn string(s: Str) -> Json {
+    return Json.Str(s)
+}
+
+pub fn array(items: [Json]) -> Json {
+    return Json.Array(items)
+}
+
+pub fn object(members: [Member]) -> Json {
+    return Json.Object(members)
+}
+
+pub fn member(key: Str, value: Json) -> Member {
+    return Member { key: key, value: value }
+}
+
+// ---- Reading values ----
+
+// The member `key` of an object, or Null: for a missing key, a null one
+// and a value that is not an object alike, so lookups chain:
+// `get(get(request, "params"), "position")`.
+pub fn get(j: Json, key: Str) -> Json {
+    match j {
+        Json.Object(members) => {
+            let mut i = len(members) - 1
+            for i >= 0 {
+                if members[i].key == key {
+                    return members[i].value
+                }
+                i = i - 1
+            }
+        }
+        _ => {}
+    }
+    return Json.Null
+}
+
+// Item `i` of an array, or Null.
+pub fn at(j: Json, i: Int) -> Json {
+    match j {
+        Json.Array(items) => {
+            if i >= 0 && i < len(items) {
+                return items[i]
+            }
+        }
+        _ => {}
+    }
+    return Json.Null
+}
+
+pub fn has(j: Json, key: Str) -> Bool {
+    match j {
+        Json.Object(members) => {
+            for m in members {
+                if m.key == key {
+                    return true
+                }
+            }
+        }
+        _ => {}
+    }
+    return false
+}
+
+pub fn is_null(j: Json) -> Bool {
+    match j {
+        Json.Null => return true
+        _ => return false
+    }
+}
+
+pub fn as_str(j: Json) -> Option[Str] {
+    match j {
+        Json.Str(s) => return Some(s)
+        _ => return None
+    }
+}
+
+pub fn as_int(j: Json) -> Option[Int] {
+    match j {
+        Json.Int(n) => return Some(n)
+        _ => return None
+    }
+}
+
+// A Float, or an Int as one.
+pub fn as_float(j: Json) -> Option[Float] {
+    match j {
+        Json.Float(x) => return Some(x)
+        Json.Int(n) => return Some(float(n))
+        _ => return None
+    }
+}
+
+pub fn as_bool(j: Json) -> Option[Bool] {
+    match j {
+        Json.Bool(b) => return Some(b)
+        _ => return None
+    }
+}
+
+// The items of an array; [] for anything else.
+pub fn items(j: Json) -> [Json] {
+    match j {
+        Json.Array(xs) => return xs
+        _ => return []
+    }
+}
+
+// The members of an object; [] for anything else.
+pub fn members(j: Json) -> [Member] {
+    match j {
+        Json.Object(ms) => return ms
+        _ => return []
+    }
+}
+
+pub fn str_or(j: Json, fallback: Str) -> Str {
+    match j {
+        Json.Str(s) => return s
+        _ => return fallback
+    }
+}
+
+pub fn int_or(j: Json, fallback: Int) -> Int {
+    match j {
+        Json.Int(n) => return n
+        _ => return fallback
+    }
+}
+
+pub fn bool_or(j: Json, fallback: Bool) -> Bool {
+    match j {
+        Json.Bool(b) => return b
+        _ => return fallback
+    }
+}
+
+// ---- Writing ----
+
+// On one line, with no spaces: {"a":[1,2.5,null]}. A Float that JSON
+// cannot write (inf, nan) becomes null, as JavaScript's JSON.stringify does.
+pub fn show(j: Json) -> Str {
+    let mut b = strings.builder()
+    write(mut b, j, -1, 0)
+    return strings.build(b)
+}
+
+// Over several lines, indented by two spaces; an empty array or object
+// stays as [] or {}.
+pub fn pretty(j: Json) -> Str {
+    let mut b = strings.builder()
+    write(mut b, j, 2, 0)
+    return strings.build(b)
+}
+
+// A Str as a JSON string, quotes and all.
+pub fn quote(s: Str) -> Str {
+    let mut b = strings.builder()
+    write_str(mut b, s)
+    return strings.build(b)
+}
+
+// `indent` < 0 for one line; otherwise the spaces per level, `depth` levels in.
+fn write(b: mut strings.Builder, j: Json, indent: Int, depth: Int) {
+    match j {
+        Json.Null => strings.add(mut b, "null")
+        Json.Bool(v) => {
+            if v {
+                strings.add(mut b, "true")
+            } else {
+                strings.add(mut b, "false")
+            }
+        }
+        Json.Int(n) => strings.add_int(mut b, n)
+        Json.Float(x) => {
+            if x != x || x - x != 0.0 {
+                strings.add(mut b, "null")  // nan, or an infinity
+            } else {
+                strings.add(mut b, strings.from_float(x))
+            }
+        }
+        Json.Str(s) => write_str(mut b, s)
+        Json.Array(xs) => {
+            if len(xs) == 0 {
+                strings.add(mut b, "[]")
+                return
+            }
+            strings.add_byte(mut b, '[')
+            for i in 0..len(xs) {
+                if i > 0 {
+                    strings.add_byte(mut b, ',')
+                }
+                new_line(mut b, indent, depth + 1)
+                write(mut b, xs[i], indent, depth + 1)
+            }
+            new_line(mut b, indent, depth)
+            strings.add_byte(mut b, ']')
+        }
+        Json.Object(ms) => {
+            if len(ms) == 0 {
+                strings.add(mut b, "{}")
+                return
+            }
+            strings.add_byte(mut b, '{')
+            for i in 0..len(ms) {
+                if i > 0 {
+                    strings.add_byte(mut b, ',')
+                }
+                new_line(mut b, indent, depth + 1)
+                write_str(mut b, ms[i].key)
+                strings.add_byte(mut b, ':')
+                if indent >= 0 {
+                    strings.add_byte(mut b, ' ')
+                }
+                write(mut b, ms[i].value, indent, depth + 1)
+            }
+            new_line(mut b, indent, depth)
+            strings.add_byte(mut b, '}')
+        }
+    }
+}
+
+fn new_line(b: mut strings.Builder, indent: Int, depth: Int) {
+    if indent < 0 {
+        return
+    }
+    strings.add_byte(mut b, '\n')
+    for _ in 0..indent * depth {
+        strings.add_byte(mut b, ' ')
+    }
+}
+
+fn write_str(b: mut strings.Builder, s: Str) {
+    strings.add_byte(mut b, '"')
+    for c in s {
+        if c == '"' || c == '\\' {
+            strings.add_byte(mut b, '\\')
+            strings.add_byte(mut b, c)
+        } else if c == '\n' {
+            strings.add(mut b, "\\n")
+        } else if c == '\r' {
+            strings.add(mut b, "\\r")
+        } else if c == '\t' {
+            strings.add(mut b, "\\t")
+        } else if c < 32 || c == 127 {
+            strings.add(mut b, "\\u00")
+            strings.add_byte(mut b, hex_digit(int(c) / 16))
+            strings.add_byte(mut b, hex_digit(int(c) % 16))
+        } else {
+            strings.add_byte(mut b, c)
+        }
+    }
+    strings.add_byte(mut b, '"')
+}
+
+fn hex_digit(n: Int) -> Byte {
+    if n < 10 {
+        return byte(48 + n)
+    }
+    return byte(87 + n)
+}
+
+// ---- Parsing ----
+
+type Reader = struct {
+    text: Str
+    pos: Int
+    error: Str  // the first error, "line L, col C: ...", or ""
+}
+
+// Arrays and objects nested deeper than this are an error rather than a
+// stack overflow: the parser calls itself once per level.
+fn max_depth() -> Int {
+    return 500
+}
+
+// The one JSON value in `text`, which may have spaces around it but
+// nothing else.
+pub fn parse(text: Str) -> Result[Json, Str] {
+    let mut r = Reader { text: text, pos: 0, error: "" }
+    skip_space(mut r)
+    let v = value(mut r, 0)
+    if r.error == "" {
+        skip_space(mut r)
+        if r.pos < len(text) {
+            fail(mut r, "expected the end of the text after the value")
+        }
+    }
+    if r.error != "" {
+        return Err(r.error)
+    }
+    return Ok(v)
+}
+
+// Records the error at the reader's position, unless there is one already.
+fn fail(r: mut Reader, message: Str) {
+    if r.error != "" {
+        return
+    }
+    let mut line = 1
+    let mut col = 1
+    for i in 0..r.pos {
+        if r.text[i] == '\n' {
+            line = line + 1
+            col = 1
+        } else {
+            col = col + 1
+        }
+    }
+    r.error = "line " + strings.from_int(line) + ", col " + strings.from_int(col) + ": " + message
+}
+
+fn skip_space(r: mut Reader) {
+    for r.pos < len(r.text) {
+        let c = r.text[r.pos]
+        if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
+            return
+        }
+        r.pos = r.pos + 1
+    }
+}
+
+// The next byte, or 0 at the end.
+fn peek(r: Reader) -> Byte {
+    if r.pos < len(r.text) {
+        return r.text[r.pos]
+    }
+    return byte(0)
+}
+
+fn next_is(r: Reader, word: Str) -> Bool {
+    return r.pos + len(word) <= len(r.text) && r.text[r.pos..r.pos + len(word)] == word
+}
+
+// A value starting at the reader's position (spaces already skipped).
+fn value(r: mut Reader, depth: Int) -> Json {
+    if depth > max_depth() {
+        fail(mut r, "arrays and objects nested more than " + strings.from_int(max_depth()) + " deep")
+        return Json.Null
+    }
+    let c = peek(r)
+    if c == '{' {
+        return object_value(mut r, depth)
+    }
+    if c == '[' {
+        return array_value(mut r, depth)
+    }
+    if c == '"' {
+        return Json.Str(string_value(mut r))
+    }
+    if c == '-' || c >= '0' && c <= '9' {
+        return number_value(mut r)
+    }
+    for w in ["true", "false", "null"] {
+        if next_is(r, w) {
+            r.pos = r.pos + len(w)
+            return match w {
+                "true" => Json.Bool(true)
+                "false" => Json.Bool(false)
+                _ => Json.Null
+            }
+        }
+    }
+    if r.pos == len(r.text) {
+        fail(mut r, "expected a value, found the end of the text")
+    } else {
+        fail(mut r, "expected a value")
+    }
+    return Json.Null
+}
+
+fn array_value(r: mut Reader, depth: Int) -> Json {
+    r.pos = r.pos + 1  // [
+    let mut xs: [Json] = []
+    skip_space(mut r)
+    if peek(r) == ']' {
+        r.pos = r.pos + 1
+        return Json.Array(xs)
+    }
+    for r.error == "" {
+        skip_space(mut r)
+        push(mut xs, value(mut r, depth + 1))
+        skip_space(mut r)
+        let c = peek(r)
+        if c == ']' {
+            r.pos = r.pos + 1
+            return Json.Array(xs)
+        }
+        if c != ',' {
+            fail(mut r, "expected ',' or ']' in an array")
+        }
+        r.pos = r.pos + 1
+    }
+    return Json.Null
+}
+
+fn object_value(r: mut Reader, depth: Int) -> Json {
+    r.pos = r.pos + 1  // {
+    let mut ms: [Member] = []
+    skip_space(mut r)
+    if peek(r) == '}' {
+        r.pos = r.pos + 1
+        return Json.Object(ms)
+    }
+    for r.error == "" {
+        skip_space(mut r)
+        if peek(r) != '"' {
+            fail(mut r, "expected a member name in quotes")
+            return Json.Null
+        }
+        let key = string_value(mut r)
+        skip_space(mut r)
+        if peek(r) != ':' {
+            fail(mut r, "expected ':' after the member name")
+            return Json.Null
+        }
+        r.pos = r.pos + 1
+        skip_space(mut r)
+        push(mut ms, Member { key: key, value: value(mut r, depth + 1) })
+        skip_space(mut r)
+        let c = peek(r)
+        if c == '}' {
+            r.pos = r.pos + 1
+            return Json.Object(ms)
+        }
+        if c != ',' {
+            fail(mut r, "expected ',' or '}' in an object")
+        }
+        r.pos = r.pos + 1
+    }
+    return Json.Null
+}
+
+fn number_value(r: mut Reader) -> Json {
+    let start = r.pos
+    let mut whole = true
+    if peek(r) == '-' {
+        r.pos = r.pos + 1
+    }
+    if peek(r) == '0' {
+        r.pos = r.pos + 1
+    } else if !digits(mut r) {
+        fail(mut r, "expected a digit")
+        return Json.Null
+    }
+    if peek(r) == '.' {
+        whole = false
+        r.pos = r.pos + 1
+        if !digits(mut r) {
+            fail(mut r, "expected a digit after '.'")
+            return Json.Null
+        }
+    }
+    if peek(r) == 'e' || peek(r) == 'E' {
+        whole = false
+        r.pos = r.pos + 1
+        if peek(r) == '+' || peek(r) == '-' {
+            r.pos = r.pos + 1
+        }
+        if !digits(mut r) {
+            fail(mut r, "expected a digit in the exponent")
+            return Json.Null
+        }
+    }
+    let text = r.text[start..r.pos]
+    if whole {
+        match whole_number(text) {
+            Some(n) => return Json.Int(n)
+            None => {}
+        }
+    }
+    match strings.parse_float(text) {
+        Some(x) => return Json.Float(x)
+        None => {}
+    }
+    fail(mut r, "not a number")  // not reached: the syntax was checked above
+    return Json.Null
+}
+
+// Skips digits; false if there were none.
+fn digits(r: mut Reader) -> Bool {
+    let start = r.pos
+    for r.pos < len(r.text) && r.text[r.pos] >= '0' && r.text[r.pos] <= '9' {
+        r.pos = r.pos + 1
+    }
+    return r.pos > start
+}
+
+// "-12" as an Int, or None when it does not fit in one.
+fn whole_number(s: Str) -> Option[Int] {
+    let negative = s[0] == '-'
+    let mut i = 0
+    if negative {
+        i = 1
+    }
+    // Counted downwards, since the most negative Int has no positive twin.
+    let min = -9223372036854775807 - 1
+    let mut n = 0
+    for i < len(s) {
+        let d = int(s[i] - '0')
+        if n < (min + d) / 10 {
+            return None
+        }
+        n = n * 10 - d
+        i = i + 1
+    }
+    if negative {
+        return Some(n)
+    }
+    if n == min {
+        return None
+    }
+    return Some(-n)
+}
+
+// A string starting at the opening quote; the reader ends after the closing one.
+fn string_value(r: mut Reader) -> Str {
+    r.pos = r.pos + 1
+    let mut b = strings.builder()
+    let mut start = r.pos  // of the bytes not yet added, which need no unescaping
+    for r.pos < len(r.text) {
+        let c = r.text[r.pos]
+        if c == '"' {
+            strings.add(mut b, r.text[start..r.pos])
+            r.pos = r.pos + 1
+            return strings.build(b)
+        }
+        if c < 32 {
+            fail(mut r, "a control character in a string; write it as an escape such as \\n")
+            return ""
+        }
+        if c != '\\' {
+            r.pos = r.pos + 1
+            continue
+        }
+        strings.add(mut b, r.text[start..r.pos])
+        r.pos = r.pos + 1
+        let e = peek(r)
+        r.pos = r.pos + 1
+        if e == 'n' {
+            strings.add_byte(mut b, '\n')
+        } else if e == 't' {
+            strings.add_byte(mut b, '\t')
+        } else if e == 'r' {
+            strings.add_byte(mut b, '\r')
+        } else if e == 'b' {
+            strings.add_byte(mut b, byte(8))
+        } else if e == 'f' {
+            strings.add_byte(mut b, byte(12))
+        } else if e == '"' || e == '\\' || e == '/' {
+            strings.add_byte(mut b, e)
+        } else if e == 'u' {
+            let mut code = hex4(mut r)
+            // A UTF-16 surrogate pair, \ud83d\ude00, is one character.
+            if code >= 55296 && code < 56320 && next_is(r, "\\u") {
+                let back = r.pos
+                r.pos = r.pos + 2
+                let low = hex4(mut r)
+                if low >= 56320 && low < 57344 {
+                    code = 65536 + (code - 55296) * 1024 + (low - 56320)
+                } else {
+                    r.pos = back
+                }
+            }
+            if code >= 55296 && code < 57344 {
+                code = 65533  // a lone surrogate: the replacement character
+            }
+            add_utf8(mut b, code)
+        } else {
+            r.pos = r.pos - 1
+            fail(mut r, "unknown escape in a string")
+            return ""
+        }
+        start = r.pos
+    }
+    fail(mut r, "a string with no closing quote")
+    return ""
+}
+
+// Four hex digits after `\u`, or an error.
+fn hex4(r: mut Reader) -> Int {
+    let mut n = 0
+    for _ in 0..4 {
+        let c = peek(r)
+        let mut d = -1
+        if c >= '0' && c <= '9' {
+            d = int(c - '0')
+        } else if c >= 'a' && c <= 'f' {
+            d = int(c - 'a') + 10
+        } else if c >= 'A' && c <= 'F' {
+            d = int(c - 'A') + 10
+        }
+        if d < 0 {
+            fail(mut r, "expected four hex digits after \\u")
+            return 0
+        }
+        n = n * 16 + d
+        r.pos = r.pos + 1
+    }
+    return n
+}
+
+fn add_utf8(b: mut strings.Builder, code: Int) {
+    if code < 128 {
+        strings.add_byte(mut b, byte(code))
+    } else if code < 2048 {
+        strings.add_byte(mut b, byte(192 + code / 64))
+        strings.add_byte(mut b, byte(128 + code % 64))
+    } else if code < 65536 {
+        strings.add_byte(mut b, byte(224 + code / 4096))
+        strings.add_byte(mut b, byte(128 + code / 64 % 64))
+        strings.add_byte(mut b, byte(128 + code % 64))
+    } else {
+        strings.add_byte(mut b, byte(240 + code / 262144))
+        strings.add_byte(mut b, byte(128 + code / 4096 % 64))
+        strings.add_byte(mut b, byte(128 + code / 64 % 64))
+        strings.add_byte(mut b, byte(128 + code % 64))
+    }
+}
+
+// ---- Tests ----
+
+fn parsed(text: Str) -> Json {
+    match parse(text) {
+        Ok(j) => return j
+        Err(e) => {
+            print(e)
+            assert(false)
+        }
+    }
+    return Json.Null
+}
+
+fn error_of(text: Str) -> Str {
+    match parse(text) {
+        Ok(_) => return "no error"
+        Err(e) => return e
+    }
+}
+
+test "values" {
+    assert(show(parsed(" null ")) == "null")
+    assert(show(parsed("[true,false]")) == "[true,false]")
+    assert(int_or(parsed("-42"), 0) == -42)
+    assert(int_or(parsed("9223372036854775807"), 0) == 9223372036854775807)
+    assert(int_or(parsed("-9223372036854775808"), 0) == -9223372036854775807 - 1)
+    // Too big for an Int: a Float.
+    assert(show(parsed("9223372036854775808")) == "9.223372036854776e+18")
+    assert(show(parsed("[0.5, -1e3, 2E-2, 1.0]")) == "[0.5,-1000.0,0.02,1.0]")
+    match as_float(parsed("7")) {
+        Some(x) => assert(x == 7.0)
+        None => assert(false)
+    }
+    assert(show(number(1.0 / 0.0)) == "null")
+}
+
+test "strings" {
+    assert(str_or(parsed("\"a\\\"b\\\\c\\/d\\n\""), "") == "a\"b\\c/d\n")
+    assert(str_or(parsed("\"\\u00e9\\u20ac\""), "") == "é€")
+    assert(str_or(parsed("\"\\ud83d\\ude00\""), "") == "😀")
+    assert(str_or(parsed("\"\\ud83d!\""), "") == "�!")
+    assert(str_or(parsed("\"olé\""), "") == "olé")
+    assert(quote("tab\there \"q\" \0") == "\"tab\\there \\\"q\\\" \\u0000\"")
+}
+
+test "objects and arrays" {
+    let doc = parsed("{\"id\": 3, \"params\": {\"position\": {\"line\": 4}}, \"id\": 5, \"list\": [1, [2, []], {}]}")
+    assert(int_or(get(doc, "id"), 0) == 5)
+    assert(int_or(get(get(get(doc, "params"), "position"), "line"), 0) == 4)
+    assert(is_null(get(get(doc, "nothing"), "deeper")) && is_null(get(get(doc, "id"), "x")))
+    assert(has(doc, "list") && !has(doc, "lists") && len(members(doc)) == 4)
+    assert(int_or(at(at(get(doc, "list"), 1), 0), 0) == 2 && is_null(at(get(doc, "list"), 9)))
+    assert(show(doc) == "{\"id\":3,\"params\":{\"position\":{\"line\":4}},\"id\":5,\"list\":[1,[2,[]],{}]}")
+    let made = object([member("ok", boolean(true)), member("items", array([integer(1), string("x"), null()]))])
+    assert(show(made) == "{\"ok\":true,\"items\":[1,\"x\",null]}")
+    assert(pretty(made) == "{\n  \"ok\": true,\n  \"items\": [\n    1,\n    \"x\",\n    null\n  ]\n}")
+    // What show writes, parse reads back the same.
+    assert(show(parsed(pretty(doc))) == show(doc))
+}
+
+test "errors" {
+    assert(error_of("") == "line 1, col 1: expected a value, found the end of the text")
+    assert(error_of("[1, 2") == "line 1, col 6: expected ',' or ']' in an array")
+    assert(error_of("{\"a\" 1}") == "line 1, col 6: expected ':' after the member name")
+    assert(error_of("{\n  \"a\": tru\n}") == "line 2, col 8: expected a value")
+    assert(error_of("[1] 2") == "line 1, col 5: expected the end of the text after the value")
+    assert(error_of("01") == "line 1, col 2: expected the end of the text after the value")
+    assert(error_of("1.") == "line 1, col 3: expected a digit after '.'")
+    assert(error_of("\"abc") == "line 1, col 5: a string with no closing quote")
+    assert(error_of("\"\\q\"") == "line 1, col 3: unknown escape in a string")
+    assert(error_of("{1: 2}") == "line 1, col 2: expected a member name in quotes")
+    assert(error_of("[,]") == "line 1, col 2: expected a value")
+    assert(error_of(text_repeat("[", 600)) == "line 1, col 502: arrays and objects nested more than 500 deep")
+}
+
+fn text_repeat(s: Str, n: Int) -> Str {
+    let mut b = strings.builder()
+    for _ in 0..n {
+        strings.add(mut b, s)
+    }
+    return strings.build(b)
+}
