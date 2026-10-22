@@ -3,11 +3,13 @@
 //     vela1 tokens FILE    print the token stream
 //     vela1 ast FILE       print the syntax tree
 //     vela1 check FILE     report the program's errors, generate nothing
+//     vela1 c FILE         print the generated C
 //
 // More commands arrive as the rest of the compiler is ported (M8). Exit
 // codes as in Stage 0: 0 success, 1 the program has errors, 2 bad command line.
 import ast
 import checker
+import codegen
 import errors
 import files
 import lexer
@@ -28,13 +30,16 @@ fn main() {
         syntax_tree(path)
     } else if command == "check" {
         check(path, std_dir(args[0]))
+    } else if command == "c" {
+        let out = codegen.generate(checked(path, std_dir(args[0])))
+        print(out[0..len(out) - 1])
     } else {
         usage()
     }
 }
 
 fn usage() {
-    os.eprint("usage: vela1 (tokens | ast | check) FILE")
+    os.eprint("usage: vela1 (tokens | ast | check | c) FILE")
     os.exit(2)
 }
 

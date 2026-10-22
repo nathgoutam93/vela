@@ -1,0 +1,532 @@
+// How Vela's types are laid out in C and how their memory is managed: a
+// port of stage0/c_layout.py, which explains tagged unions, boxing of
+// recursive fields, managed types and the generated retain/release
+// functions. Every name and line comes out as Stage 0 writes it.
+import maps
+import strings
+import types
+
+pub type Layout = struct {
+    table: types.Table
+    types: [Int]  // every struct and enum: user types in program order, then Option and Result instances
+    element_types: [Int]  // every type held by an array or map
+    names: Map[Int, Str]  // C names of structs and enums
+    used: Map[Str, Bool]
+    tags: Map[Str, Str]  // by "type variant": C names of enum tags
+    boxed: Map[Str, Bool]  // by "type slot index": slots stored in a box
+    box_types: [Int]  // the types that live in boxes, in order
+    managed_cache: Map[Int, Bool]
+}
+
+// The C name of `name` in `module`, with the module's length in front so
+// two different pairs never give the same name (see Stage 0).
+pub fn mangle(module: Str, name: Str) -> Str {
+    if module == "" {
+        return name
+    }
+    return strings.from_int(len(module)) + module + "_" + name
+}
+
+fn primitive_c(t: Int) -> Str {
+    return match t {
+        1 => "int64_t"
+        2 => "uint8_t"
+        3 => "bool"
+        4 => "vela_str"
+        5 => "vela_unit"
+        _ => ""
+    }
+}
+
+fn runtime_descriptor(t: Int) -> Str {
+    return match t {
+        1 => "&vela_type_int"
+        2 => "&vela_type_byte"
+        3 => "&vela_type_bool"
+        4 => "&vela_type_str"
+        5 => "&vela_type_unit"
+        _ => ""
+    }
+}
+
+fn is_array_like(table: types.Table, t: Int) -> Bool {
+    return t == types.BUILDER() || types.is_array(table, t)
+}
+
+pub fn new_layout(table: types.Table, user_types: [Int], element_types: [Int]) -> Layout {
+    let mut all = user_types
+    for t in table.instances {
+        push(mut all, t)
+    }
+    let mut l = Layout {
+        table: table, types: all, element_types: element_types, names: [:], used: [:], tags: [:], boxed: [:],
+        box_types: [], managed_cache: [:],
+    }
+    for t in all {
+        let name = unique(mut l, base_name(l, t))
+        l.names[t] = name
+    }
+    for t in all {
+        let ti = types.get(table, t)
+        if ti.tag == types.Tag.Enum {
+            for v in ti.variants {
+                let tag = unique(mut l, l.names[t] + "_" + v.name)
+                l.tags[strings.from_int(t) + " " + v.name] = tag
+            }
+        }
+    }
+    find_boxed(mut l)
+    for t in all {
+        for s in slots(l, t) {
+            if is_boxed(l, t, s.name, s.index) && !contains_int(l.box_types, s.ty) {
+                push(mut l.box_types, s.ty)
+            }
+        }
+    }
+    return l
+}
+
+fn contains_int(xs: [Int], x: Int) -> Bool {
+    for y in xs {
+        if y == x {
+            return true
+        }
+    }
+    return false
+}
+
+// `name`, or `name_2`, `name_3`... if a different type already took it.
+fn unique(l: mut Layout, name: Str) -> Str {
+    let mut n = 2
+    let mut out = name
+    for maps.has(l.used, out) {
+        out = name + "_" + strings.from_int(n)
+        n = n + 1
+    }
+    l.used[out] = true
+    return out
+}
+
+fn base_name(l: Layout, t: Int) -> Str {
+    let ti = types.get(l.table, t)
+    if types.is_builtin_enum(l.table, t) {
+        let mut b = strings.builder()
+        strings.add(mut b, ti.name)
+        for a in ti.args {
+            strings.add(mut b, "_" + suffix(l, a))
+        }
+        return strings.build(b)
+    }
+    return "t_" + mangle(ti.module, ti.name)
+}
+
+// How a type argument reads inside a generated name: Int, Token, Option_Int.
+fn suffix(l: Layout, t: Int) -> Str {
+    let ti = types.get(l.table, t)
+    if primitive_c(t) != "" {
+        return ti.name
+    }
+    if types.is_array(l.table, t) {
+        return "Array_" + suffix(l, ti.args[0])
+    }
+    if types.is_map(l.table, t) {
+        return "Map_" + suffix(l, ti.args[0]) + "_" + suffix(l, ti.args[1])
+    }
+    if t == types.BUILDER() {
+        return "7strings_Builder"
+    }
+    if types.is_builtin_enum(l.table, t) {
+        return base_name(l, t)
+    }
+    return mangle(ti.module, ti.name)
+}
+
+pub fn c_type(l: Layout, t: Int) -> Str {
+    if t == types.NOTHING() {
+        return "void"
+    }
+    if is_array_like(l.table, t) {
+        return "vela_array *"
+    }
+    if types.is_map(l.table, t) {
+        return "vela_map *"
+    }
+    let p = primitive_c(t)
+    if p != "" {
+        return p
+    }
+    return l.names[t]
+}
+
+pub fn name_of(l: Layout, t: Int) -> Str {
+    return l.names[t]
+}
+
+pub fn tag(l: Layout, enum: Int, variant: Str) -> Str {
+    return l.tags[strings.from_int(enum) + " " + variant]
+}
+
+pub fn box_name(l: Layout, t: Int) -> Str {
+    return "box_" + l.names[t]
+}
+
+// ---- Boxing ----
+
+pub type Slot = struct {
+    name: Str  // the field, or the variant
+    index: Int  // the payload index (0 for a field)
+    ty: Int
+}
+
+// The places inside `t` that hold other values by value.
+pub fn slots(l: Layout, t: Int) -> [Slot] {
+    let mut out: [Slot] = []
+    let ti = types.get(l.table, t)
+    if ti.tag == types.Tag.Struct {
+        for f in ti.fields {
+            push(mut out, Slot { name: f.name, index: 0, ty: f.ty })
+        }
+    } else if ti.tag == types.Tag.Enum {
+        for v in ti.variants {
+            for i in 0..len(v.payload) {
+                push(mut out, Slot { name: v.name, index: i, ty: v.payload[i] })
+            }
+        }
+    }
+    return out
+}
+
+// Whether a value of `outer` holds a `target` by value, at any depth.
+fn contains(l: Layout, outer: Int, target: Int) -> Bool {
+    let mut seen: Map[Int, Bool] = [:]
+    let mut stack = [outer]
+    for len(stack) > 0 {
+        let t = stack[len(stack) - 1]
+        stack = stack[0..len(stack) - 1]
+        if t == target {
+            return true
+        }
+        if maps.has(seen, t) {
+            continue
+        }
+        seen[t] = true
+        for s in slots(l, t) {
+            push(mut stack, s.ty)
+        }
+    }
+    return false
+}
+
+fn slot_key(t: Int, name: Str, index: Int) -> Str {
+    return strings.from_int(t) + " " + name + " " + strings.from_int(index)
+}
+
+// Box every slot of a user type whose type leads back to that type.
+fn find_boxed(l: mut Layout) {
+    for t in l.types {
+        if types.is_builtin_enum(l.table, t) {
+            continue
+        }
+        for s in slots(l, t) {
+            if contains(l, s.ty, t) {
+                l.boxed[slot_key(t, s.name, s.index)] = true
+            }
+        }
+    }
+}
+
+pub fn is_boxed(l: Layout, t: Int, name: Str, index: Int) -> Bool {
+    return maps.has(l.boxed, slot_key(t, name, index))
+}
+
+// ---- Managed types ----
+
+// Whether values of `t` hold references that must be counted.
+pub fn managed(l: mut Layout, t: Int) -> Bool {
+    if t == types.NOTHING() || primitive_c(t) != "" && t != types.STR() {
+        return false
+    }
+    if t == types.STR() || is_array_like(l.table, t) || types.is_map(l.table, t) {
+        return true
+    }
+    match maps.get(l.managed_cache, t) {
+        Some(m) => return m
+        None => {}
+    }
+    l.managed_cache[t] = false  // in progress: only boxed slots lead back here
+    let mut result = false
+    for s in slots(l, t) {
+        if is_boxed(l, t, s.name, s.index) || managed(mut l, s.ty) {
+            result = true
+            break
+        }
+    }
+    l.managed_cache[t] = result
+    return result
+}
+
+// A C statement retaining the value `c` of type `t`, or "".
+pub fn retain(l: mut Layout, t: Int, c: Str) -> Str {
+    if !managed(mut l, t) {
+        return ""
+    }
+    if t == types.STR() {
+        return "vela_str_retain(" + c + ");"
+    }
+    if is_array_like(l.table, t) {
+        return "vela_array_retain(" + c + ");"
+    }
+    if types.is_map(l.table, t) {
+        return "vela_map_retain(" + c + ");"
+    }
+    return "rc_retain_" + l.names[t] + "(" + c + ");"
+}
+
+pub fn release(l: mut Layout, t: Int, c: Str) -> Str {
+    if !managed(mut l, t) {
+        return ""
+    }
+    if t == types.STR() {
+        return "vela_str_release(" + c + ");"
+    }
+    if is_array_like(l.table, t) {
+        return "vela_array_release(" + c + ");"
+    }
+    if types.is_map(l.table, t) {
+        return "vela_map_release(" + c + ");"
+    }
+    return "rc_release_" + l.names[t] + "(" + c + ");"
+}
+
+// A C expression for the vela_type describing `t` to arrays and maps.
+pub fn descriptor(l: Layout, t: Int) -> Str {
+    let d = runtime_descriptor(t)
+    if d != "" {
+        return d
+    }
+    if is_array_like(l.table, t) {
+        return "&vela_type_array"
+    }
+    if types.is_map(l.table, t) {
+        return "&vela_type_map"
+    }
+    return "vt_" + l.names[t] + "()"
+}
+
+// ---- Definitions ----
+
+// C declarations for every type, each after the types it contains by
+// value, then the functions that manage their memory.
+pub fn definitions(l: mut Layout) -> [Str] {
+    let mut out: [Str] = []
+    for t in l.types {
+        push(mut out, "typedef struct " + l.names[t] + " " + l.names[t] + ";")
+    }
+    for t in l.box_types {
+        push(mut out, "typedef struct " + box_name(l, t) + " " + box_name(l, t) + ";")
+    }
+    let mut done: Map[Int, Bool] = [:]
+    for t in l.types {
+        define(mut l, t, mut done, mut out)
+    }
+    for line in memory_functions(mut l) {
+        push(mut out, line)
+    }
+    return out
+}
+
+fn define(l: mut Layout, t: Int, done: mut Map[Int, Bool], out: mut [Str]) {
+    if maps.has(done, t) || primitive_c(t) != "" || is_array_like(l.table, t) || types.is_map(l.table, t) {
+        return
+    }
+    done[t] = true
+    for s in slots(l, t) {
+        if !is_boxed(l, t, s.name, s.index) {
+            define(mut l, s.ty, mut done, mut out)
+        }
+    }
+    let name = l.names[t]
+    let ti = types.get(l.table, t)
+    push(mut out, "")
+    if ti.tag == types.Tag.Struct {
+        push(mut out, "struct " + name + " {")
+        for f in ti.fields {
+            push(mut out, "    " + member(l, t, f.name, 0, f.ty, "m_" + f.name) + ";")
+        }
+        push(mut out, "};")
+    } else {
+        let mut tags = strings.builder()
+        strings.add(mut tags, "enum { ")
+        for i in 0..len(ti.variants) {
+            if i > 0 {
+                strings.add(mut tags, ", ")
+            }
+            strings.add(mut tags, tag(l, t, ti.variants[i].name))
+        }
+        strings.add(mut tags, " };")
+        push(mut out, strings.build(tags))
+        push(mut out, "struct " + name + " {")
+        push(mut out, "    int32_t tag;")
+        let mut carrying = false
+        for v in ti.variants {
+            if len(v.payload) > 0 {
+                carrying = true
+            }
+        }
+        if carrying {  // C does not allow an empty union
+            push(mut out, "    union {")
+            for v in ti.variants {
+                if len(v.payload) == 0 {
+                    continue
+                }
+                let mut members = strings.builder()
+                for i in 0..len(v.payload) {
+                    if i > 0 {
+                        strings.add_byte(mut members, ' ')
+                    }
+                    strings.add(mut members, member(l, t, v.name, i, v.payload[i], "_" + strings.from_int(i)) + ";")
+                }
+                push(mut out, "        struct { " + strings.build(members) + " } m_" + v.name + ";")
+            }
+            push(mut out, "    } as;")
+        }
+        push(mut out, "};")
+    }
+    if contains_int(l.box_types, t) {
+        push(mut out, "struct " + box_name(l, t) + " { int64_t rc; " + name + " value; };")
+    }
+}
+
+// A member declaration: `int64_t m_x`, or `box_t_Expr *_0` when boxed.
+fn member(l: Layout, t: Int, name: Str, index: Int, slot_type: Int, m: Str) -> Str {
+    if is_boxed(l, t, name, index) {
+        return box_name(l, slot_type) + " *" + m
+    }
+    return c_type(l, slot_type) + " " + m
+}
+
+// Statements retaining (op "retain") or releasing one slot.
+fn slot_ops(l: mut Layout, t: Int, name: Str, index: Int, slot_type: Int, c: Str, op: Str) -> [Str] {
+    if is_boxed(l, t, name, index) {
+        if op == "retain" {
+            return [c + "->rc++;"]
+        }
+        return [box_name(l, slot_type) + "_release(" + c + ");"]
+    }
+    let mut s = ""
+    if op == "retain" {
+        s = retain(mut l, slot_type, c)
+    } else {
+        s = release(mut l, slot_type, c)
+    }
+    if s == "" {
+        let none: [Str] = []
+        return none
+    }
+    return [s]
+}
+
+// rc_retain_T / rc_release_T for every managed struct and enum, box
+// helpers for every boxed type, and descriptors for element types.
+fn memory_functions(l: mut Layout) -> [Str] {
+    let mut managed_types: [Int] = []
+    for t in l.types {
+        if managed(mut l, t) {
+            push(mut managed_types, t)
+        }
+    }
+    let mut out = [""]
+    for t in managed_types {
+        let n = l.names[t]
+        push(mut out, "static inline VELA_UNUSED void rc_retain_" + n + "(" + n + " v);")
+        push(mut out, "static inline VELA_UNUSED void rc_release_" + n + "(" + n + " v);")
+    }
+    for t in l.box_types {
+        let b = box_name(l, t)
+        push(mut out, "static inline VELA_UNUSED void " + b + "_release(" + b + " *b);")
+    }
+    for t in managed_types {
+        let n = l.names[t]
+        let ti = types.get(l.table, t)
+        for op in ["retain", "release"] {
+            push(mut out, "static inline VELA_UNUSED void rc_" + op + "_" + n + "(" + n + " v) {")
+            if ti.tag == types.Tag.Struct {
+                for f in ti.fields {
+                    for s in slot_ops(mut l, t, f.name, 0, f.ty, "v.m_" + f.name, op) {
+                        push(mut out, "    " + s)
+                    }
+                }
+            } else {
+                push(mut out, "    switch (v.tag) {")
+                for v in ti.variants {
+                    let mut body: [Str] = []
+                    for i in 0..len(v.payload) {
+                        let path = "v.as.m_" + v.name + "._" + strings.from_int(i)
+                        for s in slot_ops(mut l, t, v.name, i, v.payload[i], path, op) {
+                            push(mut body, s)
+                        }
+                    }
+                    if len(body) > 0 {
+                        let mut line = strings.builder()
+                        strings.add(mut line, "    case " + tag(l, t, v.name) + ": ")
+                        for i in 0..len(body) {
+                            if i > 0 {
+                                strings.add_byte(mut line, ' ')
+                            }
+                            strings.add(mut line, body[i])
+                        }
+                        strings.add(mut line, " break;")
+                        push(mut out, strings.build(line))
+                    }
+                }
+                push(mut out, "    default: break;")
+                push(mut out, "    }")
+            }
+            push(mut out, "}")
+        }
+    }
+    for t in l.box_types {
+        let b = box_name(l, t)
+        let n = l.names[t]
+        let keep = retain(mut l, t, "copy->value")
+        let drop = release(mut l, t, "b->value")
+        for line in [
+            "static inline VELA_UNUSED " + b + " *" + b + "_new(" + n + " value) {",
+            "    " + b + " *b = vela_alloc(sizeof(" + b + "));",
+            "    b->rc = 1;",
+            "    b->value = value;",
+            "    return b;",
+            "}",
+            "static inline VELA_UNUSED void " + b + "_release(" + b + " *b) {",
+            "    if (--b->rc == 0) { " + drop + " free(b); }",
+            "}",
+            "// Copy-on-write: a box about to change gets a copy if anything else shares it.",
+            "static inline VELA_UNUSED void " + b + "_unique(" + b + " **b) {",
+            "    if ((*b)->rc == 1) return;",
+            "    " + b + " *copy = " + b + "_new((*b)->value);",
+            "    " + keep,
+            "    (*b)->rc--;",
+            "    *b = copy;",
+            "}",
+        ] {
+            push(mut out, line)
+        }
+    }
+    for t in l.element_types {
+        if runtime_descriptor(t) != "" || is_array_like(l.table, t) || types.is_map(l.table, t) {
+            continue
+        }
+        let n = l.names[t]
+        let mut funcs = "NULL, NULL"
+        if managed(mut l, t) {
+            push(mut out, "static inline VELA_UNUSED void vt_retain_" + n + "(void *p) { rc_retain_" + n + "(*(" + n + " *)p); }")
+            push(mut out, "static inline VELA_UNUSED void vt_release_" + n + "(void *p) { rc_release_" + n + "(*(" + n + " *)p); }")
+            funcs = "vt_retain_" + n + ", vt_release_" + n
+        }
+        push(mut out, "static inline VELA_UNUSED const vela_type *vt_" + n + "(void) {")
+        push(mut out, "    static const vela_type t = {sizeof(" + n + "), " + funcs + ", NULL, NULL};")
+        push(mut out, "    return &t;")
+        push(mut out, "}")
+    }
+    return out
+}

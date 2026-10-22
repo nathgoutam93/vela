@@ -1,0 +1,48 @@
+#!/bin/sh
+# Stage 1's command line. Everything is done by build/vela1, the compiler
+# written in Vela, except the one step Vela cannot do yet: running the C
+# compiler. (Stage 0's driver, stage0/main.py, does that step in Python.)
+#
+#     stage1/vela1 build FILE [-o EXE]
+#     stage1/vela1 run FILE [ARGS...]
+#     stage1/vela1 c | check | tokens | ast FILE
+#
+# Uses VELA_CC and VELA_CFLAGS as Stage 0 does.
+root=$(cd "$(dirname "$0")/.." && pwd)
+compiler="$root/build/vela1"
+
+compile() {  # compile FILE EXE
+    tmp=$(mktemp -d)
+    "$compiler" c "$1" > "$tmp/program.c" || { status=$?; rm -rf "$tmp"; exit $status; }
+    # shellcheck disable=SC2086
+    if ! ${VELA_CC:-cc} -std=c11 -O2 $VELA_CFLAGS -I "$root/runtime" "$tmp/program.c" "$root/runtime/vela_rt.c" \
+            -o "$2" 2> "$tmp/cc.txt"; then
+        echo "vela: internal compiler error: the C compiler rejected the generated code" >&2
+        cat "$tmp/cc.txt" >&2
+        rm -rf "$tmp"
+        exit 70
+    fi
+    rm -rf "$tmp"
+}
+
+case "$1" in
+    build)
+        file=$2
+        out=${file%.vl}
+        if [ "$3" = "-o" ]; then out=$4; fi
+        compile "$file" "$out"
+        ;;
+    run)
+        file=$2
+        shift 2
+        dir=$(mktemp -d)
+        compile "$file" "$dir/program"
+        "$dir/program" "$@"
+        status=$?
+        rm -rf "$dir"
+        exit $status
+        ;;
+    *)
+        exec "$compiler" "$@"
+        ;;
+esac

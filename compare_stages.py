@@ -8,11 +8,16 @@
 Stage 1 is first built with Stage 0 into build/vela1. Every .vl file under
 tests/, std/ and stage1/ is then given to both compilers, from the file's
 own directory and by its bare name, as run_tests.py does. Their stdout,
-stderr and exit codes must be identical: the same dump, or the same errors.
+stderr and exit codes must be identical: the same dump, the same errors,
+the same C.
+
+VELA1_PREBUILT=1 skips the build and uses build/vela1 as it is: for
+example one built with AddressSanitizer, to check Stage 1 itself.
 """
 from __future__ import annotations
 
 import argparse
+import os
 import concurrent.futures
 import difflib
 import subprocess
@@ -22,10 +27,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 STAGE0 = [sys.executable, str(ROOT / "stage0" / "main.py")]
 STAGE1 = ROOT / "build" / "vela1"
-COMMANDS = ("tokens", "ast", "check")
+COMMANDS = ("tokens", "ast", "check", "c")
 
 
 def build_stage1() -> None:
+    if os.environ.get("VELA1_PREBUILT"):
+        return
     STAGE1.parent.mkdir(exist_ok=True)
     built = subprocess.run([*STAGE0, "build", str(ROOT / "stage1" / "main.vl"), "-o", str(STAGE1)],
                            capture_output=True, text=True)
