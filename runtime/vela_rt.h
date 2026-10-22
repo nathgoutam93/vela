@@ -74,6 +74,23 @@ _Noreturn void vela_assert_failed(const char *loc, const char *what, const char 
 _Noreturn void vela_assert_failed_values(const char *loc, const char *what, const char *text, vela_str left,
                                          vela_str right, bool quote);
 
+// A closure's environment: the copies it captured, behind this header. The
+// code generator makes a struct for each closure that starts with one, and
+// `drop` releases the copies and frees it. A named function used as a
+// value has no environment (NULL).
+typedef struct vela_env {
+    int64_t rc;
+    void (*drop)(struct vela_env *e);
+} vela_env;
+
+static inline void vela_env_retain(vela_env *e) {
+    if (e) e->rc++;
+}
+
+static inline void vela_env_release(vela_env *e) {
+    if (e && --e->rc == 0) e->drop(e);
+}
+
 // The Str for a C string literal of `n` bytes.
 #define VELA_STR(literal, n) ((vela_str){NULL, (const uint8_t *)(literal), (n)})
 

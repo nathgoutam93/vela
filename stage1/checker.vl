@@ -46,6 +46,22 @@ pub type Ref = enum {
     Indirect  // a call through a function value
 }
 
+// A closure, by the node id of its expression.
+pub type ClosureInfo = struct {
+    params: [Int]  // locals
+    captures: [Int]  // locals of the enclosing code it copies, in order of first use
+    result: Int  // NOTHING() when it returns nothing
+}
+
+// While a closure's body is checked.
+type ClosureCtx = struct {
+    id: Int  // its node id
+    boundary: Int  // its own scopes start here in c.scopes
+    captures: [Int]
+    result: Int  // -3 until a return says, when it was not written
+    effect_reported: Bool
+}
+
 pub type Checked = struct {
     errors: [errors.CompileError]  // sorted
     warnings: [errors.CompileError]  // sorted; they do not stop the program from compiling
@@ -58,6 +74,7 @@ pub type Checked = struct {
     refs: [Ref]  // by node id
     breaks: [Bool]  // by node id: whether a `for` loop has a break
     targs: [[Int]]  // by node id: the type arguments of a call to a generic function
+    closures: Map[Int, ClosureInfo]  // by node id
 }
 
 type Loop = struct {
@@ -93,6 +110,9 @@ type Checker = struct {
     effects_reported: Map[Str, Bool]  // missing from its `uses`, and already said so
     defining: Int  // the generic type whose fields are being read, or -1
     expected: Int  // the type the context wants for the expression about to be inferred, or -2
+    closures: Map[Int, ClosureInfo]
+    in_closures: [ClosureCtx]  // the closures being checked, innermost last
+    pending: [Int]  // type parameters of a generic call whose arguments are being checked, still unknown
 }
 
 pub fn check(loaded: modules.Loaded) -> Checked {
@@ -115,12 +135,13 @@ pub fn check_program(loaded: modules.Loaded, for_tests: Bool) -> Checked {
     let mut c = Checker {
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
-        undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], defining: -1, expected: -2,
+        undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
+        in_closures: [], pending: [], defining: -1, expected: -2,
     }
     program(mut c, for_tests)
     return Checked {
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
-        locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs,
+        locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
     }
 }
 
@@ -740,6 +761,15 @@ fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
     if effect != "fs" && effect != "os" {
         return  // none, or an unknown one, already reported where it is declared
     }
+    let n = len(c.in_closures)
+    if n > 0 {
+        if !c.in_closures[n - 1].effect_reported {
+            c.in_closures[n - 1].effect_reported = true
+            report_at(mut c, e, "a function value cannot use " + effect + ", through " + through +
+                ": function values have no effects")
+        }
+        return
+    }
     c.effects_used[effect] = true
     let f = c.fns[c.current_fn]
     if f.is_test || is_main(c, c.current_fn) || maps.has(c.effects_reported, effect) {
@@ -1169,6 +1199,11 @@ fn place(c: mut Checker, target: ast.Expr, verb: Str) -> Int {
     match c.refs[root.id] {
         Ref.Local(id) => {
             let l = c.locals[id]
+            if captured(c, id) {
+                report_at(mut c, root, "cannot " + verb + " '" + l.name + "' inside a function value: it has its own copy " +
+                    "of '" + l.name + "', made when it was created, and changes to the copy would be lost")
+                return ty
+            }
             let mut part = ""
             if is_field(target) {
                 part = "a field of "
@@ -1191,6 +1226,11 @@ fn place(c: mut Checker, target: ast.Expr, verb: Str) -> Int {
 }
 
 fn return_stmt(c: mut Checker, s: ast.Stmt, v: Option[ast.Expr]) {
+    let n = len(c.in_closures)
+    if n > 0 {
+        closure_return(mut c, s, v)
+        return
+    }
     let f = c.fns[c.current_fn]
     let mut has_result = false
     match f.decl.result {
@@ -1729,10 +1769,12 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
         ast.ExprKind.BoolLit(_) => return types.BOOL()
         ast.ExprKind.StrLit(_) => return types.STR()
         ast.ExprKind.UnitLit => return types.UNIT()
+        ast.ExprKind.Closure(params, result, body, _) => return closure(mut c, e, params, result, body, expected)
         ast.ExprKind.Name(name) => {
             match resolve(mut c, e, name) {
                 Ref.Local(id) => {
                     c.refs[e.id] = Ref.Local(id)
+                    capture(mut c, id)
                     return c.locals[id].ty
                 }
                 Ref.Function(id) => return fn_value(mut c, e, id, name, expected)
@@ -1921,8 +1963,17 @@ fn try_expr(c: mut Checker, e: ast.Expr, inner: ast.Expr) -> Int {
         return types.ERROR()
     }
     let f = c.fns[c.current_fn]
-    let result = f.result
-    let name = f.decl.name
+    let mut result = f.result
+    let mut name = f.decl.name
+    let n = len(c.in_closures)
+    if n > 0 {
+        result = c.in_closures[n - 1].result
+        name = "this function value"
+        if result == -3 {
+            result = types.ERROR()
+            report_at(mut c, e, "'?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... }")
+        }
+    }
     let mut returns = "returns nothing"
     if result != types.NOTHING() {
         returns = "returns " + show(c, result)
@@ -2065,7 +2116,7 @@ fn field(c: mut Checker, e: ast.Expr, obj: ast.Expr, name: Str, expected: Int) -
         }
         if types.is_generic(c.table, enum) {
             // `Tree.Leaf` says nothing about T: the context must.
-            if expected >= 0 && types.get(c.table, expected).origin == enum {
+            if expected >= 0 && types.get(c.table, expected).origin == enum && known_type(c, expected) {
                 c.refs[e.id] = Ref.Variant(expected, vi)
                 return expected
             }
@@ -2342,6 +2393,15 @@ fn unify(c: Checker, pattern: Int, actual: Int, params: [Int], bound: mut [Int])
 // the other arguments have told what its element type is.
 fn needs_context(c: Checker, e: ast.Expr) -> Bool {
     match e.kind {
+        ast.ExprKind.Closure(params, _, _, _) => {
+            for p in params {
+                match p.ty {
+                    None => return true
+                    Some(_) => {}
+                }
+            }
+            return false
+        }
         ast.ExprKind.Field(obj, _) => {
             // `Tree.Leaf`, a variant of a generic enum
             match obj.kind {
@@ -2411,7 +2471,13 @@ fn infer_args(c: mut Checker, params: [Int], wants: [Int], args: [ast.Expr], mut
                 check_expr(mut c, value_e, want, msg(labels[i] + " must be " + show(c, want) + ", found ", ""))
                 continue
             }
+            // A closure takes what is known of its type from here; the
+            // parameters still unknown it works out itself.
+            let saved = c.pending
+            c.pending = params
+            c.expected = want
             let t = value(mut c, value_e)
+            c.pending = saved
             if !unify(c, want, t, params, mut bound) {
                 report_at(mut c, value_e, labels[i] + " must be " + show(c, want) + ", found " + show(c, t))
             }
@@ -2431,7 +2497,7 @@ fn unknown(n: Int) -> [Int] {
 // When the context wants an instance of generic type `decl`, its type
 // arguments say what the parameters still unknown are.
 fn from_context(c: mut Checker, decl: Int, expected: Int, bound: mut [Int]) {
-    if expected < 0 || types.get(c.table, expected).origin != decl {
+    if expected < 0 || types.get(c.table, expected).origin != decl || !known_type(c, expected) {
         return
     }
     let args = types.get(c.table, expected).args
@@ -2935,6 +3001,7 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
             let local = lookup_local(c, name)
             if local >= 0 {
                 if types.is_func(c.table, c.locals[local].ty) {
+                    capture(mut c, local)
                     return Ref.Local(local)  // a call through a function value
                 }
                 if c.locals[local].ty != types.ERROR() {
@@ -2981,6 +3048,150 @@ fn callee_value(c: mut Checker, callee: ast.Expr) -> Ref {
     return Ref.NoRef
 }
 
+// ---- Closures ----
+
+// Whether local `id` belongs to code outside the innermost closure being
+// checked: a capture.
+fn captured(c: Checker, id: Int) -> Bool {
+    let n = len(c.in_closures)
+    if n == 0 {
+        return false
+    }
+    for i in c.in_closures[n - 1].boundary..len(c.scopes) {
+        for name in maps.keys(c.scopes[i]) {
+            if c.scopes[i][name] == id {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+// Record that each closure being checked whose scopes do not hold local
+// `id` captures it: an inner closure's capture is one of its outer
+// closure's too.
+fn capture(c: mut Checker, id: Int) {
+    for k in 0..len(c.in_closures) {
+        let mut inside = false
+        for i in c.in_closures[k].boundary..len(c.scopes) {
+            for name in maps.keys(c.scopes[i]) {
+                if c.scopes[i][name] == id {
+                    inside = true
+                }
+            }
+        }
+        if inside {
+            continue
+        }
+        let mut seen = false
+        for x in c.in_closures[k].captures {
+            if x == id {
+                seen = true
+            }
+        }
+        if !seen {
+            push(mut c.in_closures[k].captures, id)
+        }
+    }
+}
+
+// Whether `t` can be used for a closure's parameter or result: it says
+// nothing about a type parameter still being worked out.
+fn known_type(c: Checker, t: Int) -> Bool {
+    return t >= 0 && !mentions(c, t, c.pending)
+}
+
+// `fn(x: Int) -> Int { ... }` or `fn(x) => x + 1`: a function value that
+// copies the variables it uses from around it.
+fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Option[ast.TypeName], body: ast.Block,
+    expected: Int) -> Int {
+    let mut want_params: [Int] = []
+    let mut want_result = -3
+    if expected >= 0 && types.is_func(c.table, expected) && len(types.get(c.table, expected).args) == len(params) {
+        want_params = types.get(c.table, expected).args
+        if known_type(c, types.get(c.table, expected).result) || types.get(c.table, expected).result == types.NOTHING() {
+            want_result = types.get(c.table, expected).result
+        }
+    }
+    let mut scope: Map[Str, Int] = [:]
+    let mut locals: [Int] = []
+    let mut param_types: [Int] = []
+    for i in 0..len(params) {
+        let p = params[i]
+        let mut t = types.ERROR()
+        match p.ty {
+            Some(tn) => t = resolve_type(mut c, tn)
+            None => {
+                if i < len(want_params) && known_type(c, want_params[i]) {
+                    t = want_params[i]
+                } else {
+                    report(mut c, p.line, p.col, "cannot tell the type of parameter '" + p.name + "'; write it, as in fn(" +
+                        p.name + ": Int) => ...")
+                }
+            }
+        }
+        if maps.has(scope, p.name) {
+            report(mut c, p.line, p.col, "parameter '" + p.name + "' is already declared")
+        }
+        check_name_allowed(mut c, p.name, p.line, p.col)
+        let local = new_local(mut c, p.name, t, "parameter", p.line, p.col)
+        scope[p.name] = local
+        push(mut locals, local)
+        push(mut param_types, t)
+    }
+    let mut res = want_result
+    match result {
+        Some(tn) => res = resolve_type(mut c, tn)
+        None => {}
+    }
+    push(mut c.in_closures, ClosureCtx { id: e.id, boundary: len(c.scopes), captures: [], result: res, effect_reported: false })
+    push_scope(mut c, scope)
+    let saved_loops = c.loops
+    c.loops = []  // break and continue cannot leave a function value
+    for s in body.stmts {
+        stmt(mut c, s)
+    }
+    c.loops = saved_loops
+    pop_scope(mut c)
+    let ctx = c.in_closures[len(c.in_closures) - 1]
+    c.in_closures = c.in_closures[0..len(c.in_closures) - 1]
+    let mut final = ctx.result
+    if final == -3 {
+        final = types.NOTHING()  // no return said otherwise
+    }
+    if final != types.NOTHING() && final != types.ERROR() && !terminates_block(c, body) {
+        report(mut c, body.end_line, body.end_col, "missing return: this function value returns " + show(c, final) +
+            ", but the end of its body can be reached")
+    }
+    c.closures[e.id] = ClosureInfo { params: locals, captures: ctx.captures, result: final }
+    return types.func(mut c.table, param_types, final)
+}
+
+// `return` inside a closure: against its result type, or deciding it.
+fn closure_return(c: mut Checker, s: ast.Stmt, v: Option[ast.Expr]) {
+    let n = len(c.in_closures)
+    let want = c.in_closures[n - 1].result
+    match v {
+        None => {
+            if want == -3 {
+                c.in_closures[n - 1].result = types.NOTHING()
+            } else if want != types.NOTHING() && want != types.ERROR() {
+                report(mut c, s.line, s.col, "this function value returns " + show(c, want) + ", so 'return' needs a value")
+            }
+        }
+        Some(e) => {
+            if want == -3 {
+                c.in_closures[n - 1].result = value(mut c, e)
+            } else if want == types.NOTHING() {
+                report_at(mut c, e, "this function value does not return a value, so 'return' cannot have one")
+                infer(mut c, e)
+            } else {
+                check_expr(mut c, e, want, msg("this function value returns " + show(c, want) + ", but this is ", ""))
+            }
+        }
+    }
+}
+
 // A named function used as a value: `lists.map(xs, double)`. A generic one
 // takes its type arguments from the function type the context wants.
 fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> Int {
@@ -2999,7 +3210,7 @@ fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> I
     c.refs[e.id] = Ref.Function(id)
     let tp = f.type_params
     let mut bound = unknown(len(tp))
-    if len(tp) > 0 && expected >= 0 && types.is_func(c.table, expected) {
+    if len(tp) > 0 && expected >= 0 && types.is_func(c.table, expected) && known_type(c, expected) {
         let pattern = types.func(mut c.table, f.params, f.result)
         unify(c, pattern, expected, tp, mut bound)
     }

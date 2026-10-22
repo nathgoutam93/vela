@@ -260,6 +260,17 @@ fn expr(w: mut Walk, e: ast.Expr) {
             }
         }
         ast.ExprKind.Match(scrutinee, arms) => match_arms(mut w, scrutinee, arms)
+        ast.ExprKind.Closure(_, _, body, _) => {
+            let info = w.k.closures[e.id]
+            for l in info.params {
+                sub(mut w, w.k.locals[l].ty)
+            }
+            for l in info.captures {
+                sub(mut w, w.k.locals[l].ty)
+            }
+            sub(mut w, info.result)
+            block(mut w, body)
+        }
         _ => {}
     }
 }

@@ -80,6 +80,7 @@ fn starts_expression(k: lexer.Kind) -> Bool {
         lexer.Kind.Bang => true
         lexer.Kind.LParen => true
         lexer.Kind.Match => true
+        lexer.Kind.Fn => true
         _ => false
     }
 }
@@ -989,6 +990,9 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
         advance(mut p)
         return Ok(expr(mut p, ast.ExprKind.UnitLit, tok.line, tok.col))
     }
+    if k == lexer.Kind.Fn {
+        return closure(mut p, tok)
+    }
     if k == lexer.Kind.LParen {
         let inner = nested_expression(mut p)?
         let close = peek(p, 0)
@@ -1004,6 +1008,43 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
     expect(mut p, lexer.Kind.LBrace, "after the value being matched")?
     let arms = arms(mut p, false)?
     return Ok(expr(mut p, ast.ExprKind.Match(scrutinee, arms), tok.line, tok.col))
+}
+
+// `fn(x: Int, y) -> Int { ... }` or `fn(x) => x + 1`, after the `fn`.
+fn closure(p: mut Parser, start: lexer.Token) -> Result[ast.Expr, errors.CompileError] {
+    expect(mut p, lexer.Kind.LParen, "after 'fn' in a function value")?
+    let mut params: [ast.ClosureParam] = []
+    for peek(p, 0).kind != lexer.Kind.RParen {
+        let name = expect_name(mut p, "for a parameter")?
+        let mut ty: Option[ast.TypeName] = None
+        if peek(p, 0).kind == lexer.Kind.Colon {
+            advance(mut p)
+            ty = Some(type_name(mut p)?)
+        }
+        push(mut params, ast.ClosureParam { name: name.text, ty: ty, line: name.line, col: name.col })
+        if peek(p, 0).kind != lexer.Kind.Comma {
+            break
+        }
+        advance(mut p)
+    }
+    expect(mut p, lexer.Kind.RParen, "after the parameters of a function value")?
+    let mut result: Option[ast.TypeName] = None
+    if peek(p, 0).kind == lexer.Kind.Arrow {
+        advance(mut p)
+        result = Some(type_name(mut p)?)
+    }
+    if peek(p, 0).kind == lexer.Kind.FatArrow {
+        let arrow = advance(mut p)
+        let value = nested_expression(mut p)?
+        let ret = stmt(mut p, ast.StmtKind.Return(Some(value)), arrow.line, arrow.col)
+        let body = ast.Block { stmts: [ret], end_line: arrow.line, end_col: arrow.col }
+        return Ok(expr(mut p, ast.ExprKind.Closure(params, result, body, true), start.line, start.col))
+    }
+    let saved = p.no_struct
+    p.no_struct = false
+    let body = block(mut p, "or '=>' to start the body of a function value")
+    p.no_struct = saved
+    return Ok(expr(mut p, ast.ExprKind.Closure(params, result, body?, false), start.line, start.col))
 }
 
 // `obj[i]` or `obj[a..b]`, after `obj`.

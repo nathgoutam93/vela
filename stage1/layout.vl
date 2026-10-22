@@ -290,7 +290,7 @@ pub fn managed(l: mut Layout, t: Int) -> Bool {
     if t == types.NOTHING() || primitive_c(t) != "" && t != types.STR() {
         return false
     }
-    if t == types.STR() || is_array_like(l.table, t) || types.is_map(l.table, t) {
+    if t == types.STR() || is_array_like(l.table, t) || types.is_map(l.table, t) || types.is_func(l.table, t) {
         return true
     }
     match maps.get(l.managed_cache, t) {
@@ -374,16 +374,14 @@ pub fn definitions(l: mut Layout) -> [Str] {
     for t in l.funcs {
         let ti = types.get(l.table, t)
         let mut params = strings.builder()
+        strings.add(mut params, "vela_env *")
         for i in 0..len(ti.args) {
-            if i > 0 {
-                strings.add(mut params, ", ")
-            }
-            strings.add(mut params, c_type(l, ti.args[i]))
+            strings.add(mut params, ", " + c_type(l, ti.args[i]))
         }
-        if len(ti.args) == 0 {
-            strings.add(mut params, "void")
-        }
-        push(mut out, "typedef " + c_type(l, ti.result) + " (*" + l.names[t] + ")(" + strings.build(params) + ");")
+        // A function value: code, and the environment it gets first (NULL
+        // for a named function).
+        push(mut out, "typedef struct { " + c_type(l, ti.result) + " (*fn)(" + strings.build(params) + "); vela_env *env; } " +
+            l.names[t] + ";")
     }
     let mut done: Map[Int, Bool] = [:]
     for t in l.types {
@@ -497,6 +495,12 @@ fn memory_functions(l: mut Layout) -> [Str] {
         }
     }
     let mut out = [""]
+    // Function values count their environment's references.
+    for t in l.funcs {
+        let n = l.names[t]
+        push(mut out, "static inline VELA_UNUSED void rc_retain_" + n + "(" + n + " v) { vela_env_retain(v.env); }")
+        push(mut out, "static inline VELA_UNUSED void rc_release_" + n + "(" + n + " v) { vela_env_release(v.env); }")
+    }
     for t in managed_types {
         let n = l.names[t]
         push(mut out, "static inline VELA_UNUSED void rc_retain_" + n + "(" + n + " v);")

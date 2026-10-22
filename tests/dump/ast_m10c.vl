@@ -1,0 +1,20 @@
+// The syntax tree of M10c's additions: closures, both forms, and Floats.
+// stage 1 only
+// dump: ast
+// out: (fn main ()
+// out:   (block
+// out:     (let k 2)
+// out:     (let f (fn ((x)) (=> (* x k))))
+// out:     (let g
+// out:       (fn ((a Int) (b Float)) Float
+// out:         (block
+// out:           (return (+ (call float a) b)))))
+// out:     (let h 1.5e-3)))
+fn main() {
+    let k = 2
+    let f = fn(x) => x * k
+    let g = fn(a: Int, b: Float) -> Float {
+        return float(a) + b
+    }
+    let h = 1.5e-3
+}

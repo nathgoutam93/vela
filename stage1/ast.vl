@@ -47,6 +47,17 @@ pub type ExprKind = enum {
     MapLit([MapEntry])
     StructLit(Str, Str, [FieldInit])  // module or "", type name, fields
     Match(Expr, [Arm])
+    // `fn(x: Int) -> Int { ... }` or `fn(x) => x * 2`: the parameters, the
+    // result type if written, the body (for `=>`, one return of the
+    // expression), and whether it was written with `=>`
+    Closure([ClosureParam], Option[TypeName], Block, Bool)
+}
+
+pub type ClosureParam = struct {
+    name: Str
+    ty: Option[TypeName]  // None when the context tells it
+    line: Int
+    col: Int
 }
 
 pub type MapEntry = struct {
@@ -556,6 +567,34 @@ fn sx_expr(e: Expr) -> Sx {
             return list(items)
         }
         ExprKind.Match(scrutinee, arms) => return sx_match(scrutinee, arms)
+        ExprKind.Closure(params, result, body, short) => {
+            let mut ps: [Sx] = []
+            for p in params {
+                match p.ty {
+                    Some(t) => push(mut ps, list([atom(p.name), atom(type_text(t))]))
+                    None => push(mut ps, list([atom(p.name)]))
+                }
+            }
+            let mut items = [atom("fn"), list(ps)]
+            match result {
+                Some(t) => push(mut items, atom(type_text(t)))
+                None => {}
+            }
+            if short {
+                match body.stmts[0].kind {
+                    StmtKind.Return(v) => {
+                        match v {
+                            Some(x) => push(mut items, list([atom("=>"), sx_expr(x)]))
+                            None => {}
+                        }
+                    }
+                    _ => {}
+                }
+                return list(items)
+            }
+            push(mut items, sx_block(body))
+            return list(items)
+        }
     }
 }
 
@@ -684,6 +723,7 @@ fn power(e: Expr) -> Int {
         ExprKind.Binary(op, _, _) => op_power(op)
         ExprKind.Unary(_, _) => 30
         ExprKind.MutArg(_) => 0
+        ExprKind.Closure(_, _, _, _) => 0
         _ => 40
     }
 }
@@ -781,5 +821,21 @@ pub fn expr_text(e: Expr) -> Str {
             return strings.build(b)
         }
         ExprKind.Match(scrutinee, _) => return "match " + expr_text(scrutinee) + " { ... }"
+        ExprKind.Closure(params, _, _, _) => {
+            let mut names: [Str] = []
+            for p in params {
+                push(mut names, p.name)
+            }
+            let mut b = strings.builder()
+            strings.add(mut b, "fn(")
+            for i in 0..len(names) {
+                if i > 0 {
+                    strings.add(mut b, ", ")
+                }
+                strings.add(mut b, names[i])
+            }
+            strings.add(mut b, ") ...")
+            return strings.build(b)
+        }
     }
 }

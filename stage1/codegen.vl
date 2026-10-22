@@ -47,6 +47,24 @@ type Gen = struct {
     params: [Int]
     args: [Int]
     instance_names: Map[Str, Str]  // C names of generic copies, by mono.key
+    cname: Str  // the C function being written
+    // In a closure's body: the C expressions of the variables it captured,
+    // by local id, and its result type; empty and -2 elsewhere.
+    captures: Map[Int, Str]
+    closure_result: Int
+    closures: Int  // closures written so far in this C function, for names
+    extra: [Str]  // C written before this function: its closures' environments and bodies
+    wrappers: Map[Str, Str]  // functions used as values: wrapper definitions by name
+}
+
+fn new_gen(k: checker.Checked, l: layout.Layout, id: Int, params: [Int], args: [Int],
+    instance_names: Map[Str, Str], cname: Str) -> Gen {
+    return Gen {
+        k: k, l: l, filename: k.modules[k.fns[id].module].path, lines: [], depth: 1, temps: 0, names: [:],
+        used: [:], frames: [], dead: false, current_fn: id, params: params, args: args,
+        instance_names: instance_names, cname: cname, captures: [:], closure_result: -2, closures: 0, extra: [],
+        wrappers: [:],
+    }
 }
 
 // What a match does with an arm's body: run it, or store its value in a
@@ -157,6 +175,8 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
         let c = copies.instances[i]
         push(mut out, prototype(k, l, c.fn_id, none, k.fns[c.fn_id].type_params, c.args, copy_names[i]) + ";")
     }
+    let mut bodies: [Str] = []
+    let mut wrappers: Map[Str, Str] = [:]
     for i in 0..len(roots) + len(copies.instances) {
         let mut id = 0
         let mut params: [Int] = []
@@ -172,16 +192,29 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
             args = c.args
             name = copy_names[i - len(roots)]
         }
-        let mut g = Gen {
-            k: k, l: l, filename: k.modules[k.fns[id].module].path, lines: [], depth: 1, temps: 0, names: [:],
-            used: [:], frames: [], dead: false, current_fn: id, params: params, args: args,
-            instance_names: instance_names,
+        let mut g = new_gen(k, l, id, params, args, instance_names, name)
+        let lines = function(mut g, id, name)
+        for line in g.extra {
+            push(mut bodies, line)
         }
-        push(mut out, "")
-        for line in function(mut g, id, name) {
-            push(mut out, line)
+        push(mut bodies, "")
+        for line in lines {
+            push(mut bodies, line)
+        }
+        for w in maps.keys(g.wrappers) {
+            wrappers[w] = g.wrappers[w]
         }
         l = g.l  // the layout remembers which types are managed
+    }
+    // Functions used as values, wrapped to take an environment they ignore,
+    // like a closure's: after the prototypes they call, before the bodies
+    // that use them.
+    for w in maps.keys(wrappers) {
+        push(mut out, "")
+        push(mut out, wrappers[w])
+    }
+    for line in bodies {
+        push(mut out, line)
     }
     if for_tests {
         for line in ["", "int main(int argc, char **argv) {", "    vela_init(argc, argv);",
@@ -346,6 +379,10 @@ fn local_ty(g: Gen, id: Int) -> Int {
 // The C name of a local: `v_x`, or `v_x_2` for a second `x`, and `(*v_x)`
 // for a mut parameter, which is a pointer to the caller's value.
 fn local(g: mut Gen, id: Int) -> Str {
+    match maps.get(g.captures, id) {
+        Some(c) => return c  // a closure's copy, in its environment
+        None => {}
+    }
     let name = c_name(mut g, id)
     if g.k.locals[id].kind == "mut parameter" {
         return "(*" + name + ")"
@@ -576,8 +613,8 @@ fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
 // there, borrowed.
 fn ensures_code(g: mut Gen, result_c: Str) {
     let f = g.k.fns[g.current_fn]
-    if len(f.decl.ensures) == 0 {
-        return
+    if len(f.decl.ensures) == 0 || g.closure_result != -2 {
+        return  // a closure's returns are not its function's
     }
     emit(mut g, "{")
     g.depth = g.depth + 1
@@ -1096,7 +1133,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             match g.k.refs[e.id] {
                 checker.Ref.Local(id) => return value(local(mut g, id), t)
                 checker.Ref.Variant(enum, vi) => return enum_value(mut g, sub(g, enum), vi, [])  // `None`
-                checker.Ref.Function(id) => return value(function_name(g, id, e), t)  // a function as a value
+                checker.Ref.Function(id) => return function_value(mut g, id, e)  // a function as a value
                 _ => return no_value()
             }
         }
@@ -1162,7 +1199,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
         ast.ExprKind.Field(obj, name) => {
             match g.k.refs[e.id] {
                 checker.Ref.Variant(enum, vi) => return enum_value(mut g, sub(g, enum), vi, [])
-                checker.Ref.Function(id) => return value(function_name(g, id, e), t)  // `module.f` as a value
+                checker.Ref.Function(id) => return function_value(mut g, id, e)  // `module.f` as a value
                 _ => {}
             }
             let c = expr(mut g, obj).c
@@ -1219,7 +1256,131 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             match_code(mut g, scrutinee, arms, ArmCode.StoreIn(result))
             return own(mut g, result, t)
         }
+        ast.ExprKind.Closure(_, _, body, _) => return closure_value(mut g, e, body)
     }
+}
+
+// What the function (or closure) being written returns.
+fn result_type(g: Gen) -> Int {
+    if g.closure_result != -2 {
+        return sub(g, g.closure_result)
+    }
+    return sub(g, g.k.fns[g.current_fn].result)
+}
+
+// A function used as a value: the pair of a wrapper that takes (and
+// ignores) an environment, and no environment.
+fn function_value(g: mut Gen, id: Int, e: ast.Expr) -> Value {
+    let t = ty(g, e)
+    let target = function_name(g, id, e)
+    let wrapper = "vw_" + target
+    if !maps.has(g.wrappers, wrapper) {
+        let ft = types.get(g.k.table, t)
+        let mut params = strings.builder()
+        let mut args = strings.builder()
+        strings.add(mut params, "vela_env *env")
+        for i in 0..len(ft.args) {
+            strings.add(mut params, ", " + c_type(g, ft.args[i]) + " a" + strings.from_int(i))
+            if i > 0 {
+                strings.add(mut args, ", ")
+            }
+            strings.add(mut args, "a" + strings.from_int(i))
+        }
+        let call = target + "(" + strings.build(args) + ");"
+        let mut ret = "return "
+        if ft.result == types.NOTHING() {
+            ret = ""
+        }
+        g.wrappers[wrapper] = "static VELA_UNUSED " + c_type(g, ft.result) + " " + wrapper + "(" + strings.build(params) +
+            ") { (void)env; " + ret + call + " }"
+    }
+    return store(mut g, t, "(" + c_type(g, t) + "){ .fn = " + wrapper + ", .env = NULL }")
+}
+
+// A closure: its body becomes a C function of its own, which gets the
+// captured copies through an environment, a counted block made here.
+fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
+    let t = ty(g, e)
+    let info = g.k.closures[e.id]
+    g.closures = g.closures + 1
+    let name = g.cname + "_c" + strings.from_int(g.closures)
+    let env = "ve_" + name
+    let fname = "vc_" + name
+    // The body, written by a generator of its own.
+    let mut inner = new_gen(g.k, g.l, g.current_fn, g.params, g.args, g.instance_names, name)
+    inner.closure_result = info.result
+    inner.filename = g.filename
+    for i in 0..len(info.captures) {
+        inner.captures[info.captures[i]] = "(env->c" + strings.from_int(i) + ")"
+    }
+    push_frame(mut inner, "function")
+    let mut params = strings.builder()
+    strings.add(mut params, "vela_env *env_")
+    for lid in info.params {
+        let pt = local_ty(inner, lid)
+        let pname = c_name(mut inner, lid)
+        strings.add(mut params, ", " + c_type(inner, pt) + " " + pname)
+        if managed(mut inner, pt) {
+            push(mut inner.frames[len(inner.frames) - 1].items, Item { c: pname, ty: pt })
+        }
+    }
+    for s in body.stmts {
+        stmt(mut inner, s)
+    }
+    pop_frame(mut inner)
+    for line in inner.extra {
+        push(mut g.extra, line)  // closures inside this one come first
+    }
+    for w in maps.keys(inner.wrappers) {
+        g.wrappers[w] = inner.wrappers[w]
+    }
+    g.l = inner.l
+    // The environment: a header the runtime knows, then the copies.
+    let n = len(info.captures)
+    if n > 0 {
+        push(mut g.extra, "")
+        push(mut g.extra, "typedef struct " + env + " {")
+        push(mut g.extra, "    vela_env head;")
+        for i in 0..n {
+            push(mut g.extra, "    " + c_type(g, local_ty(g, info.captures[i])) + " c" + strings.from_int(i) + ";")
+        }
+        push(mut g.extra, "} " + env + ";")
+        push(mut g.extra, "static void " + env + "_drop(vela_env *e_) {")
+        push(mut g.extra, "    " + env + " *e = (" + env + " *)e_;")
+        for i in 0..n {
+            let r = release(mut g, local_ty(g, info.captures[i]), "e->c" + strings.from_int(i))
+            if r != "" {
+                push(mut g.extra, "    " + r)
+            }
+        }
+        push(mut g.extra, "    free(e);")
+        push(mut g.extra, "}")
+    }
+    push(mut g.extra, "")
+    push(mut g.extra, "static " + c_type(g, sub(g, info.result)) + " " + fname + "(" + strings.build(params) + ") {")
+    if n > 0 {
+        push(mut g.extra, "    " + env + " *env = (" + env + " *)env_;")
+    } else {
+        push(mut g.extra, "    (void)env_;")
+    }
+    for line in inner.lines {
+        push(mut g.extra, line)
+    }
+    push(mut g.extra, "}")
+    if n == 0 {
+        return store(mut g, t, "(" + c_type(g, t) + "){ .fn = " + fname + ", .env = NULL }")
+    }
+    let block = new_temp(mut g)
+    emit(mut g, env + " *" + block + " = vela_alloc(sizeof(" + env + "));")
+    emit(mut g, block + "->head.rc = 1;")
+    emit(mut g, block + "->head.drop = " + env + "_drop;")
+    for i in 0..n {
+        let cid = info.captures[i]
+        let member = block + "->c" + strings.from_int(i)
+        emit(mut g, member + " = " + local(mut g, cid) + ";")
+        emit(mut g, retain(mut g, local_ty(g, cid), member))
+    }
+    return store(mut g, t, "(" + c_type(g, t) + "){ .fn = " + fname + ", .env = &" + block + "->head }")
 }
 
 // The C function called, or named as a value, at node `e`: for a generic
@@ -1236,19 +1397,25 @@ fn function_name(g: Gen, id: Int, e: ast.Expr) -> Str {
 }
 
 // A call through a function value: the callee first, then the arguments,
-// left to right, passed owned as to any function.
+// left to right, passed owned as to any function. The value's code gets
+// its environment first.
 fn indirect_call(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
     let mut callee = ""
     match e.kind {
-        ast.ExprKind.Call(f, _) => callee = expr(mut g, f).c
+        ast.ExprKind.Call(f, _) => {
+            let v = expr(mut g, f)
+            callee = v.c
+            if !is_simple(callee) {
+                // Evaluated once: a borrowed copy is enough for the call.
+                callee = scalar(mut g, v.ty, callee)
+            }
+        }
         _ => {}
     }
     let mut b = strings.builder()
-    strings.add(mut b, callee + "(")
+    strings.add(mut b, callee + ".fn(" + callee + ".env")
     for i in 0..len(args) {
-        if i > 0 {
-            strings.add(mut b, ", ")
-        }
+        strings.add(mut b, ", ")
         strings.add(mut b, consume(mut g, expr(mut g, args[i])))
     }
     strings.add_byte(mut b, ')')
@@ -1266,7 +1433,7 @@ fn indirect_call(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
 fn try_value(g: mut Gen, e: ast.Expr, inner: ast.Expr) -> Value {
     let v = expr(mut g, inner)
     let t = ty(g, inner)
-    let result = sub(g, g.k.fns[g.current_fn].result)
+    let result = result_type(g)
     let ti = types.get(g.k.table, t)
     let mut fail = "None"
     let mut ok = "Some"

@@ -1,0 +1,32 @@
+// Mistakes with closures.
+// stage 1 only
+// err: closure_errors.vl:16:9: error: cannot assign to 'total' inside a function value: it has its own copy of 'total', made when it was created, and changes to the copy would be lost
+// err: closure_errors.vl:18:16: error: cannot tell the type of parameter 'x'; write it, as in fn(x: Int) => ...
+// err: closure_errors.vl:19:36: error: a function value cannot use fs, through files.read: function values have no effects
+// err: closure_errors.vl:24:5: error: missing return: this function value returns Int, but the end of its body can be reached
+// err: closure_errors.vl:25:40: error: this function value returns Str, but this is Int
+// err: closure_errors.vl:28:13: error: 'break' is only allowed inside a loop
+// err: closure_errors.vl:31:33: error: a function value cannot use fs, through files.read: function values have no effects
+// err: closure_errors.vl:31:40: error: '?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... }
+import files
+
+fn main() {
+    let mut total = 0
+    let add = fn(x: Int) {
+        total = total + x
+    }
+    let f = fn(x) => x + 1
+    let read = fn(p: Str) => files.read(p)
+    let g = fn(x: Int) -> Int {
+        if x > 0 {
+            return x
+        }
+    }
+    let h = fn(x: Int) -> Str { return x }
+    for i in 0..3 {
+        let stop = fn() {
+            break
+        }
+    }
+    let q = fn(s: Str) => files.read(s)?
+}
