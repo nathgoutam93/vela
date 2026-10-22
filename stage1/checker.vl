@@ -42,10 +42,12 @@ pub type Ref = enum {
     Function(Int)
     Builtin(Str)  // "print", "maps.get", ...
     Variant(Int, Int)  // the enum's type, the variant's index
+    Indirect  // a call through a function value
 }
 
 pub type Checked = struct {
     errors: [errors.CompileError]  // sorted
+    warnings: [errors.CompileError]  // sorted; they do not stop the program from compiling
     table: types.Table
     modules: [modules.Module]
     fns: [FnInfo]  // every function, in program order
@@ -69,6 +71,7 @@ type Msg = struct {
 
 type Checker = struct {
     errors: [errors.CompileError]
+    warnings: [errors.CompileError]
     table: types.Table
     modules: [modules.Module]
     order: [Int]
@@ -107,13 +110,13 @@ pub fn check_program(loaded: modules.Loaded, for_tests: Bool) -> Checked {
         push(mut targs, [])
     }
     let mut c = Checker {
-        errors: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
+        errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
         undefined: [], targs: targs, type_scope: [:], defining: -1, expected: -2,
     }
     program(mut c, for_tests)
     return Checked {
-        errors: errors.sorted(c.errors), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
+        errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
         locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs,
     }
 }
@@ -128,8 +131,17 @@ fn plural(n: Int, word: Str) -> Str {
 }
 
 fn report(c: mut Checker, line: Int, col: Int, message: Str) {
-    let e = errors.CompileError { path: c.modules[c.current].path, line: line, col: col, message: message }
+    let e = errors.CompileError {
+        path: c.modules[c.current].path, line: line, col: col, message: message, warning: false,
+    }
     errors.add(mut c.errors, e)
+}
+
+fn warn_at(c: mut Checker, e: ast.Expr, message: Str) {
+    let w = errors.CompileError {
+        path: c.modules[c.current].path, line: e.line, col: e.col, message: message, warning: true,
+    }
+    errors.add(mut c.warnings, w)
 }
 
 fn report_at(c: mut Checker, e: ast.Expr, message: Str) {
@@ -442,6 +454,19 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
     if t.name == "[]" {
         let elem = resolve_type(mut c, t.args[0])
         return types.array(mut c.table, elem)
+    }
+    if t.name == "fn" || t.name == "fn->" {
+        let mut params: [Int] = []
+        let mut result = types.NOTHING()
+        for i in 0..len(t.args) {
+            let a = resolve_type(mut c, t.args[i])
+            if t.name == "fn->" && i == len(t.args) - 1 {
+                result = a
+            } else {
+                push(mut params, a)
+            }
+        }
+        return types.func(mut c.table, params, result)
     }
     if t.module == "" {
         match maps.get(c.type_scope, t.name) {
@@ -1552,10 +1577,7 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
                     c.refs[e.id] = Ref.Local(id)
                     return c.locals[id].ty
                 }
-                Ref.Function(_) => {
-                    report_at(mut c, e, "'" + name + "' is a function; call it as " + name + "(...)")
-                    return types.ERROR()
-                }
+                Ref.Function(id) => return fn_value(mut c, e, id, name, expected)
                 _ => return types.ERROR()
             }
         }
@@ -1571,7 +1593,11 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
             return want  // the result type is known even if the operand was wrong
         }
         ast.ExprKind.Binary(op, l, r) => return binary(mut c, e, op, l, r)
-        ast.ExprKind.Call(callee, args) => return call(mut c, e, callee, args, expected)
+        ast.ExprKind.Call(callee, args) => {
+            let t = call(mut c, e, callee, args, expected)
+            stale_copies(mut c, args)
+            return t
+        }
         ast.ExprKind.Field(obj, name) => return field(mut c, e, obj, name, expected)
         ast.ExprKind.StructLit(module, name, fields) => return struct_lit(mut c, e, module, name, fields, expected)
         ast.ExprKind.Match(scrutinee, arms) => return match_arms(mut c, scrutinee, arms, e.line, e.col, MatchBody.Infer)
@@ -1835,8 +1861,14 @@ fn field(c: mut Checker, e: ast.Expr, obj: ast.Expr, name: Str, expected: Int) -
         let m = c.modules[module]
         if maps.has(m.types, name) {
             report_at(mut c, e, "'" + m.name + "." + name + "' is a type, not a value")
-        } else if maps.has(m.fns, name) || has_std(m, name) {
-            report_at(mut c, e, "'" + m.name + "." + name + "' is a function; call it as " + m.name + "." + name + "(...)")
+        } else if has_std(m, name) {
+            report_at(mut c, e, "'" + m.name + "." + name + "' is a built-in function, which cannot be used as a value; " +
+                "wrap it in a function of your own")
+        } else if maps.has(m.fns, name) {
+            match module_fn(mut c, e.line, e.col, module, name) {
+                Ref.Function(id) => return fn_value(mut c, e, id, m.name + "." + name, expected)
+                _ => return types.ERROR()
+            }
         } else {
             report_at(mut c, e, "module '" + m.name + "' has no '" + name + "'")
         }
@@ -2084,7 +2116,7 @@ fn mentions(c: Checker, t: Int, params: [Int]) -> Bool {
             return true
         }
     }
-    return false
+    return mentions(c, types.get(c.table, t).result, params)
 }
 
 // `t` with the type arguments found so far put in.
@@ -2127,7 +2159,10 @@ fn unify(c: Checker, pattern: Int, actual: Int, params: [Int], bound: mut [Int])
             return false
         }
     }
-    return true
+    if p.result < 0 || a.result < 0 {
+        return p.result == a.result
+    }
+    return unify(c, p.result, a.result, params, mut bound)
 }
 
 // A value whose type the context gives: in `f([])`, the [] is checked once
@@ -2265,6 +2300,194 @@ fn all_known(c: mut Checker, e: ast.Expr, params: [Int], bound: mut [Int], where
     return ok
 }
 
+// ---- Copies made before a change ----
+//
+// Arguments are values, evaluated left to right, and a `mut` argument's
+// place last of all. So in `unify(c, types.instantiate(mut c.table, ...))`
+// the first argument is a copy of `c` made before the second changes
+// c.table, and in `f(c, mut c.x)` the call changes c.x through a pointer
+// while its first argument still has the old c. Both are almost always
+// mistakes, and both are warned about. Only an argument that is itself the
+// variable, or a path into it, counts: in `report(mut c, show(c, t))` the
+// copy of c is used up making a message before the call changes c. And
+// reading a part of what changes, as in `push(mut xs, xs[0])`, is what
+// anyone means.
+
+// A variable, or a path of fields and elements ("[]") into one.
+type Path = struct {
+    local: Int
+    parts: [Str]
+}
+
+fn path_of(c: Checker, e: ast.Expr) -> Option[Path] {
+    match e.kind {
+        ast.ExprKind.Name(_) => {
+            match c.refs[e.id] {
+                Ref.Local(l) => return Some(Path { local: l, parts: [] })
+                _ => return None
+            }
+        }
+        ast.ExprKind.Field(obj, name) => {
+            match c.refs[e.id] {
+                Ref.Variant(_, _) => return None
+                Ref.Function(_) => return None
+                _ => {}
+            }
+            let mut p = path_of(c, obj)?
+            push(mut p.parts, name)
+            return Some(p)
+        }
+        ast.ExprKind.Index(obj, _) => {
+            let mut p = path_of(c, obj)?
+            push(mut p.parts, "[]")
+            return Some(p)
+        }
+        _ => return None
+    }
+}
+
+fn path_text(c: Checker, p: Path) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, c.locals[p.local].name)
+    for part in p.parts {
+        if part == "[]" {
+            strings.add(mut b, "[...]")
+        } else {
+            strings.add(mut b, "." + part)
+        }
+    }
+    return strings.build(b)
+}
+
+// Whether a copy of `read` holds the place `changed`.
+fn covers(read: Path, changed: Path) -> Bool {
+    if read.local != changed.local || len(read.parts) > len(changed.parts) {
+        return false
+    }
+    for i in 0..len(read.parts) {
+        if read.parts[i] != changed.parts[i] {
+            return false
+        }
+    }
+    return true
+}
+
+// The places `e` reads, and those it changes through `mut` arguments of
+// calls inside it.
+fn accesses(c: Checker, e: ast.Expr, reads: mut [Path], changes: mut [Path]) {
+    match e.kind {
+        ast.ExprKind.MutArg(p) => {
+            match path_of(c, p) {
+                Some(path) => push(mut changes, path)
+                None => {}
+            }
+            return
+        }
+        ast.ExprKind.Name(_) => {}
+        ast.ExprKind.Field(_, _) => {}
+        ast.ExprKind.Index(_, i) => accesses(c, i, mut reads, mut changes)
+        _ => {}
+    }
+    match path_of(c, e) {
+        Some(path) => {
+            push(mut reads, path)
+            return
+        }
+        None => {}
+    }
+    let mut parts: [ast.Expr] = []
+    match e.kind {
+        ast.ExprKind.Unary(_, x) => parts = [x]
+        ast.ExprKind.Binary(_, l, r) => parts = [l, r]
+        ast.ExprKind.Call(callee, args) => {
+            parts = args
+            push(mut parts, callee)
+        }
+        ast.ExprKind.Field(obj, _) => parts = [obj]
+        ast.ExprKind.Index(obj, _) => parts = [obj]
+        ast.ExprKind.Try(x) => parts = [x]
+        ast.ExprKind.Slice(obj, lo, hi) => parts = [obj, lo, hi]
+        ast.ExprKind.ArrayLit(xs) => parts = xs
+        ast.ExprKind.MapLit(entries) => {
+            for en in entries {
+                push(mut parts, en.key)
+                push(mut parts, en.value)
+            }
+        }
+        ast.ExprKind.StructLit(_, _, fields) => {
+            for f in fields {
+                push(mut parts, f.value)
+            }
+        }
+        ast.ExprKind.Match(scrutinee, _) => parts = [scrutinee]
+        _ => {}
+    }
+    for x in parts {
+        accesses(c, x, mut reads, mut changes)
+    }
+}
+
+// Warn about an argument that is a copy of something a later argument, or
+// the call itself through a `mut` argument, changes.
+fn stale_copies(c: mut Checker, args: [ast.Expr]) {
+    if len(args) < 2 {
+        return
+    }
+    let mut reads: [[Path]] = []
+    let mut changes: [[Path]] = []  // by nested calls, while the argument is worked out
+    let mut direct: [Option[Path]] = []  // by the call, through the argument
+    for a in args {
+        let mut r: [Path] = []
+        let mut w: [Path] = []
+        let mut d: Option[Path] = None
+        match a.kind {
+            ast.ExprKind.MutArg(p) => d = path_of(c, p)
+            _ => {
+                let mut nested_reads: [Path] = []
+                accesses(c, a, mut nested_reads, mut w)
+                match path_of(c, a) {
+                    Some(p) => push(mut r, p)
+                    None => {}
+                }
+            }
+        }
+        push(mut reads, r)
+        push(mut changes, w)
+        push(mut direct, d)
+    }
+    for i in 0..len(args) {
+        for read in reads[i] {
+            for j in 0..len(args) {
+                if j == i {
+                    continue
+                }
+                let what = "argument " + strings.from_int(i + 1) + " is a copy of '" + path_text(c, read) + "'"
+                match direct[j] {
+                    Some(changed) => {
+                        if covers(read, changed) {
+                            warn_at(mut c, args[i], what + ", but the call changes '" + path_text(c, changed) +
+                                "' through `mut` in argument " + strings.from_int(j + 1) +
+                                    ", and the copy will not show it; pass only the part the call needs")
+                            return
+                        }
+                    }
+                    None => {}
+                }
+                if j > i {
+                    for changed in changes[j] {
+                        if covers(read, changed) {
+                            warn_at(mut c, args[i], what + " made before argument " + strings.from_int(j + 1) + " changes '" +
+                                path_text(c, changed) + "' through `mut`, so it has the old value; make the change " +
+                                    "in a statement before this call")
+                            return
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ---- Calls ----
 
 fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expected: Int) -> Int {
@@ -2344,7 +2567,12 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
             // Even after an argument error, the call has the declared result type.
             return f.result
         }
-        Ref.Local(_) => return types.ERROR()  // not reached
+        Ref.Local(id) => {
+            set_ty(mut c, callee, c.locals[id].ty)
+            c.refs[callee.id] = Ref.Local(id)
+            return indirect_call(mut c, e, c.locals[id].ty, args)
+        }
+        Ref.Indirect => return indirect_call(mut c, e, c.ty[callee.id], args)
     }
 }
 
@@ -2524,14 +2752,18 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
                 }
                 _ => {}
             }
-            report_at(mut c, callee, "only a named function can be called")
-            return Ref.NoRef
+            return callee_value(mut c, callee)
         }
         ast.ExprKind.Name(name) => {
             let local = lookup_local(c, name)
             if local >= 0 {
-                report_at(mut c, callee, "'" + name + "' is a variable of type " + show(c, c.locals[local].ty) +
-                    ", not a function")
+                if types.is_func(c.table, c.locals[local].ty) {
+                    return Ref.Local(local)  // a call through a function value
+                }
+                if c.locals[local].ty != types.ERROR() {
+                    report_at(mut c, callee, "'" + name + "' is a variable of type " + show(c, c.locals[local].ty) +
+                        ", not a function")
+                }
                 return Ref.NoRef
             }
             if is_prelude(name) || is_builtin_variant(name) {
@@ -2555,11 +2787,81 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
             }
             return Ref.NoRef
         }
-        _ => {
-            report_at(mut c, callee, "only a named function can be called")
-            return Ref.NoRef
+        _ => return callee_value(mut c, callee)
+    }
+}
+
+// A callee that is an expression, not a name: `p.on_click(...)`,
+// `handlers[0](...)`. It can be called if it is a function value.
+fn callee_value(c: mut Checker, callee: ast.Expr) -> Ref {
+    let t = value(mut c, callee)
+    if types.is_func(c.table, t) {
+        return Ref.Indirect
+    }
+    if t != types.ERROR() {
+        report_at(mut c, callee, "only a function can be called, and this is " + show(c, t))
+    }
+    return Ref.NoRef
+}
+
+// A named function used as a value: `lists.map(xs, double)`. A generic one
+// takes its type arguments from the function type the context wants.
+fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> Int {
+    let f = c.fns[id]
+    for m in f.mutable {
+        if m {
+            report_at(mut c, e, "'" + name + "' has a mut parameter, so it cannot be used as a value")
+            return types.ERROR()
         }
     }
+    c.refs[e.id] = Ref.Function(id)
+    let tp = f.type_params
+    let mut bound = unknown(len(tp))
+    if len(tp) > 0 && expected >= 0 && types.is_func(c.table, expected) {
+        let pattern = types.func(mut c.table, f.params, f.result)
+        unify(c, pattern, expected, tp, mut bound)
+    }
+    if len(tp) > 0 {
+        let example = example_type(mut c, types.func(mut c.table, f.params, f.result), tp, bound)
+        if !all_known(mut c, e, tp, mut bound, "in '" + name + "' used as a value", "; give it a type, as in `let f: " +
+            show(c, example) + " = " + name + "`") {
+            return types.ERROR()
+        }
+        for i in 0..len(tp) {
+            check_bounds(mut c, e.line, e.col, "'" + name + "'", tp[i], bound[i])
+        }
+        c.targs[e.id] = bound
+    }
+    let mut params: [Int] = []
+    for p in f.params {
+        push(mut params, partial(mut c, p, tp, bound))
+    }
+    let result = partial(mut c, f.result, tp, bound)
+    return types.func(mut c.table, params, result)
+}
+
+// A call through a function value of type `t`.
+fn indirect_call(c: mut Checker, e: ast.Expr, t: Int, args: [ast.Expr]) -> Int {
+    let ft = types.get(c.table, t)
+    c.refs[e.id] = Ref.Indirect
+    arity(mut c, e, "this function", len(ft.args), len(args))
+    for i in 0..len(args) {
+        let arg = args[i]
+        if i >= len(ft.args) {
+            infer(mut c, arg)
+            continue
+        }
+        let want = ft.args[i]
+        let m = msg("argument " + strings.from_int(i + 1) + " must be " + show(c, want) + ", found ", "")
+        match arg.kind {
+            ast.ExprKind.MutArg(p) => {
+                report_at(mut c, arg, "a function value has no mut parameters; remove `mut`")
+                check_expr(mut c, p, want, m)
+            }
+            _ => check_expr(mut c, arg, want, m)
+        }
+    }
+    return ft.result
 }
 
 fn arity(c: mut Checker, e: ast.Expr, name: Str, expected: Int, got: Int) -> Bool {

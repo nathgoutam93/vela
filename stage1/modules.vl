@@ -124,7 +124,9 @@ fn add_errors(ld: mut Loader, errs: [errors.CompileError], path: Str) {
 }
 
 fn report(ld: mut Loader, importer: Int, imp: ast.Import, message: Str) {
-    let e = errors.CompileError { path: ld.modules[importer].path, line: imp.line, col: imp.col, message: message }
+    let e = errors.CompileError {
+        path: ld.modules[importer].path, line: imp.line, col: imp.col, message: message, warning: false,
+    }
     errors.add(mut ld.errors, e)
 }
 

@@ -16,6 +16,7 @@ pub type Layout = struct {
     boxed: Map[Str, Bool]  // by "type slot index": slots stored in a box
     box_types: [Int]  // the types that live in boxes, in order
     managed_cache: Map[Int, Bool]
+    funcs: [Int]  // function types, which are C function pointer typedefs
 }
 
 // The C name of `name` in `module`, with the module's length in front so
@@ -63,7 +64,7 @@ pub fn new_layout(table: types.Table, user_types: [Int], element_types: [Int]) -
     }
     let mut l = Layout {
         table: table, types: all, element_types: element_types, names: [:], used: [:], tags: [:], boxed: [:],
-        box_types: [], managed_cache: [:],
+        box_types: [], managed_cache: [:], funcs: [],
     }
     for t in all {
         let name = unique(mut l, base_name(l, t))
@@ -77,6 +78,16 @@ pub fn new_layout(table: types.Table, user_types: [Int], element_types: [Int]) -
                 l.tags[strings.from_int(t) + " " + v.name] = tag
             }
         }
+    }
+    for t in 0..len(table.types) {
+        let ti = types.get(table, t)
+        if ti.tag == types.Tag.Func && !ti.open {
+            push(mut l.funcs, t)
+        }
+    }
+    for t in l.funcs {
+        let name = unique(mut l, suffix(l, t))
+        l.names[t] = name
     }
     find_boxed(mut l)
     for t in all {
@@ -141,6 +152,23 @@ pub fn suffix(l: Layout, t: Int) -> Str {
     }
     if t == types.BUILDER() {
         return "7strings_Builder"
+    }
+    if ti.tag == types.Tag.Func {
+        // fn_Int_Str__Bool for fn(Int, Str) -> Bool
+        let mut b = strings.builder()
+        strings.add(mut b, "fn")
+        for a in ti.args {
+            strings.add(mut b, "_" + suffix(l, a))
+        }
+        if len(ti.args) == 0 {
+            strings.add(mut b, "_void")
+        }
+        if ti.result >= 0 {
+            strings.add(mut b, "__" + suffix(l, ti.result))
+        } else {
+            strings.add(mut b, "__void")
+        }
+        return strings.build(b)
     }
     if types.is_builtin_enum(l.table, t) {
         return base_name(l, t)
@@ -339,6 +367,22 @@ pub fn definitions(l: mut Layout) -> [Str] {
     for t in l.box_types {
         push(mut out, "typedef struct " + box_name(l, t) + " " + box_name(l, t) + ";")
     }
+    // After the struct names, which their parameters may mention: a
+    // prototype may have parameters of a struct type not yet defined.
+    for t in l.funcs {
+        let ti = types.get(l.table, t)
+        let mut params = strings.builder()
+        for i in 0..len(ti.args) {
+            if i > 0 {
+                strings.add(mut params, ", ")
+            }
+            strings.add(mut params, c_type(l, ti.args[i]))
+        }
+        if len(ti.args) == 0 {
+            strings.add(mut params, "void")
+        }
+        push(mut out, "typedef " + c_type(l, ti.result) + " (*" + l.names[t] + ")(" + strings.build(params) + ");")
+    }
     let mut done: Map[Int, Bool] = [:]
     for t in l.types {
         define(mut l, t, mut done, mut out)
@@ -350,7 +394,8 @@ pub fn definitions(l: mut Layout) -> [Str] {
 }
 
 fn define(l: mut Layout, t: Int, done: mut Map[Int, Bool], out: mut [Str]) {
-    if maps.has(done, t) || primitive_c(t) != "" || is_array_like(l.table, t) || types.is_map(l.table, t) {
+    if maps.has(done, t) || primitive_c(t) != "" || is_array_like(l.table, t) || types.is_map(l.table, t) ||
+        types.is_func(l.table, t) {
         return
     }
     done[t] = true

@@ -207,7 +207,7 @@ fn space(a: Piece, b: Piece) -> Bool {
     if bk == lexer.Kind.LParen || bk == lexer.Kind.LBracket {
         // A call, an index or type arguments hug what they follow.
         let hugs = ak == lexer.Kind.Ident || ak == lexer.Kind.RParen || ak == lexer.Kind.RBracket ||
-            ak == lexer.Kind.Question || ak == lexer.Kind.Str
+            ak == lexer.Kind.Question || ak == lexer.Kind.Str || ak == lexer.Kind.Fn && bk == lexer.Kind.LParen
         return !hugs
     }
     return true
@@ -324,6 +324,7 @@ test "spaces around operators, none inside brackets" {
     assert(stmt("let m=[:]") == "let m = [:]")
     assert(stmt("let r=xs[i+1..n]") == "let r = xs[i + 1..n]")
     assert(formatted("fn f[T:Ord+Key]()->[T]{}\n") == "fn f[T: Ord + Key]() -> [T] {}\n")
+    assert(formatted("fn f(g:fn (Int)->Int){}\n") == "fn f(g: fn(Int) -> Int) {}\n")
 }
 
 test "a unary minus after an operator or bracket" {

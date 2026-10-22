@@ -1,0 +1,94 @@
+// Function values (M10b): named functions passed, stored, returned and
+// called; a generic function becomes a value by the type the context wants.
+// stage 1 only
+// out: 7
+// out: 12
+// out: 3
+// out: -6
+// out: 3
+// out: fig, pear
+// out: hi
+// out: 10
+// out: 25
+// out: 2
+import lists
+
+type Op = struct {
+    name: Str
+    apply: fn(Int, Int) -> Int
+}
+
+fn add(a: Int, b: Int) -> Int {
+    return a + b
+}
+
+fn mul(a: Int, b: Int) -> Int {
+    return a * b
+}
+
+fn sub(a: Int, b: Int) -> Int {
+    return a - b
+}
+
+fn pick(name: Str) -> fn(Int, Int) -> Int {
+    if name == "mul" {
+        return mul
+    }
+    return add
+}
+
+fn twice(f: fn(Int) -> Int, x: Int) -> Int {
+    return f(f(x))
+}
+
+fn inc(x: Int) -> Int {
+    return x + 1
+}
+
+fn first[T](xs: [T]) -> T {
+    return xs[0]
+}
+
+fn say(s: Str) {
+    print(s)
+}
+
+fn join(words: [Str]) -> Str {
+    return lists.fold(words, "", comma)
+}
+
+fn comma(acc: Str, w: Str) -> Str {
+    if acc == "" {
+        return w
+    }
+    return acc + ", " + w
+}
+
+fn main() {
+    let f = add
+    print(f(3, 4))
+    print(pick("mul")(3, 4))
+    let ops = [Op { name: "add", apply: add }, Op { name: "sub", apply: sub }]
+    print(ops[0].apply(1, 2))
+    let o = ops[1]
+    print(o.apply(-3, 3))
+    print(twice(inc, 1))
+    let get: fn([Str]) -> Str = first
+    let words = lists.sort_by(["pear", "fig"], len_of)
+    print(get([join(words)]))
+    let speak: fn(Str) = say
+    speak("hi")
+    let table: [fn(Int) -> Int] = [inc, square]
+    print(table[0](9))
+    print(table[1](5))
+    let lens = lists.map(["ab", "c"], len_of)
+    print(lens[0])
+}
+
+fn square(x: Int) -> Int {
+    return x * x
+}
+
+fn len_of(s: Str) -> Int {
+    return len(s)
+}

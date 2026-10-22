@@ -1,0 +1,40 @@
+// The warning for an argument that is a copy made before a `mut` change:
+// a warning does not stop the program from compiling.
+// stage 1 only
+// command: check
+// err: warning_stale_copy.vl:33:16: warning: argument 1 is a copy of 'c' made before argument 2 changes 'c.table' through `mut`, so it has the old value; make the change in a statement before this call
+// err: warning_stale_copy.vl:34:17: warning: argument 2 is a copy of 'c', but the call changes 'c' through `mut` in argument 1, and the copy will not show it; pass only the part the call needs
+import strings
+
+type Table = struct {
+    names: [Str]
+}
+
+type Checker = struct {
+    table: Table
+    n: Int
+}
+
+fn add(t: mut Table, name: Str) -> Int {
+    push(mut t.names, name)
+    return len(t.names) - 1
+}
+
+fn bump(c: mut Checker, old: Checker) {
+    c.n = old.n + 1
+}
+
+fn size(c: Checker, id: Int) -> Int {
+    return len(c.table.names) + id
+}
+
+fn main() {
+    let mut c = Checker { table: Table { names: [] }, n: 0 }
+    print(size(c, add(mut c.table, "x")))
+    bump(mut c, c)
+    // Not warned about: a part read before it changes, and a copy used up
+    // inside an argument before the call.
+    let mut xs = [1]
+    push(mut xs, xs[0])
+    print(add(mut c.table, strings.from_int(size(c, 0))))
+}

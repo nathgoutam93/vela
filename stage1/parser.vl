@@ -419,6 +419,28 @@ fn variant_decl(p: mut Parser) -> Result[ast.VariantDecl, errors.CompileError] {
 }
 
 fn type_name(p: mut Parser) -> Result[ast.TypeName, errors.CompileError] {
+    if peek(p, 0).kind == lexer.Kind.Fn {
+        // `fn(Int, Str) -> Bool`: the parameter types, then the result type
+        // if there is one ("fn->" says there is, and it comes last).
+        let open = advance(mut p)
+        expect(mut p, lexer.Kind.LParen, "after 'fn' in a function type")?
+        let mut args: [ast.TypeName] = []
+        for peek(p, 0).kind != lexer.Kind.RParen {
+            push(mut args, type_name(mut p)?)
+            if peek(p, 0).kind != lexer.Kind.Comma {
+                break
+            }
+            advance(mut p)
+        }
+        expect(mut p, lexer.Kind.RParen, "after the parameter types of a function type")?
+        let mut name = "fn"
+        if peek(p, 0).kind == lexer.Kind.Arrow {
+            advance(mut p)
+            push(mut args, type_name(mut p)?)
+            name = "fn->"
+        }
+        return Ok(ast.TypeName { name: name, args: args, line: open.line, col: open.col, module: "" })
+    }
     if peek(p, 0).kind == lexer.Kind.LBracket {
         let open = advance(mut p)
         let elem = type_name(mut p)?

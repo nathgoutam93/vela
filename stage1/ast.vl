@@ -10,7 +10,10 @@
 import strings
 
 pub type TypeName = struct {
-    name: Str  // "[]" for an array type [T], with T as its one argument
+    // "[]" for an array type [T], with T as its one argument; "fn" for a
+    // function type, with its parameter types as arguments, or "fn->" when
+    // it has a result type, which is the last argument
+    name: Str
     args: [TypeName]
     line: Int
     col: Int
@@ -249,6 +252,25 @@ fn qualified(module: Str, name: Str) -> Str {
 pub fn type_text(t: TypeName) -> Str {
     if t.name == "[]" {
         return "[" + type_text(t.args[0]) + "]"
+    }
+    if t.name == "fn" || t.name == "fn->" {
+        let mut n = len(t.args)
+        if t.name == "fn->" {
+            n = n - 1
+        }
+        let mut b = strings.builder()
+        strings.add(mut b, "fn(")
+        for i in 0..n {
+            if i > 0 {
+                strings.add(mut b, ", ")
+            }
+            strings.add(mut b, type_text(t.args[i]))
+        }
+        strings.add_byte(mut b, ')')
+        if t.name == "fn->" {
+            strings.add(mut b, " -> " + type_text(t.args[n]))
+        }
+        return strings.build(b)
     }
     let name = qualified(t.module, t.name)
     if len(t.args) == 0 {

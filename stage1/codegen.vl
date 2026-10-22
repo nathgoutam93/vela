@@ -1004,6 +1004,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             match g.k.refs[e.id] {
                 checker.Ref.Local(id) => return value(local(mut g, id), t)
                 checker.Ref.Variant(enum, vi) => return enum_value(mut g, sub(g, enum), vi, [])  // `None`
+                checker.Ref.Function(id) => return value(function_name(g, id, e), t)  // a function as a value
                 _ => return no_value()
             }
         }
@@ -1042,14 +1043,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
                             _ => {}
                         }
                     }
-                    let mut callee = fn_name(g.k, id)
-                    if len(g.k.fns[id].type_params) > 0 {
-                        let mut targs: [Int] = []
-                        for t2 in g.k.targs[e.id] {
-                            push(mut targs, sub(g, t2))
-                        }
-                        callee = g.instance_names[mono.key(id, targs)]
-                    }
+                    let callee = function_name(g, id, e)
                     let mut b = strings.builder()
                     strings.add(mut b, callee + "(")
                     for i in 0..len(cs) {
@@ -1066,12 +1060,14 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
                     }
                     return store(mut g, t, call)
                 }
+                checker.Ref.Indirect => return indirect_call(mut g, e, args)
                 _ => return no_value()
             }
         }
         ast.ExprKind.Field(obj, name) => {
             match g.k.refs[e.id] {
                 checker.Ref.Variant(enum, vi) => return enum_value(mut g, sub(g, enum), vi, [])
+                checker.Ref.Function(id) => return value(function_name(g, id, e), t)  // `module.f` as a value
                 _ => {}
             }
             let c = expr(mut g, obj).c
@@ -1129,6 +1125,44 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             return own(mut g, result, t)
         }
     }
+}
+
+// The C function called, or named as a value, at node `e`: for a generic
+// function, the copy for its type arguments there.
+fn function_name(g: Gen, id: Int, e: ast.Expr) -> Str {
+    if len(g.k.fns[id].type_params) == 0 {
+        return fn_name(g.k, id)
+    }
+    let mut targs: [Int] = []
+    for t in g.k.targs[e.id] {
+        push(mut targs, sub(g, t))
+    }
+    return g.instance_names[mono.key(id, targs)]
+}
+
+// A call through a function value: the callee first, then the arguments,
+// left to right, passed owned as to any function.
+fn indirect_call(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
+    let mut callee = ""
+    match e.kind {
+        ast.ExprKind.Call(f, _) => callee = expr(mut g, f).c
+        _ => {}
+    }
+    let mut b = strings.builder()
+    strings.add(mut b, callee + "(")
+    for i in 0..len(args) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, consume(mut g, expr(mut g, args[i])))
+    }
+    strings.add_byte(mut b, ')')
+    let t = ty(g, e)
+    if t == types.NOTHING() {
+        emit(mut g, strings.build(b) + ";")
+        return no_value()
+    }
+    return store(mut g, t, strings.build(b))
 }
 
 // `x?`: if x is an Err (or None), return it from the function now,

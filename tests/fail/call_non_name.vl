@@ -1,4 +1,5 @@
-// err: call_non_name.vl:3:11: error: only a named function can be called
+// stage 1 only (functions became values in M10b)
+// err: call_non_name.vl:4:11: error: only a function can be called, and this is Int
 fn main() {
     print(5(1))
 }

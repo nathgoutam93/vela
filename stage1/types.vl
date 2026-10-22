@@ -29,6 +29,7 @@ pub type Tag = enum {
     Struct
     Enum  // a user enum, or Option / Result (which have args)
     Param  // a type parameter
+    Func  // a function type, fn(Int) -> Str: its parameter types in args
 }
 
 pub type Variant = struct {
@@ -56,6 +57,7 @@ pub type TypeInfo = struct {
     origin: Int  // an instance's generic declaration; -1 for anything else
     open: Bool  // mentions a type parameter
     filled: Bool  // a generic declaration: its fields or variants are known; an instance: they are put in
+    result: Int  // a function type's result type; NOTHING() when it returns nothing
 }
 
 pub type Table = struct {
@@ -102,7 +104,7 @@ pub fn NOTHING() -> Int {
 fn info(tag: Tag, name: Str) -> TypeInfo {
     return TypeInfo {
         tag: tag, name: name, module: "", public: true, line: 0, col: 0, args: [], fields: [], variants: [],
-        params: [], bounds: [], origin: -1, open: false, filled: false,
+        params: [], bounds: [], origin: -1, open: false, filled: false, result: -1,
     }
 }
 
@@ -208,6 +210,36 @@ pub fn map(table: mut Table, k: Int, v: Int) -> Int {
     return id
 }
 
+// `fn(params) -> result`, interned; `result` is NOTHING() for a function
+// that returns nothing.
+pub fn func(table: mut Table, params: [Int], result: Int) -> Int {
+    for p in params {
+        if p == ERROR() {
+            return ERROR()
+        }
+    }
+    if result == ERROR() {
+        return ERROR()
+    }
+    let k = key("fn " + strings.from_int(result), params)
+    match maps.get(table.index, k) {
+        Some(t) => return t
+        None => {}
+    }
+    let mut t = info(Tag.Func, "fn")
+    t.args = params
+    t.result = result
+    t.open = any_open(table, params) || result >= 0 && table.types[result].open
+    push(mut table.types, t)
+    let id = len(table.types) - 1
+    table.index[k] = id
+    return id
+}
+
+pub fn is_func(table: Table, t: Int) -> Bool {
+    return t >= 0 && table.types[t].tag == Tag.Func
+}
+
 pub fn option(table: mut Table, t: Int) -> Int {
     return instance(mut table, "Option", [t])
 }
@@ -293,6 +325,9 @@ fn any_open(table: Table, ts: [Int]) -> Bool {
 // How deeply `t` nests: 1 for Int, 2 for [Int], 3 for Option[[Int]].
 pub fn depth(table: Table, t: Int) -> Int {
     let mut deepest = 0
+    if table.types[t].result >= 0 {
+        deepest = depth(table, table.types[t].result)
+    }
     for a in table.types[t].args {
         let d = depth(table, a)
         if d > deepest {
@@ -414,6 +449,10 @@ pub fn find_subst(table: Table, t: Int, params: [Int], args: [Int]) -> Int {
     if ti.tag == Tag.Array {
         return table.index[key("[]", new_args)]
     }
+    if ti.tag == Tag.Func {
+        let r = find_subst(table, ti.result, params, args)
+        return table.index[key("fn " + strings.from_int(r), new_args)]
+    }
     if ti.origin >= 0 {
         return table.index[key("inst " + strings.from_int(ti.origin), new_args)]
     }
@@ -443,6 +482,10 @@ pub fn subst(table: mut Table, t: Int, params: [Int], args: [Int]) -> Int {
     }
     if ti.tag == Tag.Map {
         return map(mut table, new_args[0], new_args[1])
+    }
+    if ti.tag == Tag.Func {
+        let r = subst(mut table, ti.result, params, args)
+        return func(mut table, new_args, r)
     }
     if ti.origin >= 0 {
         return instantiate(mut table, ti.origin, new_args)
@@ -495,7 +538,24 @@ pub fn show(table: Table, t: Int, viewpoint: Str) -> Str {
         Tag.Struct => show_enum(table, ti, viewpoint)
         Tag.Enum => show_enum(table, ti, viewpoint)
         Tag.Param => ti.name
+        Tag.Func => show_func(table, ti, viewpoint)
     }
+}
+
+fn show_func(table: Table, ti: TypeInfo, viewpoint: Str) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, "fn(")
+    for i in 0..len(ti.args) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, show(table, ti.args[i], viewpoint))
+    }
+    strings.add_byte(mut b, ')')
+    if ti.result >= 0 {
+        strings.add(mut b, " -> " + show(table, ti.result, viewpoint))
+    }
+    return strings.build(b)
 }
 
 fn show_enum(table: Table, ti: TypeInfo, viewpoint: Str) -> Str {

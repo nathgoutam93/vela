@@ -65,7 +65,9 @@ def compare(what: str, path: Path) -> list[str]:
     old = run([*STAGE0, what], path)
     new = run([str(STAGE1), what], path)
     problems = []
-    for name, a, b in (("stdout", old.stdout, new.stdout), ("stderr", old.stderr, new.stderr)):
+    # Stage 0 has no warnings (they came in M10b), so Stage 1's are left out.
+    new_err = b"".join(line for line in new.stderr.splitlines(keepends=True) if b": warning: " not in line)
+    for name, a, b in (("stdout", old.stdout, new.stdout), ("stderr", old.stderr, new_err)):
         if a != b:
             diff = difflib.unified_diff(a.decode("utf-8", "replace").splitlines(),
                                         b.decode("utf-8", "replace").splitlines(),

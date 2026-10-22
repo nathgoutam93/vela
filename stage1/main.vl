@@ -161,9 +161,21 @@ fn checked(path: Str, root: Str) -> checker.Checked {
     }
     let result = checker.check(loaded)
     if len(result.errors) > 0 {
-        fail(path, result.errors)
+        fail(path, errors.merged(result.errors, result.warnings))
     }
+    warn(path, result.warnings)
     return result
+}
+
+// Print warnings; they do not stop the compiler.
+fn warn(path: Str, warnings: [errors.CompileError]) {
+    for w in warnings {
+        let mut shown = w
+        if shown.path == "" {
+            shown.path = path
+        }
+        os.eprint(errors.render(shown))
+    }
 }
 
 // FILE without its extension, as Stage 0 picks it.
@@ -341,13 +353,21 @@ fn fmt(args: [Str]) {
 // It exits 1 when there are errors, as `check` does.
 fn check_json(path: Str, root: Str) {
     let mut errs: [errors.CompileError] = []
+    let mut failed = false
     match files.read(path) {
-        Err(e) => push(mut errs, errors.CompileError { path: path, line: 0, col: 0, message: e })
+        Err(e) => {
+            push(mut errs, errors.CompileError { path: path, line: 0, col: 0, message: e, warning: false })
+            failed = true
+        }
         Ok(source) => {
             let loaded = modules.load(path, source, modules.join(root, "std"))
             errs = loaded.errors
             if len(errs) == 0 {
-                errs = checker.check(loaded).errors
+                let k = checker.check(loaded)
+                failed = len(k.errors) > 0
+                errs = errors.merged(k.errors, k.warnings)
+            } else {
+                failed = true
             }
         }
     }
@@ -355,7 +375,11 @@ fn check_json(path: Str, root: Str) {
     if len(errs) == 0 {
         strings.add(mut b, "{\"ok\": true, \"errors\": []}")
     } else {
-        strings.add(mut b, "{\"ok\": false, \"errors\": [")
+        if failed {
+            strings.add(mut b, "{\"ok\": false, \"errors\": [")
+        } else {
+            strings.add(mut b, "{\"ok\": true, \"errors\": [")
+        }
         for i in 0..len(errs) {
             let e = errs[i]
             let mut file = e.path
@@ -366,7 +390,11 @@ fn check_json(path: Str, root: Str) {
             strings.add_int(mut b, e.line)
             strings.add(mut b, ", \"col\": ")
             strings.add_int(mut b, e.col)
-            strings.add(mut b, ", \"severity\": \"error\", \"message\": " + json_string(e.message) + "}")
+            let mut severity = "error"
+            if e.warning {
+                severity = "warning"
+            }
+            strings.add(mut b, ", \"severity\": \"" + severity + "\", \"message\": " + json_string(e.message) + "}")
             if i < len(errs) - 1 {
                 strings.add_byte(mut b, ',')
             }
@@ -374,7 +402,7 @@ fn check_json(path: Str, root: Str) {
         strings.add(mut b, "\n]}")
     }
     print(strings.build(b))
-    if len(errs) > 0 {
+    if failed {
         os.exit(1)
     }
 }
@@ -418,8 +446,9 @@ fn test_command(path: Str, words: [Str], root: Str) {
     }
     let k = checker.check_program(loaded, true)
     if len(k.errors) > 0 {
-        fail(path, k.errors)
+        fail(path, errors.merged(k.errors, k.warnings))
     }
+    warn(path, k.warnings)
     let ids = codegen.test_ids(k)
     let mut chosen: [Int] = []
     for i in 0..len(ids) {

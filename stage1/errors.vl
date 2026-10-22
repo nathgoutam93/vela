@@ -8,19 +8,33 @@ pub type CompileError = struct {
     line: Int
     col: Int
     message: Str
+    warning: Bool  // a warning: reported, but the program still compiles
 }
 
 pub fn at(line: Int, col: Int, message: Str) -> CompileError {
-    return CompileError { path: "", line: line, col: col, message: message }
+    return CompileError { path: "", line: line, col: col, message: message, warning: false }
 }
 
-// `file:line:col: error: message`
+// `file:line:col: error: message`, or `warning:`
 pub fn render(e: CompileError) -> Str {
-    return e.path + ":" + strings.from_int(e.line) + ":" + strings.from_int(e.col) + ": error: " + e.message
+    let mut kind = ": error: "
+    if e.warning {
+        kind = ": warning: "
+    }
+    return e.path + ":" + strings.from_int(e.line) + ":" + strings.from_int(e.col) + kind + e.message
 }
 
 fn same(a: CompileError, b: CompileError) -> Bool {
-    return a.path == b.path && a.line == b.line && a.col == b.col && a.message == b.message
+    return a.path == b.path && a.line == b.line && a.col == b.col && a.message == b.message && a.warning == b.warning
+}
+
+// Errors and warnings in one list, in the order they are reported.
+pub fn merged(errs: [CompileError], warnings: [CompileError]) -> [CompileError] {
+    let mut all = errs
+    for w in warnings {
+        push(mut all, w)
+    }
+    return sorted(all)
 }
 
 // Adds `e` unless an identical error is already there.
