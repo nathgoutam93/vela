@@ -391,3 +391,7 @@ generator (identical C). Three questions first:
    generator, each matched against Stage 0 before the next) suit you? Or
    would you rather review Stage 1 one module at a time, as separate
    milestones?
+
+**Answered after M7:** add a `Unit` type, allow `<` on Str, and the M8
+plan as proposed. M8 adds both language changes, and `mut` parameters
+(see `m08-stage1.md`).

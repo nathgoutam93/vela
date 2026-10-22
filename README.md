@@ -25,6 +25,7 @@ python3 run_tests.py                      # run the test suite
 
 ```
 stage0/      the compiler in Python (thrown away after bootstrap)
+stage1/      the compiler in Vela; stage1/vela1 runs it
 runtime/     C runtime linked into every program
 std/         standard modules written in Vela
 tests/run/   programs and their expected output
@@ -32,16 +33,19 @@ tests/fail/  programs and the exact errors they must produce
 tests/dump/  expected token and syntax-tree dumps
 docs/        one walkthrough per milestone
 run_tests.py the golden-test runner
+compare_stages.py  checks that Stage 0 and Stage 1 agree on every file
 ```
 
 ## Status
 
-M0 to M7 are done: the driver and test runner, expressions, variables,
+M0 to M8 are done: the driver and test runner, expressions, variables,
 functions and control flow, a type checker that reports every error in one
 run, structs, enums, `match` and `Option`/`Result`, reference-counted
 strings, arrays and maps, programs of several files (`import`, `pub`), the
-`?` operator, and a standard library for files, arguments, exit codes and
-string building.
+`?` operator, a standard library for files, arguments, exit codes and
+string building, and Stage 1: the compiler rewritten in Vela, which writes
+the same C as Stage 0 for every program (`python3 compare_stages.py tokens
+ast check c`; `python3 run_tests.py --compiler stage1/vela1`).
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
 
