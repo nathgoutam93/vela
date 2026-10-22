@@ -10,7 +10,7 @@
 // err: generics_errors.vl:62:14: error: T has no fields
 // err: generics_errors.vl:66:12: error: 'Box' needs 1 type argument, as in Box[Int]
 // err: generics_errors.vl:67:12: error: 'Box' needs 1 type argument, as in Box[Int]
-// err: generics_errors.vl:68:5: error: 'biggest' needs T to be ordered by <, as Int, Byte and Str are, but here T is Point
+// err: generics_errors.vl:68:5: error: 'biggest' needs T to be ordered by <, as Int, Byte, Float and Str are, but here T is Point
 // err: generics_errors.vl:69:13: error: cannot tell what T is in this call to 'make'; give the result a type, as in `let x: [Int] = make(...)`
 // err: generics_errors.vl:70:18: error: cannot tell which Tree this Tree.Leaf is; give it a type, as in `let x: Tree[Int] = Tree.Leaf`
 // err: generics_errors.vl:71:34: error: value 1 of Tree.Node must be Str, found Int

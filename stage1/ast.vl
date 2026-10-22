@@ -29,6 +29,7 @@ pub type Expr = struct {
 
 pub type ExprKind = enum {
     IntLit(Int)
+    FloatLit(Str)  // as written: 1.5, 2e10
     ByteLit(Int)
     BoolLit(Bool)
     StrLit(Str)
@@ -514,6 +515,7 @@ fn sx_exprs(head: Sx, xs: [Expr]) -> Sx {
 fn sx_expr(e: Expr) -> Sx {
     match e.kind {
         ExprKind.IntLit(n) => return atom(strings.from_int(n))
+        ExprKind.FloatLit(text) => return atom(text)
         ExprKind.ByteLit(n) => return atom(quote_byte(n))
         ExprKind.BoolLit(b) => {
             if b {
@@ -721,6 +723,7 @@ fn texts(es: [Expr]) -> Str {
 pub fn expr_text(e: Expr) -> Str {
     match e.kind {
         ExprKind.IntLit(n) => return strings.from_int(n)
+        ExprKind.FloatLit(text) => return text
         ExprKind.ByteLit(n) => return quote_byte(n)
         ExprKind.BoolLit(b) => {
             if b {

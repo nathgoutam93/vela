@@ -70,6 +70,7 @@ fn is_comparison(k: lexer.Kind) -> Bool {
 fn starts_expression(k: lexer.Kind) -> Bool {
     return match k {
         lexer.Kind.Int => true
+        lexer.Kind.Float => true
         lexer.Kind.Bool => true
         lexer.Kind.Str => true
         lexer.Kind.Byte => true
@@ -952,6 +953,9 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
     let k = tok.kind
     if k == lexer.Kind.Int {
         return Ok(expr(mut p, ast.ExprKind.IntLit(digits_value(tok.text)), tok.line, tok.col))
+    }
+    if k == lexer.Kind.Float {
+        return Ok(expr(mut p, ast.ExprKind.FloatLit(tok.text), tok.line, tok.col))
     }
     if k == lexer.Kind.Bool {
         return Ok(expr(mut p, ast.ExprKind.BoolLit(tok.text == "true"), tok.line, tok.col))

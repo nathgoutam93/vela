@@ -45,6 +45,7 @@ typedef uint8_t vela_unit;
 extern const vela_type vela_type_unit;
 extern const vela_type vela_type_int;
 extern const vela_type vela_type_byte;
+extern const vela_type vela_type_float;
 extern const vela_type vela_type_bool;
 extern const vela_type vela_type_str;
 extern const vela_type vela_type_array;
@@ -152,9 +153,11 @@ vela_array *vela_map_keys(vela_map *m);
 void vela_print_int(int64_t x);
 void vela_print_bool(bool x);
 void vela_print_str(vela_str x);
+void vela_print_float(double x);
 void vela_eprint_int(int64_t x);
 void vela_eprint_bool(bool x);
 void vela_eprint_str(vela_str x);
+void vela_eprint_float(double x);
 
 // ---- The built-in modules: os, files, strings ----
 
@@ -200,6 +203,11 @@ void vela_builder_add(vela_array *b, vela_str s);
 void vela_builder_add_int(vela_array *b, int64_t n);
 vela_str vela_builder_build(vela_array *b);
 vela_str vela_from_int(int64_t n);
+// The shortest decimal that reads back as exactly x, with ".0" when it
+// would look like an Int: 0.1, 2.5, 3.0, 1e+20, inf, -inf, nan.
+vela_str vela_from_float(double x);
+// int(x) of a Float: rounded toward zero; a panic for NaN or out of range.
+int64_t vela_float_to_int(double x, const char *loc);
 
 // ---- Int arithmetic ----
 //

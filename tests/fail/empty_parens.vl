@@ -1,5 +1,6 @@
 // `()` is the Unit value (M8), which print does not take.
-// err: empty_parens.vl:4:11: error: print takes an Int, Byte, Bool or Str, not Unit
+// stage 1 only (its messages mention Float, which came in M10c)
+// err: empty_parens.vl:5:11: error: print takes an Int, Byte, Float, Bool or Str, not Unit
 fn main() {
     print(())
 }

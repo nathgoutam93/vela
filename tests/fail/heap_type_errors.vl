@@ -1,22 +1,23 @@
 // Mistakes with arrays, maps, Strs and Bytes.
-// err: heap_type_errors.vl:23:13: error: cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`
-// err: heap_type_errors.vl:24:13: error: cannot tell what this [:] holds; give it a type, as in `let m: Map[Str, Int] = [:]`
-// err: heap_type_errors.vl:25:18: error: the elements of an array must all be Int, but this is Str
-// err: heap_type_errors.vl:27:12: error: Int cannot be indexed; only arrays, Strs and maps can
-// err: heap_type_errors.vl:29:6: error: a Str cannot be changed; build a new one instead, for example with +
-// err: heap_type_errors.vl:31:14: error: cannot change 'ys', which was declared with 'let'; use 'let mut' to allow changes
-// err: heap_type_errors.vl:33:18: error: the elements of [Int] are Int, but this is Str
-// err: heap_type_errors.vl:34:15: error: len takes a Str, an array or a map, not Int
-// err: heap_type_errors.vl:35:19: error: 300 does not fit in a Byte (0 to 255)
-// err: heap_type_errors.vl:37:17: error: operator '+' needs two Bytes or two Ints, found Byte and Int; convert with int() or byte()
-// err: heap_type_errors.vl:38:15: error: int takes a Byte, found Int
-// err: heap_type_errors.vl:40:14: error: the keys of Map[Str, Int] are Str, but this is Int
-// err: heap_type_errors.vl:41:14: error: a map cannot be looped over directly; loop over maps.keys(m) instead
-// err: heap_type_errors.vl:43:14: error: cannot loop over Int; 'for ... in' needs an array, a Str or a range
-// err: heap_type_errors.vl:45:20: error: maps.has needs a map, not [Int]
-// err: heap_type_errors.vl:46:16: error: Map keys must be Int, Byte, Bool or Str, not [Int]
-// err: heap_type_errors.vl:47:15: error: operator '+' joins two Strs, found Str and Int
-// err: heap_type_errors.vl:48:16: error: the bounds of a slice must be Int, found Bool
+// stage 1 only (its messages mention Float, which came in M10c)
+// err: heap_type_errors.vl:24:13: error: cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`
+// err: heap_type_errors.vl:25:13: error: cannot tell what this [:] holds; give it a type, as in `let m: Map[Str, Int] = [:]`
+// err: heap_type_errors.vl:26:18: error: the elements of an array must all be Int, but this is Str
+// err: heap_type_errors.vl:28:12: error: Int cannot be indexed; only arrays, Strs and maps can
+// err: heap_type_errors.vl:30:6: error: a Str cannot be changed; build a new one instead, for example with +
+// err: heap_type_errors.vl:32:14: error: cannot change 'ys', which was declared with 'let'; use 'let mut' to allow changes
+// err: heap_type_errors.vl:34:18: error: the elements of [Int] are Int, but this is Str
+// err: heap_type_errors.vl:35:15: error: len takes a Str, an array or a map, not Int
+// err: heap_type_errors.vl:36:19: error: 300 does not fit in a Byte (0 to 255)
+// err: heap_type_errors.vl:38:17: error: operator '+' needs two Bytes or two Ints, found Byte and Int; convert with int() or byte()
+// err: heap_type_errors.vl:39:15: error: int takes a Byte or a Float, found Int
+// err: heap_type_errors.vl:41:14: error: the keys of Map[Str, Int] are Str, but this is Int
+// err: heap_type_errors.vl:42:14: error: a map cannot be looped over directly; loop over maps.keys(m) instead
+// err: heap_type_errors.vl:44:14: error: cannot loop over Int; 'for ... in' needs an array, a Str or a range
+// err: heap_type_errors.vl:46:20: error: maps.has needs a map, not [Int]
+// err: heap_type_errors.vl:47:16: error: Map keys must be Int, Byte, Bool or Str, not [Int]
+// err: heap_type_errors.vl:48:15: error: operator '+' joins two Strs, found Str and Int
+// err: heap_type_errors.vl:49:16: error: the bounds of a slice must be Int, found Bool
 import maps
 
 fn main() {

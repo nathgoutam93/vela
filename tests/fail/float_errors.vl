@@ -1,0 +1,18 @@
+// Mistakes with Floats.
+// stage 1 only
+// err: float_errors.vl:12:13: error: operator '+' needs two Floats or two Ints, found Float and Int; convert with float() or int()
+// err: float_errors.vl:13:13: error: operator '%' needs Int operands; a Float has no remainder
+// err: float_errors.vl:14:16: error: Map keys must be Int, Byte, Bool or Str, not Float
+// err: float_errors.vl:15:15: error: int takes a Byte or a Float, found Str
+// err: float_errors.vl:16:17: error: float takes an Int, found Float
+// err: float_errors.vl:17:18: error: 'i' is declared as Int, but its value is Float
+fn main() {
+    let x = 1.5
+    let n = 2
+    print(x + n)
+    print(x % 2.0)
+    let m: Map[Float, Int] = [:]
+    print(int("7"))
+    print(float(1.5))
+    let i: Int = 2.0
+}

@@ -11,6 +11,7 @@ pub type Kind = enum {
     Bool
     Str
     Byte
+    Float
     Eof
     Semi
     // Keywords
@@ -80,6 +81,7 @@ pub fn kind_name(k: Kind) -> Str {
         Kind.Bool => "bool"
         Kind.Str => "str"
         Kind.Byte => "byte"
+        Kind.Float => "float"
         Kind.Eof => "eof"
         Kind.Semi => ";"
         Kind.Fn => "fn"
@@ -186,6 +188,7 @@ fn ends_statement(k: Kind) -> Bool {
         Kind.Bool => true
         Kind.Str => true
         Kind.Byte => true
+        Kind.Float => true
         Kind.RParen => true
         Kind.RBracket => true
         Kind.RBrace => true
@@ -379,6 +382,47 @@ fn number(lx: mut Lexer) {
     let start = lx.pos
     for is_digit(peek(lx, 0)) {
         lx.pos = lx.pos + 1
+    }
+    // A Float: digits, then a fraction (`.` and digits), an exponent (`e`,
+    // a sign, digits), or both. `0..n` stays a range: `.` must be followed
+    // by a digit.
+    let int_end = lx.pos
+    let mut is_float = false
+    if peek(lx, 0) == int('.') && is_digit(peek(lx, 1)) {
+        is_float = true
+        lx.pos = lx.pos + 1
+        for is_digit(peek(lx, 0)) {
+            lx.pos = lx.pos + 1
+        }
+    }
+    let e = peek(lx, 0)
+    if e == int('e') || e == int('E') {
+        let mut k = 1
+        if peek(lx, 1) == int('+') || peek(lx, 1) == int('-') {
+            k = 2
+        }
+        if is_digit(peek(lx, k)) {
+            is_float = true
+            lx.pos = lx.pos + k
+            for is_digit(peek(lx, 0)) {
+                lx.pos = lx.pos + 1
+            }
+        }
+    }
+    if is_float {
+        if is_ident_char(peek(lx, 0)) {
+            for is_ident_char(peek(lx, 0)) {
+                lx.pos = lx.pos + 1
+            }
+            error(mut lx, start, "invalid number '" + lx.src[start..lx.pos] + "'")
+            return
+        }
+        let whole = lx.src[start..int_end]
+        if len(whole) > 1 && whole[0] == '0' {
+            error(mut lx, start, "number '" + lx.src[start..lx.pos] + "' has a leading zero")
+        }
+        add(mut lx, Kind.Float, lx.src[start..lx.pos], start, "")
+        return
     }
     if is_ident_char(peek(lx, 0)) {
         // `12abc` is one bad token, not the number 12 then the name abc.
@@ -580,6 +624,7 @@ pub fn describe(tok: Token) -> Str {
         Kind.Bool => tok.text
         Kind.Str => "string " + tok.text
         Kind.Byte => "byte " + tok.text
+        Kind.Float => "number " + tok.text
         Kind.Eof => "end of file"
         Kind.Semi => semicolon_name(tok.text)
         _ => named(tok.kind)
@@ -612,7 +657,7 @@ pub fn dump(tokens: [Token]) -> Str {
         strings.add_int(mut b, tok.col)
         strings.add_byte(mut b, ' ')
         let k = tok.kind
-        if k == Kind.Ident || k == Kind.Int || k == Kind.Bool || k == Kind.Str || k == Kind.Byte {
+        if k == Kind.Ident || k == Kind.Int || k == Kind.Bool || k == Kind.Str || k == Kind.Byte || k == Kind.Float {
             strings.add(mut b, kind_name(k) + " " + tok.text)
         } else if k == Kind.Semi && tok.text != ";" {
             if tok.text == "\n" {

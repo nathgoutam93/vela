@@ -35,6 +35,7 @@ fn primitive_c(t: Int) -> Str {
         3 => "bool"
         4 => "vela_str"
         5 => "vela_unit"
+        7 => "double"
         _ => ""
     }
 }
@@ -46,6 +47,7 @@ fn runtime_descriptor(t: Int) -> Str {
         3 => "&vela_type_bool"
         4 => "&vela_type_str"
         5 => "&vela_type_unit"
+        7 => "&vela_type_float"
         _ => ""
     }
 }

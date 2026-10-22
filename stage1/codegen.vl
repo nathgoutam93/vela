@@ -1073,7 +1073,13 @@ fn bindings(g: Gen, p: ast.Pattern, path: Str, t: Int) -> [Binding] {
 fn expr(g: mut Gen, e: ast.Expr) -> Value {
     let t = ty(g, e)
     match e.kind {
-        ast.ExprKind.IntLit(n) => return value(strings.from_int(n), t)
+        ast.ExprKind.IntLit(n) => {
+            if t == types.FLOAT() {
+                return value(strings.from_int(n) + ".0", t)  // so C divides as doubles
+            }
+            return value(strings.from_int(n), t)
+        }
+        ast.ExprKind.FloatLit(text) => return value(text, t)
         ast.ExprKind.ByteLit(n) => return value(strings.from_int(n), t)
         ast.ExprKind.BoolLit(b) => {
             if b {
@@ -1096,6 +1102,9 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
         }
         ast.ExprKind.Unary(op, operand) => {
             let c = expr(mut g, operand).c
+            if op == "-" && t == types.FLOAT() {
+                return value(scalar(mut g, t, "(-" + c + ")"), t)
+            }
             if op == "-" {
                 return value(scalar(mut g, types.INT(), "vela_neg(" + c + ", " + loc_of(g, e) + ")"), t)
             }
@@ -1389,6 +1398,10 @@ fn binary(g: mut Gen, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Value {
 // `left op right`, for operands already worked out, of type `operand`.
 fn operation(g: mut Gen, e: ast.Expr, op: Str, left: Str, right: Str, operand: Int) -> Value {
     if op == "+" || op == "-" || op == "*" || op == "/" || op == "%" {
+        if operand == types.FLOAT() {
+            // IEEE arithmetic: no overflow checks, and x / 0.0 is an infinity.
+            return value(scalar(mut g, operand, "(" + left + " " + op + " " + right + ")"), operand)
+        }
         if operand == types.STR() {
             return store(mut g, types.STR(), "vela_str_concat(" + left + ", " + right + ")")
         }
@@ -1419,6 +1432,9 @@ fn print_function(t: Int) -> Str {
     if t == types.BOOL() {
         return "vela_print_bool"
     }
+    if t == types.FLOAT() {
+        return "vela_print_float"
+    }
     if t == types.STR() {
         return "vela_print_str"
     }
@@ -1442,7 +1458,9 @@ fn assert_code(g: mut Gen, e: ast.Expr, cond: ast.Expr, kind: Str) {
         ast.ExprKind.Binary(op, l, r) => {
             let t = ty(g, l)
             let comparison = op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">="
-            if comparison && (t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.STR()) {
+            let printable = t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.STR() ||
+                t == types.FLOAT()
+            if comparison && printable {
                 let left = expr(mut g, l).c
                 let right = expr(mut g, r).c
                 let ok = operation(mut g, cond, op, left, right, t).c
@@ -1471,6 +1489,9 @@ fn shown(t: Int, c: Str) -> Str {
     if t == types.BOOL() {
         return "(" + c + " ? VELA_STR(\"true\", 4) : VELA_STR(\"false\", 5))"
     }
+    if t == types.FLOAT() {
+        return "vela_from_float(" + c + ")"
+    }
     return "vela_from_int((int64_t)" + c + ")"
 }
 
@@ -1489,7 +1510,7 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         emit(mut g, func + "(" + arg.c + ");")
         return no_value()
     }
-    if name == "os.args" || name == "strings.build" || name == "strings.from_int" {
+    if name == "os.args" || name == "strings.build" || name == "strings.from_int" || name == "strings.from_float" {
         let mut cs = strings.builder()
         for i in 0..len(args) {
             if i > 0 {
@@ -1500,6 +1521,7 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         let func = match name {
             "os.args" => "vela_os_args"
             "strings.build" => "vela_builder_build"
+            "strings.from_float" => "vela_from_float"
             _ => "vela_from_int"
         }
         return store(mut g, t, func + "(" + strings.build(cs) + ")")
@@ -1547,8 +1569,15 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         return value(scalar(mut g, types.INT(), length), types.INT())
     }
     if name == "int" {
+        let arg = expr(mut g, args[0])
+        if arg.ty == types.FLOAT() {
+            return value(scalar(mut g, types.INT(), "vela_float_to_int(" + arg.c + ", " + loc_of(g, e) + ")"), types.INT())
+        }
+        return value(scalar(mut g, types.INT(), "(int64_t)" + arg.c), types.INT())
+    }
+    if name == "float" {
         let c = expr(mut g, args[0]).c
-        return value(scalar(mut g, types.INT(), "(int64_t)" + c), types.INT())
+        return value(scalar(mut g, types.FLOAT(), "(double)" + c), types.FLOAT())
     }
     if name == "byte" {
         let c = expr(mut g, args[0]).c

@@ -1,5 +1,5 @@
-// err: unknown_type.vl:2:9: error: unknown type 'Float'
-fn f(x: Float) {
+// err: unknown_type.vl:2:9: error: unknown type 'Real'
+fn f(x: Real) {
 }
 fn main() {
 }

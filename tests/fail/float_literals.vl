@@ -1,0 +1,9 @@
+// Float literals: a fraction or an exponent, digits on both sides of the
+// point, and no leading zero.
+// stage 1 only
+// err: float_literals.vl:7:13: error: invalid number '1.5x'
+// err: float_literals.vl:8:13: error: number '01.5' has a leading zero
+fn main() {
+    let a = 1.5x
+    let b = 01.5
+}

@@ -96,6 +96,10 @@ pub fn BUILDER() -> Int {
     return 6
 }
 
+pub fn FLOAT() -> Int {
+    return 7
+}
+
 // The "type" of a call that returns nothing.
 pub fn NOTHING() -> Int {
     return -1
@@ -117,6 +121,7 @@ pub fn new_table() -> Table {
     let mut builder = info(Tag.Std, "Builder")
     builder.module = "strings"
     push(mut t.types, builder)
+    push(mut t.types, info(Tag.Prim, "Float"))
     return t
 }
 
@@ -128,6 +133,7 @@ pub fn primitive(name: Str) -> Int {
         "Bool" => BOOL()
         "Str" => STR()
         "Unit" => UNIT()
+        "Float" => FLOAT()
         _ => -1
     }
 }

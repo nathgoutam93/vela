@@ -1,0 +1,67 @@
+// Float (M10c): a C double. Literals, arithmetic, comparisons, conversions,
+// and printing as the shortest decimal that reads back exactly.
+// stage 1 only
+// out: 0.30000000000000004
+// out: 2.5
+// out: 3.0
+// out: -0.5
+// out: 1e+20
+// out: 1.5e-07
+// out: inf
+// out: -inf
+// out: nan
+// out: true
+// out: false
+// out: 7
+// out: -3
+// out: 2.0
+// out: 3.14
+// out: 10.0
+// out: 2.0
+// out: [0.5, 1.5, 2.5]
+// err: floats.vl:66:11: panic: int() of inf, which is not a number in Int's range
+// exit: 101
+import lists
+import strings
+
+fn mean(xs: [Float]) -> Float {
+    let mut total = 0.0
+    for x in xs {
+        total = total + x
+    }
+    return total / float(len(xs))
+}
+
+fn main() {
+    print(0.1 + 0.2)
+    print(5.0 / 2.0)
+    print(1.5 * 2)
+    print(-0.5)
+    print(1e20)
+    print(1.5e-7)
+    let zero = 0.0
+    print(1.0 / zero)
+    print(-1.0 / zero)
+    print(zero / zero)
+    print(0.1 + 0.2 > 0.3)
+    print(zero / zero == zero / zero)
+    print(int(7.9))
+    print(int(-3.9))
+    print(float(2))
+    print(strings.from_float(3.14))
+    let half: Float = 5
+    print(half * 2)
+    print(mean([1.0, 2.0, 3.0]))
+    let sorted = lists.sort([2.5, 0.5, 1.5])
+    let mut b = strings.builder()
+    strings.add(mut b, "[")
+    for i in 0..len(sorted) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, strings.from_float(sorted[i]))
+    }
+    strings.add(mut b, "]")
+    print(strings.build(b))
+    print(int(1.0 / zero))
+}

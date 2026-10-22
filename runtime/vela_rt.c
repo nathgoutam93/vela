@@ -4,6 +4,7 @@
 #include "vela_rt.h"
 
 #include <errno.h>
+#include <math.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -97,6 +98,7 @@ static void release_map(void *v) { vela_map_release(*(vela_map **)v); }
 const vela_type vela_type_unit = {sizeof(vela_unit), NULL, NULL, hash_byte, eq_byte};
 const vela_type vela_type_int = {sizeof(int64_t), NULL, NULL, hash_int, eq_int};
 const vela_type vela_type_byte = {sizeof(uint8_t), NULL, NULL, hash_byte, eq_byte};
+const vela_type vela_type_float = {sizeof(double), NULL, NULL, NULL, NULL};
 const vela_type vela_type_bool = {sizeof(bool), NULL, NULL, hash_bool, eq_bool};
 const vela_type vela_type_str = {sizeof(vela_str), retain_str, release_str, hash_str, eq_str};
 const vela_type vela_type_array = {sizeof(vela_array *), retain_array, release_array, NULL, NULL};
@@ -418,6 +420,65 @@ static void captured(vela_str s) {
     vela_builder_add(*fake_stdout, s);
     uint8_t nl = '\n';
     vela_array_push(*fake_stdout, &nl);
+}
+
+static vela_str str_from(const char *data, size_t len);
+
+// The shortest decimal that reads back as x, into buf; returns its length.
+static int float_text(double x, char *buf, size_t n) {
+    if (isnan(x)) return snprintf(buf, n, "nan");
+    if (isinf(x)) return snprintf(buf, n, x < 0 ? "-inf" : "inf");
+    // The fewest significant digits that read back as x...
+    int digits = 1, len = 0;
+    for (; digits <= 17; digits++) {
+        len = snprintf(buf, n, "%.*e", digits - 1, x);
+        if (strtod(buf, NULL) == x) break;
+    }
+    // ...written plainly for exponents -4 to 15, as Python's repr does:
+    // 10.0 rather than 1e+01, 1e+20 rather than 100000000000000000000.0.
+    int exp = atoi(strchr(buf, 'e') + 1);
+    if (exp >= -4 && exp < 16) {
+        int fraction = digits - 1 - exp;
+        len = snprintf(buf, n, "%.*f", fraction < 0 ? 0 : fraction, x);
+    }
+    if (!strpbrk(buf, ".e")) len += snprintf(buf + len, n - (size_t)len, ".0");
+    return len;
+}
+
+vela_str vela_from_float(double x) {
+    char buf[40];
+    int len = float_text(x, buf, sizeof buf);
+    return str_from(buf, (size_t)len);
+}
+
+int64_t vela_float_to_int(double x, const char *loc) {
+    // 2^63 is exact as a double; anything at or beyond it does not fit.
+    if (isnan(x) || x >= 9223372036854775808.0 || x < -9223372036854775808.0) {
+        char buf[40];
+        float_text(x, buf, sizeof buf);
+        char msg[128];
+        snprintf(msg, sizeof msg, "int() of %s, which is not a number in Int's range", buf);
+        vela_panic(loc, msg);
+    }
+    return (int64_t)x;
+}
+
+void vela_print_float(double x) {
+    char buf[40];
+    int len = float_text(x, buf, sizeof buf);
+    if (fake_stdout) {
+        captured((vela_str){NULL, (const uint8_t *)buf, len});
+        return;
+    }
+    fwrite(buf, 1, (size_t)len, stdout);
+    putchar('\n');
+}
+
+void vela_eprint_float(double x) {
+    char buf[40];
+    int len = float_text(x, buf, sizeof buf);
+    fwrite(buf, 1, (size_t)len, stderr);
+    fputc('\n', stderr);
 }
 
 void vela_print_int(int64_t x) {

@@ -185,7 +185,8 @@ fn variant_family(name: Str) -> Str {
 }
 
 fn is_prelude(name: Str) -> Bool {
-    return name == "print" || name == "len" || name == "push" || name == "int" || name == "byte" || name == "assert"
+    return name == "print" || name == "len" || name == "push" || name == "int" || name == "byte" || name == "assert" ||
+        name == "float"
 }
 
 fn set_ty(c: mut Checker, e: ast.Expr, t: Int) {
@@ -614,7 +615,8 @@ fn satisfies(c: Checker, t: Int, b: Str) -> Bool {
         return comparable(c, t)
     }
     if b == "Ord" {
-        return t == types.INT() || t == types.BYTE() || t == types.STR() || types.has_bound(c.table, t, "Ord")
+        return t == types.INT() || t == types.BYTE() || t == types.STR() || t == types.FLOAT() ||
+            types.has_bound(c.table, t, "Ord")
     }
     return key_type(c, t)
 }
@@ -628,7 +630,7 @@ fn check_bounds(c: mut Checker, line: Int, col: Int, owner: Str, p: Int, t: Int)
         }
         let need = match b {
             "Eq" => "to work with ==, as Int, Byte, Bool, Str and enums without values do"
-            "Ord" => "to be ordered by <, as Int, Byte and Str are"
+            "Ord" => "to be ordered by <, as Int, Byte, Float and Str are"
             _ => "to be a map key: Int, Byte, Bool or Str"
         }
         report(mut c, line, col, owner + " needs " + pname + " " + need + ", but here " + pname + " is " + show(c, t))
@@ -912,7 +914,7 @@ fn std_hint(c: Checker, name: Str) -> Str {
             "maps" => ["has", "get", "remove", "keys"]
             "files" => ["read", "write", "remove", "temp_dir"]
             "os" => ["args", "exit", "eprint", "run", "env"]
-            _ => ["builder", "add", "add_byte", "add_int", "build", "from_int"]
+            _ => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float"]
         }
         for f in fns {
             if f == name {
@@ -1620,6 +1622,22 @@ fn check_expr(c: mut Checker, e: ast.Expr, want: Int, m: Msg) {
                 _ => {}
             }
         }
+        ast.ExprKind.IntLit(_) => {
+            if want == types.FLOAT() {
+                set_ty(mut c, e, types.FLOAT())  // a number is an Int unless the context wants a Float
+                return
+            }
+        }
+        ast.ExprKind.Unary(op, x) => {
+            if op == "-" && want == types.FLOAT() {
+                check_expr(mut c, x, types.FLOAT(), m)
+                set_ty(mut c, e, types.FLOAT())
+                return
+            }
+        }
+        _ => {}
+    }
+    match e.kind {
         ast.ExprKind.IntLit(n) => {
             if want == types.BYTE() {
                 // A number is an Int unless the context wants a Byte.
@@ -1706,6 +1724,7 @@ fn infer(c: mut Checker, e: ast.Expr) -> Int {
 fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
     match e.kind {
         ast.ExprKind.IntLit(_) => return types.INT()
+        ast.ExprKind.FloatLit(_) => return types.FLOAT()
         ast.ExprKind.ByteLit(_) => return types.BYTE()
         ast.ExprKind.BoolLit(_) => return types.BOOL()
         ast.ExprKind.StrLit(_) => return types.STR()
@@ -1726,6 +1745,9 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
                 want = types.INT()
             }
             let ty = value(mut c, operand)
+            if op == "-" && ty == types.FLOAT() {
+                return ty
+            }
             if ty != want && ty != types.ERROR() {
                 report_at(mut c, e, "operator '" + op + "' needs " + show(c, want) + ", found " + show(c, ty))
             }
@@ -1773,6 +1795,10 @@ fn operands(c: mut Checker, l: ast.Expr, r: ast.Expr) -> [Int] {
 }
 
 fn literal_like(c: mut Checker, lit: ast.Expr, other: Int) -> Int {
+    if other == types.FLOAT() {
+        set_ty(mut c, lit, types.FLOAT())
+        return types.FLOAT()
+    }
     if other == types.BYTE() {
         check_expr(mut c, lit, types.BYTE(), msg("", ""))  // reports only an out-of-range number
         return types.BYTE()
@@ -1804,7 +1830,7 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Int
     let mut result = types.BOOL()
     if is_arithmetic(op) {
         result = types.INT()
-        if left == types.INT() || left == types.BYTE() || left == types.STR() && op == "+" {
+        if left == types.INT() || left == types.BYTE() || left == types.FLOAT() || left == types.STR() && op == "+" {
             result = left
         }
     }
@@ -1835,6 +1861,14 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Int
         // Strs are ordered byte by byte
     } else if is_ordering(op) && left == right && types.has_bound(c.table, left, "Ord") {
         // a type parameter bound by Ord
+    } else if left == types.FLOAT() && right == types.FLOAT() {
+        if op == "%" {
+            report_at(mut c, e, "operator '%' needs Int operands; a Float has no remainder")
+        }
+    } else if (left == types.FLOAT() || right == types.FLOAT()) && (left == int || left == byte || left == types.FLOAT()) &&
+        (right == int || right == byte || right == types.FLOAT()) {
+        report_at(mut c, e, "operator '" + op + "' needs two Floats or two Ints, found " + show(c, left) + " and " +
+            show(c, right) + "; convert with float() or int()")
     } else if left != right || left != int && left != byte {
         let both_numbers = (left == int || left == byte) && (right == int || right == byte)
         if (left == byte || right == byte) && both_numbers {
@@ -3021,7 +3055,7 @@ fn arity(c: mut Checker, e: ast.Expr, name: Str, expected: Int, got: Int) -> Boo
 }
 
 fn is_printable(t: Int) -> Bool {
-    return t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.STR()
+    return t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.STR() || t == types.FLOAT()
 }
 
 // The built-in functions whose types do not depend on their arguments.
@@ -3065,6 +3099,7 @@ fn signature(c: mut Checker, name: Str) -> [Int] {
         "strings.add_byte" => [b, types.BYTE(), nothing]
         "strings.add_int" => [b, types.INT(), nothing]
         "strings.build" => [b, s]
+        "strings.from_float" => [types.FLOAT(), s]
         _ => [types.INT(), s]  // strings.from_int
     }
 }
@@ -3077,7 +3112,7 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
     }
     let mut want = 2
     if name == "print" || name == "os.eprint" || name == "len" || name == "int" || name == "byte" || name == "maps.keys" ||
-        name == "assert" {
+        name == "assert" || name == "float" {
         want = 1
     }
     if !arity(mut c, e, written, want, len(args)) {
@@ -3087,6 +3122,7 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
         return match name {
             "print" => types.NOTHING()
             "assert" => types.NOTHING()
+            "float" => types.FLOAT()
             "os.eprint" => types.NOTHING()
             "push" => types.NOTHING()
             "maps.remove" => types.NOTHING()
@@ -3100,7 +3136,7 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
     if name == "print" || name == "os.eprint" {
         let t = value(mut c, args[0])
         if !is_printable(t) && t != types.ERROR() {
-            report_at(mut c, args[0], written + " takes an Int, Byte, Bool or Str, not " + show(c, t))
+            report_at(mut c, args[0], written + " takes an Int, Byte, Float, Bool or Str, not " + show(c, t))
         }
         return types.NOTHING()
     }
@@ -3116,8 +3152,25 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
         return types.INT()
     }
     if name == "int" {
-        check_expr(mut c, args[0], types.BYTE(), msg("int takes a Byte, found ", ""))
+        // int(x) of a Byte, or of a Float (rounded toward zero).
+        let mut is_lit = false
+        match args[0].kind {
+            ast.ExprKind.IntLit(_) => is_lit = true
+            _ => {}
+        }
+        if is_lit {
+            check_expr(mut c, args[0], types.BYTE(), msg("int takes a Byte or a Float, found ", ""))
+        } else {
+            let t = value(mut c, args[0])
+            if t != types.BYTE() && t != types.FLOAT() && t != types.ERROR() {
+                report_at(mut c, args[0], "int takes a Byte or a Float, found " + show(c, t))
+            }
+        }
         return types.INT()
+    }
+    if name == "float" {
+        check_expr(mut c, args[0], types.INT(), msg("float takes an Int, found ", ""))
+        return types.FLOAT()
     }
     if name == "byte" {
         check_expr(mut c, args[0], types.INT(), msg("byte takes an Int, found ", ""))
