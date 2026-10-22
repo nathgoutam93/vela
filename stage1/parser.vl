@@ -324,9 +324,45 @@ fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
         advance(mut p)
         result = Some(type_name(mut p)?)
     }
+    // `uses fs, os`, then `requires ...` and `ensures ...`, each of which
+    // may start a new line.
+    let mut effects: [Str] = []
+    let mut effects_line = 0
+    let mut effects_col = 0
+    clause_line(mut p)
+    if peek(p, 0).kind == lexer.Kind.Uses {
+        let u = advance(mut p)
+        effects_line = u.line
+        effects_col = u.col
+        for {
+            let effect = expect_name(mut p, "for an effect after 'uses' (fs or os)")?
+            push(mut effects, effect.text)
+            if peek(p, 0).kind != lexer.Kind.Comma {
+                break
+            }
+            advance(mut p)
+        }
+    }
+    let mut requires: [ast.Expr] = []
+    let mut ensures: [ast.Expr] = []
+    for {
+        clause_line(mut p)
+        let tok = peek(p, 0)
+        if tok.kind != lexer.Kind.Ident || tok.text != "requires" && tok.text != "ensures" {
+            break
+        }
+        advance(mut p)
+        let cond = head_expression(mut p)?
+        if tok.text == "requires" {
+            push(mut requires, cond)
+        } else {
+            push(mut ensures, cond)
+        }
+    }
     let body = block(mut p, "to start the body of '" + name.text + "'")?
     return Ok(ast.FnDecl {
-        name: name.text, type_params: type_params, params: params, result: result, body: body, line: name.line, col: name.col,
+        name: name.text, type_params: type_params, params: params, result: result, effects: effects, effects_line: effects_line,
+        effects_col: effects_col, requires: requires, ensures: ensures, body: body, line: name.line, col: name.col,
         public: false,
     })
 }
@@ -368,6 +404,19 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
         return Ok(decl)
     }
     return Err(error(kind, "expected 'struct' or 'enum' after 'type " + name.text + " ='" + found(kind)))
+}
+
+// Skip the line end before `uses`, `requires` or `ensures` on a line of its
+// own, which the newline rule ended with a `;`.
+fn clause_line(p: mut Parser) {
+    let t = peek(p, 0)
+    if t.kind != lexer.Kind.Semi || t.text != "\n" {
+        return
+    }
+    let next = peek(p, 1)
+    if next.kind == lexer.Kind.Uses || next.kind == lexer.Kind.Ident && (next.text == "requires" || next.text == "ensures") {
+        advance(mut p)
+    }
 }
 
 // `[T, U: Ord]` after a function's or a type's name, or nothing.
@@ -566,6 +615,9 @@ fn statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
         let b = block(mut p, "")?
         return Ok(stmt(mut p, ast.StmtKind.Block(b), tok.line, tok.col))
     }
+    if k == lexer.Kind.With {
+        return with_stmt(mut p)
+    }
     if k == lexer.Kind.Import {
         return Err(error(tok, "imports go at the top of the file, before all declarations"))
     }
@@ -604,6 +656,31 @@ fn simple_statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
         return Ok(stmt(mut p, ast.StmtKind.Assign(e, value), eq.line, eq.col))
     }
     return Ok(stmt(mut p, ast.StmtKind.ExprStmt(e), e.line, e.col))
+}
+
+// `with files = m, stdout = mut out { ... }`
+fn with_stmt(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
+    let tok = advance(mut p)  // "with"
+    let mut items: [ast.WithItem] = []
+    for {
+        let name = expect_name(mut p, "of what to fake after 'with' (files, args, env or stdout)")?
+        expect(mut p, lexer.Kind.Eq, "after '" + name.text + "' in 'with'")?
+        let mut value = ast.Expr { kind: ast.ExprKind.UnitLit, line: 0, col: 0, id: 0 }
+        if peek(p, 0).kind == lexer.Kind.Mut {
+            let m = advance(mut p)
+            let place = head_expression(mut p)?
+            value = expr(mut p, ast.ExprKind.MutArg(place), m.line, m.col)
+        } else {
+            value = head_expression(mut p)?
+        }
+        push(mut items, ast.WithItem { name: name.text, value: value, line: name.line, col: name.col })
+        if peek(p, 0).kind != lexer.Kind.Comma {
+            break
+        }
+        advance(mut p)
+    }
+    let body = block(mut p, "after what 'with' fakes")?
+    return Ok(stmt(mut p, ast.StmtKind.With(items, body), tok.line, tok.col))
 }
 
 fn let_stmt(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {

@@ -88,6 +88,11 @@ fn walk_fn(w: mut Walk, inst: Instance) {
     for l in f.param_locals {
         sub(mut w, w.k.locals[l].ty)
     }
+    if f.result_local >= 0 {
+        sub(mut w, w.k.locals[f.result_local].ty)
+    }
+    exprs(mut w, f.decl.requires)
+    exprs(mut w, f.decl.ensures)
     block(mut w, f.decl.body)
 }
 
@@ -149,6 +154,12 @@ fn stmt(w: mut Walk, s: ast.Stmt) {
             }
         }
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut w, scrutinee, arms)
+        ast.StmtKind.With(items, body) => {
+            for item in items {
+                expr(mut w, item.value)
+            }
+            block(mut w, body)
+        }
     }
 }
 

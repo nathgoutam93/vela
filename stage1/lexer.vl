@@ -29,6 +29,8 @@ pub type Kind = enum {
     Import
     Pub
     Test
+    Uses
+    With
     // Operators
     DotDotEq
     EqEq
@@ -95,6 +97,8 @@ pub fn kind_name(k: Kind) -> Str {
         Kind.Import => "import"
         Kind.Pub => "pub"
         Kind.Test => "test"
+        Kind.Uses => "uses"
+        Kind.With => "with"
         Kind.DotDotEq => "..="
         Kind.EqEq => "=="
         Kind.NotEq => "!="
@@ -144,6 +148,8 @@ pub fn is_keyword(k: Kind) -> Bool {
         Kind.Import => true
         Kind.Pub => true
         Kind.Test => true
+        Kind.Uses => true
+        Kind.With => true
         _ => false
     }
 }
@@ -165,6 +171,8 @@ fn keyword(word: Str) -> Option[Kind] {
         "import" => Some(Kind.Import)
         "pub" => Some(Kind.Pub)
         "test" => Some(Kind.Test)
+        "uses" => Some(Kind.Uses)
+        "with" => Some(Kind.With)
         _ => None
     }
 }

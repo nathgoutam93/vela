@@ -395,7 +395,11 @@ fn release_frame(g: mut Gen, frame: Frame) {
     let mut i = len(frame.items) - 1
     for i >= 0 {
         let item = frame.items[i]
-        emit(mut g, release(mut g, item.ty, item.c))
+        if item.ty == restore_item() {
+            emit(mut g, item.c)
+        } else {
+            emit(mut g, release(mut g, item.ty, item.c))
+        }
         i = i - 1
     }
 }
@@ -547,8 +551,16 @@ fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
             push(mut g.frames[len(g.frames) - 1].items, Item { c: names[i], ty: t })
         }
     }
+    for r in f.decl.requires {
+        push_frame(mut g, "stmt")
+        assert_code(mut g, r, r, "requires of '" + f.decl.name + "'")
+        pop_frame(mut g)
+    }
     for s in f.decl.body.stmts {
         stmt(mut g, s)
+    }
+    if !g.dead && f.result == types.NOTHING() {
+        ensures_code(mut g, "")
     }
     pop_frame(mut g)
     let mut out = [prototype(g.k, g.l, id, names, g.params, g.args, cname) + " {"]
@@ -557,6 +569,29 @@ fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
     }
     push(mut out, "}")
     return out
+}
+
+// The ensures clauses, checked as the function returns `result_c` ("" when
+// it returns nothing), in a C block of their own: `result` names the value
+// there, borrowed.
+fn ensures_code(g: mut Gen, result_c: Str) {
+    let f = g.k.fns[g.current_fn]
+    if len(f.decl.ensures) == 0 {
+        return
+    }
+    emit(mut g, "{")
+    g.depth = g.depth + 1
+    push_frame(mut g, "stmt")
+    if f.result_local >= 0 && result_c != "" {
+        let name = c_name(mut g, f.result_local)
+        emit(mut g, c_type(g, local_ty(g, f.result_local)) + " " + name + " = " + result_c + ";")
+    }
+    for e in f.decl.ensures {
+        assert_code(mut g, e, e, "ensures of '" + f.decl.name + "'")
+    }
+    pop_frame(mut g)
+    g.depth = g.depth - 1
+    emit(mut g, "}")
 }
 
 fn block(g: mut Gen, b: ast.Block, kind: Str) {
@@ -641,6 +676,7 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
         ast.StmtKind.Return(v) => {
             match v {
                 None => {
+                    ensures_code(mut g, "")
                     release_until(mut g, "")
                     emit(mut g, "return;")
                 }
@@ -648,6 +684,7 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
                     let c = consume(mut g, expr(mut g, e))
                     let result = new_temp(mut g)
                     emit(mut g, c_type(g, ty(g, e)) + " " + result + " = " + c + ";")
+                    ensures_code(mut g, result)
                     release_until(mut g, "")
                     emit(mut g, "return " + result + ";")
                 }
@@ -655,8 +692,43 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
             g.dead = true
         }
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_code(mut g, scrutinee, arms, ArmCode.Statements)
+        ast.StmtKind.With(items, body) => with_code(mut g, items, body)
         ast.StmtKind.Block(_) => {}  // handled in stmt
     }
+}
+
+// An Item that is not a value to release but a C statement to run when its
+// frame ends: putting back what a `with` faked.
+fn restore_item() -> Int {
+    return -3
+}
+
+// `with`: each fake is set when the block starts and put back however the
+// block is left, as its frame ends (at its end, or by return, break or ?).
+fn with_code(g: mut Gen, items: [ast.WithItem], body: ast.Block) {
+    open(mut g, "{")
+    push_frame(mut g, "block")
+    for w in items {
+        let saved = new_temp(mut g)
+        if w.name == "stdout" {
+            let p = place(mut g, mut_place(w.value))
+            emit(mut g, "vela_array **" + saved + " = vela_fake_stdout(&" + p + ");")
+        } else {
+            let v = consume(mut g, expr(mut g, w.value))
+            let mut c_ty = "vela_map *"
+            if w.name == "args" {
+                c_ty = "vela_array *"
+            }
+            emit(mut g, c_ty + saved + " = vela_fake_" + w.name + "(" + v + ");")
+        }
+        let restore = "vela_fake_" + w.name + "_restore(" + saved + ");"
+        push(mut g.frames[len(g.frames) - 1].items, Item { c: restore, ty: restore_item() })
+    }
+    for s in body.stmts {
+        stmt(mut g, s)
+    }
+    pop_frame(mut g)
+    close(mut g, "}")
 }
 
 fn if_stmt(g: mut Gen, cond: ast.Expr, then: ast.Block, otherwise: ast.Else) {
@@ -1192,6 +1264,7 @@ fn try_value(g: mut Gen, e: ast.Expr, inner: ast.Expr) -> Value {
     } else {
         emit(mut g, r + " " + returned + " = (" + r + "){ .tag = " + layout.tag(g.l, result, "None") + " };")
     }
+    ensures_code(mut g, returned)
     release_until(mut g, "")
     emit(mut g, "return " + returned + ";")
     close(mut g, "}")
@@ -1347,7 +1420,9 @@ fn mut_place(e: ast.Expr) -> ast.Expr {
 
 // `assert(cond)`: a panic if cond is false. When cond compares two values
 // that can be printed, the message shows both.
-fn assert_code(g: mut Gen, e: ast.Expr, cond: ast.Expr) {
+// `kind` names the check in the panic: "assertion", "requires of 'f'"...
+fn assert_code(g: mut Gen, e: ast.Expr, cond: ast.Expr, kind: Str) {
+    let what = c_string(kind)
     let text = c_string(ast.expr_text(cond))
     match cond.kind {
         ast.ExprKind.Binary(op, l, r) => {
@@ -1362,7 +1437,7 @@ fn assert_code(g: mut Gen, e: ast.Expr, cond: ast.Expr) {
                     quote = "true"
                 }
                 open(mut g, "if (!" + ok + ") {")
-                emit(mut g, "vela_assert_failed_values(" + loc_of(g, e) + ", " + text + ", " + shown(t, left) + ", " +
+                emit(mut g, "vela_assert_failed_values(" + loc_of(g, e) + ", " + what + ", " + text + ", " + shown(t, left) + ", " +
                     shown(t, right) + ", " + quote + ");")
                 close(mut g, "}")
                 return
@@ -1371,7 +1446,7 @@ fn assert_code(g: mut Gen, e: ast.Expr, cond: ast.Expr) {
         _ => {}
     }
     let c = expr(mut g, cond).c
-    emit(mut g, "if (!" + c + ") vela_assert_failed(" + loc_of(g, e) + ", " + text + ");")
+    emit(mut g, "if (!" + c + ") vela_assert_failed(" + loc_of(g, e) + ", " + what + ", " + text + ");")
 }
 
 // A value of a printable type as a Str, for an assertion's message.
@@ -1388,7 +1463,7 @@ fn shown(t: Int, c: Str) -> Str {
 fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     let t = ty(g, e)
     if name == "assert" {
-        assert_code(mut g, e, args[0])
+        assert_code(mut g, e, args[0], "assertion")
         return no_value()
     }
     if name == "print" || name == "os.eprint" {

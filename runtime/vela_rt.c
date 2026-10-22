@@ -24,17 +24,18 @@ void vela_panic(const char *loc, const char *msg) {
     _Exit(101);
 }
 
-void vela_assert_failed(const char *loc, const char *text) {
+void vela_assert_failed(const char *loc, const char *what, const char *text) {
     fflush(stdout);
-    fprintf(stderr, "%s: panic: assertion failed: %s\n", loc, text);
+    fprintf(stderr, "%s: panic: %s failed: %s\n", loc, what, text);
     fflush(stderr);
     _Exit(101);
 }
 
-void vela_assert_failed_values(const char *loc, const char *text, vela_str left, vela_str right, bool quote) {
+void vela_assert_failed_values(const char *loc, const char *what, const char *text, vela_str left, vela_str right,
+                               bool quote) {
     const char *q = quote ? "\"" : "";
     fflush(stdout);
-    fprintf(stderr, "%s: panic: assertion failed: %s (left: %s%.*s%s, right: %s%.*s%s)\n", loc, text, q,
+    fprintf(stderr, "%s: panic: %s failed: %s (left: %s%.*s%s, right: %s%.*s%s)\n", loc, what, text, q,
             (int)left.len, (const char *)left.data, q, q, (int)right.len, (const char *)right.data, q);
     fflush(stderr);
     _Exit(101);
@@ -354,15 +355,94 @@ vela_array *vela_map_keys(vela_map *m) {
 
 // ---- print ----
 
+// ---- Fakes for tests ----
+//
+// `with files = m, args = xs, env = m, stdout = mut out { ... }` in a test:
+// while one is set, the runtime uses it instead of the real thing. Each
+// setter takes the new value (owned) and returns the old one, which the
+// matching restore puts back when the block is left, however it is left.
+
+static vela_map *fake_files = NULL;    // path -> contents; "dir/" keys are directories
+static vela_array *fake_args = NULL;
+static vela_map *fake_env = NULL;
+static vela_array **fake_stdout = NULL; // the test's strings.Builder
+static int64_t fake_temp_dirs = 0;
+
+vela_map *vela_fake_files(vela_map *m) {
+    vela_map *old = fake_files;
+    fake_files = m;
+    return old;
+}
+
+void vela_fake_files_restore(vela_map *old) {
+    vela_map_release(fake_files);
+    fake_files = old;
+}
+
+vela_array *vela_fake_args(vela_array *a) {
+    vela_array *old = fake_args;
+    fake_args = a;
+    return old;
+}
+
+void vela_fake_args_restore(vela_array *old) {
+    vela_array_release(fake_args);
+    fake_args = old;
+}
+
+vela_map *vela_fake_env(vela_map *m) {
+    vela_map *old = fake_env;
+    fake_env = m;
+    return old;
+}
+
+void vela_fake_env_restore(vela_map *old) {
+    vela_map_release(fake_env);
+    fake_env = old;
+}
+
+vela_array **vela_fake_stdout(vela_array **out) {
+    vela_array **old = fake_stdout;
+    fake_stdout = out;
+    return old;
+}
+
+void vela_fake_stdout_restore(vela_array **old) {
+    fake_stdout = old;
+}
+
+// Printing into the faked stdout: the builder may be shared, so it is made
+// unique first, as any change to a value is.
+static void captured(vela_str s) {
+    vela_array_unique(fake_stdout);
+    vela_builder_add(*fake_stdout, s);
+    uint8_t nl = '\n';
+    vela_array_push(*fake_stdout, &nl);
+}
+
 void vela_print_int(int64_t x) {
+    if (fake_stdout) {
+        char buf[32];
+        int len = snprintf(buf, sizeof buf, "%" PRId64, x);
+        captured((vela_str){NULL, (const uint8_t *)buf, len});
+        return;
+    }
     printf("%" PRId64 "\n", x);
 }
 
 void vela_print_bool(bool x) {
+    if (fake_stdout) {
+        captured(x ? VELA_STR("true", 4) : VELA_STR("false", 5));
+        return;
+    }
     puts(x ? "true" : "false");
 }
 
 void vela_print_str(vela_str x) {
+    if (fake_stdout) {
+        captured(x);
+        return;
+    }
     if (x.len) fwrite(x.data, 1, (size_t)x.len, stdout);
     putchar('\n');
 }
@@ -391,6 +471,10 @@ void vela_init(int argc, char **argv) {
 }
 
 vela_array *vela_os_args(void) {
+    if (fake_args) {
+        vela_array_retain(fake_args);
+        return fake_args;
+    }
     vela_array *a = vela_array_new(&vela_type_str, saved_argc);
     for (int i = 0; i < saved_argc; i++) {
         // argv lives as long as the program, so its strings need no object,
@@ -437,6 +521,16 @@ static char *c_path(vela_str path) {
 }
 
 bool vela_files_read(vela_str path, vela_str *out) {
+    if (fake_files) {
+        vela_str *found = vela_map_find(fake_files, &path);
+        if (!found) {
+            *out = file_error("cannot read", path, strerror(ENOENT));
+            return false;
+        }
+        *out = *found;
+        vela_str_retain(*out);
+        return true;
+    }
     char *p = c_path(path);
     if (!p) {
         *out = file_error("cannot read", path, "the path contains a zero byte");
@@ -471,6 +565,13 @@ bool vela_files_read(vela_str path, vela_str *out) {
 }
 
 bool vela_files_write(vela_str path, vela_str data, vela_str *err) {
+    if (fake_files) {
+        vela_map_unique(&fake_files);
+        vela_str_retain(path);  // the map owns what it is given
+        vela_str_retain(data);
+        vela_map_set(fake_files, &path, &data);
+        return true;
+    }
     char *p = c_path(path);
     if (!p) {
         *err = file_error("cannot write", path, "the path contains a zero byte");
@@ -526,6 +627,16 @@ vela_str vela_from_int(int64_t n) {
 }
 
 bool vela_files_remove(vela_str path, vela_str *err) {
+    if (fake_files) {
+        vela_map_unique(&fake_files);
+        if (vela_map_remove(fake_files, &path)) return true;
+        vela_str dir = vela_str_concat(path, VELA_STR("/", 1));
+        bool removed = vela_map_remove(fake_files, &dir);
+        vela_str_release(dir);
+        if (removed) return true;
+        *err = file_error("cannot remove", path, strerror(ENOENT));
+        return false;
+    }
     char *p = c_path(path);
     if (!p) {
         *err = file_error("cannot remove", path, "the path contains a zero byte");
@@ -541,6 +652,16 @@ bool vela_files_remove(vela_str path, vela_str *err) {
 }
 
 bool vela_files_temp_dir(vela_str *out) {
+    if (fake_files) {
+        char buf[48];
+        int len = snprintf(buf, sizeof buf, "/fake-tmp/%" PRId64, ++fake_temp_dirs);
+        *out = str_from(buf, (size_t)len);
+        vela_str key = vela_str_concat(*out, VELA_STR("/", 1));
+        vela_str empty = VELA_STR("", 0);
+        vela_map_unique(&fake_files);
+        vela_map_set(fake_files, &key, &empty);
+        return true;
+    }
     const char *base = getenv("TMPDIR");
     if (!base || !*base) base = "/tmp";
     size_t n = strlen(base) + 20;
@@ -645,6 +766,13 @@ bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
 }
 
 bool vela_os_env(vela_str name, vela_str *out) {
+    if (fake_env) {
+        vela_str *found = vela_map_find(fake_env, &name);
+        if (!found) return false;
+        *out = *found;
+        vela_str_retain(*out);
+        return true;
+    }
     char *n = c_path(name);
     if (!n) return false;
     const char *v = getenv(n);

@@ -181,6 +181,14 @@ fn continues(p: Piece) -> Bool {
         p.kind == lexer.Kind.Dot
 }
 
+// The start of a line that continues a function's signature.
+fn clause(p: Piece) -> Bool {
+    if p.is_comment {
+        return false
+    }
+    return p.kind == lexer.Kind.Uses || p.kind == lexer.Kind.Ident && (p.text == "requires" || p.text == "ensures")
+}
+
 // Whether a space goes between `a` and `b`, two pieces on one line.
 fn space(a: Piece, b: Piece) -> Bool {
     if b.is_comment {
@@ -252,6 +260,11 @@ fn layout(ps: [Piece]) -> Str {
                 k = k + 1
             }
             anchor = level
+        } else if len(stack) == 0 && clause(first) {
+            // `uses`, `requires` and `ensures` on lines of their own belong to
+            // the signature above: one level in, and the body's `{` at the end
+            // of the last one opens a body at the function's level.
+            level = 1
         } else if written && continues(last_code) && !prev_opened {
             level = level + 1
         }
@@ -338,6 +351,11 @@ test "indentation follows brackets and continuations" {
     let src = "fn f() {\nlet x = a +\nb\nif a &&\nb {\ng(1,\n2)\n}\n}\n"
     let want = "fn f() {\n    let x = a +\n        b\n    if a &&\n        b {\n        g(1,\n            2)\n    }\n}\n"
     assert(formatted(src) == want)
+}
+
+test "contract lines are indented under the signature" {
+    let src = "fn f(n: Int) -> Int\nuses os\nrequires n > 0\nensures result > 0 {\nreturn n\n}\n"
+    assert(formatted(src) == "fn f(n: Int) -> Int\n    uses os\n    requires n > 0\n    ensures result > 0 {\n    return n\n}\n")
 }
 
 test "comments stay, blank lines shrink to one" {

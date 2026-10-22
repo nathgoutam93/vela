@@ -109,6 +109,15 @@ pub type StmtKind = enum {
     Continue
     Return(Option[Expr])
     MatchStmt(Expr, [Arm])
+    With([WithItem], Block)  // in a test: fakes for the block
+}
+
+// `files = [...]` in `with files = [...], args = [...] { ... }`.
+pub type WithItem = struct {
+    name: Str
+    value: Expr
+    line: Int
+    col: Int
 }
 
 pub type Else = enum {
@@ -144,6 +153,11 @@ pub type FnDecl = struct {
     type_params: [TypeParam]
     params: [Param]
     result: Option[TypeName]
+    effects: [Str]  // what it declares it uses: `uses fs, os`
+    effects_line: Int  // where `uses` is, or 0
+    effects_col: Int
+    requires: [Expr]  // contracts: checked when it is called
+    ensures: [Expr]  // and when it returns, where `result` is what it returns
     body: Block
     line: Int
     col: Int
@@ -367,6 +381,19 @@ fn sx_fn(f: FnDecl) -> Sx {
         Some(t) => push(mut items, atom(type_text(t)))
         None => {}
     }
+    if len(f.effects) > 0 {
+        let mut u = [atom("uses")]
+        for e in f.effects {
+            push(mut u, atom(e))
+        }
+        push(mut items, list(u))
+    }
+    for r in f.requires {
+        push(mut items, list([atom("requires"), sx_expr(r)]))
+    }
+    for r in f.ensures {
+        push(mut items, list([atom("ensures"), sx_expr(r)]))
+    }
     push(mut items, sx_block(f.body))
     return list(items)
 }
@@ -429,6 +456,14 @@ fn sx_stmt(s: Stmt) -> Sx {
             }
         }
         StmtKind.MatchStmt(scrutinee, arms) => return sx_match(scrutinee, arms)
+        StmtKind.With(items, body) => {
+            let mut out = [atom("with")]
+            for w in items {
+                push(mut out, list([atom(w.name), sx_expr(w.value)]))
+            }
+            push(mut out, sx_block(body))
+            return list(out)
+        }
     }
 }
 

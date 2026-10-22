@@ -33,6 +33,7 @@ pub type FnInfo = struct {
     param_locals: [Int]
     type_params: [Int]  // a generic function's, as Param types
     is_test: Bool  // a `test` block, checked as a function named `test "..."`
+    result_local: Int  // `result` in its ensures clauses, or -1
 }
 
 // What a name, call, field, pattern or declaration refers to.
@@ -88,6 +89,8 @@ type Checker = struct {
     undefined: [Str]  // unknown names already reported in this function
     targs: [[Int]]
     type_scope: Map[Str, Int]  // the type parameters in scope, by name
+    effects_used: Map[Str, Bool]  // by the function being checked
+    effects_reported: Map[Str, Bool]  // missing from its `uses`, and already said so
     defining: Int  // the generic type whose fields are being read, or -1
     expected: Int  // the type the context wants for the expression about to be inferred, or -2
 }
@@ -112,7 +115,7 @@ pub fn check_program(loaded: modules.Loaded, for_tests: Bool) -> Checked {
     let mut c = Checker {
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
-        undefined: [], targs: targs, type_scope: [:], defining: -1, expected: -2,
+        undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], defining: -1, expected: -2,
     }
     program(mut c, for_tests)
     return Checked {
@@ -401,9 +404,21 @@ fn signatures(c: mut Checker) {
             None => {}
         }
         c.type_scope = [:]
+        for i in 0..len(f.effects) {
+            let u = f.effects[i]
+            if u != "fs" && u != "os" {
+                report(mut c, f.effects_line, f.effects_col, "unknown effect '" + u + "'; the effects are fs (the files module) " +
+                    "and os (os.args, os.exit, os.env and os.run)")
+            }
+            for j in 0..i {
+                if f.effects[j] == u {
+                    report(mut c, f.effects_line, f.effects_col, "effect '" + u + "' is listed twice")
+                }
+            }
+        }
         push(mut c.fns, FnInfo {
             decl: f, module: m, params: params, mutable: mutable, result: result, param_locals: [],
-            type_params: type_params, is_test: false,
+            type_params: type_params, is_test: false, result_local: -1,
         })
         let id = len(c.fns) - 1
         if f.public {
@@ -439,12 +454,12 @@ fn signatures(c: mut Checker) {
             }
         }
         let f = ast.FnDecl {
-            name: "test " + ast.quote(t.name), type_params: [], params: [], result: None, body: t.body, line: t.line,
-            col: t.col, public: false,
+            name: "test " + ast.quote(t.name), type_params: [], params: [], result: None, effects: [], effects_line: 0,
+            effects_col: 0, requires: [], ensures: [], body: t.body, line: t.line, col: t.col, public: false,
         }
         push(mut c.fns, FnInfo {
             decl: f, module: m, params: [], mutable: [], result: types.NOTHING(), param_locals: [], type_params: [],
-            is_test: true,
+            is_test: true, result_local: -1,
         })
     }
 }
@@ -649,10 +664,41 @@ fn function(c: mut Checker, id: Int) {
     c.fns[id].param_locals = locals
     c.scopes = [scope]
     c.type_scope = scope_of(c, c.fns[id].type_params)
+    c.effects_used = [:]
+    c.effects_reported = [:]
+    for r in f.requires {
+        check_expr(mut c, r, types.BOOL(), msg("a requires clause must be Bool, found ", ""))
+    }
     for s in f.body.stmts {
         stmt(mut c, s)
     }
+    if len(f.ensures) > 0 {
+        // The ensures clauses see the parameters, and `result`.
+        let mut after: Map[Str, Int] = [:]
+        if c.fns[id].result != types.NOTHING() {
+            if maps.has(scope, "result") {
+                report(mut c, f.line, f.col, "'" + f.name + "' has a parameter called 'result', which its ensures " +
+                    "clauses cannot tell from the value it returns; rename the parameter")
+            }
+            let r = new_local(mut c, "result", c.fns[id].result, "result", f.line, f.col)
+            after["result"] = r
+            c.fns[id].result_local = r
+        }
+        c.scopes = [scope, after]
+        for e in f.ensures {
+            check_expr(mut c, e, types.BOOL(), msg("an ensures clause must be Bool, found ", ""))
+        }
+    }
     c.type_scope = [:]
+    for u in f.effects {
+        if !maps.has(c.effects_used, u) && !c.fns[id].is_test && !is_main(c, id) {
+            let w = errors.CompileError {
+                path: c.modules[c.current].path, line: f.effects_line, col: f.effects_col,
+                message: "'" + f.name + "' says `uses " + u + "` but uses nothing of it", warning: true,
+            }
+            errors.add(mut c.warnings, w)
+        }
+    }
     match f.result {
         Some(_) => {
             if !terminates_block(c, f.body) {
@@ -662,6 +708,88 @@ fn function(c: mut Checker, id: Int) {
         }
         None => {}
     }
+}
+
+fn is_main(c: Checker, id: Int) -> Bool {
+    return c.fns[id].decl.name == "main" && c.modules[c.fns[id].module].name == ""
+}
+
+// ---- Effects ----
+//
+// A function that touches the world says how: `uses fs` for the files
+// module, `uses os` for os.args, os.exit, os.env and os.run. Printing is
+// not an effect. A function must declare what it does itself and what the
+// functions it calls declare; main and tests may do anything.
+
+// The effect of a built-in function, or "".
+fn effect_of(name: Str) -> Str {
+    if len(name) > 6 && name[0..6] == "files." {
+        return "fs"
+    }
+    if name == "os.args" || name == "os.exit" || name == "os.env" || name == "os.run" {
+        return "os"
+    }
+    return ""
+}
+
+// The function being checked uses `effect`, through the call at `e` to `through`.
+fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
+    if effect == "" {
+        return
+    }
+    c.effects_used[effect] = true
+    let f = c.fns[c.current_fn]
+    if f.is_test || is_main(c, c.current_fn) || maps.has(c.effects_reported, effect) {
+        return
+    }
+    for u in f.decl.effects {
+        if u == effect {
+            return
+        }
+    }
+    c.effects_reported[effect] = true
+    // A warning for now: the compiler's own source cannot say `uses` until
+    // the seed knows the word. The next step makes it an error.
+    warn_at(mut c, e, "'" + f.decl.name + "' uses " + effect + ", through " + through + ", but does not say so; add `uses " +
+        effect + "` after its signature")
+}
+
+// ---- With ----
+
+// `with files = m, args = xs, env = m, stdout = mut out { ... }`: in a test,
+// the code the block runs sees these instead of the real ones.
+fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block) {
+    if !c.fns[c.current_fn].is_test {
+        report(mut c, s.line, s.col, "'with' only works in tests, where it fakes files, args, env or stdout for the code " +
+            "the test calls")
+    }
+    let text_map = types.map(mut c.table, types.STR(), types.STR())
+    let words = types.array(mut c.table, types.STR())
+    let mut seen: [Str] = []
+    for w in items {
+        for name in seen {
+            if name == w.name {
+                report(mut c, w.line, w.col, "'" + w.name + "' is faked twice in this 'with'")
+            }
+        }
+        push(mut seen, w.name)
+        if w.name == "files" {
+            check_expr(mut c, w.value, text_map, msg("'with files' needs a Map[Str, Str] from paths to contents, found ", ""))
+        } else if w.name == "env" {
+            check_expr(mut c, w.value, text_map, msg("'with env' needs a Map[Str, Str] from names to values, found ", ""))
+        } else if w.name == "args" {
+            check_expr(mut c, w.value, words, msg("'with args' needs a [Str], found ", ""))
+        } else if w.name == "stdout" {
+            let t = mut_argument(mut c, w.value, types.BUILDER(), "'with stdout'")
+            if t != types.BUILDER() && t != types.ERROR() {
+                report_at(mut c, w.value, "'with stdout' needs a strings.Builder to collect what is printed, found " + show(c, t))
+            }
+        } else {
+            report(mut c, w.line, w.col, "'with' cannot fake '" + w.name + "'; it fakes files, args, env and stdout")
+            infer(mut c, w.value)
+        }
+    }
+    block(mut c, body)
 }
 
 // `None`, `Some`, `Ok` and `Err` cannot name variables.
@@ -886,6 +1014,7 @@ fn stmt(c: mut Checker, s: ast.Stmt) {
         ast.StmtKind.Continue => jump(mut c, s, "continue")
         ast.StmtKind.Return(v) => return_stmt(mut c, s, v)
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut c, scrutinee, arms, s.line, s.col, MatchBody.Statements)
+        ast.StmtKind.With(items, body) => with_stmt(mut c, s, items, body)
     }
 }
 
@@ -2525,6 +2654,7 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
                 return types.ERROR()
             }
             c.refs[e.id] = Ref.Builtin(name)
+            use_effect(mut c, e, effect_of(name), name)
             return builtin(mut c, e, name, args, written(callee))
         }
         Ref.Variant(enum, vi) => {
@@ -2538,6 +2668,9 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
             let f = c.fns[id]
             c.refs[e.id] = Ref.Function(id)
             let name = written(callee)
+            for u in f.decl.effects {
+                use_effect(mut c, e, u, "'" + name + "'")
+            }
             if len(f.type_params) > 0 {
                 return generic_call(mut c, e, id, name, args, expected)
             }
@@ -2813,6 +2946,11 @@ fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> I
             report_at(mut c, e, "'" + name + "' has a mut parameter, so it cannot be used as a value")
             return types.ERROR()
         }
+    }
+    if len(f.decl.effects) > 0 {
+        report_at(mut c, e, "'" + name + "' uses " + f.decl.effects[0] + ", so it cannot be used as a value: function values " +
+            "have no effects")
+        return types.ERROR()
     }
     c.refs[e.id] = Ref.Function(id)
     let tp = f.type_params
@@ -3142,6 +3280,7 @@ fn terminates(c: Checker, s: ast.Stmt) -> Bool {
             }
             return true
         }
+        ast.StmtKind.With(_, body) => return terminates_block(c, body)
         _ => return false
     }
 }

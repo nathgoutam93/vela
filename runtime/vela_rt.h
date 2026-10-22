@@ -66,11 +66,12 @@ typedef struct {
     int64_t len;
 } vela_str;
 
-// assert(cond) failed: a panic naming the condition as written, and, for a
-// comparison of two printable values, what the two sides were.
-_Noreturn void vela_assert_failed(const char *loc, const char *text);
-_Noreturn void vela_assert_failed_values(const char *loc, const char *text, vela_str left, vela_str right,
-                                         bool quote);
+// assert(cond), or a requires or ensures clause, failed: a panic naming the
+// check (`what`: "assertion", "requires of 'f'") and the condition as
+// written, and, for a comparison of two printable values, the two sides.
+_Noreturn void vela_assert_failed(const char *loc, const char *what, const char *text);
+_Noreturn void vela_assert_failed_values(const char *loc, const char *what, const char *text, vela_str left,
+                                         vela_str right, bool quote);
 
 // The Str for a C string literal of `n` bytes.
 #define VELA_STR(literal, n) ((vela_str){NULL, (const uint8_t *)(literal), (n)})
@@ -161,6 +162,17 @@ void vela_eprint_str(vela_str x);
 void vela_init(int argc, char **argv);
 // os.args(): every argument, the program's own name first.
 vela_array *vela_os_args(void);
+
+// Fakes for `with` in tests: each setter takes the new value and returns
+// the old one, for the restore.
+vela_map *vela_fake_files(vela_map *m);
+void vela_fake_files_restore(vela_map *old);
+vela_array *vela_fake_args(vela_array *a);
+void vela_fake_args_restore(vela_array *old);
+vela_map *vela_fake_env(vela_map *m);
+void vela_fake_env_restore(vela_map *old);
+vela_array **vela_fake_stdout(vela_array **out);
+void vela_fake_stdout_restore(vela_array **old);
 // os.exit(code): flushes output and ends the program. Like a panic, it
 // does not release the values still in use; the OS takes the memory back.
 _Noreturn void vela_os_exit(int64_t code, const char *loc);
