@@ -13,6 +13,7 @@
 // space goes between two tokens except after an opening bracket, before a
 // closing one, around `.` and `..`, before `,` `:` `?`, after a unary `-` or
 // `!`, and between a name and the `(` or `[` that follows it.
+// stage 1 only (it has tests, which Stage 0 cannot read)
 import errors
 import lexer
 import parser
@@ -300,4 +301,49 @@ fn layout(ps: [Piece]) -> Str {
         i = j
     }
     return strings.build(b)
+}
+
+fn formatted(src: Str) -> Str {
+    match format(src) {
+        Ok(out) => return out
+        Err(errs) => return "error: " + errs[0].message
+    }
+}
+
+// A statement formatted in a function body, without the function.
+fn stmt(src: Str) -> Str {
+    let out = formatted("fn f() {\n" + src + "\n}\n")
+    if len(out) < 15 || out[0..13] != "fn f() {\n    " {
+        return out
+    }
+    return out[13..len(out) - 3]
+}
+
+test "spaces around operators, none inside brackets" {
+    assert(formatted("fn f(a:Int)->Int{return -a*(a+1)-g( a )}\n") == "fn f(a: Int) -> Int { return -a * (a + 1) - g(a) }\n")
+    assert(stmt("let m=[:]") == "let m = [:]")
+    assert(stmt("let r=xs[i+1..n]") == "let r = xs[i + 1..n]")
+    assert(formatted("fn f[T:Ord+Key]()->[T]{}\n") == "fn f[T: Ord + Key]() -> [T] {}\n")
+}
+
+test "a unary minus after an operator or bracket" {
+    assert(stmt("let x=a- -b") == "let x = a - -b")
+    assert(stmt("f(-1,[-2])") == "f(-1, [-2])")
+    assert(stmt("return !ok") == "return !ok")
+    assert(stmt("match x {-1=>{}}") == "match x { -1 => {} }")
+}
+
+test "indentation follows brackets and continuations" {
+    let src = "fn f() {\nlet x = a +\nb\nif a &&\nb {\ng(1,\n2)\n}\n}\n"
+    let want = "fn f() {\n    let x = a +\n        b\n    if a &&\n        b {\n        g(1,\n            2)\n    }\n}\n"
+    assert(formatted(src) == want)
+}
+
+test "comments stay, blank lines shrink to one" {
+    let src = "// top\n\n\n\nfn f() {\n\n    g()  // why\n\n}\n"
+    assert(formatted(src) == "// top\n\nfn f() {\n    g()  // why\n}\n")
+}
+
+test "a file that does not parse is not formatted" {
+    assert(formatted("fn f( {\n") == "error: expected a name for a parameter, found '{'")
 }

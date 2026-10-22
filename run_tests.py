@@ -43,8 +43,8 @@ The directory a test lives in decides what is checked:
                   runs in a scratch copy of the test. For `fmt`, formatting
                   NAME.expected again must change nothing
 
-Besides these, every examples/*/main.vl, and every std/*.vl with tests in
-it, must pass `vela test` (with Stage 1 only).
+Besides these, the compiler (stage1/main.vl), every examples/*/main.vl and
+every std/*.vl with tests in it must pass `vela test` (with Stage 1 only).
 
 The compiler runs inside the test's directory and is given the bare file
 name, so messages read `name.vl:3:7: ...` wherever the repo is checked out.
@@ -85,6 +85,7 @@ HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args|command):(.*)$")
 STAGE1_ONLY = "// stage 1 only"
 COMPILE_TIMEOUT = 60
 RUN_TIMEOUT = 10
+VELA_TEST_TIMEOUT = 600  # the compiler's own tests build the whole compiler, under --sanitize too
 
 
 @dataclass
@@ -249,9 +250,9 @@ def run_vela_tests(compiler: list[str], path: Path, env: dict[str, str]) -> list
     """`vela test` on an example or a standard module: all its tests must pass."""
     try:
         ran = subprocess.run([*compiler, "test", str(path.relative_to(ROOT))], cwd=ROOT, env=env,
-                             capture_output=True, text=True, timeout=COMPILE_TIMEOUT + RUN_TIMEOUT)
+                             capture_output=True, text=True, timeout=VELA_TEST_TIMEOUT)
     except subprocess.TimeoutExpired:
-        return ["vela test took too long"]
+        return [f"vela test took longer than {VELA_TEST_TIMEOUT}s"]
     if ran.returncode != 0:
         return [f"vela test exited with {ran.returncode}:", *ran.stdout.splitlines(), *ran.stderr.splitlines()]
     return []
@@ -260,6 +261,7 @@ def run_vela_tests(compiler: list[str], path: Path, env: dict[str, str]) -> list
 def find_tests(filters: list[str]) -> list[Path]:
     tests = []
     tests += sorted((ROOT / "examples").glob("*/main.vl"))
+    tests.append(ROOT / "stage1" / "main.vl")  # the compiler's own tests
     tests += [p for p in sorted((ROOT / "std").glob("*.vl")) if 'test "' in p.read_text()]
     for kind in KINDS:
         for p in sorted((TESTS / kind).iterdir()):

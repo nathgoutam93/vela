@@ -16,6 +16,7 @@
 // like Option, whose `origin` is the declaration and whose fields or
 // variants are the declaration's with the arguments put in. A type that
 // mentions a parameter anywhere is "open"; only closed types reach C.
+// stage 1 only (it has tests, which Stage 0 cannot read)
 import maps
 import strings
 
@@ -289,6 +290,18 @@ fn any_open(table: Table, ts: [Int]) -> Bool {
     return false
 }
 
+// How deeply `t` nests: 1 for Int, 2 for [Int], 3 for Option[[Int]].
+pub fn depth(table: Table, t: Int) -> Int {
+    let mut deepest = 0
+    for a in table.types[t].args {
+        let d = depth(table, a)
+        if d > deepest {
+            deepest = d
+        }
+    }
+    return deepest + 1
+}
+
 // A new type parameter.
 pub fn param(table: mut Table, name: Str, bounds: [Str], line: Int, col: Int) -> Int {
     let mut t = info(Tag.Param, name)
@@ -511,4 +524,31 @@ fn qualified(module: Str, name: Str, viewpoint: Str) -> Str {
         return module + "." + name
     }
     return name
+}
+
+test "substitution makes closed types" {
+    let mut t = new_table()
+    let p = param(mut t, "T", [], 1, 1)
+    let xs = array(mut t, p)
+    let opt = option(mut t, xs)
+    assert(is_open(t, xs) && is_open(t, opt))
+    let ints = subst(mut t, opt, [p], [INT()])
+    assert(!is_open(t, ints))
+    assert(ints == option(mut t, array(mut t, INT())))
+    assert(show(t, ints, "") == "Option[[Int]]")
+    assert(find_subst(t, opt, [p], [INT()]) == ints)
+}
+
+test "instances of a generic type are interned and filled" {
+    let mut t = new_table()
+    let decl = add_user(mut t, true, "Box", "", true, 1, 1)
+    let p = param(mut t, "T", [], 1, 5)
+    t.types[decl].params = [p]
+    push(mut t.types[decl].fields, FieldInfo { name: "value", ty: p })
+    t.types[decl].filled = true
+    let a = instantiate(mut t, decl, [STR()])
+    assert(a == instantiate(mut t, decl, [STR()]))
+    assert(a != instantiate(mut t, decl, [INT()]))
+    assert(get(t, a).fields[0].ty == STR())
+    assert(show(t, a, "") == "Box[Str]")
 }

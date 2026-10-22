@@ -77,7 +77,7 @@ fn main() {
     } else if command == "check" {
         checked(path, root)
     } else if command == "c" {
-        let out = codegen.generate(checked(path, root))
+        let out = c_code(path, codegen.generate(checked(path, root)))
         print(out[0..len(out) - 1])
     } else {
         usage()
@@ -193,7 +193,16 @@ fn split_flags(flags: Str) -> [Str] {
 
 // Compile a .vl file all the way to a native executable.
 fn build(path: Str, exe: Str, root: Str) {
-    compile(codegen.generate(checked(path, root)), modules.stem(path), exe, root)
+    compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root)
+}
+
+// The C, or stop with the errors that only writing it found.
+fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str {
+    match generated {
+        Ok(c) => return c
+        Err(errs) => fail(path, errs)
+    }
+    return ""  // not reached
 }
 
 // C into a scratch directory, then the C compiler.
@@ -435,7 +444,7 @@ fn test_command(path: Str, words: [Str], root: Str) {
         Err(e) => driver_error(e)
     }
     let exe = modules.join(tmp, "tests")
-    compile(codegen.generate_tests(k), modules.stem(path) + "_tests", exe, root)
+    compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root)
     let mut failed = 0
     for i in chosen {
         let f = k.fns[ids[i]]

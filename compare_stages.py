@@ -5,18 +5,18 @@
     python3 compare_stages.py tokens ast    several commands
     python3 compare_stages.py -v tokens     also list the files that agree
 
-Stage 1 is first built with Stage 0 into build/vela1. Every .vl file under
-tests/, std/ and stage1/ is then given to both compilers, from the file's
+Stage 1 is build/vela, made by `sh bootstrap/bootstrap.sh` (or VELA1, any
+other build of it: one with AddressSanitizer, say, to check Stage 1
+itself). Every .vl file under tests/, std/ and stage1/ is given to both
+compilers, from the file's
 own directory and by its bare name, as run_tests.py does. Their stdout,
 stderr and exit codes must be identical: the same dump, the same errors,
 the same C.
 
 Stage 0 is frozen at M9, so this holds only for the M9 language. Files that
 use a later feature say `// stage 1 only` at the top and are left out; for
-the rest, the check is a regression test of Stage 1 against Stage 0.
-
-VELA1_PREBUILT=1 skips the build and uses build/vela1 as it is: for
-example one built with AddressSanitizer, to check Stage 1 itself.
+the rest, the check is a regression test of Stage 1 against Stage 0. The
+compiler's own modules (stage1/) are compared only as `tokens` and `ast`.
 """
 from __future__ import annotations
 
@@ -30,18 +30,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 STAGE0 = [sys.executable, str(ROOT / "stage0" / "main.py")]
-STAGE1 = ROOT / "build" / "vela1"
+STAGE1 = Path(os.environ.get("VELA1", ROOT / "build" / "vela")).resolve()
 COMMANDS = ("tokens", "ast", "check", "c")
 
 
 def build_stage1() -> None:
-    if os.environ.get("VELA1_PREBUILT"):
-        return
-    STAGE1.parent.mkdir(exist_ok=True)
-    built = subprocess.run([*STAGE0, "build", str(ROOT / "stage1" / "main.vl"), "-o", str(STAGE1)],
-                           capture_output=True, text=True)
-    if built.returncode != 0:
-        sys.exit(f"Stage 0 could not build Stage 1:\n{built.stderr}")
+    if not STAGE1.exists():
+        sys.exit(f"{STAGE1} does not exist; build it with: sh bootstrap/bootstrap.sh")
 
 
 def inputs() -> list[Path]:
@@ -87,7 +82,11 @@ def main() -> int:
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     build_stage1()
-    jobs = [(what, p) for what in args.commands for p in inputs()]
+    # The compiler's own modules import ones with tests in them, which Stage 0
+    # cannot read, so only their tokens and trees, file by file, compare.
+    whole_program = ("check", "c")
+    jobs = [(what, p) for what in args.commands for p in inputs()
+            if not (what in whole_program and p.is_relative_to(ROOT / "stage1"))]
     failed = 0
     with concurrent.futures.ThreadPoolExecutor() as pool:
         for (what, path), problems in zip(jobs, pool.map(lambda j: compare(*j), jobs)):

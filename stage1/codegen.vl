@@ -3,6 +3,7 @@
 // cleanup frames, copy-on-write). The C it writes is byte for byte Stage 0's.
 import ast
 import checker
+import errors
 import layout
 import maps
 import mono
@@ -55,13 +56,13 @@ type ArmCode = enum {
     StoreIn(Str)
 }
 
-pub fn generate(checked: checker.Checked) -> Str {
+pub fn generate(checked: checker.Checked) -> Result[Str, [errors.CompileError]] {
     return program(checked, false)
 }
 
 // The C for `vela test`: the program's tests, and a main that runs the one
 // whose number it is given (its index in test_ids).
-pub fn generate_tests(checked: checker.Checked) -> Str {
+pub fn generate_tests(checked: checker.Checked) -> Result[Str, [errors.CompileError]] {
     return program(checked, true)
 }
 
@@ -79,7 +80,8 @@ pub fn test_ids(k: checker.Checked) -> [Int] {
     return out
 }
 
-fn program(checked: checker.Checked, for_tests: Bool) -> Str {
+// The C, or the errors only making the generic copies finds.
+fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.CompileError]] {
     let mut k = checked
     // The functions that are not generic are all written; generic ones only
     // as the copies they are called as. Tests only for `vela test`.
@@ -96,6 +98,9 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Str {
         }
     }
     let copies = mono.collect(mut k, roots)
+    if len(copies.errors) > 0 {
+        return Err(copies.errors)
+    }
     let mut elements: [Int] = []
     for t in k.table.arrays {
         if !types.is_open(k.table, t) {
@@ -202,7 +207,7 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Str {
         }
         strings.add(mut b, out[i])
     }
-    return strings.build(b)
+    return Ok(strings.build(b))
 }
 
 fn add_new(xs: mut [Int], x: Int) {

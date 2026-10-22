@@ -1,6 +1,7 @@
 // Programs made of several files: a port of stage0/modules.py, which
 // explains the rules. Modules are kept in one array and refer to each
 // other by index.
+// stage 1 only (it has tests, which Stage 0 cannot read)
 import ast
 import errors
 import files
@@ -287,4 +288,13 @@ pub fn normpath(path: Str) -> Str {
         return "."
     }
     return out
+}
+
+test "paths" {
+    assert(dirname("a/b/c.vl") == "a/b")
+    assert(dirname("c.vl") == "")
+    assert(dirname("/c.vl") == "/")
+    assert(join("a", "b.vl") == "a/b.vl" && join("", "b.vl") == "b.vl" && join("a", "/x") == "/x")
+    assert(stem("src/main.vl") == "main" && stem(".vl") == ".vl")
+    assert(normpath("a/./b/../c") == "a/c" && normpath("../x") == "../x" && normpath("a/..") == ".")
 }

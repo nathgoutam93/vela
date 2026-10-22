@@ -11,6 +11,7 @@
 // first function is written.
 import ast
 import checker
+import errors
 import maps
 import strings
 import types
@@ -24,10 +25,19 @@ pub type Instance = struct {
 pub type Collected = struct {
     instances: [Instance]  // generic copies, in the order first called
     index: Map[Str, Int]  // instances by key()
+    errors: [errors.CompileError]
+}
+
+// Type arguments nested deeper than this mean generic functions that call
+// each other with ever bigger types, f[T] calling g[[T]] calling f[[[T]]]:
+// there would be no end to the copies.
+fn max_depth() -> Int {
+    return 24
 }
 
 type Walk = struct {
     k: checker.Checked
+    path: Str  // the file of the function being walked
     params: [Int]  // of the function being walked
     args: [Int]
     out: Collected
@@ -47,7 +57,9 @@ pub fn key(fn_id: Int, args: [Int]) -> Str {
 // Every generic copy reachable from `roots` (the functions to write, by
 // id, none of them generic). `k.table` gains the types the copies need.
 pub fn collect(k: mut checker.Checked, roots: [Int]) -> Collected {
-    let mut w = Walk { k: k, params: [], args: [], out: Collected { instances: [], index: [:] }, queue: [] }
+    let mut w = Walk {
+        k: k, path: "", params: [], args: [], out: Collected { instances: [], index: [:], errors: [] }, queue: [],
+    }
     for id in roots {
         walk_fn(mut w, Instance { fn_id: id, args: [] })
     }
@@ -55,9 +67,6 @@ pub fn collect(k: mut checker.Checked, roots: [Int]) -> Collected {
     for i < len(w.queue) {
         walk_fn(mut w, w.queue[i])
         i = i + 1
-        if i > 100000 {
-            break  // cannot happen: the checker rules out a function calling itself with bigger types
-        }
     }
     k.table = w.k.table
     return w.out
@@ -69,6 +78,7 @@ fn sub(w: mut Walk, t: Int) -> Int {
 
 fn walk_fn(w: mut Walk, inst: Instance) {
     let f = w.k.fns[inst.fn_id]
+    w.path = w.k.modules[f.module].path
     w.params = f.type_params
     w.args = inst.args
     for t in f.params {
@@ -181,8 +191,24 @@ fn expr(w: mut Walk, e: ast.Expr) {
                 for t in w.k.targs[e.id] {
                     push(mut args, sub(mut w, t))
                 }
+                let mut deepest = 0
+                for a in args {
+                    let d = types.depth(w.k.table, a)
+                    if d > deepest {
+                        deepest = d
+                    }
+                }
                 let k = key(id, args)
-                if !maps.has(w.out.index, k) {
+                if deepest > max_depth() {
+                    if len(w.out.errors) == 0 {
+                        let name = w.k.fns[id].decl.name
+                        push(mut w.out.errors, errors.CompileError {
+                            path: w.path, line: e.line, col: e.col,
+                            message: "'" + name + "' is called here with types that grow without end, as generic " +
+                                "functions that call each other with bigger types do (f[T] calling g[[T]])",
+                        })
+                    }
+                } else if !maps.has(w.out.index, k) {
                     w.out.index[k] = len(w.out.instances)
                     let inst = Instance { fn_id: id, args: args }
                     push(mut w.out.instances, inst)
