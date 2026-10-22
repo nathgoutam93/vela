@@ -56,7 +56,10 @@ fn is_array_like(table: types.Table, t: Int) -> Bool {
 pub fn new_layout(table: types.Table, user_types: [Int], element_types: [Int]) -> Layout {
     let mut all = user_types
     for t in table.instances {
-        push(mut all, t)
+        // A type that mentions a type parameter exists only in the checker.
+        if !types.is_open(table, t) {
+            push(mut all, t)
+        }
     }
     let mut l = Layout {
         table: table, types: all, element_types: element_types, names: [:], used: [:], tags: [:], boxed: [:],
@@ -117,11 +120,15 @@ fn base_name(l: Layout, t: Int) -> Str {
         }
         return strings.build(b)
     }
+    if ti.origin >= 0 {
+        return "t_" + suffix(l, t)
+    }
     return "t_" + mangle(ti.module, ti.name)
 }
 
-// How a type argument reads inside a generated name: Int, Token, Option_Int.
-fn suffix(l: Layout, t: Int) -> Str {
+// How a type argument reads inside a generated name: Int, Token, Option_Int,
+// Pair_Int_Str.
+pub fn suffix(l: Layout, t: Int) -> Str {
     let ti = types.get(l.table, t)
     if primitive_c(t) != "" {
         return ti.name
@@ -138,7 +145,14 @@ fn suffix(l: Layout, t: Int) -> Str {
     if types.is_builtin_enum(l.table, t) {
         return base_name(l, t)
     }
-    return mangle(ti.module, ti.name)
+    let mut b = strings.builder()
+    strings.add(mut b, mangle(ti.module, ti.name))
+    if ti.origin >= 0 {
+        for a in ti.args {
+            strings.add(mut b, "_" + suffix(l, a))
+        }
+    }
+    return strings.build(b)
 }
 
 pub fn c_type(l: Layout, t: Int) -> Str {

@@ -1,0 +1,232 @@
+// Generic functions on arrays. `import lists`.
+// stage 1 only
+//
+// Sorting is stable: values that compare equal keep their order. Without
+// function values, a sort by some property of the elements takes the keys
+// as an array of their own: `lists.sort_by(orders, totals)`.
+import maps
+
+pub fn contains[T: Eq](xs: [T], x: T) -> Bool {
+    for y in xs {
+        if y == x {
+            return true
+        }
+    }
+    return false
+}
+
+// The index of the first element equal to `x`.
+pub fn index_of[T: Eq](xs: [T], x: T) -> Option[Int] {
+    for i in 0..len(xs) {
+        if xs[i] == x {
+            return Some(i)
+        }
+    }
+    return None
+}
+
+pub fn reverse[T](xs: [T]) -> [T] {
+    let mut out: [T] = []
+    let mut i = len(xs) - 1
+    for i >= 0 {
+        push(mut out, xs[i])
+        i = i - 1
+    }
+    return out
+}
+
+pub fn concat[T](a: [T], b: [T]) -> [T] {
+    let mut out = a
+    for x in b {
+        push(mut out, x)
+    }
+    return out
+}
+
+// The first `n` elements, or all of them if there are fewer.
+pub fn take[T](xs: [T], n: Int) -> [T] {
+    if n >= len(xs) {
+        return xs
+    }
+    if n <= 0 {
+        return xs[0..0]
+    }
+    return xs[0..n]
+}
+
+pub fn repeat[T](x: T, n: Int) -> [T] {
+    let mut out: [T] = []
+    for _ in 0..n {
+        push(mut out, x)
+    }
+    return out
+}
+
+pub fn sum(xs: [Int]) -> Int {
+    let mut total = 0
+    for x in xs {
+        total = total + x
+    }
+    return total
+}
+
+pub fn max[T: Ord](xs: [T]) -> Option[T] {
+    if len(xs) == 0 {
+        return None
+    }
+    let mut best = xs[0]
+    for x in xs {
+        if x > best {
+            best = x
+        }
+    }
+    return Some(best)
+}
+
+pub fn min[T: Ord](xs: [T]) -> Option[T] {
+    if len(xs) == 0 {
+        return None
+    }
+    let mut best = xs[0]
+    for x in xs {
+        if x < best {
+            best = x
+        }
+    }
+    return Some(best)
+}
+
+// Each value once, where it first appears.
+pub fn unique[T: Key](xs: [T]) -> [T] {
+    let mut seen: Map[T, Bool] = [:]
+    let mut out: [T] = []
+    for x in xs {
+        if !maps.has(seen, x) {
+            seen[x] = true
+            push(mut out, x)
+        }
+    }
+    return out
+}
+
+// How many times each value appears.
+pub fn count[T: Key](xs: [T]) -> Map[T, Int] {
+    let mut m: Map[T, Int] = [:]
+    for x in xs {
+        match maps.get(m, x) {
+            Some(n) => m[x] = n + 1
+            None => m[x] = 1
+        }
+    }
+    return m
+}
+
+// The positions of `keys` in sorted order: keys[order(keys)[0]] is the
+// smallest. A stable merge sort, O(n log n).
+pub fn order[K: Ord](keys: [K]) -> [Int] {
+    let n = len(keys)
+    let mut idx: [Int] = []
+    for i in 0..n {
+        push(mut idx, i)
+    }
+    let mut spare = idx
+    let mut width = 1
+    for width < n {
+        let mut lo = 0
+        for lo < n {
+            let mid = smaller(lo + width, n)
+            let hi = smaller(lo + 2 * width, n)
+            let mut i = lo
+            let mut j = mid
+            for k in lo..hi {
+                // Take from the left run unless the right one is strictly smaller.
+                if i < mid && (j >= hi || !(keys[idx[j]] < keys[idx[i]])) {
+                    spare[k] = idx[i]
+                    i = i + 1
+                } else {
+                    spare[k] = idx[j]
+                    j = j + 1
+                }
+            }
+            lo = hi
+        }
+        let done = spare
+        spare = idx
+        idx = done
+        width = width * 2
+    }
+    return idx
+}
+
+fn smaller(a: Int, b: Int) -> Int {
+    if a < b {
+        return a
+    }
+    return b
+}
+
+pub fn sort[T: Ord](xs: [T]) -> [T] {
+    return sort_by(xs, xs)
+}
+
+// `xs` in the order of `keys`, where keys[i] is the key of xs[i].
+pub fn sort_by[K: Ord, T](xs: [T], keys: [K]) -> [T] {
+    assert(len(keys) == len(xs))
+    let mut out: [T] = []
+    for i in order(keys) {
+        push(mut out, xs[i])
+    }
+    return out
+}
+
+test "contains and index_of" {
+    assert(contains([1, 2, 3], 3))
+    assert(!contains(["a"], "b"))
+    match index_of(["a", "b", "b"], "b") {
+        Some(i) => assert(i == 1)
+        None => assert(false)
+    }
+}
+
+test "reverse, concat, take, repeat" {
+    let r = reverse([1, 2, 3])
+    assert(r[0] == 3 && r[2] == 1)
+    assert(len(concat([1], [2, 3])) == 3)
+    assert(len(take([1, 2, 3], 2)) == 2)
+    assert(len(take([1], 5)) == 1)
+    assert(len(take([1], -1)) == 0)
+    assert(len(repeat("x", 4)) == 4)
+}
+
+test "sum, max, min" {
+    assert(sum([1, 2, 3]) == 6)
+    match max(["pear", "apple", "zucchini"]) {
+        Some(m) => assert(m == "zucchini")
+        None => assert(false)
+    }
+    let none: [Int] = []
+    match min(none) {
+        Some(_) => assert(false)
+        None => {}
+    }
+}
+
+test "unique and count" {
+    let u = unique(["b", "a", "b", "c", "a"])
+    assert(len(u) == 3 && u[0] == "b" && u[2] == "c")
+    let c = count([1, 2, 1, 1])
+    assert(c[1] == 3 && c[2] == 1)
+}
+
+test "sort is ordered and stable" {
+    let s = sort([5, 3, 9, 1, 3, 8, 2, 7, 6, 4, 0])
+    for i in 1..len(s) {
+        assert(s[i - 1] <= s[i])
+    }
+    assert(len(s) == 11 && s[0] == 0 && s[10] == 9)
+    // Equal keys keep their order.
+    let names = sort_by(["b1", "a1", "b2", "a2", "c1"], [2, 1, 2, 1, 3])
+    assert(names[0] == "a1" && names[1] == "a2" && names[2] == "b1" && names[3] == "b2")
+    let empty: [Int] = []
+    assert(len(sort(empty)) == 0)
+}

@@ -1,0 +1,81 @@
+// Just enough CSV for orders.csv: fields split at commas, no quoting.
+// stage 1 only
+
+// The lines of `text`, without their line endings; blank lines are left out.
+pub fn lines(text: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(text) + 1 {
+        if i == len(text) || text[i] == '\n' {
+            let mut end = i
+            if end > start && text[end - 1] == '\r' {
+                end = end - 1
+            }
+            if end > start {
+                push(mut out, text[start..end])
+            }
+            start = i + 1
+        }
+    }
+    return out
+}
+
+pub fn fields(line: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(line) + 1 {
+        if i == len(line) || line[i] == ',' {
+            push(mut out, trim(line[start..i]))
+            start = i + 1
+        }
+    }
+    return out
+}
+
+pub fn trim(s: Str) -> Str {
+    let mut lo = 0
+    let mut hi = len(s)
+    for lo < hi && s[lo] == ' ' {
+        lo = lo + 1
+    }
+    for hi > lo && s[hi - 1] == ' ' {
+        hi = hi - 1
+    }
+    return s[lo..hi]
+}
+
+// A whole number of decimal digits, with no sign.
+pub fn number(s: Str) -> Option[Int] {
+    if len(s) == 0 || len(s) > 18 {
+        return None
+    }
+    let mut n = 0
+    for c in s {
+        if c < '0' || c > '9' {
+            return None
+        }
+        n = n * 10 + int(c - '0')
+    }
+    return Some(n)
+}
+
+test "lines drop endings and blanks" {
+    let ls = lines("a\r\n\nb\n")
+    assert(len(ls) == 2 && ls[0] == "a" && ls[1] == "b")
+}
+
+test "fields are trimmed" {
+    let f = fields("1, ada ,,x")
+    assert(len(f) == 4 && f[1] == "ada" && f[2] == "")
+}
+
+test "numbers" {
+    match number("1250") {
+        Some(n) => assert(n == 1250)
+        None => assert(false)
+    }
+    match number("12a") {
+        Some(_) => assert(false)
+        None => {}
+    }
+}

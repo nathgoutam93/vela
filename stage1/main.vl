@@ -2,10 +2,15 @@
 //
 //     vela build FILE [-o EXE]    compile to an executable
 //     vela run FILE [ARGS...]     compile to a temporary executable and run it
+//     vela test FILE [WORDS...]   run the program's tests (those whose names
+//                                 contain one of the words, if any are given)
 //     vela c FILE                 print the generated C
 //     vela check FILE             report the program's errors, generate nothing
+//     vela check --json FILE      the same, as one JSON document on stdout
 //     vela tokens FILE            print the token stream
 //     vela ast FILE               print the syntax tree
+//     vela fmt [-w | -l] FILE...  print the files formatted; -w rewrites them,
+//                                 -l lists the ones that are not formatted
 //
 // Exit codes as in Stage 0: 0 success, 1 the program has errors, 2 bad
 // command line, 70 internal compiler error.
@@ -19,6 +24,7 @@ import checker
 import codegen
 import errors
 import files
+import format
 import lexer
 import modules
 import os
@@ -31,10 +37,25 @@ fn main() {
         usage()
     }
     let command = args[1]
-    let path = args[2]
+    if command == "fmt" {
+        fmt(args[2..len(args)])
+        return
+    }
     let root = root_dir(args[0])
+    if command == "check" && args[2] == "--json" {
+        if len(args) != 4 {
+            usage()
+        }
+        check_json(args[3], root)
+        return
+    }
+    let path = args[2]
     if command == "run" {
         run(path, args[3..len(args)], root)
+    }
+    if command == "test" {
+        test_command(path, args[3..len(args)], root)
+        return
     }
     if command == "build" {
         let mut out = default_output(path)
@@ -64,7 +85,7 @@ fn main() {
 }
 
 fn usage() {
-    os.eprint("usage: vela (build | run | c | check | tokens | ast) FILE")
+    os.eprint("usage: vela (build | run | test | c | check | tokens | ast | fmt) FILE")
     os.exit(2)
 }
 
@@ -170,16 +191,19 @@ fn split_flags(flags: Str) -> [Str] {
     return out
 }
 
-// Compile a .vl file all the way to a native executable: C into a scratch
-// directory, then the C compiler.
+// Compile a .vl file all the way to a native executable.
 fn build(path: Str, exe: Str, root: Str) {
-    let c_source = codegen.generate(checked(path, root))
+    compile(codegen.generate(checked(path, root)), modules.stem(path), exe, root)
+}
+
+// C into a scratch directory, then the C compiler.
+fn compile(c_source: Str, stem: Str, exe: Str, root: Str) {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
         Err(e) => driver_error(e)
     }
-    let c_file = modules.join(tmp, modules.stem(path) + ".c")
+    let c_file = modules.join(tmp, stem + ".c")
     match files.write(c_file, c_source) {
         Ok(_) => {}
         Err(e) => driver_error(e)
@@ -247,4 +271,208 @@ fn run(path: Str, args: [Str], root: Str) {
         Ok(code) => os.exit(code)
         Err(e) => internal_error(e)
     }
+}
+
+// `vela fmt`: every file is formatted, or its errors reported, before the
+// exit code says whether all went well (and with -l, whether all were
+// formatted already).
+fn fmt(args: [Str]) {
+    let mut mode = ""
+    let mut paths = args
+    if len(args) > 0 && (args[0] == "-w" || args[0] == "-l") {
+        mode = args[0]
+        paths = args[1..len(args)]
+    }
+    if len(paths) == 0 {
+        os.eprint("usage: vela fmt [-w | -l] FILE...")
+        os.exit(2)
+    }
+    let mut failed = false
+    for path in paths {
+        let source = read(path)
+        match format.format(source) {
+            Err(errs) => {
+                for e in errs {
+                    let mut shown = e
+                    shown.path = path
+                    os.eprint(errors.render(shown))
+                }
+                failed = true
+            }
+            Ok(out) => {
+                if mode == "-w" {
+                    if out != source {
+                        match files.write(path, out) {
+                            Ok(_) => {}
+                            Err(e) => driver_error(e)
+                        }
+                    }
+                } else if mode == "-l" {
+                    if out != source {
+                        print(path)
+                        failed = true
+                    }
+                } else {
+                    print(out[0..len(out) - 1])
+                }
+            }
+        }
+    }
+    if failed {
+        os.exit(1)
+    }
+}
+
+// `vela check --json`: every error the program has, for tools to read:
+//
+//     {"ok": false, "errors": [
+//       {"file": "a.vl", "line": 3, "col": 7, "severity": "error", "message": "..."}
+//     ]}
+//
+// It exits 1 when there are errors, as `check` does.
+fn check_json(path: Str, root: Str) {
+    let mut errs: [errors.CompileError] = []
+    match files.read(path) {
+        Err(e) => push(mut errs, errors.CompileError { path: path, line: 0, col: 0, message: e })
+        Ok(source) => {
+            let loaded = modules.load(path, source, modules.join(root, "std"))
+            errs = loaded.errors
+            if len(errs) == 0 {
+                errs = checker.check(loaded).errors
+            }
+        }
+    }
+    let mut b = strings.builder()
+    if len(errs) == 0 {
+        strings.add(mut b, "{\"ok\": true, \"errors\": []}")
+    } else {
+        strings.add(mut b, "{\"ok\": false, \"errors\": [")
+        for i in 0..len(errs) {
+            let e = errs[i]
+            let mut file = e.path
+            if file == "" {
+                file = path
+            }
+            strings.add(mut b, "\n  {\"file\": " + json_string(file) + ", \"line\": ")
+            strings.add_int(mut b, e.line)
+            strings.add(mut b, ", \"col\": ")
+            strings.add_int(mut b, e.col)
+            strings.add(mut b, ", \"severity\": \"error\", \"message\": " + json_string(e.message) + "}")
+            if i < len(errs) - 1 {
+                strings.add_byte(mut b, ',')
+            }
+        }
+        strings.add(mut b, "\n]}")
+    }
+    print(strings.build(b))
+    if len(errs) > 0 {
+        os.exit(1)
+    }
+}
+
+fn json_string(s: Str) -> Str {
+    let mut b = strings.builder()
+    strings.add_byte(mut b, '"')
+    for c in s {
+        if c == '"' || c == '\\' {
+            strings.add_byte(mut b, '\\')
+            strings.add_byte(mut b, c)
+        } else if c == '\n' {
+            strings.add(mut b, "\\n")
+        } else if c == '\t' {
+            strings.add(mut b, "\\t")
+        } else if c < 32 {
+            strings.add(mut b, "\\u00")
+            strings.add_byte(mut b, hex_digit(int(c) / 16))
+            strings.add_byte(mut b, hex_digit(int(c) % 16))
+        } else {
+            strings.add_byte(mut b, c)
+        }
+    }
+    strings.add_byte(mut b, '"')
+    return strings.build(b)
+}
+
+fn hex_digit(n: Int) -> Byte {
+    if n < 10 {
+        return byte(48 + n)
+    }
+    return byte(87 + n)
+}
+
+// `vela test`: build the program's tests into one executable, then run it
+// once per test, so a test that panics fails alone and the rest still run.
+fn test_command(path: Str, words: [Str], root: Str) {
+    let loaded = modules.load(path, read(path), modules.join(root, "std"))
+    if len(loaded.errors) > 0 {
+        fail(path, loaded.errors)
+    }
+    let k = checker.check_program(loaded, true)
+    if len(k.errors) > 0 {
+        fail(path, k.errors)
+    }
+    let ids = codegen.test_ids(k)
+    let mut chosen: [Int] = []
+    for i in 0..len(ids) {
+        let name = k.fns[ids[i]].decl.name
+        let mut wanted = len(words) == 0
+        for w in words {
+            if contains(name, w) {
+                wanted = true
+            }
+        }
+        if wanted {
+            push(mut chosen, i)
+        }
+    }
+    if len(chosen) == 0 {
+        print("no tests to run")
+        return
+    }
+    let mut tmp = ""
+    match files.temp_dir() {
+        Ok(dir) => tmp = dir
+        Err(e) => driver_error(e)
+    }
+    let exe = modules.join(tmp, "tests")
+    compile(codegen.generate_tests(k), modules.stem(path) + "_tests", exe, root)
+    let mut failed = 0
+    for i in chosen {
+        let f = k.fns[ids[i]]
+        let label = k.modules[f.module].path + ": " + f.decl.name
+        match os.run([exe, strings.from_int(i)]) {
+            Ok(code) => {
+                if code == 0 {
+                    print("PASS  " + label)
+                } else if code == 101 {
+                    print("FAIL  " + label)
+                    failed = failed + 1
+                } else {
+                    print("FAIL  " + label + " (exit code " + strings.from_int(code) + ")")
+                    failed = failed + 1
+                }
+            }
+            Err(e) => internal_error(e)
+        }
+    }
+    files.remove(exe)
+    files.remove(tmp)
+    let n = len(chosen)
+    let mut summary = strings.from_int(n) + " tests"
+    if n == 1 {
+        summary = "1 test"
+    }
+    print(summary + ": " + strings.from_int(n - failed) + " passed, " + strings.from_int(failed) + " failed")
+    if failed > 0 {
+        os.exit(1)
+    }
+}
+
+fn contains(s: Str, word: Str) -> Bool {
+    for i in 0..len(s) - len(word) + 1 {
+        if s[i..i + len(word)] == word {
+            return true
+        }
+    }
+    return false
 }

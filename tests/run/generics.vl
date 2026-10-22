@@ -1,0 +1,193 @@
+// User generics (M10a): generic functions with bounds, generic structs and
+// enums, inference from arguments and from the context, one C copy per
+// set of type arguments.
+// stage 1 only
+// out: 3
+// out: c
+// out: 10
+// out: none
+// out: a
+// out: true
+// out: false
+// out: x=1 y=pear
+// out: 4
+// out: 1 2 3 4 5
+// out: kiwi 2
+// out: fig 1
+// out: 2
+// out: b
+// out: empty
+// out: [3, 1, 2]
+// out: 9
+import maps
+import strings
+
+type Pair[A, B] = struct {
+    first: A
+    second: B
+}
+
+type Tree[T] = enum {
+    Leaf
+    Node(Tree[T], T, Tree[T])
+}
+
+type Stack[T] = struct {
+    items: [T]
+}
+
+fn largest[T: Ord](xs: [T]) -> T {
+    let mut best = xs[0]
+    for x in xs {
+        if x > best {
+            best = x
+        }
+    }
+    return best
+}
+
+fn first[T](xs: [T]) -> Option[T] {
+    if len(xs) == 0 {
+        return None
+    }
+    return Some(xs[0])
+}
+
+fn contains[T: Eq](xs: [T], want: T) -> Bool {
+    for x in xs {
+        if x == want {
+            return true
+        }
+    }
+    return false
+}
+
+fn swap[A, B](p: Pair[A, B]) -> Pair[B, A] {
+    return Pair { first: p.second, second: p.first }
+}
+
+fn insert[T: Ord](t: Tree[T], v: T) -> Tree[T] {
+    match t {
+        Tree.Leaf => return Tree.Node(Tree.Leaf, v, Tree.Leaf)
+        Tree.Node(l, x, r) => {
+            if v < x {
+                return Tree.Node(insert(l, v), x, r)
+            }
+            return Tree.Node(l, x, insert(r, v))
+        }
+    }
+}
+
+fn size[T](t: Tree[T]) -> Int {
+    match t {
+        Tree.Leaf => return 0
+        Tree.Node(l, _, r) => return size(l) + 1 + size(r)
+    }
+}
+
+fn walk[T](t: Tree[T], out: mut [T]) {
+    match t {
+        Tree.Leaf => {}
+        Tree.Node(l, x, r) => {
+            walk(l, mut out)
+            push(mut out, x)
+            walk(r, mut out)
+        }
+    }
+}
+
+fn push_all[T](s: mut Stack[T], xs: [T]) {
+    for x in xs {
+        push(mut s.items, x)
+    }
+}
+
+fn count[K: Key](xs: [K]) -> Map[K, Int] {
+    let mut m: Map[K, Int] = [:]
+    for x in xs {
+        match maps.get(m, x) {
+            Some(n) => m[x] = n + 1
+            None => m[x] = 1
+        }
+    }
+    return m
+}
+
+// A generic function calling another with its own type parameter.
+fn second_largest[T: Ord](xs: [T]) -> T {
+    let top = largest(xs)
+    let mut rest: [T] = []
+    for x in xs {
+        if x != top {
+            push(mut rest, x)
+        }
+    }
+    return largest(rest)
+}
+
+fn empty[T]() -> [T] {
+    return []
+}
+
+fn show_ints(xs: [Int]) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, "[")
+    for i in 0..len(xs) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add_int(mut b, xs[i])
+    }
+    strings.add(mut b, "]")
+    return strings.build(b)
+}
+
+fn main() {
+    print(largest([1, 3, 2]))
+    print(largest(["a", "c", "b"]))
+    print(largest([byte(10), byte(4)]))
+    let none: [Str] = []
+    match first(none) {
+        Some(s) => print(s)
+        None => print("none")
+    }
+    match first(["a", "b"]) {
+        Some(s) => print(s)
+        None => print("none")
+    }
+    print(contains([1, 2, 3], 2))
+    print(contains(["x"], "y"))
+    let p = swap(Pair { first: "pear", second: 1 })
+    print("x=" + strings.from_int(p.first) + " y=" + p.second)
+    let mut t: Tree[Int] = Tree.Leaf
+    for v in [3, 1, 4, 5, 2] {
+        t = insert(t, v)
+    }
+    print(size(t) - 1)
+    let mut sorted: [Int] = []
+    walk(t, mut sorted)
+    let mut line = strings.builder()
+    for i in 0..len(sorted) {
+        if i > 0 {
+            strings.add(mut line, " ")
+        }
+        strings.add_int(mut line, sorted[i])
+    }
+    print(strings.build(line))
+    let counts = count(["kiwi", "fig", "kiwi"])
+    for k in maps.keys(counts) {
+        print(k + " " + strings.from_int(counts[k]))
+    }
+    print(second_largest([1, 3, 2]))
+    print(second_largest(["a", "c", "b"]))
+    let nothing: [Str] = empty()
+    if len(nothing) == 0 {
+        print("empty")
+    }
+    let mut s = Stack { items: [3] }
+    push_all(mut s, [1, 2])
+    print(show_ints(s.items))
+    let words = Stack { items: ["one"] }
+    let pairs = [Pair { first: words, second: 9 }]
+    print(pairs[0].second)
+}

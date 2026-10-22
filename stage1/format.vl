@@ -1,0 +1,303 @@
+// `vela fmt`: the one layout for Vela source.
+//
+// The formatter works on tokens, not on the syntax tree. It keeps every line
+// break the author made and every comment, and decides only two things: how
+// far each line is indented, and where the spaces go within a line. So it
+// cannot change what a program means, and it checks that it did not: the
+// output must lex to exactly the tokens and comments of the input.
+//
+// Indentation is four spaces per open bracket, counted per line: a line that
+// opens a `{`, `(` or `[` and does not close it indents the lines after it by
+// one more level, until the line that closes it. A line that ends with an
+// operator continues on the next line, one level deeper. Within a line, a
+// space goes between two tokens except after an opening bracket, before a
+// closing one, around `.` and `..`, before `,` `:` `?`, after a unary `-` or
+// `!`, and between a name and the `(` or `[` that follows it.
+import errors
+import lexer
+import parser
+import strings
+
+// A token or a comment, in source order.
+type Piece = struct {
+    kind: lexer.Kind  // for a comment, Semi (unused)
+    text: Str
+    line: Int
+    is_comment: Bool
+    unary: Bool  // a `-` or `!` that applies to what follows it
+}
+
+type Open = struct {
+    kind: lexer.Kind
+    level: Int  // the indentation of the line it is on
+}
+
+// The program formatted, or the errors that stop it from being formatted:
+// a file that does not lex or parse is left alone.
+pub fn format(src: Str) -> Result[Str, [errors.CompileError]] {
+    let lexed = lexer.tokenize(src)
+    if len(lexed.errors) > 0 {
+        return Err(lexed.errors)
+    }
+    let parsed = parser.parse(lexed.tokens, 0)
+    if len(parsed.errors) > 0 {
+        return Err(parsed.errors)
+    }
+    let out = layout(pieces(lexed))
+    // The safety net: the same tokens, the same comments.
+    let again = lexer.tokenize(out)
+    let differs = first_difference(lexed.tokens, again.tokens)
+    if len(again.errors) > 0 || differs >= 0 || !same_comments(lexed.comments, again.comments) {
+        let mut at = lexed.tokens[0]
+        if differs >= 0 && differs < len(lexed.tokens) {
+            at = lexed.tokens[differs]
+        }
+        let e = errors.at(at.line, at.col, "internal error: formatting would change this file's meaning here; please report it")
+        return Err([e])
+    }
+    return Ok(out)
+}
+
+// The index of the first token that differs, or -1.
+fn first_difference(a: [lexer.Token], b: [lexer.Token]) -> Int {
+    for i in 0..len(a) {
+        if i >= len(b) || a[i].kind != b[i].kind || a[i].text != b[i].text {
+            return i
+        }
+    }
+    if len(b) > len(a) {
+        return len(a)
+    }
+    return -1
+}
+
+fn same_comments(a: [lexer.Comment], b: [lexer.Comment]) -> Bool {
+    if len(a) != len(b) {
+        return false
+    }
+    for i in 0..len(a) {
+        if trim_end(a[i].text) != b[i].text {
+            return false
+        }
+    }
+    return true
+}
+
+fn trim_end(s: Str) -> Str {
+    let mut end = len(s)
+    for end > 0 && (s[end - 1] == ' ' || s[end - 1] == '\t' || s[end - 1] == '\r') {
+        end = end - 1
+    }
+    return s[0..end]
+}
+
+// Tokens and comments merged in source order, without the `;` the newline
+// rule inserted (the line breaks stay, so the lexer inserts them again).
+fn pieces(lexed: lexer.Lexed) -> [Piece] {
+    let mut out: [Piece] = []
+    let toks = lexed.tokens
+    let cs = lexed.comments
+    let mut i = 0
+    let mut j = 0
+    for i < len(toks) || j < len(cs) {
+        let take_comment = j < len(cs) && (i >= len(toks) || cs[j].line < toks[i].line ||
+            cs[j].line == toks[i].line && cs[j].col < toks[i].col)
+        if take_comment {
+            let c = cs[j]
+            push(mut out, Piece { kind: lexer.Kind.Semi, text: trim_end(c.text), line: c.line, is_comment: true, unary: false })
+            j = j + 1
+            continue
+        }
+        let t = toks[i]
+        i = i + 1
+        if t.kind == lexer.Kind.Eof || t.kind == lexer.Kind.Semi && t.text != ";" {
+            continue
+        }
+        let mut unary = false
+        if t.kind == lexer.Kind.Minus || t.kind == lexer.Kind.Bang {
+            unary = len(out) == 0 || out[len(out) - 1].line != t.line || before_operand(out[len(out) - 1])
+        }
+        push(mut out, Piece { kind: t.kind, text: t.text, line: t.line, is_comment: false, unary: unary })
+    }
+    return out
+}
+
+// Whether a `-` or `!` right after `p` must be unary: `p` cannot end an operand.
+fn before_operand(p: Piece) -> Bool {
+    if p.unary || is_binary(p.kind) {
+        return true
+    }
+    return match p.kind {
+        lexer.Kind.Ident => false
+        lexer.Kind.Int => false
+        lexer.Kind.Bool => false
+        lexer.Kind.Str => false
+        lexer.Kind.Byte => false
+        lexer.Kind.RParen => false
+        lexer.Kind.RBracket => false
+        lexer.Kind.RBrace => false
+        lexer.Kind.Question => false
+        _ => true
+    }
+}
+
+fn is_binary(k: lexer.Kind) -> Bool {
+    return match k {
+        lexer.Kind.Plus => true
+        lexer.Kind.Minus => true
+        lexer.Kind.Star => true
+        lexer.Kind.Slash => true
+        lexer.Kind.Percent => true
+        lexer.Kind.EqEq => true
+        lexer.Kind.NotEq => true
+        lexer.Kind.Lt => true
+        lexer.Kind.LtEq => true
+        lexer.Kind.Gt => true
+        lexer.Kind.GtEq => true
+        lexer.Kind.AndAnd => true
+        lexer.Kind.OrOr => true
+        _ => false
+    }
+}
+
+fn is_open(k: lexer.Kind) -> Bool {
+    return k == lexer.Kind.LParen || k == lexer.Kind.LBracket || k == lexer.Kind.LBrace
+}
+
+fn is_close(k: lexer.Kind) -> Bool {
+    return k == lexer.Kind.RParen || k == lexer.Kind.RBracket || k == lexer.Kind.RBrace
+}
+
+// A line ending in one of these goes on, so the next line is a continuation.
+fn continues(p: Piece) -> Bool {
+    if p.is_comment {
+        return false
+    }
+    if is_binary(p.kind) && !p.unary {
+        return true
+    }
+    return p.kind == lexer.Kind.Eq || p.kind == lexer.Kind.FatArrow || p.kind == lexer.Kind.Arrow ||
+        p.kind == lexer.Kind.Dot
+}
+
+// Whether a space goes between `a` and `b`, two pieces on one line.
+fn space(a: Piece, b: Piece) -> Bool {
+    if b.is_comment {
+        return true  // two, in fact; see layout
+    }
+    let ak = a.kind
+    let bk = b.kind
+    if ak == lexer.Kind.LParen || ak == lexer.Kind.LBracket || ak == lexer.Kind.Dot || a.unary {
+        return false
+    }
+    if ak == lexer.Kind.DotDot || ak == lexer.Kind.DotDotEq || bk == lexer.Kind.DotDot || bk == lexer.Kind.DotDotEq {
+        return false
+    }
+    if bk == lexer.Kind.RParen || bk == lexer.Kind.RBracket || bk == lexer.Kind.Comma || bk == lexer.Kind.Dot ||
+        bk == lexer.Kind.Question || bk == lexer.Kind.Colon || bk == lexer.Kind.Semi {
+        return false
+    }
+    if ak == lexer.Kind.LBrace && bk == lexer.Kind.RBrace {
+        return false  // {}
+    }
+    if ak == lexer.Kind.Colon && bk == lexer.Kind.RBracket {
+        return false  // [:]
+    }
+    if bk == lexer.Kind.LParen || bk == lexer.Kind.LBracket {
+        // A call, an index or type arguments hug what they follow.
+        let hugs = ak == lexer.Kind.Ident || ak == lexer.Kind.RParen || ak == lexer.Kind.RBracket ||
+            ak == lexer.Kind.Question || ak == lexer.Kind.Str
+        return !hugs
+    }
+    return true
+}
+
+fn indent(b: mut strings.Builder, level: Int) {
+    for _ in 0..level {
+        strings.add(mut b, "    ")
+    }
+}
+
+fn layout(ps: [Piece]) -> Str {
+    let mut b = strings.builder()
+    let mut stack: [Open] = []
+    let mut i = 0
+    let mut prev_line = 0  // the source line of the last line written; 0 before the first
+    let mut last_code: Piece = Piece { kind: lexer.Kind.Semi, text: "", line: 0, is_comment: true, unary: false }
+    let mut prev_opened = false  // the last code line left a bracket open
+    let mut written = false
+    for i < len(ps) {
+        // The pieces of one source line: ps[i..j].
+        let line = ps[i].line
+        let mut j = i
+        for j < len(ps) && ps[j].line == line {
+            j = j + 1
+        }
+        let first = ps[i]
+        let mut level = 0
+        if len(stack) > 0 {
+            level = stack[len(stack) - 1].level + 1
+        }
+        let mut k = i
+        // The level brackets opened on this line belong to: the statement's
+        // own, not its continuation's, so in `if a &&` / `b {` the body is
+        // one level in from the `if`.
+        let mut anchor = level
+        if !first.is_comment && is_close(first.kind) {
+            // Leading closers take the line back to where their opener was.
+            for k < j && !ps[k].is_comment && is_close(ps[k].kind) && len(stack) > 0 {
+                level = stack[len(stack) - 1].level
+                stack = stack[0..len(stack) - 1]
+                k = k + 1
+            }
+            anchor = level
+        } else if written && continues(last_code) && !prev_opened {
+            level = level + 1
+        }
+        // One blank line is kept where the author left any, except just
+        // inside a bracket.
+        let after_open = !last_code.is_comment && is_open(last_code.kind) && last_code.line == prev_line
+        if written && line > prev_line + 1 && !after_open && !(!first.is_comment && is_close(first.kind)) {
+            strings.add_byte(mut b, '\n')
+        }
+        indent(mut b, level)
+        let depth_before = len(stack)
+        for n in i..j {
+            let p = ps[n]
+            if n > i {
+                if p.is_comment {
+                    strings.add(mut b, "  ")
+                } else if space(ps[n - 1], p) {
+                    strings.add_byte(mut b, ' ')
+                }
+            }
+            strings.add(mut b, p.text)
+            if p.is_comment || n < k {
+                continue
+            }
+            if is_open(p.kind) {
+                push(mut stack, Open { kind: p.kind, level: anchor })
+            } else if is_close(p.kind) && len(stack) > 0 {
+                // Closing a bracket from an earlier line returns to its level.
+                let opened = stack[len(stack) - 1].level
+                if opened < anchor {
+                    anchor = opened
+                }
+                stack = stack[0..len(stack) - 1]
+            }
+        }
+        strings.add_byte(mut b, '\n')
+        let mut code = j - 1
+        for code >= i && ps[code].is_comment {
+            code = code - 1
+        }
+        if code >= i {
+            last_code = ps[code]
+            prev_opened = len(stack) > depth_before
+        }
+        prev_line = line
+        written = true
+        i = j
+    }
+    return strings.build(b)
+}

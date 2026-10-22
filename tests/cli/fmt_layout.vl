@@ -1,0 +1,44 @@
+// `vela fmt`: spacing and indentation, with every line break and comment kept.
+// stage 1 only
+// command: fmt
+import   strings
+type Pair[A,B]=struct{first:A,second:B}
+type Shape = enum {
+      Circle(Int)
+  Square( Int,Int )
+}
+
+
+
+fn area(s:Shape)->Int{
+  return match s{
+    Shape.Circle(r)=>3*r*r   // roughly
+    Shape.Square(w,h)=>w*h
+  }
+}
+fn pick[T : Ord+Key](xs:[T],i:Int)->Option[T]{
+    if i<0||i>=len(xs){return None}
+    let m:Map[T,Int]=[:]
+    let ys=xs[ 0..i ]
+    return Some( xs[i] )
+}
+fn long(a: Int, b: Int,
+           c: Int) -> Int {
+
+    let total = a +
+                    b +
+        c
+    if total > 10 &&
+      total < 20 {
+          return -total
+    }
+    let p = Pair {
+     first: 1,
+       second: "x",
+    }
+        // a comment on its own line
+
+    return !(total == 0) && -a < b - -c
+}
+fn main(){print(area(Shape.Circle(2)));let x=1;print(x)
+}

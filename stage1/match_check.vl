@@ -179,7 +179,7 @@ pub fn useful(table: types.Table, rows: [[SPat]], q: [SPat], ts: [Int]) -> Optio
         SPat.Ctor(k, args) => {
             let payload = payload_types(table, t, k)
             let found = useful(table, specialize(rows, k, len(args)), concat(args, rest(q)),
-                               concat_types(payload, ts[1..len(ts)]))?
+                concat_types(payload, ts[1..len(ts)]))?
             let n = len(args)
             return Some(concat([SPat.Ctor(k, found[0..n])], found[n..len(found)]))
         }
@@ -201,7 +201,7 @@ pub fn useful(table: types.Table, rows: [[SPat]], q: [SPat], ts: [Int]) -> Optio
                 for c in cs {
                     let n = len(c.payload)
                     match useful(table, specialize(rows, c.key, n), concat(wilds(n), rest(q)),
-                                 concat_types(c.payload, ts[1..len(ts)])) {
+                        concat_types(c.payload, ts[1..len(ts)])) {
                         Some(found) => return Some(concat([SPat.Ctor(c.key, found[0..n])], found[n..len(found)]))
                         None => {}
                     }
@@ -375,7 +375,12 @@ pub fn render(table: types.Table, p: SPat, t: Int, viewpoint: Str) -> Str {
                     let v = types.get(table, t).variants[i]
                     let mut name = v.name
                     if !types.is_builtin_enum(table, t) {
-                        name = types.show(table, t, viewpoint) + "." + v.name
+                        // A pattern names a generic enum without its arguments.
+                        let mut e = t
+                        if types.get(table, t).origin >= 0 {
+                            e = types.get(table, t).origin
+                        }
+                        name = types.show(table, e, viewpoint) + "." + v.name
                     }
                     if len(v.payload) == 0 {
                         return name

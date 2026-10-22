@@ -128,8 +128,17 @@ pub type Param = struct {
     mutable: Bool
 }
 
+// `T` or `T: Ord + Key` in `fn f[T](...)` or `type Box[T] = ...`.
+pub type TypeParam = struct {
+    name: Str
+    bounds: [Str]
+    line: Int
+    col: Int
+}
+
 pub type FnDecl = struct {
     name: Str
+    type_params: [TypeParam]
     params: [Param]
     result: Option[TypeName]
     body: Block
@@ -155,6 +164,7 @@ pub type VariantDecl = struct {
 // A struct (fields) or an enum (variants).
 pub type TypeDecl = struct {
     name: Str
+    params: [TypeParam]
     is_struct: Bool
     fields: [FieldDecl]
     variants: [VariantDecl]
@@ -169,10 +179,19 @@ pub type Import = struct {
     col: Int
 }
 
+// `test "name" { ... }`: run by `vela test`, left out of programs.
+pub type TestDecl = struct {
+    name: Str
+    body: Block
+    line: Int
+    col: Int
+}
+
 pub type Program = struct {
     imports: [Import]
     types: [TypeDecl]
     fns: [FnDecl]
+    tests: [TestDecl]
 }
 
 // ---- `vela ast` ----
@@ -206,6 +225,9 @@ pub fn dump(program: Program) -> Str {
     }
     for f in program.fns {
         push(mut items, sx_fn(f))
+    }
+    for t in program.tests {
+        push(mut items, list([atom("test"), atom(quote(t.name)), sx_block(t.body)]))
     }
     let mut b = strings.builder()
     for x in items {
@@ -253,12 +275,14 @@ fn sx_type_decl(d: TypeDecl) -> Sx {
     if d.is_struct {
         push(mut items, atom("struct"))
         push(mut items, atom(d.name))
+        add_type_params(mut items, d.params)
         for f in d.fields {
             push(mut items, list([atom(f.name), atom(type_text(f.ty))]))
         }
     } else {
         push(mut items, atom("enum"))
         push(mut items, atom(d.name))
+        add_type_params(mut items, d.params)
         for v in d.variants {
             let mut parts = [atom(v.name)]
             for t in v.payload {
@@ -268,6 +292,35 @@ fn sx_type_decl(d: TypeDecl) -> Sx {
         }
     }
     return list(items)
+}
+
+// `[T: Ord, U]` as one atom, when there are type parameters.
+fn add_type_params(items: mut [Sx], params: [TypeParam]) {
+    if len(params) == 0 {
+        return
+    }
+    push(mut items, atom(type_params_text(params)))
+}
+
+pub fn type_params_text(params: [TypeParam]) -> Str {
+    let mut b = strings.builder()
+    strings.add_byte(mut b, '[')
+    for i in 0..len(params) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, params[i].name)
+        for j in 0..len(params[i].bounds) {
+            if j == 0 {
+                strings.add(mut b, ": ")
+            } else {
+                strings.add(mut b, " + ")
+            }
+            strings.add(mut b, params[i].bounds[j])
+        }
+    }
+    strings.add_byte(mut b, ']')
+    return strings.build(b)
 }
 
 fn sx_fn(f: FnDecl) -> Sx {
@@ -286,6 +339,7 @@ fn sx_fn(f: FnDecl) -> Sx {
     }
     push(mut items, atom("fn"))
     push(mut items, atom(f.name))
+    add_type_params(mut items, f.type_params)
     push(mut items, list(params))
     match f.result {
         Some(t) => push(mut items, atom(type_text(t)))
@@ -557,4 +611,115 @@ fn render(x: Sx) -> [Str] {
     let last = len(lines) - 1
     lines[last] = lines[last] + ")"
     return lines
+}
+
+// ---- Expressions as source text ----
+//
+// For messages that quote the program: `assert` prints its condition when it
+// fails. Parentheses leave no node behind, so they are put back where the
+// precedence needs them.
+
+// How tightly an expression binds, as the parser counts it.
+fn power(e: Expr) -> Int {
+    return match e.kind {
+        ExprKind.Binary(op, _, _) => op_power(op)
+        ExprKind.Unary(_, _) => 30
+        ExprKind.MutArg(_) => 0
+        _ => 40
+    }
+}
+
+fn op_power(op: Str) -> Int {
+    return match op {
+        "||" => 2
+        "&&" => 4
+        "+" => 10
+        "-" => 10
+        "*" => 20
+        "/" => 20
+        "%" => 20
+        _ => 6  // comparisons
+    }
+}
+
+// `e`, in parentheses if it binds less tightly than `need`.
+fn operand(e: Expr, need: Int) -> Str {
+    if power(e) < need {
+        return "(" + expr_text(e) + ")"
+    }
+    return expr_text(e)
+}
+
+fn texts(es: [Expr]) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(es) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, expr_text(es[i]))
+    }
+    return strings.build(b)
+}
+
+pub fn expr_text(e: Expr) -> Str {
+    match e.kind {
+        ExprKind.IntLit(n) => return strings.from_int(n)
+        ExprKind.ByteLit(n) => return quote_byte(n)
+        ExprKind.BoolLit(b) => {
+            if b {
+                return "true"
+            }
+            return "false"
+        }
+        ExprKind.StrLit(s) => return quote(s)
+        ExprKind.UnitLit => return "()"
+        ExprKind.Name(name) => return name
+        ExprKind.Unary(op, x) => return op + operand(x, 30)
+        ExprKind.Binary(op, l, r) => {
+            let p = op_power(op)
+            let mut left_need = p
+            if p == 6 {
+                left_need = 7  // comparisons do not chain
+            }
+            return operand(l, left_need) + " " + op + " " + operand(r, p + 1)
+        }
+        ExprKind.Call(callee, args) => return operand(callee, 40) + "(" + texts(args) + ")"
+        ExprKind.Field(obj, name) => return operand(obj, 40) + "." + name
+        ExprKind.Index(obj, i) => return operand(obj, 40) + "[" + expr_text(i) + "]"
+        ExprKind.Try(x) => return operand(x, 40) + "?"
+        ExprKind.MutArg(x) => return "mut " + expr_text(x)
+        ExprKind.Slice(obj, lo, hi) => return operand(obj, 40) + "[" + expr_text(lo) + ".." + expr_text(hi) + "]"
+        ExprKind.ArrayLit(xs) => return "[" + texts(xs) + "]"
+        ExprKind.MapLit(entries) => {
+            if len(entries) == 0 {
+                return "[:]"
+            }
+            let mut b = strings.builder()
+            strings.add_byte(mut b, '[')
+            for i in 0..len(entries) {
+                if i > 0 {
+                    strings.add(mut b, ", ")
+                }
+                strings.add(mut b, expr_text(entries[i].key) + ": " + expr_text(entries[i].value))
+            }
+            strings.add_byte(mut b, ']')
+            return strings.build(b)
+        }
+        ExprKind.StructLit(module, name, fields) => {
+            let mut b = strings.builder()
+            strings.add(mut b, qualified(module, name) + " {")
+            for i in 0..len(fields) {
+                if i > 0 {
+                    strings.add_byte(mut b, ',')
+                }
+                strings.add(mut b, " " + fields[i].name + ": " + expr_text(fields[i].value))
+            }
+            if len(fields) > 0 {
+                strings.add_byte(mut b, ' ')
+            }
+            strings.add_byte(mut b, '}')
+            return strings.build(b)
+        }
+        ExprKind.Match(scrutinee, _) => return "match " + expr_text(scrutinee) + " { ... }"
+    }
 }

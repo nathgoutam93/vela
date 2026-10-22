@@ -1,0 +1,75 @@
+// Errors in generic code: bounds not met, type arguments that cannot be
+// worked out, operations a type parameter does not allow.
+// stage 1 only
+// err: generics_errors.vl:25:19: error: 'Grow' can only contain itself with its own type parameters, as in Grow[T]
+// err: generics_errors.vl:38:14: error: T values cannot be compared with '=='; declare the type parameter as `T: Eq`
+// err: generics_errors.vl:42:14: error: operator '<' needs values that can be ordered; declare the type parameter as `T: Ord`
+// err: generics_errors.vl:53:10: error: unknown bound 'Wobbly'; the bounds are Eq (==), Ord (<) and Key (map keys)
+// err: generics_errors.vl:53:26: error: type parameter 'T' is declared twice
+// err: generics_errors.vl:58:12: error: 'deeper' calls itself with [T] for T; a generic function can only call itself with its own type parameters
+// err: generics_errors.vl:62:14: error: T has no fields
+// err: generics_errors.vl:66:12: error: 'Box' needs 1 type argument, as in Box[Int]
+// err: generics_errors.vl:67:12: error: 'Box' needs 1 type argument, as in Box[Int]
+// err: generics_errors.vl:68:5: error: 'biggest' needs T to be ordered by <, as Int, Byte and Str are, but here T is Point
+// err: generics_errors.vl:69:13: error: cannot tell what T is in this call to 'make'; give the result a type, as in `let x: [Int] = make(...)`
+// err: generics_errors.vl:70:18: error: cannot tell which Tree this Tree.Leaf is; give it a type, as in `let x: Tree[Int] = Tree.Leaf`
+// err: generics_errors.vl:71:34: error: value 1 of Tree.Node must be Str, found Int
+// err: generics_errors.vl:72:29: error: 'Box' has no field 'extra'
+// err: generics_errors.vl:73:36: error: field 'value' of 'Box' must be Int, found Str
+// err: generics_errors.vl:74:16: error: Map keys must be Int, Byte, Bool or Str, not Box[Int]
+type Box[T] = struct {
+    value: T
+}
+
+type Grow[T] = struct {
+    inner: Option[Grow[[T]]]
+}
+
+type Tree[T] = enum {
+    Leaf
+    Node(T)
+}
+
+type Point = struct {
+    x: Int
+}
+
+fn same[T](a: T, b: T) -> Bool {
+    return a == b
+}
+
+fn less[T](a: T, b: T) -> Bool {
+    return a < b
+}
+
+fn biggest[T: Ord](xs: [T]) -> T {
+    return xs[0]
+}
+
+fn make[T]() -> [T] {
+    return []
+}
+
+fn twice[T: Eq + Wobbly, T](x: T) -> T {
+    return x
+}
+
+fn deeper[T](x: T) -> Int {
+    return deeper([x])
+}
+
+fn field_of[T](x: T) -> Int {
+    return x.size
+}
+
+fn main() {
+    let b: Box = Box { value: 1 }
+    let c: Box[Int, Int] = Box { value: 1 }
+    biggest([Point { x: 1 }])
+    let m = make()
+    let t = Tree.Leaf
+    let u: Tree[Str] = Tree.Node(1)
+    let d = Box { value: 1, extra: 2 }
+    let e: Box[Int] = Box { value: "s" }
+    let k: Map[Box[Int], Int] = [:]
+}

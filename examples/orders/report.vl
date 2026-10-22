@@ -1,0 +1,95 @@
+// The report: totals per customer, ranked, as aligned text.
+// stage 1 only
+import lists
+import maps
+import orders
+import strings
+
+// A thing with the number it is ranked by.
+pub type Ranked[T] = struct {
+    item: T
+    score: Int
+}
+
+// The `n` items with the highest scores, highest first; equal scores keep
+// their order.
+pub fn top[T](items: [T], scores: [Int], n: Int) -> [Ranked[T]] {
+    let mut negated: [Int] = []
+    for s in scores {
+        push(mut negated, -s)
+    }
+    let mut out: [Ranked[T]] = []
+    for i in lists.take(lists.order(negated), n) {
+        push(mut out, Ranked { item: items[i], score: scores[i] })
+    }
+    return out
+}
+
+// What each customer spent, by customer, in the order they first appear.
+pub fn spending(all: [orders.Order]) -> Map[Str, Int] {
+    let mut out: Map[Str, Int] = [:]
+    for o in all {
+        match maps.get(out, o.customer) {
+            Some(t) => out[o.customer] = t + orders.total(o)
+            None => out[o.customer] = orders.total(o)
+        }
+    }
+    return out
+}
+
+// 1234 cents as "12.34".
+pub fn money(cents: Int) -> Str {
+    let mut rest = strings.from_int(cents % 100)
+    if len(rest) == 1 {
+        rest = "0" + rest
+    }
+    return strings.from_int(cents / 100) + "." + rest
+}
+
+// `s` with spaces added on the left (`right` false) or right, to `width`.
+pub fn pad(s: Str, width: Int, right: Bool) -> Str {
+    let mut spaces = ""
+    for _ in len(s)..width {
+        spaces = spaces + " "
+    }
+    if right {
+        return s + spaces
+    }
+    return spaces + s
+}
+
+pub fn lines(all: [orders.Order], n: Int) -> [Str] {
+    let mut revenue = 0
+    for o in all {
+        revenue = revenue + orders.total(o)
+    }
+    let mut out = ["orders:  " + strings.from_int(len(all)), "revenue: " + money(revenue), "top customers:"]
+    let spent = spending(all)
+    let names = maps.keys(spent)
+    let mut amounts: [Int] = []
+    for name in names {
+        push(mut amounts, spent[name])
+    }
+    for r in top(names, amounts, n) {
+        push(mut out, "  " + pad(r.item, 8, true) + pad(money(r.score), 9, false))
+    }
+    return out
+}
+
+test "money has two decimals" {
+    assert(money(1234) == "12.34")
+    assert(money(5) == "0.05")
+    assert(money(100) == "1.00")
+}
+
+test "top keeps the highest, in order" {
+    let ranked = top(["a", "b", "c", "d"], [5, 9, 5, 1], 3)
+    assert(len(ranked) == 3)
+    assert(ranked[0].item == "b" && ranked[1].item == "a" && ranked[2].item == "c")
+}
+
+test "pad" {
+    assert(pad("ab", 4, true) == "ab  ")
+    assert(pad("ab", 4, false) == "  ab")
+    assert(pad("abcdef", 4, false) == "abcdef")
+}

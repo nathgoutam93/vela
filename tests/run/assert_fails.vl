@@ -1,0 +1,17 @@
+// assert in an ordinary program: a failed one is a panic (exit code 101)
+// that names the condition and, for a comparison, both sides.
+// stage 1 only
+// out: before
+// err: assert_fails.vl:15:5: panic: assertion failed: double(x) - 1 >= 10 * (x + 1) (left: 7, right: 50)
+// exit: 101
+fn double(n: Int) -> Int {
+    return n * 2
+}
+
+fn main() {
+    let x = 4
+    assert(x == 4)
+    print("before")
+    assert(double(x) - 1 >= 10 * (x + 1))
+    print("not reached")
+}

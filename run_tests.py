@@ -22,6 +22,11 @@ whose main file is main.vl. Comment lines at the very top of the .vl file
     // args: <words>  command-line arguments for the program, split like a shell would
     // dump: <what>   tests/dump only: `tokens` or `ast`, the dump that the
     //                `out:` lines are compared against
+    // command: <words>  tests/cli only: the compiler's command line; FILE
+    //                stands for the test's file, which goes last if FILE is
+    //                not there
+    // stage 1 only   the test uses what Stage 0, frozen at M9, does not
+    //                have; --stage0 skips it
 
 The directory a test lives in decides what is checked:
 
@@ -32,6 +37,14 @@ The directory a test lives in decides what is checked:
     tests/fail/   the compiler must reject it with exit code 1, and its
                   stderr must match exactly
     tests/dump/   `vela tokens` or `vela ast` must print exactly the `out:` lines
+    tests/cli/    the `command:` must print the `out:` lines on stdout (or,
+                  if NAME.expected exists, exactly its contents) and the
+                  `err:` lines on stderr, and exit with the `exit:` code. It
+                  runs in a scratch copy of the test. For `fmt`, formatting
+                  NAME.expected again must change nothing
+
+Besides these, every examples/*/main.vl, and every std/*.vl with tests in
+it, must pass `vela test` (with Stage 1 only).
 
 The compiler runs inside the test's directory and is given the bare file
 name, so messages read `name.vl:3:7: ...` wherever the repo is checked out.
@@ -53,7 +66,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 TESTS = ROOT / "tests"
-KINDS = ("run", "fail", "dump")
+KINDS = ("run", "fail", "dump", "cli")
 
 # Generated C must compile without a single warning; the test suite enforces it.
 # The exceptions are warnings about the Vela program rather than about the
@@ -68,7 +81,8 @@ STRICT_CFLAGS = (
 # behaviour, and, when the program exits, any memory it never freed.
 SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all"
 
-HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args):(.*)$")
+HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args|command):(.*)$")
+STAGE1_ONLY = "// stage 1 only"
 COMPILE_TIMEOUT = 60
 RUN_TIMEOUT = 10
 
@@ -80,6 +94,8 @@ class Expectations:
     exit: int = 0
     dump: str | None = None
     args: list[str] = field(default_factory=list)
+    command: list[str] = field(default_factory=list)
+    stage1_only: bool = False
 
 
 def read_expectations(path: Path) -> Expectations:
@@ -88,6 +104,9 @@ def read_expectations(path: Path) -> Expectations:
     for line in text.splitlines():
         if not line.startswith("//"):
             break  # the header ends at the first line that is not a comment
+        if line.strip().startswith(STAGE1_ONLY):
+            expect.stage1_only = True
+            continue
         m = HEADER_LINE.match(line)
         if not m:
             continue  # an ordinary comment describing the test
@@ -102,6 +121,8 @@ def read_expectations(path: Path) -> Expectations:
             expect.exit = int(value)
         elif key == "args":
             expect.args = shlex.split(value)
+        elif key == "command":
+            expect.command = shlex.split(value)
         else:
             expect.dump = value.strip()
     return expect
@@ -117,10 +138,14 @@ def compare(what: str, expected: list[str], actual: str) -> list[str]:
 
 def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
     """Run one test. Returns a list of problems; empty means it passed."""
+    if not path.is_relative_to(TESTS):
+        return run_vela_tests(compiler, path, env)
     kind = path.relative_to(TESTS).parts[0]
     expect = read_expectations(path)
     if kind == "dump":
         return run_dump_test(compiler, path, expect, env)
+    if kind == "cli":
+        return run_cli_test(compiler, path, expect, env)
     with tempfile.TemporaryDirectory(prefix="vela-test-") as tmp:
         exe = Path(tmp) / "program"
         try:
@@ -178,8 +203,64 @@ def run_dump_test(compiler: list[str], path: Path, expect: Expectations,
     return compare(f"{expect.dump} dump", expect.out, dumped.stdout)
 
 
+def run_cli_test(compiler: list[str], path: Path, expect: Expectations,
+                 env: dict[str, str]) -> list[str]:
+    if not expect.command:
+        return ["a cli test needs a `// command:` line"]
+    words = expect.command
+    if "FILE" in words:
+        words = [path.name if w == "FILE" else w for w in words]
+    else:
+        words = [*words, path.name]
+    expected_file = path.with_suffix(".expected")
+    with tempfile.TemporaryDirectory(prefix="vela-test-") as tmp:
+        workdir = Path(tmp) / "work"
+        if path.name == "main.vl" and path.parent.parent.name == "cli":
+            shutil.copytree(path.parent, workdir)
+        else:
+            workdir.mkdir()
+            shutil.copy(path, workdir / path.name)
+        try:
+            ran = subprocess.run([*compiler, *words], cwd=workdir, env=env, capture_output=True, text=True,
+                                 timeout=COMPILE_TIMEOUT + RUN_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return ["the command took too long"]
+        problems = []
+        if expected_file.exists():
+            expected_text = expected_file.read_text()
+            if ran.stdout != expected_text:
+                problems += compare("stdout", expected_text.splitlines(), ran.stdout) or ["stdout differs at the end"]
+            if words[0] == "fmt":
+                again_path = workdir / "again.vl"
+                again_path.write_text(expected_text)
+                again = subprocess.run([*compiler, "fmt", "again.vl"], cwd=workdir, env=env,
+                                       capture_output=True, text=True, timeout=COMPILE_TIMEOUT)
+                if again.stdout != expected_text:
+                    problems.append("formatting the expected output again changes it")
+        else:
+            problems += compare("stdout", expect.out, ran.stdout)
+        problems += compare("stderr", expect.err, ran.stderr)
+        if ran.returncode != expect.exit:
+            problems.append(f"exit code: expected {expect.exit}, got {ran.returncode}")
+        return problems
+
+
+def run_vela_tests(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
+    """`vela test` on an example or a standard module: all its tests must pass."""
+    try:
+        ran = subprocess.run([*compiler, "test", str(path.relative_to(ROOT))], cwd=ROOT, env=env,
+                             capture_output=True, text=True, timeout=COMPILE_TIMEOUT + RUN_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return ["vela test took too long"]
+    if ran.returncode != 0:
+        return [f"vela test exited with {ran.returncode}:", *ran.stdout.splitlines(), *ran.stderr.splitlines()]
+    return []
+
+
 def find_tests(filters: list[str]) -> list[Path]:
     tests = []
+    tests += sorted((ROOT / "examples").glob("*/main.vl"))
+    tests += [p for p in sorted((ROOT / "std").glob("*.vl")) if 'test "' in p.read_text()]
     for kind in KINDS:
         for p in sorted((TESTS / kind).iterdir()):
             if p.is_dir():
@@ -187,7 +268,7 @@ def find_tests(filters: list[str]) -> list[Path]:
             elif p.suffix == ".vl":
                 tests.append(p)
     if filters:
-        tests = [t for t in tests if any(f in str(t.relative_to(TESTS)) for f in filters)]
+        tests = [t for t in tests if any(f in str(t.relative_to(ROOT)) for f in filters)]
     return tests
 
 
@@ -217,6 +298,9 @@ def main() -> int:
         env["ASAN_OPTIONS"] = "detect_leaks=1"
 
     tests = find_tests(args.filters)
+    if args.stage0:
+        tests = [t for t in tests
+                 if t.is_relative_to(TESTS) and not read_expectations(t).stage1_only and t.relative_to(TESTS).parts[0] != "cli"]
     if not tests:
         print("no tests found")
         return 1

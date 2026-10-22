@@ -1,0 +1,8 @@
+// `vela fmt -l` lists the files that are not formatted, and exits with 1.
+// stage 1 only
+// command: fmt -l
+// out: fmt_check.vl
+// exit: 1
+fn main() {
+  print( 1 )
+}

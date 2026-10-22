@@ -57,7 +57,7 @@ pub fn is_builtin_module(name: Str) -> Bool {
 }
 
 fn empty_program() -> ast.Program {
-    return ast.Program { imports: [], types: [], fns: [] }
+    return ast.Program { imports: [], types: [], fns: [], tests: [] }
 }
 
 fn new_module(name: Str, path: Str) -> Module {

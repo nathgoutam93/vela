@@ -1,0 +1,23 @@
+// Mistakes in test blocks.
+// stage 1 only
+// err: test_errors.vl:13:1: error: test "twice" is already defined at 10:1
+// err: test_errors.vl:17:12: error: 'test "returns"' does not return a value, so 'return' cannot have one
+// err: test_errors.vl:21:12: error: assert takes a Bool, found Int
+// err: test_errors.vl:22:5: error: assert expects 1 argument, got 2
+fn main() {
+}
+
+test "twice" {
+}
+
+test "twice" {
+}
+
+test "returns" {
+    return 1
+}
+
+test "asserts an Int" {
+    assert(1)
+    assert(true, false)
+}

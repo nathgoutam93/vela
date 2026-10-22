@@ -1,0 +1,46 @@
+// `vela test`: each test runs in a process of its own, so one that panics
+// fails alone; a failed comparison shows both sides.
+// stage 1 only
+// command: test
+// out: PASS  test_blocks.vl: test "squares"
+// out: FAIL  test_blocks.vl: test "names"
+// out: FAIL  test_blocks.vl: test "out of range"
+// out: PASS  test_blocks.vl: test "bools"
+// out: FAIL  test_blocks.vl: test "exits" (exit code 3)
+// out: 5 tests: 2 passed, 3 failed
+// err: test_blocks.vl:30:5: panic: assertion failed: greet("vela") == "hello, Vela" (left: "hello, vela", right: "hello, Vela")
+// err: test_blocks.vl:35:15: panic: index out of range
+// exit: 1
+import os
+
+fn square(x: Int) -> Int {
+    return x * x
+}
+
+fn greet(name: Str) -> Str {
+    return "hello, " + name
+}
+
+test "squares" {
+    assert(square(3) == 9)
+    assert(square(-2) > 0)
+}
+
+test "names" {
+    assert(greet("vela") == "hello, Vela")
+}
+
+test "out of range" {
+    let xs = [1]
+    let y = xs[1]
+}
+
+test "bools" {
+    let ok = square(2) == 4
+    assert(ok)
+    assert(!(square(1) == 2) && true)
+}
+
+test "exits" {
+    os.exit(3)
+}

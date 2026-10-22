@@ -1,0 +1,14 @@
+// `vela check --json`: every error as JSON, for tools.
+// stage 1 only
+// command: check --json
+// out: {"ok": false, "errors": [
+// out:   {"file": "check_json.vl", "line": 11, "col": 18, "severity": "error", "message": "'x' is declared as Int, but its value is Str"},
+// out:   {"file": "check_json.vl", "line": 12, "col": 5, "severity": "error", "message": "undefined function 'say'"},
+// out:   {"file": "check_json.vl", "line": 13, "col": 15, "severity": "error", "message": "operator '+' joins two Strs, found Str and Int"}
+// out: ]}
+// exit: 1
+fn main() {
+    let x: Int = "a \"quoted\" word"
+    say("hi")
+    print("a" + 1)
+}

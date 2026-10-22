@@ -1,0 +1,9 @@
+id,customer,sku,cents,qty,coupon
+1001,ada,pen,250,4,
+1001,ada,notebook,600,2,
+1002,grace,desk,90000,1,SAVE10
+1003,linus,ink,1500,2,FLAT5
+1004,ada,lamp,4500,1,SAVE10
+1005,ken,pen,250,1,
+1006,grace,chair,30000,2,
+1007,linus,paper,800,5,

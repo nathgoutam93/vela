@@ -66,6 +66,12 @@ typedef struct {
     int64_t len;
 } vela_str;
 
+// assert(cond) failed: a panic naming the condition as written, and, for a
+// comparison of two printable values, what the two sides were.
+_Noreturn void vela_assert_failed(const char *loc, const char *text);
+_Noreturn void vela_assert_failed_values(const char *loc, const char *text, vela_str left, vela_str right,
+                                         bool quote);
+
 // The Str for a C string literal of `n` bytes.
 #define VELA_STR(literal, n) ((vela_str){NULL, (const uint8_t *)(literal), (n)})
 

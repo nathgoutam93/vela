@@ -11,9 +11,9 @@ own directory and by its bare name, as run_tests.py does. Their stdout,
 stderr and exit codes must be identical: the same dump, the same errors,
 the same C.
 
-Stage 0 is frozen at M9, so this holds only while the language is the M9
-language. Once Stage 1 gains a feature, files that use it are expected to
-differ; the check is then a regression test for the rest.
+Stage 0 is frozen at M9, so this holds only for the M9 language. Files that
+use a later feature say `// stage 1 only` at the top and are left out; for
+the rest, the check is a regression test of Stage 1 against Stage 0.
 
 VELA1_PREBUILT=1 skips the build and uses build/vela1 as it is: for
 example one built with AddressSanitizer, to check Stage 1 itself.
@@ -45,7 +45,21 @@ def build_stage1() -> None:
 
 
 def inputs() -> list[Path]:
-    return sorted(p for d in ("tests", "std", "stage1") for p in (ROOT / d).rglob("*.vl"))
+    return sorted(p for d in ("tests", "std", "stage1") for p in (ROOT / d).rglob("*.vl") if not stage1_only(p))
+
+
+def stage1_only(path: Path) -> bool:
+    """A file that uses what Stage 0, frozen at M9, does not have: its header
+    says `// stage 1 only`, or it is part of the compiler written after the
+    freeze, which Stage 0 cannot read."""
+    if path.parent.name == "cli" or path.parent.parent.name == "cli":
+        return True
+    for line in path.read_text(errors="replace").splitlines():
+        if not line.startswith("//"):
+            return False
+        if line.strip().startswith("// stage 1 only"):
+            return True
+    return False
 
 
 def run(command: list[str], path: Path) -> subprocess.CompletedProcess:

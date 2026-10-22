@@ -1,0 +1,48 @@
+// The orders example: read orders from a CSV file, price them, and print a
+// report of the top customers.
+//
+//     vela run examples/orders/main.vl examples/orders/orders.csv
+//     vela test examples/orders/main.vl
+// stage 1 only
+import files
+import orders
+import os
+import report
+
+fn main() {
+    let args = os.args()
+    if len(args) != 2 {
+        os.eprint("usage: orders FILE.csv")
+        os.exit(2)
+    }
+    match load(args[1]) {
+        Ok(all) => {
+            for line in report.lines(all, 3) {
+                print(line)
+            }
+        }
+        Err(e) => {
+            os.eprint("orders: " + e)
+            os.exit(1)
+        }
+    }
+}
+
+fn load(path: Str) -> Result[[orders.Order], Str] {
+    let text = files.read(path)?
+    return orders.parse(text)
+}
+
+test "the report of a small file" {
+    let text = "id,customer,sku,cents,qty,coupon\n1,ada,pen,250,4,\n2,bo,desk,90000,1,SAVE10\n3,ada,ink,1500,2,FLAT5\n"
+    match orders.parse(text) {
+        Ok(all) => {
+            let ls = report.lines(all, 3)
+            assert(ls[0] == "orders:  3")
+            assert(ls[1] == "revenue: 885.00")
+            assert(ls[3] == "  bo         850.00")
+            assert(ls[4] == "  ada         35.00")
+        }
+        Err(e) => assert(e == "")
+    }
+}

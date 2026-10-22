@@ -28,6 +28,7 @@ pub type Kind = enum {
     Type
     Import
     Pub
+    Test
     // Operators
     DotDotEq
     EqEq
@@ -93,6 +94,7 @@ pub fn kind_name(k: Kind) -> Str {
         Kind.Type => "type"
         Kind.Import => "import"
         Kind.Pub => "pub"
+        Kind.Test => "test"
         Kind.DotDotEq => "..="
         Kind.EqEq => "=="
         Kind.NotEq => "!="
@@ -141,6 +143,7 @@ pub fn is_keyword(k: Kind) -> Bool {
         Kind.Type => true
         Kind.Import => true
         Kind.Pub => true
+        Kind.Test => true
         _ => false
     }
 }
@@ -161,6 +164,7 @@ fn keyword(word: Str) -> Option[Kind] {
         "type" => Some(Kind.Type)
         "import" => Some(Kind.Import)
         "pub" => Some(Kind.Pub)
+        "test" => Some(Kind.Test)
         _ => None
     }
 }
@@ -261,24 +265,33 @@ fn is_ident_char(c: Int) -> Bool {
     return is_ident_start(c) || is_digit(c)
 }
 
+// A `//` comment, kept for the formatter; the parser never sees comments.
+pub type Comment = struct {
+    text: Str  // from the `//` to the end of the line
+    line: Int
+    col: Int
+}
+
 type Lexer = struct {
     src: Str
     pos: Int  // index of the next byte to read
     line: Int
     line_start: Int  // index of the first byte of the current line
     tokens: [Token]
+    comments: [Comment]
     errors: [errors.CompileError]
 }
 
 pub type Lexed = struct {
     tokens: [Token]
+    comments: [Comment]
     errors: [errors.CompileError]  // sorted; the tokens are only usable when there are none
 }
 
 pub fn tokenize(src: Str) -> Lexed {
-    let mut lx = Lexer { src: src, pos: 0, line: 1, line_start: 0, tokens: [], errors: [] }
+    let mut lx = Lexer { src: src, pos: 0, line: 1, line_start: 0, tokens: [], comments: [], errors: [] }
     run(mut lx)
-    return Lexed { tokens: lx.tokens, errors: errors.sorted(lx.errors) }
+    return Lexed { tokens: lx.tokens, comments: lx.comments, errors: errors.sorted(lx.errors) }
 }
 
 // The byte at pos + ahead, or -1 past the end.
@@ -327,9 +340,12 @@ fn run(lx: mut Lexer) {
         } else if c == int('/') && peek(lx, 1) == int('/') {
             // A comment runs to the end of the line. The newline itself is
             // left for the branch above, so a comment never hides one.
+            let start = lx.pos
             for peek(lx, 0) != int('\n') && peek(lx, 0) != -1 {
                 lx.pos = lx.pos + 1
             }
+            let c = Comment { text: lx.src[start..lx.pos], line: lx.line, col: col(lx, start) }
+            push(mut lx.comments, c)
         } else if is_digit(c) {
             number(mut lx)
         } else if is_ident_start(c) {

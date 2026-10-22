@@ -1,0 +1,228 @@
+// Monomorphization: the copies of generic functions a program needs.
+//
+// The checker checks a generic function once, with its type parameters as
+// opaque types. C has no generics, so the code generator writes one copy of
+// the function for each set of type arguments it is called with: `first[Int]`
+// and `first[Str]` become two C functions. This pass finds those sets before
+// any C is written, starting from every function that is not generic and
+// following calls into the copies, which may call other generic functions in
+// turn. On the way it makes every type the copies use (`[Int]` where the
+// function says `[T]`), because the C layout of types is fixed before the
+// first function is written.
+import ast
+import checker
+import maps
+import strings
+import types
+
+// One copy of a function: its type parameters given `args`.
+pub type Instance = struct {
+    fn_id: Int
+    args: [Int]
+}
+
+pub type Collected = struct {
+    instances: [Instance]  // generic copies, in the order first called
+    index: Map[Str, Int]  // instances by key()
+}
+
+type Walk = struct {
+    k: checker.Checked
+    params: [Int]  // of the function being walked
+    args: [Int]
+    out: Collected
+    queue: [Instance]
+}
+
+pub fn key(fn_id: Int, args: [Int]) -> Str {
+    let mut b = strings.builder()
+    strings.add_int(mut b, fn_id)
+    for a in args {
+        strings.add_byte(mut b, ' ')
+        strings.add_int(mut b, a)
+    }
+    return strings.build(b)
+}
+
+// Every generic copy reachable from `roots` (the functions to write, by
+// id, none of them generic). `k.table` gains the types the copies need.
+pub fn collect(k: mut checker.Checked, roots: [Int]) -> Collected {
+    let mut w = Walk { k: k, params: [], args: [], out: Collected { instances: [], index: [:] }, queue: [] }
+    for id in roots {
+        walk_fn(mut w, Instance { fn_id: id, args: [] })
+    }
+    let mut i = 0
+    for i < len(w.queue) {
+        walk_fn(mut w, w.queue[i])
+        i = i + 1
+        if i > 100000 {
+            break  // cannot happen: the checker rules out a function calling itself with bigger types
+        }
+    }
+    k.table = w.k.table
+    return w.out
+}
+
+fn sub(w: mut Walk, t: Int) -> Int {
+    return types.subst(mut w.k.table, t, w.params, w.args)
+}
+
+fn walk_fn(w: mut Walk, inst: Instance) {
+    let f = w.k.fns[inst.fn_id]
+    w.params = f.type_params
+    w.args = inst.args
+    for t in f.params {
+        sub(mut w, t)
+    }
+    sub(mut w, f.result)
+    for l in f.param_locals {
+        sub(mut w, w.k.locals[l].ty)
+    }
+    block(mut w, f.decl.body)
+}
+
+fn block(w: mut Walk, b: ast.Block) {
+    for s in b.stmts {
+        stmt(mut w, s)
+    }
+}
+
+fn local_ref(w: mut Walk, id: Int) {
+    match w.k.refs[id] {
+        checker.Ref.Local(l) => sub(mut w, w.k.locals[l].ty)
+        checker.Ref.Variant(enum, _) => sub(mut w, enum)
+        _ => {}
+    }
+}
+
+fn stmt(w: mut Walk, s: ast.Stmt) {
+    local_ref(mut w, s.id)
+    match s.kind {
+        ast.StmtKind.Block(b) => block(mut w, b)
+        ast.StmtKind.ExprStmt(e) => expr(mut w, e)
+        ast.StmtKind.Let(_, _, _, v) => expr(mut w, v)
+        ast.StmtKind.Assign(target, v) => {
+            expr(mut w, target)
+            expr(mut w, v)
+        }
+        ast.StmtKind.If(cond, then, otherwise) => {
+            expr(mut w, cond)
+            block(mut w, then)
+            match otherwise {
+                ast.Else.NoElse => {}
+                ast.Else.ElseBlock(b) => block(mut w, b)
+                ast.Else.ElseIf(s2) => stmt(mut w, s2)
+            }
+        }
+        ast.StmtKind.For(cond, body) => {
+            match cond {
+                Some(e) => expr(mut w, e)
+                None => {}
+            }
+            block(mut w, body)
+        }
+        ast.StmtKind.ForRange(_, start, end, body) => {
+            expr(mut w, start)
+            expr(mut w, end)
+            block(mut w, body)
+        }
+        ast.StmtKind.ForEach(_, iterable, body) => {
+            expr(mut w, iterable)
+            block(mut w, body)
+        }
+        ast.StmtKind.Break => {}
+        ast.StmtKind.Continue => {}
+        ast.StmtKind.Return(v) => {
+            match v {
+                Some(e) => expr(mut w, e)
+                None => {}
+            }
+        }
+        ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut w, scrutinee, arms)
+    }
+}
+
+fn match_arms(w: mut Walk, scrutinee: ast.Expr, arms: [ast.Arm]) {
+    expr(mut w, scrutinee)
+    for a in arms {
+        pattern(mut w, a.pattern)
+        match a.body {
+            ast.ArmBody.Value(e) => expr(mut w, e)
+            ast.ArmBody.Do(s) => stmt(mut w, s)
+        }
+    }
+}
+
+fn pattern(w: mut Walk, p: ast.Pattern) {
+    local_ref(mut w, p.id)
+    match p.kind {
+        ast.PatternKind.Variant(_, _, _, _, args) => {
+            for a in args {
+                pattern(mut w, a)
+            }
+        }
+        _ => {}
+    }
+}
+
+fn exprs(w: mut Walk, es: [ast.Expr]) {
+    for e in es {
+        expr(mut w, e)
+    }
+}
+
+fn expr(w: mut Walk, e: ast.Expr) {
+    sub(mut w, w.k.ty[e.id])
+    local_ref(mut w, e.id)
+    match w.k.refs[e.id] {
+        checker.Ref.Function(id) => {
+            if len(w.k.fns[id].type_params) > 0 {
+                let mut args: [Int] = []
+                for t in w.k.targs[e.id] {
+                    push(mut args, sub(mut w, t))
+                }
+                let k = key(id, args)
+                if !maps.has(w.out.index, k) {
+                    w.out.index[k] = len(w.out.instances)
+                    let inst = Instance { fn_id: id, args: args }
+                    push(mut w.out.instances, inst)
+                    push(mut w.queue, inst)
+                }
+            }
+        }
+        _ => {}
+    }
+    match e.kind {
+        ast.ExprKind.Unary(_, x) => expr(mut w, x)
+        ast.ExprKind.Binary(_, l, r) => {
+            expr(mut w, l)
+            expr(mut w, r)
+        }
+        ast.ExprKind.Call(callee, args) => {
+            expr(mut w, callee)
+            exprs(mut w, args)
+        }
+        ast.ExprKind.Field(obj, _) => expr(mut w, obj)
+        ast.ExprKind.Index(obj, i) => {
+            expr(mut w, obj)
+            expr(mut w, i)
+        }
+        ast.ExprKind.Try(x) => expr(mut w, x)
+        ast.ExprKind.MutArg(x) => expr(mut w, x)
+        ast.ExprKind.Slice(obj, lo, hi) => exprs(mut w, [obj, lo, hi])
+        ast.ExprKind.ArrayLit(xs) => exprs(mut w, xs)
+        ast.ExprKind.MapLit(entries) => {
+            for en in entries {
+                expr(mut w, en.key)
+                expr(mut w, en.value)
+            }
+        }
+        ast.ExprKind.StructLit(_, _, fields) => {
+            for f in fields {
+                expr(mut w, f.value)
+            }
+        }
+        ast.ExprKind.Match(scrutinee, arms) => match_arms(mut w, scrutinee, arms)
+        _ => {}
+    }
+}

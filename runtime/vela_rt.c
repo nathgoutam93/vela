@@ -24,6 +24,22 @@ void vela_panic(const char *loc, const char *msg) {
     _Exit(101);
 }
 
+void vela_assert_failed(const char *loc, const char *text) {
+    fflush(stdout);
+    fprintf(stderr, "%s: panic: assertion failed: %s\n", loc, text);
+    fflush(stderr);
+    _Exit(101);
+}
+
+void vela_assert_failed_values(const char *loc, const char *text, vela_str left, vela_str right, bool quote) {
+    const char *q = quote ? "\"" : "";
+    fflush(stdout);
+    fprintf(stderr, "%s: panic: assertion failed: %s (left: %s%.*s%s, right: %s%.*s%s)\n", loc, text, q,
+            (int)left.len, (const char *)left.data, q, q, (int)right.len, (const char *)right.data, q);
+    fflush(stderr);
+    _Exit(101);
+}
+
 void *vela_alloc(size_t size) {
     void *p = malloc(size);
     if (p == NULL && size != 0) vela_panic("vela runtime", "out of memory");

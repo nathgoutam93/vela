@@ -1,0 +1,28 @@
+// The syntax tree of M10a's additions: type parameters with bounds, and tests.
+// stage 1 only
+// dump: ast
+// out: (struct Pair [A, B] (first A) (second B))
+// out: (enum Tree [T] (Leaf) (Node Tree[T] T Tree[T]))
+// out: (fn largest [T: Ord + Key] ((xs [T])) T
+// out:   (block
+// out:     (return (call first xs))))
+// out: (test "largest of one"
+// out:   (block
+// out:     (call assert (== (call largest (array 1)) 1))))
+type Pair[A, B] = struct {
+    first: A
+    second: B
+}
+
+type Tree[T] = enum {
+    Leaf
+    Node(Tree[T], T, Tree[T])
+}
+
+fn largest[T: Ord + Key](xs: [T]) -> T {
+    return first(xs)
+}
+
+test "largest of one" {
+    assert(largest([1]) == 1)
+}

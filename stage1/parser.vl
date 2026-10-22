@@ -194,6 +194,7 @@ fn program(p: mut Parser) -> ast.Program {
     let mut imports: [ast.Import] = []
     let mut types: [ast.TypeDecl] = []
     let mut fns: [ast.FnDecl] = []
+    let mut tests: [ast.TestDecl] = []
     for peek(p, 0).kind != lexer.Kind.Eof {
         if peek(p, 0).kind == lexer.Kind.Semi {
             advance(mut p)
@@ -202,7 +203,7 @@ fn program(p: mut Parser) -> ast.Program {
         let start = p.i
         p.open_parens = 0
         p.open_braces = 0
-        match declaration(mut p, mut imports, mut types, mut fns) {
+        match declaration(mut p, mut imports, mut types, mut fns, mut tests) {
             Ok(_) => {}
             Err(e) => {
                 errors.add(mut p.errors, e)
@@ -210,21 +211,33 @@ fn program(p: mut Parser) -> ast.Program {
             }
         }
     }
-    return ast.Program { imports: imports, types: types, fns: fns }
+    return ast.Program { imports: imports, types: types, fns: fns, tests: tests }
 }
 
-fn declaration(p: mut Parser, imports: mut [ast.Import], types: mut [ast.TypeDecl],
-               fns: mut [ast.FnDecl]) -> Result[Unit, errors.CompileError] {
+fn declaration(p: mut Parser, imports: mut [ast.Import], types: mut [ast.TypeDecl], fns: mut [ast.FnDecl],
+    tests: mut [ast.TestDecl]) -> Result[Unit, errors.CompileError] {
     let mut tok = peek(p, 0)
     if tok.kind == lexer.Kind.Import {
         advance(mut p)
-        if len(types) > 0 || len(fns) > 0 {
+        if len(types) > 0 || len(fns) > 0 || len(tests) > 0 {
             // Go's rule: the imports are all at the top.
             return Err(error(tok, "imports must come before all declarations"))
         }
         let name = expect_name(mut p, "of a module after 'import'")?
         push(mut imports, ast.Import { name: name.text, line: name.line, col: name.col })
         end_of_item(mut p, "import")?
+        return Ok(())
+    }
+    if tok.kind == lexer.Kind.Test {
+        advance(mut p)
+        let name = peek(p, 0)
+        if name.kind != lexer.Kind.Str {
+            return Err(error(name, "expected the test's name, a string, after 'test'" + found(name)))
+        }
+        advance(mut p)
+        let body = block(mut p, "to start the body of test " + name.text)?
+        push(mut tests, ast.TestDecl { name: name.value, body: body, line: tok.line, col: tok.col })
+        end_of_item(mut p, "test")?
         return Ok(())
     }
     let public = tok.kind == lexer.Kind.Pub
@@ -257,7 +270,8 @@ fn skip_declaration(p: mut Parser, start: Int) {
     let mut braces = 0
     for peek(p, 0).kind != lexer.Kind.Eof {
         let k = peek(p, 0).kind
-        let starts = k == lexer.Kind.Fn || k == lexer.Kind.Type || k == lexer.Kind.Pub || k == lexer.Kind.Import
+        let starts = k == lexer.Kind.Fn || k == lexer.Kind.Type || k == lexer.Kind.Pub || k == lexer.Kind.Import ||
+            k == lexer.Kind.Test
         if starts && braces == 0 && p.i > start {
             return
         }
@@ -283,6 +297,7 @@ fn end_of_item(p: mut Parser, what: Str) -> Result[Unit, errors.CompileError] {
 fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
     advance(mut p)  // "fn"
     let name = expect_name(mut p, "after 'fn'")?
+    let type_params = type_params(mut p, name.text)?
     expect(mut p, lexer.Kind.LParen, "after the function name")?
     let mut params: [ast.Param] = []
     for peek(p, 0).kind != lexer.Kind.RParen {
@@ -311,7 +326,7 @@ fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
     }
     let body = block(mut p, "to start the body of '" + name.text + "'")?
     return Ok(ast.FnDecl {
-        name: name.text, params: params, result: result, body: body, line: name.line, col: name.col,
+        name: name.text, type_params: type_params, params: params, result: result, body: body, line: name.line, col: name.col,
         public: false,
     })
 }
@@ -319,10 +334,11 @@ fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
 fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
     advance(mut p)  // "type"
     let name = expect_name(mut p, "after 'type'")?
+    let params = type_params(mut p, name.text)?
     expect(mut p, lexer.Kind.Eq, "after 'type " + name.text + "'")?
     let kind = peek(p, 0)
     let mut decl = ast.TypeDecl {
-        name: name.text, is_struct: true, fields: [], variants: [], line: name.line, col: name.col,
+        name: name.text, params: params, is_struct: true, fields: [], variants: [], line: name.line, col: name.col,
         public: false,
     }
     if kind.kind == lexer.Kind.Ident && kind.text == "struct" {
@@ -352,6 +368,37 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
         return Ok(decl)
     }
     return Err(error(kind, "expected 'struct' or 'enum' after 'type " + name.text + " ='" + found(kind)))
+}
+
+// `[T, U: Ord]` after a function's or a type's name, or nothing.
+fn type_params(p: mut Parser, owner: Str) -> Result[[ast.TypeParam], errors.CompileError] {
+    let mut out: [ast.TypeParam] = []
+    if peek(p, 0).kind != lexer.Kind.LBracket {
+        return Ok(out)
+    }
+    advance(mut p)
+    for {
+        let name = expect_name(mut p, "for a type parameter of '" + owner + "'")?
+        let mut bounds: [Str] = []
+        if peek(p, 0).kind == lexer.Kind.Colon {
+            advance(mut p)
+            for {
+                let b = expect_name(mut p, "for a bound of '" + name.text + "' (Eq, Ord or Key)")?
+                push(mut bounds, b.text)
+                if peek(p, 0).kind != lexer.Kind.Plus {
+                    break
+                }
+                advance(mut p)
+            }
+        }
+        push(mut out, ast.TypeParam { name: name.text, bounds: bounds, line: name.line, col: name.col })
+        if peek(p, 0).kind != lexer.Kind.Comma {
+            break
+        }
+        advance(mut p)
+    }
+    expect(mut p, lexer.Kind.RBracket, "after the type parameters of '" + owner + "'")?
+    return Ok(out)
 }
 
 fn variant_decl(p: mut Parser) -> Result[ast.VariantDecl, errors.CompileError] {
@@ -824,7 +871,7 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
             return struct_lit(mut p, tok, "", tok)
         }
         if peek(p, 0).kind == lexer.Kind.Dot && peek(p, 1).kind == lexer.Kind.Ident &&
-                peek(p, 2).kind == lexer.Kind.LBrace && !p.no_struct {
+            peek(p, 2).kind == lexer.Kind.LBrace && !p.no_struct {
             advance(mut p)  // "."
             let name = advance(mut p)
             return struct_lit(mut p, tok, tok.text, name)
@@ -911,7 +958,7 @@ fn collection_lit(p: mut Parser, open: lexer.Token) -> Result[ast.Expr, errors.C
 // the module's name, and `start` the literal's first token, where it is
 // reported.
 fn struct_lit(p: mut Parser, start: lexer.Token, module: Str,
-              name: lexer.Token) -> Result[ast.Expr, errors.CompileError] {
+    name: lexer.Token) -> Result[ast.Expr, errors.CompileError] {
     advance(mut p)  // "{"
     let mut written = name.text
     if module != "" {

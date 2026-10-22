@@ -8,6 +8,14 @@
 // table gives back the same number. The table remembers the order in which
 // they were first asked for, because the C code generator defines them in
 // that order, and its output must match Stage 0's byte for byte.
+//
+// Generics (M10a). A type parameter, the `T` of `fn first[T]` or `type
+// Pair[A, B]`, is a type of its own (tag Param). A generic struct or enum is
+// declared once, with its parameters in `params`; each use with arguments,
+// `Pair[Int, Str]`, is an instance: a struct or enum of its own, interned
+// like Option, whose `origin` is the declaration and whose fields or
+// variants are the declaration's with the arguments put in. A type that
+// mentions a parameter anywhere is "open"; only closed types reach C.
 import maps
 import strings
 
@@ -19,6 +27,7 @@ pub type Tag = enum {
     Map
     Struct
     Enum  // a user enum, or Option / Result (which have args)
+    Param  // a type parameter
 }
 
 pub type Variant = struct {
@@ -41,12 +50,17 @@ pub type TypeInfo = struct {
     args: [Int]  // Option[T]: [T]; Result[T, E]: [T, E]; [T]: [T]; Map[K, V]: [K, V]
     fields: [FieldInfo]  // a struct's, in declaration order
     variants: [Variant]  // an enum's, in order: the index is the C tag
+    params: [Int]  // a generic declaration's type parameters
+    bounds: [Str]  // a type parameter's bounds: "Eq", "Ord", "Key"
+    origin: Int  // an instance's generic declaration; -1 for anything else
+    open: Bool  // mentions a type parameter
+    filled: Bool  // a generic declaration: its fields or variants are known; an instance: they are put in
 }
 
 pub type Table = struct {
     types: [TypeInfo]
     index: Map[Str, Int]  // interned types by a key such as "Option 4"
-    instances: [Int]  // Option and Result types, in the order first asked for
+    instances: [Int]  // Option, Result and generic instances, in the order first asked for
     arrays: [Int]  // the element type of each array type, likewise
     maps: [Int]  // key and value of each map type, likewise, two per map
 }
@@ -85,8 +99,10 @@ pub fn NOTHING() -> Int {
 }
 
 fn info(tag: Tag, name: Str) -> TypeInfo {
-    return TypeInfo { tag: tag, name: name, module: "", public: true, line: 0, col: 0, args: [], fields: [],
-                      variants: [] }
+    return TypeInfo {
+        tag: tag, name: name, module: "", public: true, line: 0, col: 0, args: [], fields: [], variants: [],
+        params: [], bounds: [], origin: -1, open: false, filled: false,
+    }
 }
 
 pub fn new_table() -> Table {
@@ -129,7 +145,7 @@ pub fn is_map_key(t: Int) -> Bool {
 
 // A new user struct or enum; its fields or variants are filled in later.
 pub fn add_user(table: mut Table, is_struct: Bool, name: Str, module: Str, public: Bool, line: Int,
-                col: Int) -> Int {
+    col: Int) -> Int {
     let mut t = info(Tag.Enum, name)
     if is_struct {
         t.tag = Tag.Struct
@@ -163,6 +179,7 @@ pub fn array(table: mut Table, elem: Int) -> Int {
     }
     let mut t = info(Tag.Array, "[]")
     t.args = [elem]
+    t.open = table.types[elem].open
     push(mut table.types, t)
     let id = len(table.types) - 1
     table.index[k] = id
@@ -181,6 +198,7 @@ pub fn map(table: mut Table, k: Int, v: Int) -> Int {
     }
     let mut t = info(Tag.Map, "Map")
     t.args = [k, v]
+    t.open = table.types[k].open || table.types[v].open
     push(mut table.types, t)
     let id = len(table.types) - 1
     table.index[name] = id
@@ -210,6 +228,8 @@ pub fn instance(table: mut Table, name: Str, args: [Int]) -> Int {
     }
     let mut t = info(Tag.Enum, name)
     t.args = args
+    t.open = any_open(table, args)
+    t.filled = true
     if name == "Option" {
         t.variants = [Variant { name: "None", payload: [] }, Variant { name: "Some", payload: [args[0]] }]
     } else {
@@ -242,9 +262,179 @@ pub fn is_map(table: Table, t: Int) -> Bool {
     return t >= 0 && table.types[t].tag == Tag.Map
 }
 
-// Option and Result, which have type arguments; user enums have none.
+// Option and Result, which have type arguments and are not instances of a
+// user's generic enum.
 pub fn is_builtin_enum(table: Table, t: Int) -> Bool {
-    return is_enum(table, t) && len(table.types[t].args) > 0
+    return is_enum(table, t) && len(table.types[t].args) > 0 && table.types[t].origin < 0
+}
+
+pub fn is_param(table: Table, t: Int) -> Bool {
+    return t >= 0 && table.types[t].tag == Tag.Param
+}
+
+pub fn is_open(table: Table, t: Int) -> Bool {
+    return t >= 0 && table.types[t].open
+}
+
+pub fn is_generic(table: Table, t: Int) -> Bool {
+    return t >= 0 && len(table.types[t].params) > 0
+}
+
+fn any_open(table: Table, ts: [Int]) -> Bool {
+    for t in ts {
+        if table.types[t].open {
+            return true
+        }
+    }
+    return false
+}
+
+// A new type parameter.
+pub fn param(table: mut Table, name: Str, bounds: [Str], line: Int, col: Int) -> Int {
+    let mut t = info(Tag.Param, name)
+    t.bounds = bounds
+    t.line = line
+    t.col = col
+    t.open = true
+    push(mut table.types, t)
+    return len(table.types) - 1
+}
+
+pub fn has_bound(table: Table, t: Int, bound: Str) -> Bool {
+    if !is_param(table, t) {
+        return false
+    }
+    for b in table.types[t].bounds {
+        // Ord includes Eq: whatever can be ordered can be compared.
+        if b == bound || b == "Ord" && bound == "Eq" {
+            return true
+        }
+    }
+    return false
+}
+
+// `decl[args]`, a generic struct or enum with its parameters filled in.
+pub fn instantiate(table: mut Table, decl: Int, args: [Int]) -> Int {
+    for a in args {
+        if a == ERROR() {
+            return ERROR()
+        }
+    }
+    let k = key("inst " + strings.from_int(decl), args)
+    match maps.get(table.index, k) {
+        Some(t) => return t
+        None => {}
+    }
+    let d = table.types[decl]
+    let mut t = info(d.tag, d.name)
+    t.module = d.module
+    t.public = d.public
+    t.line = d.line
+    t.col = d.col
+    t.args = args
+    t.origin = decl
+    t.open = any_open(table, args)
+    push(mut table.types, t)
+    let id = len(table.types) - 1
+    table.index[k] = id
+    push(mut table.instances, id)
+    if d.filled {
+        fill(mut table, id)
+    }
+    return id
+}
+
+// Put an instance's arguments into its declaration's fields or variants.
+fn fill(table: mut Table, inst: Int) {
+    let decl = table.types[inst].origin
+    let params = table.types[decl].params
+    let args = table.types[inst].args
+    table.types[inst].filled = true  // before the fields, which may lead back here
+    let mut fields: [FieldInfo] = []
+    for f in table.types[decl].fields {
+        push(mut fields, FieldInfo { name: f.name, ty: subst(mut table, f.ty, params, args) })
+    }
+    let mut variants: [Variant] = []
+    for v in table.types[decl].variants {
+        let mut payload: [Int] = []
+        for p in v.payload {
+            push(mut payload, subst(mut table, p, params, args))
+        }
+        push(mut variants, Variant { name: v.name, payload: payload })
+    }
+    table.types[inst].fields = fields
+    table.types[inst].variants = variants
+}
+
+// Fill in the instances made before their declarations' fields were known.
+pub fn fill_instances(table: mut Table) {
+    let mut i = 0
+    for i < len(table.instances) {
+        let t = table.instances[i]
+        let o = table.types[t].origin
+        if o >= 0 && !table.types[t].filled && table.types[o].filled {
+            fill(mut table, t)
+        }
+        i = i + 1
+    }
+}
+
+// `subst` for a type that already exists, without a mutable table: for the
+// code generator, after every type the program needs has been made.
+pub fn find_subst(table: Table, t: Int, params: [Int], args: [Int]) -> Int {
+    if t < 0 || !table.types[t].open || len(params) == 0 {
+        return t
+    }
+    let ti = table.types[t]
+    if ti.tag == Tag.Param {
+        for i in 0..len(params) {
+            if params[i] == t {
+                return args[i]
+            }
+        }
+        return t
+    }
+    let mut new_args: [Int] = []
+    for a in ti.args {
+        push(mut new_args, find_subst(table, a, params, args))
+    }
+    if ti.tag == Tag.Array {
+        return table.index[key("[]", new_args)]
+    }
+    if ti.origin >= 0 {
+        return table.index[key("inst " + strings.from_int(ti.origin), new_args)]
+    }
+    return table.index[key(ti.name, new_args)]  // Map, Option, Result
+}
+
+// `t` with each of `params` replaced by the matching one of `args`.
+pub fn subst(table: mut Table, t: Int, params: [Int], args: [Int]) -> Int {
+    if t < 0 || !table.types[t].open {
+        return t
+    }
+    let ti = table.types[t]
+    if ti.tag == Tag.Param {
+        for i in 0..len(params) {
+            if params[i] == t {
+                return args[i]
+            }
+        }
+        return t
+    }
+    let mut new_args: [Int] = []
+    for a in ti.args {
+        push(mut new_args, subst(mut table, a, params, args))
+    }
+    if ti.tag == Tag.Array {
+        return array(mut table, new_args[0])
+    }
+    if ti.tag == Tag.Map {
+        return map(mut table, new_args[0], new_args[1])
+    }
+    if ti.origin >= 0 {
+        return instantiate(mut table, ti.origin, new_args)
+    }
+    return instance(mut table, ti.name, new_args)
 }
 
 // The index of the variant called `name`, or -1.
@@ -289,8 +479,9 @@ pub fn show(table: Table, t: Int, viewpoint: Str) -> Str {
         Tag.Std => ti.module + "." + ti.name
         Tag.Array => "[" + show(table, ti.args[0], viewpoint) + "]"
         Tag.Map => "Map[" + show(table, ti.args[0], viewpoint) + ", " + show(table, ti.args[1], viewpoint) + "]"
-        Tag.Struct => qualified(ti.module, ti.name, viewpoint)
+        Tag.Struct => show_enum(table, ti, viewpoint)
         Tag.Enum => show_enum(table, ti, viewpoint)
+        Tag.Param => ti.name
     }
 }
 
@@ -299,7 +490,11 @@ fn show_enum(table: Table, ti: TypeInfo, viewpoint: Str) -> Str {
         return qualified(ti.module, ti.name, viewpoint)
     }
     let mut b = strings.builder()
-    strings.add(mut b, ti.name)
+    if ti.origin >= 0 {
+        strings.add(mut b, qualified(ti.module, ti.name, viewpoint))
+    } else {
+        strings.add(mut b, ti.name)
+    }
     strings.add_byte(mut b, '[')
     for i in 0..len(ti.args) {
         if i > 0 {

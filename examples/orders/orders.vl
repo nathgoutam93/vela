@@ -1,0 +1,132 @@
+// Orders, their prices, and reading them from CSV. Money is in cents.
+// stage 1 only
+import csv
+import maps
+import strings
+
+pub type Item = struct {
+    sku: Str
+    cents: Int  // the price of one
+    qty: Int
+}
+
+pub type Order = struct {
+    id: Int
+    customer: Str
+    items: [Item]
+    coupon: Option[Str]
+}
+
+pub fn subtotal(o: Order) -> Int {
+    let mut total = 0
+    for item in o.items {
+        total = total + item.cents * item.qty
+    }
+    return total
+}
+
+// SAVE10 takes 10% off, at most 50.00; FLAT5 takes 5.00 off an order of
+// 20.00 or more. Any other coupon does nothing.
+pub fn discount(o: Order) -> Int {
+    let sub = subtotal(o)
+    match o.coupon {
+        Some("SAVE10") => {
+            let off = sub / 10
+            if off > 5000 {
+                return 5000
+            }
+            return off
+        }
+        Some("FLAT5") => {
+            if sub >= 2000 {
+                return 500
+            }
+            return 0
+        }
+        _ => return 0
+    }
+}
+
+pub fn total(o: Order) -> Int {
+    return subtotal(o) - discount(o)
+}
+
+// One line per item: id,customer,sku,cents,qty,coupon. The lines of one
+// order are next to each other and agree on its customer and coupon.
+pub fn parse(text: Str) -> Result[[Order], Str] {
+    let mut orders: [Order] = []
+    let mut index: Map[Int, Int] = [:]  // position in orders, by id
+    let rows = csv.lines(text)
+    for n in 1..len(rows) {  // row 0 is the header
+        let f = csv.fields(rows[n])
+        let line = "line " + strings.from_int(n + 1)
+        if len(f) != 6 {
+            return Err(line + ": expected 6 fields, found " + strings.from_int(len(f)))
+        }
+        let id = whole(f[0], line + ": the id")?
+        let item = Item { sku: f[2], cents: whole(f[3], line + ": the price")?, qty: whole(f[4], line + ": the quantity")? }
+        let mut coupon: Option[Str] = None
+        if f[5] != "" {
+            coupon = Some(f[5])
+        }
+        match maps.get(index, id) {
+            Some(i) => push(mut orders[i].items, item)
+            None => {
+                index[id] = len(orders)
+                push(mut orders, Order { id: id, customer: f[1], items: [item], coupon: coupon })
+            }
+        }
+    }
+    return Ok(orders)
+}
+
+fn whole(s: Str, what: Str) -> Result[Int, Str] {
+    match csv.number(s) {
+        Some(n) => return Ok(n)
+        None => return Err(what + " must be a whole number, found '" + s + "'")
+    }
+}
+
+fn order(coupon: Option[Str], items: [Item]) -> Order {
+    return Order { id: 1, customer: "ada", items: items, coupon: coupon }
+}
+
+test "subtotal adds price times quantity" {
+    let o = order(None, [Item { sku: "pen", cents: 250, qty: 4 }, Item { sku: "ink", cents: 1500, qty: 1 }])
+    assert(subtotal(o) == 2500)
+    assert(total(o) == 2500)
+}
+
+test "SAVE10 takes a tenth, at most 50.00" {
+    let small = order(Some("SAVE10"), [Item { sku: "pen", cents: 250, qty: 4 }])
+    assert(discount(small) == 100)
+    let big = order(Some("SAVE10"), [Item { sku: "desk", cents: 90000, qty: 1 }])
+    assert(discount(big) == 5000)
+    assert(total(big) == 85000)
+}
+
+test "FLAT5 needs 20.00" {
+    let under = order(Some("FLAT5"), [Item { sku: "pen", cents: 1999, qty: 1 }])
+    assert(discount(under) == 0)
+    let over = order(Some("FLAT5"), [Item { sku: "pen", cents: 2000, qty: 1 }])
+    assert(total(over) == 1500)
+}
+
+test "parse groups lines into orders" {
+    let text = "id,customer,sku,cents,qty,coupon\n7,ada,pen,250,2,\n7,ada,ink,100,1,\n8,bo,desk,9000,1,SAVE10\n"
+    match parse(text) {
+        Ok(orders) => {
+            assert(len(orders) == 2)
+            assert(len(orders[0].items) == 2 && subtotal(orders[0]) == 600)
+            assert(orders[1].customer == "bo" && total(orders[1]) == 8100)
+        }
+        Err(e) => assert(e == "")
+    }
+}
+
+test "parse reports the bad line" {
+    match parse("header\n1,ada,pen,2x,1,\n") {
+        Ok(_) => assert(false)
+        Err(e) => assert(e == "line 2: the price must be a whole number, found '2x'")
+    }
+}
