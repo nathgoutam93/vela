@@ -1,62 +1,23 @@
 // Just enough CSV for orders.csv: fields split at commas, no quoting.
 // stage 1 only
+import lists
+import text
 
 // The lines of `text`, without their line endings; blank lines are left out.
-pub fn lines(text: Str) -> [Str] {
-    let mut out: [Str] = []
-    let mut start = 0
-    for i in 0..len(text) + 1 {
-        if i == len(text) || text[i] == '\n' {
-            let mut end = i
-            if end > start && text[end - 1] == '\r' {
-                end = end - 1
-            }
-            if end > start {
-                push(mut out, text[start..end])
-            }
-            start = i + 1
-        }
-    }
-    return out
+pub fn lines(s: Str) -> [Str] {
+    return lists.filter(text.lines(s), fn(line) => text.trim(line) != "")
 }
 
 pub fn fields(line: Str) -> [Str] {
-    let mut out: [Str] = []
-    let mut start = 0
-    for i in 0..len(line) + 1 {
-        if i == len(line) || line[i] == ',' {
-            push(mut out, trim(line[start..i]))
-            start = i + 1
-        }
-    }
-    return out
-}
-
-pub fn trim(s: Str) -> Str {
-    let mut lo = 0
-    let mut hi = len(s)
-    for lo < hi && s[lo] == ' ' {
-        lo = lo + 1
-    }
-    for hi > lo && s[hi - 1] == ' ' {
-        hi = hi - 1
-    }
-    return s[lo..hi]
+    return lists.map(text.split(line, ","), text.trim)
 }
 
 // A whole number of decimal digits, with no sign.
 pub fn number(s: Str) -> Option[Int] {
-    if len(s) == 0 || len(s) > 18 {
+    if text.starts_with(s, "-") {
         return None
     }
-    let mut n = 0
-    for c in s {
-        if c < '0' || c > '9' {
-            return None
-        }
-        n = n * 10 + int(c - '0')
-    }
-    return Some(n)
+    return text.parse_int(s)
 }
 
 test "lines drop endings and blanks" {
@@ -74,8 +35,10 @@ test "numbers" {
         Some(n) => assert(n == 1250)
         None => assert(false)
     }
-    match number("12a") {
-        Some(_) => assert(false)
-        None => {}
+    for bad in ["12a", "-5", ""] {
+        match number(bad) {
+            Some(_) => assert(false)
+            None => {}
+        }
     }
 }

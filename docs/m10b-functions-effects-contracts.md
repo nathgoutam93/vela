@@ -366,3 +366,8 @@ both marked optional.
    `parse_int`, `join`, `contains`, `starts_with`. Standard modules are
    found before a program's own files, so the compiler's `stage1/text.vl`
    would be renamed. Fine?
+
+**Answered after M10b:** M10c, then M12; add closures; wait on effects
+through function values; the defaults (Float, no code after branches
+that all end) and `std/text.vl` are fine. M10c is in
+`m10c-closures-floats-text.md`.

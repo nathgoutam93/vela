@@ -4,6 +4,7 @@ import lists
 import maps
 import orders
 import strings
+import text
 
 // A thing with the number it is ranked by.
 pub type Ranked[T] = struct {
@@ -13,18 +14,11 @@ pub type Ranked[T] = struct {
 
 // The `n` items with the highest scores, highest first; equal scores keep
 // their order.
-pub fn top[T](items: [T], scores: [Int], n: Int) -> [Ranked[T]]
-    requires len(items) == len(scores) && n >= 0
+pub fn top[T](items: [T], score: fn(T) -> Int, n: Int) -> [Ranked[T]]
+    requires n >= 0
     ensures len(result) <= n {
-    let mut negated: [Int] = []
-    for s in scores {
-        push(mut negated, -s)
-    }
-    let mut out: [Ranked[T]] = []
-    for i in lists.take(lists.order(negated), n) {
-        push(mut out, Ranked { item: items[i], score: scores[i] })
-    }
-    return out
+    let best = lists.take(lists.sort_by(items, fn(x) => -score(x)), n)
+    return lists.map(best, fn(x) => Ranked { item: x, score: score(x) })
 }
 
 // What each customer spent, by customer, in the order they first appear.
@@ -49,18 +43,6 @@ pub fn money(cents: Int) -> Str
     return strings.from_int(cents / 100) + "." + rest
 }
 
-// `s` with spaces added on the left (`right` false) or right, to `width`.
-pub fn pad(s: Str, width: Int, right: Bool) -> Str {
-    let mut spaces = ""
-    for _ in len(s)..width {
-        spaces = spaces + " "
-    }
-    if right {
-        return s + spaces
-    }
-    return spaces + s
-}
-
 pub fn lines(all: [orders.Order], n: Int) -> [Str] {
     let revenue = lists.sum(lists.map(all, orders.total))
     let mut out = ["orders:  " + strings.from_int(len(all)), "revenue: " + money(revenue)]
@@ -73,13 +55,8 @@ pub fn lines(all: [orders.Order], n: Int) -> [Str] {
     }
     push(mut out, "top customers:")
     let spent = spending(all)
-    let names = maps.keys(spent)
-    let mut amounts: [Int] = []
-    for name in names {
-        push(mut amounts, spent[name])
-    }
-    for r in top(names, amounts, n) {
-        push(mut out, "  " + pad(r.item, 8, true) + pad(money(r.score), 9, false))
+    for r in top(maps.keys(spent), fn(name) => spent[name], n) {
+        push(mut out, "  " + text.pad_right(r.item, 8) + text.pad_left(money(r.score), 9))
     }
     return out
 }
@@ -91,13 +68,9 @@ test "money has two decimals" {
 }
 
 test "top keeps the highest, in order" {
-    let ranked = top(["a", "b", "c", "d"], [5, 9, 5, 1], 3)
+    let scores: Map[Str, Int] = ["a": 5, "b": 9, "c": 5, "d": 1]
+    let ranked = top(["a", "b", "c", "d"], fn(k) => scores[k], 3)
     assert(len(ranked) == 3)
     assert(ranked[0].item == "b" && ranked[1].item == "a" && ranked[2].item == "c")
-}
-
-test "pad" {
-    assert(pad("ab", 4, true) == "ab  ")
-    assert(pad("ab", 4, false) == "  ab")
-    assert(pad("abcdef", 4, false) == "abcdef")
+    assert(ranked[0].score == 9)
 }

@@ -70,7 +70,9 @@ and retired Python from the build. M10a added generics
 (`fn largest[T: Ord]`, `type Box[T]`), `test` blocks with `assert`, a
 formatter and JSON errors; M10b added function values (`fn(Int) -> Str`),
 effects (`uses fs, os`), fakes for tests (`with files = ...`), contracts
-(`requires`, `ensures`) and warnings. All of M10 is in Stage 1 only.
+(`requires`, `ensures`) and warnings; M10c added closures
+(`fn(x) => x * k`), `Float`, and `std/text.vl`. All of M10 is in Stage 1
+only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
 
