@@ -79,11 +79,7 @@ STRICT_CFLAGS = (
 )
 # --sanitize: catch memory errors (use after free, out of bounds), undefined
 # behaviour, and, when the program exits, any memory it never freed.
-# -Wno-return-type: at -O0 (which `vela test` builds use) AddressSanitizer
-# keeps gcc from seeing that the cleanup code after a match whose arms all
-# return is unreachable, and it warns that the function can end without a
-# return. The runs without --sanitize still check that warning.
-SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all -Wno-return-type"
+SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all"
 
 HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args|command):(.*)$")
 STAGE1_ONLY = "// stage 1 only"

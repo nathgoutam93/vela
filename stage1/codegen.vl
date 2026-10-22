@@ -735,6 +735,7 @@ fn if_stmt(g: mut Gen, cond: ast.Expr, then: ast.Block, otherwise: ast.Else) {
     let c = expr(mut g, cond).c
     open(mut g, "if (" + c + ") {")
     block(mut g, then, "block")
+    let then_ends = g.dead
     match otherwise {
         ast.Else.NoElse => {
             close(mut g, "}")
@@ -744,6 +745,7 @@ fn if_stmt(g: mut Gen, cond: ast.Expr, then: ast.Block, otherwise: ast.Else) {
     }
     close(mut g, "} else {")
     g.depth = g.depth + 1
+    let mut else_ends = false
     match otherwise {
         ast.Else.ElseIf(s) => {
             // `else if`'s condition may need statements of its own, which
@@ -753,12 +755,17 @@ fn if_stmt(g: mut Gen, cond: ast.Expr, then: ast.Block, otherwise: ast.Else) {
                 ast.StmtKind.If(c2, then2, else2) => if_stmt(mut g, c2, then2, else2)
                 _ => {}
             }
+            else_ends = g.dead
             pop_frame(mut g)
         }
-        ast.Else.ElseBlock(b) => block(mut g, b, "block")
+        ast.Else.ElseBlock(b) => {
+            block(mut g, b, "block")
+            else_ends = g.dead
+        }
         ast.Else.NoElse => {}
     }
     close(mut g, "}")
+    g.dead = then_ends && else_ends  // as for a match: no code after both branches end
 }
 
 // `for x in xs`: the loop keeps its own reference to xs.
@@ -885,6 +892,7 @@ fn place(g: mut Gen, e: ast.Expr) -> Str {
 fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
     let v = expr(mut g, scrutinee).c
     let t = ty(g, scrutinee)
+    let mut all_end = true  // every arm returns, breaks or continues
     for i in 0..len(arms) {
         let a = arms[i]
         let last = i == len(arms) - 1
@@ -946,11 +954,17 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
                 }
             }
         }
+        if !g.dead {
+            all_end = false
+        }
         pop_frame(mut g)
         g.depth = g.depth - 1
     }
     emit(mut g, "}")
-    g.dead = false
+    // When every arm ends the function or the loop, nothing after the match
+    // runs, and no code is written for it: no releases after a match whose
+    // arms all return.
+    g.dead = all_end
 }
 
 fn payload(g: Gen, path: Str, enum: Int, vi: Int, i: Int) -> Str {

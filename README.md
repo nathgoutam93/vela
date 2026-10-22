@@ -65,7 +65,7 @@ checker that reports every error in one run, structs, enums, `match` and
 several files (`import`, `pub`), the `?` operator, a standard library for
 files, arguments, exit codes and string building, and Stage 1: the compiler
 rewritten in Vela, which writes the same C as Stage 0 for every program
-(`python3 compare_stages.py tokens ast check c`). M9 reached the fixed point
+(`python3 compare_stages.py tokens ast check`). M9 reached the fixed point
 and retired Python from the build. M10a added generics
 (`fn largest[T: Ord]`, `type Box[T]`), `test` blocks with `assert`, a
 formatter and JSON errors; M10b added function values (`fn(Int) -> Str`),

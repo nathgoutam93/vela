@@ -10,8 +10,8 @@ other build of it: one with AddressSanitizer, say, to check Stage 1
 itself). Every .vl file under tests/, std/ and stage1/ is given to both
 compilers, from the file's
 own directory and by its bare name, as run_tests.py does. Their stdout,
-stderr and exit codes must be identical: the same dump, the same errors,
-the same C.
+stderr and exit codes must be identical: the same dump, the same errors.
+(Until M10c the C was compared too; since then Stage 1 writes better C.)
 
 Stage 0 is frozen at M9, so this holds only for the M9 language. Files that
 use a later feature say `// stage 1 only` at the top and are left out; for
@@ -31,7 +31,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 STAGE0 = [sys.executable, str(ROOT / "stage0" / "main.py")]
 STAGE1 = Path(os.environ.get("VELA1", ROOT / "build" / "vela")).resolve()
-COMMANDS = ("tokens", "ast", "check", "c")
+# The C is no longer compared: since M10c, Stage 1 writes no code after a
+# match whose arms all return, and Stage 0, frozen at M9, still does.
+COMMANDS = ("tokens", "ast", "check")
 
 
 def build_stage1() -> None:
