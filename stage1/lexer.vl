@@ -1,0 +1,605 @@
+// Stage 1 lexer: source bytes in, tokens out. A port of stage0/lexer.py,
+// which explains the rules; this file follows it function by function, and
+// its tokens and messages are byte for byte the same.
+import errors
+import strings
+import text
+
+pub type Kind = enum {
+    Ident
+    Int
+    Bool
+    Str
+    Byte
+    Eof
+    Semi
+    // Keywords
+    Fn
+    Let
+    Mut
+    If
+    Else
+    Match
+    For
+    In
+    Return
+    Break
+    Continue
+    Type
+    Import
+    Pub
+    // Operators
+    DotDotEq
+    EqEq
+    NotEq
+    LtEq
+    GtEq
+    AndAnd
+    OrOr
+    DotDot
+    Arrow
+    FatArrow
+    LParen
+    RParen
+    Plus
+    Minus
+    Star
+    Slash
+    Percent
+    Comma
+    Eq
+    Lt
+    Gt
+    Bang
+    LBrace
+    RBrace
+    Colon
+    Dot
+    LBracket
+    RBracket
+    Question
+}
+
+pub type Token = struct {
+    kind: Kind
+    text: Str  // the source text; for an inserted `;`, "\n" or "" (end of file)
+    line: Int
+    col: Int
+    value: Str  // a string or byte literal's bytes, escapes decoded
+}
+
+// How Stage 0 spells a kind: the keyword or operator itself, or a class
+// name for tokens that carry text.
+pub fn kind_name(k: Kind) -> Str {
+    return match k {
+        Kind.Ident => "ident"
+        Kind.Int => "int"
+        Kind.Bool => "bool"
+        Kind.Str => "str"
+        Kind.Byte => "byte"
+        Kind.Eof => "eof"
+        Kind.Semi => ";"
+        Kind.Fn => "fn"
+        Kind.Let => "let"
+        Kind.Mut => "mut"
+        Kind.If => "if"
+        Kind.Else => "else"
+        Kind.Match => "match"
+        Kind.For => "for"
+        Kind.In => "in"
+        Kind.Return => "return"
+        Kind.Break => "break"
+        Kind.Continue => "continue"
+        Kind.Type => "type"
+        Kind.Import => "import"
+        Kind.Pub => "pub"
+        Kind.DotDotEq => "..="
+        Kind.EqEq => "=="
+        Kind.NotEq => "!="
+        Kind.LtEq => "<="
+        Kind.GtEq => ">="
+        Kind.AndAnd => "&&"
+        Kind.OrOr => "||"
+        Kind.DotDot => ".."
+        Kind.Arrow => "->"
+        Kind.FatArrow => "=>"
+        Kind.LParen => "("
+        Kind.RParen => ")"
+        Kind.Plus => "+"
+        Kind.Minus => "-"
+        Kind.Star => "*"
+        Kind.Slash => "/"
+        Kind.Percent => "%"
+        Kind.Comma => ","
+        Kind.Eq => "="
+        Kind.Lt => "<"
+        Kind.Gt => ">"
+        Kind.Bang => "!"
+        Kind.LBrace => "{"
+        Kind.RBrace => "}"
+        Kind.Colon => ":"
+        Kind.Dot => "."
+        Kind.LBracket => "["
+        Kind.RBracket => "]"
+        Kind.Question => "?"
+    }
+}
+
+pub fn is_keyword(k: Kind) -> Bool {
+    return match k {
+        Kind.Fn => true
+        Kind.Let => true
+        Kind.Mut => true
+        Kind.If => true
+        Kind.Else => true
+        Kind.Match => true
+        Kind.For => true
+        Kind.In => true
+        Kind.Return => true
+        Kind.Break => true
+        Kind.Continue => true
+        Kind.Type => true
+        Kind.Import => true
+        Kind.Pub => true
+        _ => false
+    }
+}
+
+fn keyword(word: Str) -> Option[Kind] {
+    return match word {
+        "fn" => Some(Kind.Fn)
+        "let" => Some(Kind.Let)
+        "mut" => Some(Kind.Mut)
+        "if" => Some(Kind.If)
+        "else" => Some(Kind.Else)
+        "match" => Some(Kind.Match)
+        "for" => Some(Kind.For)
+        "in" => Some(Kind.In)
+        "return" => Some(Kind.Return)
+        "break" => Some(Kind.Break)
+        "continue" => Some(Kind.Continue)
+        "type" => Some(Kind.Type)
+        "import" => Some(Kind.Import)
+        "pub" => Some(Kind.Pub)
+        _ => None
+    }
+}
+
+// The newline rule: after a line's last token, insert `;` if that token is
+// one of these.
+fn ends_statement(k: Kind) -> Bool {
+    return match k {
+        Kind.Ident => true
+        Kind.Int => true
+        Kind.Bool => true
+        Kind.Str => true
+        Kind.Byte => true
+        Kind.RParen => true
+        Kind.RBracket => true
+        Kind.RBrace => true
+        Kind.Question => true
+        Kind.Break => true
+        Kind.Continue => true
+        Kind.Return => true
+        _ => false
+    }
+}
+
+fn operator2(op: Str) -> Option[Kind] {
+    return match op {
+        "==" => Some(Kind.EqEq)
+        "!=" => Some(Kind.NotEq)
+        "<=" => Some(Kind.LtEq)
+        ">=" => Some(Kind.GtEq)
+        "&&" => Some(Kind.AndAnd)
+        "||" => Some(Kind.OrOr)
+        ".." => Some(Kind.DotDot)
+        "->" => Some(Kind.Arrow)
+        "=>" => Some(Kind.FatArrow)
+        _ => None
+    }
+}
+
+fn operator1(c: Byte) -> Option[Kind] {
+    return match c {
+        '(' => Some(Kind.LParen)
+        ')' => Some(Kind.RParen)
+        '+' => Some(Kind.Plus)
+        '-' => Some(Kind.Minus)
+        '*' => Some(Kind.Star)
+        '/' => Some(Kind.Slash)
+        '%' => Some(Kind.Percent)
+        ',' => Some(Kind.Comma)
+        ';' => Some(Kind.Semi)
+        '=' => Some(Kind.Eq)
+        '<' => Some(Kind.Lt)
+        '>' => Some(Kind.Gt)
+        '!' => Some(Kind.Bang)
+        '{' => Some(Kind.LBrace)
+        '}' => Some(Kind.RBrace)
+        ':' => Some(Kind.Colon)
+        '.' => Some(Kind.Dot)
+        '[' => Some(Kind.LBracket)
+        ']' => Some(Kind.RBracket)
+        '?' => Some(Kind.Question)
+        _ => None
+    }
+}
+
+// The bytes of a string literal escape (after the `\`), or -1.
+fn escape(c: Int) -> Int {
+    if c == int('n') {
+        return 10
+    }
+    if c == int('t') {
+        return 9
+    }
+    if c == int('r') {
+        return 13
+    }
+    if c == int('0') {
+        return 0
+    }
+    if c == int('\\') {
+        return 92
+    }
+    if c == int('"') {
+        return 34
+    }
+    return -1
+}
+
+fn is_digit(c: Int) -> Bool {
+    return c >= int('0') && c <= int('9')
+}
+
+fn is_ident_start(c: Int) -> Bool {
+    return c >= int('a') && c <= int('z') || c >= int('A') && c <= int('Z') || c == int('_')
+}
+
+fn is_ident_char(c: Int) -> Bool {
+    return is_ident_start(c) || is_digit(c)
+}
+
+type Lexer = struct {
+    src: Str
+    pos: Int  // index of the next byte to read
+    line: Int
+    line_start: Int  // index of the first byte of the current line
+    tokens: [Token]
+    errors: [errors.CompileError]
+}
+
+pub type Lexed = struct {
+    tokens: [Token]
+    errors: [errors.CompileError]  // sorted; the tokens are only usable when there are none
+}
+
+pub fn tokenize(src: Str) -> Lexed {
+    let mut lx = Lexer { src: src, pos: 0, line: 1, line_start: 0, tokens: [], errors: [] }
+    run(mut lx)
+    return Lexed { tokens: lx.tokens, errors: errors.sorted(lx.errors) }
+}
+
+// The byte at pos + ahead, or -1 past the end.
+fn peek(lx: Lexer, ahead: Int) -> Int {
+    let i = lx.pos + ahead
+    if i < len(lx.src) {
+        return int(lx.src[i])
+    }
+    return -1
+}
+
+fn col(lx: Lexer, pos: Int) -> Int {
+    return pos - lx.line_start + 1
+}
+
+fn add(lx: mut Lexer, kind: Kind, text: Str, start: Int, value: Str) {
+    push(mut lx.tokens, Token { kind: kind, text: text, line: lx.line, col: col(lx, start), value: value })
+}
+
+fn error(lx: mut Lexer, start: Int, message: Str) {
+    errors.add(mut lx.errors, errors.at(lx.line, col(lx, start), message))
+}
+
+fn insert_semicolon(lx: mut Lexer, text: Str) {
+    let n = len(lx.tokens)
+    if n > 0 && ends_statement(lx.tokens[n - 1].kind) {
+        add(mut lx, Kind.Semi, text, lx.pos, "")
+    }
+}
+
+fn run(lx: mut Lexer) {
+    for {
+        let c = peek(lx, 0)
+        if c == -1 {
+            insert_semicolon(mut lx, "")
+            add(mut lx, Kind.Eof, "", lx.pos, "")
+            return
+        }
+        if c == int(' ') || c == int('\t') || c == int('\r') {
+            lx.pos = lx.pos + 1
+        } else if c == int('\n') {
+            insert_semicolon(mut lx, "\n")
+            lx.pos = lx.pos + 1
+            lx.line = lx.line + 1
+            lx.line_start = lx.pos
+        } else if c == int('/') && peek(lx, 1) == int('/') {
+            // A comment runs to the end of the line. The newline itself is
+            // left for the branch above, so a comment never hides one.
+            for peek(lx, 0) != int('\n') && peek(lx, 0) != -1 {
+                lx.pos = lx.pos + 1
+            }
+        } else if is_digit(c) {
+            number(mut lx)
+        } else if is_ident_start(c) {
+            identifier(mut lx)
+        } else if c == int('"') {
+            string(mut lx)
+        } else if c == int('\'') {
+            byte_literal(mut lx)
+        } else {
+            operator(mut lx, c)
+        }
+    }
+}
+
+// The largest Int, as digits: a literal is too big if it is longer, or as
+// long and greater as a Str (the same digit count makes byte order numeric).
+fn too_big(digits: Str) -> Bool {
+    let max = "9223372036854775807"
+    return len(digits) > len(max) || len(digits) == len(max) && digits > max
+}
+
+fn number(lx: mut Lexer) {
+    let start = lx.pos
+    for is_digit(peek(lx, 0)) {
+        lx.pos = lx.pos + 1
+    }
+    if is_ident_char(peek(lx, 0)) {
+        // `12abc` is one bad token, not the number 12 then the name abc.
+        for is_ident_char(peek(lx, 0)) {
+            lx.pos = lx.pos + 1
+        }
+        error(mut lx, start, "invalid number '" + lx.src[start..lx.pos] + "'")
+        return
+    }
+    let digits = lx.src[start..lx.pos]
+    if len(digits) > 1 && digits[0] == '0' {
+        error(mut lx, start, "integer literal '" + digits + "' has a leading zero")
+    } else if too_big(digits) {
+        error(mut lx, start, "integer literal " + digits + " does not fit in Int (max 9223372036854775807)")
+    }
+    add(mut lx, Kind.Int, digits, start, "")
+}
+
+fn identifier(lx: mut Lexer) {
+    let start = lx.pos
+    for is_ident_char(peek(lx, 0)) {
+        lx.pos = lx.pos + 1
+    }
+    let word = lx.src[start..lx.pos]
+    match keyword(word) {
+        Some(k) => add(mut lx, k, word, start, "")
+        None => {
+            if word == "true" || word == "false" {
+                add(mut lx, Kind.Bool, word, start, "")
+            } else {
+                add(mut lx, Kind.Ident, word, start, "")
+            }
+        }
+    }
+}
+
+fn string(lx: mut Lexer) {
+    let start = lx.pos
+    lx.pos = lx.pos + 1  // the opening quote
+    let mut value = strings.builder()
+    for {
+        let c = peek(lx, 0)
+        if c == -1 || c == int('\n') {
+            // Stop at the end of the line, so the next line lexes normally.
+            error(mut lx, start, "string literal is not closed before the end of the line")
+            return
+        }
+        lx.pos = lx.pos + 1
+        if c == int('"') {
+            break
+        }
+        if c == int('\\') {
+            let e = peek(lx, 0)
+            let decoded = decode_escape(e)
+            if decoded < 0 {
+                let mut shown = ""
+                if e != -1 && e != int('\n') {
+                    shown = text.chr(e)
+                }
+                error(mut lx, lx.pos - 1, "unknown escape '\\" + shown + "'; use \\n \\t \\r \\0 \\\\ or \\\"")
+                continue  // keep scanning the string, so its end is found
+            }
+            strings.add_byte(mut value, byte(decoded))
+            lx.pos = lx.pos + 1
+        } else if c < 32 && c != int('\t') {
+            error(mut lx, lx.pos - 1, "control byte " + text.hex2(c) + " in string literal; use an escape")
+        } else {
+            strings.add_byte(mut value, byte(c))
+        }
+    }
+    let raw = lx.src[start + 1..lx.pos - 1]
+    let bad = text.first_invalid(raw)
+    if bad >= 0 {
+        error(mut lx, start + 1 + bad, "string literal is not valid UTF-8")
+    }
+    add(mut lx, Kind.Str, text.replace_invalid(lx.src[start..lx.pos]), start, strings.build(value))
+}
+
+fn decode_escape(c: Int) -> Int {
+    if c == -1 {
+        return -1
+    }
+    return escape(c)
+}
+
+// The index of the next `b` at or after `from`, or -1.
+fn find(s: Str, b: Byte, from: Int) -> Int {
+    for i in from..len(s) {
+        if s[i] == b {
+            return i
+        }
+    }
+    return -1
+}
+
+// `'a'` or `'\n'`: one byte, as a Byte value.
+fn byte_literal(lx: mut Lexer) {
+    let start = lx.pos
+    let mut end = find(lx.src, '\'', start + 1)
+    if peek(lx, 1) == int('\\') && peek(lx, 2) == int('\'') {
+        end = start + 3  // '\'' (an escaped quote)
+    }
+    let newline = find(lx.src, '\n', start)
+    if end < 0 || 0 <= newline && newline < end {
+        error(mut lx, start, "byte literal is not closed; write one character between quotes, as in 'a'")
+        lx.pos = lx.pos + 1
+        return
+    }
+    let body = lx.src[start + 1..end]
+    lx.pos = end + 1
+    // `'\'` at the very end of the file leaves pos one past the end, as in
+    // Stage 0, where slices stop at the end by themselves.
+    let mut stop = lx.pos
+    if stop > len(lx.src) {
+        stop = len(lx.src)
+    }
+    let shown = text.replace_invalid(lx.src[start..stop])
+    let mut value = 0
+    if len(body) == 2 && body[0] == '\\' {
+        let e = int(body[1])
+        if e == int('\'') {
+            value = 39
+        } else if escape(e) >= 0 {
+            value = escape(e)
+        } else {
+            error(mut lx, start + 1, "unknown escape '\\" + text.chr(e) + "'; use \\n \\t \\r \\0 \\\\ \\' or \\\"")
+            return
+        }
+    } else if len(body) == 1 && body[0] >= ' ' && body[0] < 127 && body[0] != '\\' {
+        value = int(body[0])
+    } else if len(body) == 0 {
+        error(mut lx, start, "empty byte literal; write one character between quotes, as in 'a'")
+        return
+    } else if body[0] >= 128 {
+        error(mut lx, start, "a byte literal holds one byte, but " + shown + " is " +
+            strings.from_int(len(body)) + " bytes in UTF-8; use a Str instead")
+        return
+    } else {
+        error(mut lx, start, "a byte literal holds one character, as in 'a', not " + shown)
+        return
+    }
+    let mut b = strings.builder()
+    strings.add_byte(mut b, byte(value))
+    add(mut lx, Kind.Byte, shown, start, strings.build(b))
+}
+
+fn operator(lx: mut Lexer, c: Int) {
+    let end3 = lx.pos + 3
+    if end3 <= len(lx.src) && lx.src[lx.pos..end3] == "..=" {
+        add(mut lx, Kind.DotDotEq, "..=", lx.pos, "")
+        lx.pos = lx.pos + 3
+        return
+    }
+    if lx.pos + 2 <= len(lx.src) {
+        let two = lx.src[lx.pos..lx.pos + 2]
+        match operator2(two) {
+            Some(k) => {
+                add(mut lx, k, two, lx.pos, "")
+                lx.pos = lx.pos + 2
+                return
+            }
+            None => {}
+        }
+    }
+    match operator1(byte(c)) {
+        Some(k) => {
+            add(mut lx, k, lx.src[lx.pos..lx.pos + 1], lx.pos, "")
+            lx.pos = lx.pos + 1
+        }
+        None => unexpected(mut lx, c)
+    }
+}
+
+// Report a byte that starts no token, and skip it.
+fn unexpected(lx: mut Lexer, c: Int) {
+    let start = lx.pos
+    lx.pos = lx.pos + 1
+    if c >= 128 {
+        // Skip the rest of a multi-byte UTF-8 character too (its
+        // continuation bytes are 0x80-0xBF), so it is one error, not several.
+        for peek(lx, 0) >= 128 && peek(lx, 0) <= 191 {
+            lx.pos = lx.pos + 1
+        }
+        error(mut lx, start, "unexpected byte " + text.hex2(c) + "; non-ASCII text is only allowed in comments and strings")
+    } else if c == int('&') || c == int('|') {
+        error(mut lx, start, "unexpected character '" + text.chr(c) + "'; did you mean '" + text.chr(c) + text.chr(c) + "'?")
+    } else if c >= 33 && c <= 126 {
+        error(mut lx, start, "unexpected character '" + text.chr(c) + "'")
+    } else {
+        error(mut lx, start, "unexpected control byte " + text.hex2(c))
+    }
+}
+
+// How a token is named in error messages: `found <describe(tok)>`.
+pub fn describe(tok: Token) -> Str {
+    return match tok.kind {
+        Kind.Ident => "identifier '" + tok.text + "'"
+        Kind.Int => "integer " + tok.text
+        Kind.Bool => tok.text
+        Kind.Str => "string " + tok.text
+        Kind.Byte => "byte " + tok.text
+        Kind.Eof => "end of file"
+        Kind.Semi => semicolon_name(tok.text)
+        _ => named(tok.kind)
+    }
+}
+
+fn semicolon_name(t: Str) -> Str {
+    if t == "\n" {
+        return "newline"
+    }
+    if t == "" {
+        return "end of file"
+    }
+    return "';'"
+}
+
+fn named(k: Kind) -> Str {
+    if is_keyword(k) {
+        return "keyword '" + kind_name(k) + "'"
+    }
+    return "'" + kind_name(k) + "'"
+}
+
+// One token per line, `line:col kind [text]`; what `vela tokens` prints.
+pub fn dump(tokens: [Token]) -> Str {
+    let mut b = strings.builder()
+    for tok in tokens {
+        strings.add_int(mut b, tok.line)
+        strings.add_byte(mut b, ':')
+        strings.add_int(mut b, tok.col)
+        strings.add_byte(mut b, ' ')
+        let k = tok.kind
+        if k == Kind.Ident || k == Kind.Int || k == Kind.Bool || k == Kind.Str || k == Kind.Byte {
+            strings.add(mut b, kind_name(k) + " " + tok.text)
+        } else if k == Kind.Semi && tok.text != ";" {
+            if tok.text == "\n" {
+                strings.add(mut b, "; (newline)")
+            } else {
+                strings.add(mut b, "; (end of file)")
+            }
+        } else {
+            strings.add(mut b, kind_name(k))
+        }
+        strings.add_byte(mut b, '\n')
+    }
+    return strings.build(b)
+}

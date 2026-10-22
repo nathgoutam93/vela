@@ -1,0 +1,74 @@
+// Errors in the program being compiled, as in stage0/errors.py: each has a
+// file, a position and a message, and a phase reports all of its errors
+// sorted by file, then position, then message, without exact duplicates.
+import strings
+
+pub type CompileError = struct {
+    path: Str  // "" until whoever knows the file fills it in
+    line: Int
+    col: Int
+    message: Str
+}
+
+pub fn at(line: Int, col: Int, message: Str) -> CompileError {
+    return CompileError { path: "", line: line, col: col, message: message }
+}
+
+// `file:line:col: error: message`
+pub fn render(e: CompileError) -> Str {
+    return e.path + ":" + strings.from_int(e.line) + ":" + strings.from_int(e.col) + ": error: " + e.message
+}
+
+fn same(a: CompileError, b: CompileError) -> Bool {
+    return a.path == b.path && a.line == b.line && a.col == b.col && a.message == b.message
+}
+
+// Adds `e` unless an identical error is already there.
+pub fn add(errors: mut [CompileError], e: CompileError) {
+    for old in errors {
+        if same(old, e) {
+            return
+        }
+    }
+    push(mut errors, e)
+}
+
+pub fn has_error_at(errors: [CompileError], line: Int, col: Int) -> Bool {
+    for e in errors {
+        if e.line == line && e.col == col {
+            return true
+        }
+    }
+    return false
+}
+
+fn before(a: CompileError, b: CompileError) -> Bool {
+    if a.path != b.path {
+        return a.path < b.path
+    }
+    if a.line != b.line {
+        return a.line < b.line
+    }
+    if a.col != b.col {
+        return a.col < b.col
+    }
+    return a.message < b.message
+}
+
+// Sorted into the order they are reported in. An insertion sort: a phase
+// rarely has more than a few dozen errors.
+pub fn sorted(errors: [CompileError]) -> [CompileError] {
+    let mut out = errors
+    let mut i = 1
+    for i < len(out) {
+        let e = out[i]
+        let mut j = i - 1
+        for j >= 0 && before(e, out[j]) {
+            out[j + 1] = out[j]
+            j = j - 1
+        }
+        out[j + 1] = e
+        i = i + 1
+    }
+    return out
+}

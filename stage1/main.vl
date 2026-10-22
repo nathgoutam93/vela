@@ -1,0 +1,61 @@
+// The Stage 1 compiler driver: the Vela version of stage0/main.py.
+//
+//     vela1 tokens FILE    print the token stream
+//
+// More commands arrive as the rest of the compiler is ported (M8). Exit
+// codes as in Stage 0: 0 success, 1 the program has errors, 2 bad command line.
+import errors
+import files
+import lexer
+import os
+
+fn main() {
+    let args = os.args()
+    if len(args) != 3 {
+        usage()
+    }
+    let command = args[1]
+    let path = args[2]
+    if command == "tokens" {
+        tokens(path)
+    } else {
+        usage()
+    }
+}
+
+fn usage() {
+    os.eprint("usage: vela1 tokens FILE")
+    os.exit(2)
+}
+
+fn read(path: Str) -> Str {
+    match files.read(path) {
+        Ok(text) => return text
+        Err(e) => {
+            os.eprint("vela: error: " + e)
+            os.exit(1)
+        }
+    }
+}
+
+// Print every error, each with the file it is in, and stop.
+fn fail(path: Str, errs: [errors.CompileError]) {
+    for e in errs {
+        let mut shown = e
+        if shown.path == "" {
+            shown.path = path
+        }
+        os.eprint(errors.render(shown))
+    }
+    os.exit(1)
+}
+
+fn tokens(path: Str) {
+    let lexed = lexer.tokenize(read(path))
+    if len(lexed.errors) > 0 {
+        fail(path, lexed.errors)
+    }
+    let out = lexer.dump(lexed.tokens)
+    // print adds a newline, and the dump already ends with one.
+    print(out[0..len(out) - 1])
+}

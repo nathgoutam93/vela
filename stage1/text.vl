@@ -1,0 +1,146 @@
+// Small text helpers that Python gives Stage 0 for free: hex numbers,
+// Python's chr() of a byte, and UTF-8 checking the way Python's decoder
+// does it. Messages must come out byte for byte as Stage 0's.
+import strings
+
+// `0x1f`: two lower-case hex digits, as Python's f"0x{c:02x}".
+pub fn hex2(c: Int) -> Str {
+    let digits = "0123456789abcdef"
+    return "0x" + digits[c / 16..c / 16 + 1] + digits[c % 16..c % 16 + 1]
+}
+
+// The text Python's chr(c) prints for a byte value: the byte itself below
+// 0x80, and above it the UTF-8 encoding of code point c (Python treats
+// the byte as a Latin-1 character).
+pub fn chr(c: Int) -> Str {
+    let mut b = strings.builder()
+    if c < 128 {
+        strings.add_byte(mut b, byte(c))
+    } else {
+        strings.add_byte(mut b, byte(192 + c / 64))
+        strings.add_byte(mut b, byte(128 + c % 64))
+    }
+    return strings.build(b)
+}
+
+// The length of the valid UTF-8 sequence starting at s[i], or 0 if the
+// bytes there are not one. The rules are Python's (and Unicode's): no
+// overlong forms, no surrogates, nothing above U+10FFFF.
+pub fn sequence_length(s: Str, i: Int) -> Int {
+    let c = int(s[i])
+    if c < 128 {
+        return 1
+    }
+    let mut n = 0
+    let mut lo = 128
+    let mut hi = 191  // the range allowed for the second byte
+    if c >= 194 && c <= 223 {
+        n = 2
+    } else if c == 224 {
+        n = 3
+        lo = 160
+    } else if c >= 225 && c <= 236 || c == 238 || c == 239 {
+        n = 3
+    } else if c == 237 {
+        n = 3
+        hi = 159
+    } else if c == 240 {
+        n = 4
+        lo = 144
+    } else if c >= 241 && c <= 243 {
+        n = 4
+    } else if c == 244 {
+        n = 4
+        hi = 143
+    } else {
+        return 0
+    }
+    if i + n > len(s) {
+        return 0
+    }
+    let second = int(s[i + 1])
+    if second < lo || second > hi {
+        return 0
+    }
+    for k in 2..n {
+        let next = int(s[i + k])
+        if next < 128 || next > 191 {
+            return 0
+        }
+    }
+    return n
+}
+
+// The offset of the first byte that is not valid UTF-8, or -1.
+pub fn first_invalid(s: Str) -> Int {
+    let mut i = 0
+    for i < len(s) {
+        let n = sequence_length(s, i)
+        if n == 0 {
+            return i
+        }
+        i = i + n
+    }
+    return -1
+}
+
+// How many bytes from s[i] make up one invalid sequence that Python's
+// decoder replaces with a single U+FFFD: the first byte, plus the
+// continuation bytes that were still acceptable before it went wrong.
+fn invalid_length(s: Str, i: Int) -> Int {
+    let c = int(s[i])
+    let mut n = 0
+    let mut lo = 128
+    let mut hi = 191
+    if c >= 194 && c <= 223 {
+        n = 2
+    } else if c == 224 {
+        n = 3
+        lo = 160
+    } else if c >= 225 && c <= 236 || c == 238 || c == 239 {
+        n = 3
+    } else if c == 237 {
+        n = 3
+        hi = 159
+    } else if c == 240 {
+        n = 4
+        lo = 144
+    } else if c >= 241 && c <= 243 {
+        n = 4
+    } else if c == 244 {
+        n = 4
+        hi = 143
+    } else {
+        return 1
+    }
+    let mut k = 1
+    for k < n && i + k < len(s) {
+        let next = int(s[i + k])
+        if k == 1 && (next < lo || next > hi) || k > 1 && (next < 128 || next > 191) {
+            return k
+        }
+        k = k + 1
+    }
+    return k
+}
+
+// `s` with each invalid UTF-8 sequence replaced by U+FFFD, as Python's
+// bytes.decode("utf-8", errors="replace") does.
+pub fn replace_invalid(s: Str) -> Str {
+    if first_invalid(s) < 0 {
+        return s
+    }
+    let mut b = strings.builder()
+    let mut i = 0
+    for i < len(s) {
+        let n = sequence_length(s, i)
+        if n > 0 {
+            strings.add(mut b, s[i..i + n])
+            i = i + n
+        } else {
+            strings.add(mut b, "�")  // U+FFFD, the replacement character
+            i = i + invalid_length(s, i)
+        }
+    }
+    return strings.build(b)
+}
