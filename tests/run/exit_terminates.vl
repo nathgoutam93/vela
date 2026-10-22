@@ -1,0 +1,17 @@
+// A call to os.exit ends a function as `return` does, so no return is
+// missing after it.
+// out: 7
+// exit: 4
+import os
+
+fn pick(n: Int) -> Int {
+    if n > 5 {
+        return n
+    }
+    os.exit(4)
+}
+
+fn main() {
+    print(pick(7))
+    print(pick(1))
+}

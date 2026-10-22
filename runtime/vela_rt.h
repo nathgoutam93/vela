@@ -133,10 +133,35 @@ void vela_map_set(vela_map *m, const void *key, const void *value);
 bool vela_map_remove(vela_map *m, const void *key);
 vela_array *vela_map_keys(vela_map *m);
 
-// ---- print ----
+// ---- print, and os.eprint for stderr ----
 void vela_print_int(int64_t x);
 void vela_print_bool(bool x);
 void vela_print_str(vela_str x);
+void vela_eprint_int(int64_t x);
+void vela_eprint_bool(bool x);
+void vela_eprint_str(vela_str x);
+
+// ---- The built-in modules: os, files, strings ----
+
+// Called by main() before anything else, to keep the command line.
+void vela_init(int argc, char **argv);
+// os.args(): every argument, the program's own name first.
+vela_array *vela_os_args(void);
+// os.exit(code): flushes output and ends the program. Like a panic, it
+// does not release the values still in use; the OS takes the memory back.
+_Noreturn void vela_os_exit(int64_t code, const char *loc);
+
+// files.read and files.write. They return true on success. *out gets the
+// contents (read) or, on failure, a message saying what went wrong.
+bool vela_files_read(vela_str path, vela_str *out);
+bool vela_files_write(vela_str path, vela_str data, vela_str *err);
+
+// strings.Builder is an array of bytes (elem = &vela_type_byte); building
+// copies them into a new Str. The builder must already be unique.
+void vela_builder_add(vela_array *b, vela_str s);
+void vela_builder_add_int(vela_array *b, int64_t n);
+vela_str vela_builder_build(vela_array *b);
+vela_str vela_from_int(int64_t n);
 
 // ---- Int arithmetic ----
 //

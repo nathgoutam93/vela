@@ -40,7 +40,7 @@ must release it. For every managed struct and enum this module generates
 """
 from __future__ import annotations
 
-from typesys import BOOL, BYTE, INT, STR, ArrayType, EnumType, MapType, StructType, Type
+from typesys import BOOL, BUILDER, BYTE, INT, STR, ArrayType, EnumType, MapType, StructType, Type
 
 PRIMITIVE_C = {INT: "int64_t", BYTE: "uint8_t", BOOL: "bool", STR: "vela_str"}
 RUNTIME_DESCRIPTORS = {INT: "&vela_type_int", BYTE: "&vela_type_byte", BOOL: "&vela_type_bool",
@@ -103,6 +103,8 @@ class Layout:
             return "Array_" + self.suffix(t.elem)
         if isinstance(t, MapType):
             return f"Map_{self.suffix(t.key)}_{self.suffix(t.value)}"
+        if t is BUILDER:
+            return "7strings_Builder"
         if isinstance(t, EnumType) and t.builtin:
             return self.base_name(t)
         return mangle(t.module, t.name)  # type: ignore[attr-defined]
@@ -110,7 +112,7 @@ class Layout:
     def c_type(self, t: Type | None) -> str:
         if t is None:
             return "void"
-        if isinstance(t, ArrayType):
+        if isinstance(t, ArrayType) or t is BUILDER:
             return "vela_array *"
         if isinstance(t, MapType):
             return "vela_map *"
@@ -175,7 +177,7 @@ class Layout:
         """Whether values of `t` hold references that must be counted."""
         if t is None or t in PRIMITIVE_C and t is not STR:
             return False
-        if t is STR or isinstance(t, (ArrayType, MapType)):
+        if t is STR or t is BUILDER or isinstance(t, (ArrayType, MapType)):
             return True
         if t not in self.managed_cache:
             self.managed_cache[t] = False  # in progress: only boxed slots lead back here
@@ -190,7 +192,7 @@ class Layout:
             return None
         if t is STR:
             return f"vela_str_retain({c});"
-        if isinstance(t, ArrayType):
+        if isinstance(t, ArrayType) or t is BUILDER:
             return f"vela_array_retain({c});"
         if isinstance(t, MapType):
             return f"vela_map_retain({c});"
@@ -201,7 +203,7 @@ class Layout:
             return None
         if t is STR:
             return f"vela_str_release({c});"
-        if isinstance(t, ArrayType):
+        if isinstance(t, ArrayType) or t is BUILDER:
             return f"vela_array_release({c});"
         if isinstance(t, MapType):
             return f"vela_map_release({c});"
@@ -211,7 +213,7 @@ class Layout:
         """A C expression for the vela_type describing `t` to arrays and maps."""
         if t in RUNTIME_DESCRIPTORS:
             return RUNTIME_DESCRIPTORS[t]
-        if isinstance(t, ArrayType):
+        if isinstance(t, ArrayType) or t is BUILDER:
             return "&vela_type_array"
         if isinstance(t, MapType):
             return "&vela_type_map"
@@ -232,7 +234,7 @@ class Layout:
         return out
 
     def define(self, t: Type, done: set[Type], out: list[str]) -> None:
-        if t in done or t in PRIMITIVE_C or isinstance(t, (ArrayType, MapType)):
+        if t in done or t in PRIMITIVE_C or t is BUILDER or isinstance(t, (ArrayType, MapType)):
             return
         done.add(t)
         for name, i, st in self.slots(t):
@@ -337,7 +339,7 @@ class Layout:
                 "}",
             ]
         for t in self.element_types:
-            if t in RUNTIME_DESCRIPTORS or isinstance(t, (ArrayType, MapType)):
+            if t in RUNTIME_DESCRIPTORS or t is BUILDER or isinstance(t, (ArrayType, MapType)):
                 continue
             n = self.names[t]
             if self.managed(t):

@@ -1,0 +1,65 @@
+// files: reading, writing, reading back, and the errors: a missing file,
+// a directory where a file is expected. Writing replaces a file whole.
+// out: 18 bytes, 2 lines
+// out: wrote 5
+// out: hello
+// out: wrote 2
+// out: hi
+// out: cannot read missing.txt: No such file or directory
+// out: cannot read .: Is a directory
+// out: cannot write .: Is a directory
+// out: cannot write no/such/dir.txt: No such file or directory
+// out: wrote 0
+// out: 0
+import files
+
+fn lines(text: Str) -> Int {
+    let mut n = 0
+    for c in text {
+        if c == '\n' {
+            n = n + 1
+        }
+    }
+    return n
+}
+
+fn show_read(path: Str) {
+    match files.read(path) {
+        Ok(text) => print(text)
+        Err(e) => print(e)
+    }
+}
+
+fn show_write(path: Str, text: Str) {
+    match files.write(path, text) {
+        Ok(n) => print("wrote " + digits(n))
+        Err(e) => print(e)
+    }
+}
+
+fn digits(n: Int) -> Str {
+    if n < 10 {
+        return "0123456789"[n..n + 1]
+    }
+    return digits(n / 10) + digits(n % 10)
+}
+
+fn main() {
+    match files.read("data.txt") {
+        Ok(text) => print(digits(len(text)) + " bytes, " + digits(lines(text)) + " lines")
+        Err(e) => print(e)
+    }
+    show_write("out.txt", "hello")
+    show_read("out.txt")
+    show_write("out.txt", "hi")
+    show_read("out.txt")
+    show_read("missing.txt")
+    show_read(".")
+    show_write(".", "x")
+    show_write("no/such/dir.txt", "x")
+    show_write("empty.txt", "")
+    match files.read("empty.txt") {
+        Ok(text) => print(len(text))
+        Err(e) => print(e)
+    }
+}

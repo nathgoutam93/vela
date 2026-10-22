@@ -23,7 +23,7 @@ commas or newlines):
               | "break" | "continue" | "return" [ expr ]
               | block
               | expr [ "=" expr ]
-    expr      = ... | [ NAME "." ] NAME "{" { NAME ":" expr } "}" | expr "." NAME
+    expr      = ... | [ NAME "." ] NAME "{" { NAME ":" expr } "}" | expr "." NAME | expr "?"
               | expr "[" expr [ ".." expr ] "]"
               | "[" [ expr { "," expr } ] "]" | "[" ":" "]" | "[" expr ":" expr { "," expr ":" expr } "]"
               | "match" expr "{" { pattern "=>" expr } "}"
@@ -50,7 +50,7 @@ from typing import Any, Callable
 from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, EnumDecl, Expr,
     ExprStmt, Field, FieldDecl, FieldInit, FnDecl, For, ForEach, ForRange, If, Import, Index,
-    IntLit, Let,
+    IntLit, Let, Try,
     MapEntry, MapLit, Match, MatchStmt, Name, Param, Pattern, PBind, PLit, Program, PRange,
     PVariant, PWild, Return, Slice, Stmt, StrLit, StructDecl, StructLit, TypeName, Unary,
     VariantDecl,
@@ -72,7 +72,7 @@ INFIX = {
 COMPARISONS = frozenset({"==", "!=", "<", "<=", ">", ">="})
 EXPRESSION_STARTS = frozenset({"int", "bool", "str", "byte", "[", "ident", "-", "!", "(", "match"})
 PREFIX = 30   # unary `-` and `!`: `-a * b` is `(-a) * b`
-POSTFIX = 40  # calls, field access, indexing: `-f(x).y[0]` is `-(((f(x)).y)[0])`
+POSTFIX = 40  # calls, field access, indexing, `?`: `-f(x).y[0]` is `-(((f(x)).y)[0])`
 
 
 def parse(tokens: list[Token]) -> Program:
@@ -559,6 +559,9 @@ class Parser:
                 left = Field(left, name.text, name.line, name.col)
             elif tok.kind == "[" and POSTFIX >= min_bp:
                 left = self.index(left)
+            elif tok.kind == "?" and POSTFIX >= min_bp:
+                self.advance()
+                left = Try(left, tok.line, tok.col)
             elif tok.kind in INFIX and INFIX[tok.kind][0] >= min_bp:
                 if tok.kind in COMPARISONS and after_comparison:
                     raise self.error(

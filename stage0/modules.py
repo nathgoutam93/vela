@@ -6,9 +6,15 @@ A module is loaded once, however many files import it, and its name in
 other files is the name it was imported by: `lexer.next(s)`,
 `lexer.Token`.
 
-A few module names are built in: the standard modules (STD_MODULES). They
-have no file; the checker knows their functions. `import maps` always
-means the standard module, even when there is a maps.vl.
+Some module names belong to the standard library, and `import maps`
+always means the standard module, even when there is a maps.vl. There are
+two kinds:
+
+- Built-in modules (STD_MODULES) have no file. The checker knows their
+  functions and the runtime implements them in C: maps, files, os,
+  strings.
+- Standard modules written in Vela live in the std/ directory next to
+  stage0/, and are loaded like any other module: bytes.
 
 Loading runs before anything is checked. It lexes and parses each file,
 follows its imports, and reports:
@@ -34,11 +40,19 @@ import lexer
 import parser
 from ast_nodes import Import, Program
 from errors import CompileError, CompileErrors, ErrorList
+from typesys import BUILDER
 
-# The standard modules and the functions in each.
+# The built-in modules, the functions in each, and their types.
 STD_MODULES = {
     "maps": frozenset({"has", "get", "remove", "keys"}),
+    "files": frozenset({"read", "write"}),
+    "os": frozenset({"args", "exit", "eprint"}),
+    "strings": frozenset({"builder", "add", "add_byte", "add_int", "build", "from_int"}),
 }
+STD_TYPES = {"strings": {"Builder": BUILDER}}
+
+# The standard modules written in Vela, shown in messages as std/name.vl.
+STD_DIR = Path(__file__).resolve().parent.parent / "std"
 
 
 @dataclass(eq=False)  # compared by identity
@@ -59,7 +73,8 @@ class Module:
         return self.name or Path(self.path).stem
 
 
-STD = {name: Module(name, "", std=fns) for name, fns in STD_MODULES.items()}
+STD = {name: Module(name, "", std=fns, types=dict(STD_TYPES.get(name, {})))
+       for name, fns in STD_MODULES.items()}
 
 
 def load(path: str, source: bytes) -> list[Module]:
@@ -79,16 +94,18 @@ class Loader:
         self.order: list[Module] = []  # finished modules, dependencies first
         self.active: list[Module] = []  # the chain of imports being followed
 
-    def file(self, name: str, path: str, source: bytes) -> Module:
-        """Lex and parse one file, then load what it imports."""
-        module = Module(name, path)
+    def file(self, name: str, path: str, source: bytes, shown: str | None = None) -> Module:
+        """Lex and parse one file, then load what it imports. `shown` is how
+        messages name the file, if not by `path`."""
+        shown = shown or path
+        module = Module(name, shown)
         self.by_path[os.path.normpath(path)] = module
         try:
             # The lexer and parser are each a phase: a file with lexical
             # errors is not parsed, and its imports are not followed.
             module.program = parser.parse(lexer.tokenize(source))
         except CompileErrors as e:
-            self.add(e.errors, path)
+            self.add(e.errors, shown)
             # The parser recovers from errors, so the imports of a file
             # with syntax errors are still known and still worth loading.
             module.program = e.program
@@ -116,6 +133,10 @@ class Loader:
             importer.imports[imp.name] = STD[imp.name]
             return
         path = os.path.join(self.directory, imp.name + ".vl")
+        shown = path
+        if (STD_DIR / (imp.name + ".vl")).is_file():
+            path = str(STD_DIR / (imp.name + ".vl"))
+            shown = f"std/{imp.name}.vl"
         known = self.by_path.get(os.path.normpath(path))
         if known in self.active:
             chain = self.active[self.active.index(known):]
@@ -132,5 +153,5 @@ class Loader:
             except OSError:
                 self.report(importer, imp, f"cannot find module '{imp.name}': there is no file {path}")
                 return
-            known = self.file(imp.name, path, source)
+            known = self.file(imp.name, path, source, shown)
         importer.imports[imp.name] = known

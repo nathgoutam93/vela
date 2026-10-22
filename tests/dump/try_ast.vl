@@ -1,0 +1,11 @@
+// dump: ast
+// out: (fn f ((s Str)) Result[Int, Str]
+// out:   (block
+// out:     (let n (? (call parse s)))
+// out:     (? (call g n))
+// out:     (return (call Ok (+ (- (. (? (call h n)) size)) 1)))))
+fn f(s: Str) -> Result[Int, Str] {
+    let n = parse(s)?
+    g(n)?
+    return Ok(-h(n)?.size + 1)
+}

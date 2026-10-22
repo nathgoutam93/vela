@@ -1,0 +1,53 @@
+// M7's "a Vela program reads a file, counts words, writes a report":
+//
+//     word_report INPUT REPORT
+//
+// It then reads the report back and prints it, so the test sees it.
+// args: input.txt report.txt
+// out: wrote report.txt, 162 bytes
+// out: words: 39
+// out: distinct: 21
+// out:
+// out: the     6 ######
+// out: dog     4 ####
+// out: fox     4 ####
+// out: lazy    3 ###
+// out: quick   3 ###
+// out: a       2 ##
+// out: brown   2 ##
+// out: is      2 ##
+// out: and     1 #
+// out: does    1 #
+// out:
+import files
+import os
+import report
+import strings
+import words
+
+fn main() {
+    let args = os.args()
+    if len(args) != 3 {
+        os.eprint("usage: word_report INPUT REPORT")
+        os.exit(2)
+    }
+    match run(args[1], args[2]) {
+        Ok(n) => print("wrote " + args[2] + ", " + strings.from_int(n) + " bytes")
+        Err(e) => fail(e)
+    }
+    match files.read(args[2]) {
+        Ok(text) => print(text)
+        Err(e) => fail(e)
+    }
+}
+
+fn run(input: Str, output: Str) -> Result[Int, Str] {
+    let text = files.read(input)?
+    let all = words.split(text)
+    return files.write(output, report.render(len(all), words.count(all), 10))
+}
+
+fn fail(message: Str) {
+    os.eprint("word_report: " + message)
+    os.exit(1)
+}

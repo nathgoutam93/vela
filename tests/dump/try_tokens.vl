@@ -1,0 +1,20 @@
+// dump: tokens
+// out: 19:1 let
+// out: 19:5 ident n
+// out: 19:7 =
+// out: 19:9 ident parse
+// out: 19:14 (
+// out: 19:15 ident s
+// out: 19:16 )
+// out: 19:17 ?
+// out: 19:18 ; (newline)
+// out: 20:1 ident f
+// out: 20:2 (
+// out: 20:3 )
+// out: 20:4 ?
+// out: 20:5 .
+// out: 20:6 ident x
+// out: 20:7 ; (newline)
+// out: 21:1 eof
+let n = parse(s)?
+f()?.x

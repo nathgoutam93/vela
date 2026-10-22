@@ -42,6 +42,23 @@ class ErrorType(Type):
         return "<error>"  # never shown: every message involving ERROR is skipped
 
 
+class StdType(Type):
+    """A type a standard module provides, such as strings.Builder. Its
+    values are handled by the runtime; Vela code sees only its functions."""
+
+    def __init__(self, module: str, name: str):
+        self.module = module
+        self.name = name
+        self.pub = True
+
+    def __str__(self) -> str:
+        return f"{self.module}.{self.name}"
+
+
+# A growing buffer of bytes for building a Str piece by piece. In C it is an
+# array of bytes, so it is reference counted and copied on write like one.
+BUILDER = StdType("strings", "Builder")
+
 INT = PrimType("Int")
 BYTE = PrimType("Byte")
 BOOL = PrimType("Bool")

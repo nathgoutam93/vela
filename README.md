@@ -25,6 +25,7 @@ python3 run_tests.py                      # run the test suite
 ```
 stage0/      the compiler in Python (thrown away after bootstrap)
 runtime/     C runtime linked into every program
+std/         standard modules written in Vela
 tests/run/   programs and their expected output
 tests/fail/  programs and the exact errors they must produce
 tests/dump/  expected token and syntax-tree dumps
@@ -34,10 +35,12 @@ run_tests.py the golden-test runner
 
 ## Status
 
-M0 to M6 are done: the driver and test runner, expressions, variables,
+M0 to M7 are done: the driver and test runner, expressions, variables,
 functions and control flow, a type checker that reports every error in one
 run, structs, enums, `match` and `Option`/`Result`, reference-counted
-strings, arrays and maps, and programs of several files (`import`, `pub`).
+strings, arrays and maps, programs of several files (`import`, `pub`), the
+`?` operator, and a standard library for files, arguments, exit codes and
+string building.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
 

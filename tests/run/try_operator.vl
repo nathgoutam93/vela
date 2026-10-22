@@ -1,0 +1,132 @@
+// `?` on Result and Option: the value inside, or an early return that
+// releases everything live, from inside loops, matches and nested calls.
+// Under --sanitize a missed release is a leak.
+// out: 579
+// out: bad digit 'x' in "12x"
+// out: 7
+// out: sum is 30
+// out: bad digit '-' in "-4"
+// out: 3
+// out: 3
+// out: none
+// out: 10
+// out: checked 2 lines
+// out: line 3 is empty
+import strings
+
+fn digit(c: Byte, s: Str) -> Result[Int, Str] {
+    if c >= '0' && c <= '9' {
+        return Ok(int(c - '0'))
+    }
+    let mut b = strings.builder()
+    strings.add(b, "bad digit '")
+    strings.add_byte(b, c)
+    strings.add(b, "' in \"" + s + "\"")
+    return Err(strings.build(b))
+}
+
+fn number(s: Str) -> Result[Int, Str] {
+    let mut n = 0
+    for c in s {
+        n = n * 10 + digit(c, s)?
+    }
+    return Ok(n)
+}
+
+// The error passes through a Result of a different value type.
+fn total(items: [Str]) -> Result[Str, Str] {
+    let mut sum = 0
+    let mut seen: [Str] = []
+    for item in items {
+        push(seen, item + "!")
+        sum = sum + number(item)?
+    }
+    return Ok("sum is " + strings.from_int(sum))
+}
+
+fn show(r: Result[Int, Str]) {
+    match r {
+        Ok(n) => print(n)
+        Err(e) => print(e)
+    }
+}
+
+fn show_str(r: Result[Str, Str]) {
+    match r {
+        Ok(s) => print(s)
+        Err(e) => print(e)
+    }
+}
+
+type Node = struct {
+    name: Str
+    next: Option[Str]
+}
+
+fn find(nodes: [Node], name: Str) -> Option[Node] {
+    for n in nodes {
+        if n.name == name {
+            return Some(n)
+        }
+    }
+    return None
+}
+
+// Two hops along `next`; None as soon as one is missing.
+fn two_hops(nodes: [Node], start: Str) -> Option[Int] {
+    let first = find(nodes, start)?
+    let second = find(nodes, first.next?)?
+    return Some(len(second.name))
+}
+
+fn show_opt(o: Option[Int]) {
+    match o {
+        Some(n) => print(n)
+        None => print("none")
+    }
+}
+
+fn check_lines(lines: [Str]) -> Result[Int, Str] {
+    let mut i = 0
+    for line in lines {
+        i = i + 1
+        // `?` on a call may stand alone as a statement.
+        nonempty(line, i)?
+    }
+    return Ok(i)
+}
+
+fn nonempty(line: Str, i: Int) -> Result[Bool, Str] {
+    if len(line) == 0 {
+        return Err("line " + strings.from_int(i) + " is empty")
+    }
+    return Ok(true)
+}
+
+fn main() {
+    show(number("579"))
+    show(number("12x"))
+    show(number("7"))
+    show_str(total(["10", "20"]))
+    show_str(total(["1", "-4", "5"]))
+    let nodes = [
+        Node { name: "a", next: Some("bcd") },
+        Node { name: "bcd", next: Some("efg") },
+        Node { name: "efg", next: None },
+    ]
+    show_opt(two_hops(nodes, "a"))
+    show_opt(two_hops(nodes, "bcd"))
+    show_opt(two_hops(nodes, "zz"))
+    match check_lines(["ab", "c"]) {
+        Ok(n) => print(n * 5)
+        Err(e) => print(e)
+    }
+    match check_lines(["ab", "c"]) {
+        Ok(n) => print("checked " + strings.from_int(n) + " lines")
+        Err(e) => print(e)
+    }
+    match check_lines(["ab", "c", "", "d"]) {
+        Ok(n) => print(n)
+        Err(e) => print(e)
+    }
+}

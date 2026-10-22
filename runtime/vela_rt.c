@@ -1,5 +1,6 @@
 #include "vela_rt.h"
 
+#include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -333,4 +334,162 @@ void vela_print_bool(bool x) {
 void vela_print_str(vela_str x) {
     if (x.len) fwrite(x.data, 1, (size_t)x.len, stdout);
     putchar('\n');
+}
+
+void vela_eprint_int(int64_t x) {
+    fprintf(stderr, "%" PRId64 "\n", x);
+}
+
+void vela_eprint_bool(bool x) {
+    fputs(x ? "true\n" : "false\n", stderr);
+}
+
+void vela_eprint_str(vela_str x) {
+    if (x.len) fwrite(x.data, 1, (size_t)x.len, stderr);
+    fputc('\n', stderr);
+}
+
+// ---- os ----
+
+static int saved_argc;
+static char **saved_argv;
+
+void vela_init(int argc, char **argv) {
+    saved_argc = argc;
+    saved_argv = argv;
+}
+
+vela_array *vela_os_args(void) {
+    vela_array *a = vela_array_new(&vela_type_str, saved_argc);
+    for (int i = 0; i < saved_argc; i++) {
+        // argv lives as long as the program, so its strings need no object,
+        // just like literals.
+        vela_str s = {NULL, (const uint8_t *)saved_argv[i], (int64_t)strlen(saved_argv[i])};
+        vela_array_push(a, &s);
+    }
+    return a;
+}
+
+void vela_os_exit(int64_t code, const char *loc) {
+    if (code < 0 || code > 255) vela_panic(loc, "exit code must be 0 to 255");
+    fflush(stdout);
+    fflush(stderr);
+    _Exit((int)code);
+}
+
+// ---- files ----
+
+static vela_str str_from(const char *data, size_t len) {
+    vela_strobj *obj = vela_alloc(sizeof(vela_strobj) + len);
+    obj->rc = 1;
+    if (len) memcpy(obj->bytes, data, len);
+    return (vela_str){obj, obj->bytes, (int64_t)len};
+}
+
+// "cannot read notes.txt: No such file or directory"
+static vela_str file_error(const char *verb, vela_str path, const char *why) {
+    size_t n = strlen(verb) + (size_t)path.len + strlen(why) + 4;
+    char *buf = vela_alloc(n);
+    int len = snprintf(buf, n, "%s %.*s: %s", verb, (int)path.len, (const char *)path.data, why);
+    vela_str s = str_from(buf, (size_t)len);
+    free(buf);
+    return s;
+}
+
+// The path as a C string, or NULL if it holds a zero byte (C would cut it there).
+static char *c_path(vela_str path) {
+    if (path.len && memchr(path.data, 0, (size_t)path.len)) return NULL;
+    char *p = vela_alloc((size_t)path.len + 1);
+    if (path.len) memcpy(p, path.data, (size_t)path.len);
+    p[path.len] = 0;
+    return p;
+}
+
+bool vela_files_read(vela_str path, vela_str *out) {
+    char *p = c_path(path);
+    if (!p) {
+        *out = file_error("cannot read", path, "the path contains a zero byte");
+        return false;
+    }
+    FILE *f = fopen(p, "rb");
+    free(p);
+    if (!f) {
+        *out = file_error("cannot read", path, strerror(errno));
+        return false;
+    }
+    // Read in chunks into a growing buffer: the size of a pipe or a
+    // terminal is not known in advance.
+    size_t cap = 4096, len = 0;
+    char *buf = vela_alloc(cap);
+    for (;;) {
+        len += fread(buf + len, 1, cap - len, f);
+        if (len < cap) break;
+        cap *= 2;
+        buf = vela_realloc(buf, cap);
+    }
+    int failed = ferror(f) ? errno : 0;
+    fclose(f);
+    if (failed) {
+        free(buf);
+        *out = file_error("cannot read", path, strerror(failed));
+        return false;
+    }
+    *out = str_from(buf, len);
+    free(buf);
+    return true;
+}
+
+bool vela_files_write(vela_str path, vela_str data, vela_str *err) {
+    char *p = c_path(path);
+    if (!p) {
+        *err = file_error("cannot write", path, "the path contains a zero byte");
+        return false;
+    }
+    FILE *f = fopen(p, "wb");
+    free(p);
+    if (!f) {
+        *err = file_error("cannot write", path, strerror(errno));
+        return false;
+    }
+    size_t written = data.len ? fwrite(data.data, 1, (size_t)data.len, f) : 0;
+    int failed = written < (size_t)data.len ? errno : 0;
+    // fclose writes what is still buffered, so it can fail too (a full disk).
+    if (fclose(f) != 0 && !failed) failed = errno;
+    if (failed) {
+        *err = file_error("cannot write", path, strerror(failed));
+        return false;
+    }
+    return true;
+}
+
+// ---- strings ----
+
+void vela_builder_add(vela_array *b, vela_str s) {
+    if (s.len == 0) return;
+    int64_t need;
+    if (__builtin_add_overflow(b->len, s.len, &need)) vela_panic("vela runtime", "string too long");
+    if (need > b->cap) {
+        int64_t cap = b->cap ? b->cap : 16;
+        while (cap < need) cap *= 2;
+        b->data = vela_realloc(b->data, (size_t)cap);
+        b->cap = cap;
+    }
+    memcpy(b->data + b->len, s.data, (size_t)s.len);
+    b->len = need;
+}
+
+void vela_builder_add_int(vela_array *b, int64_t n) {
+    char buf[24];  // INT64_MIN is 20 characters
+    int len = snprintf(buf, sizeof buf, "%" PRId64, n);
+    vela_builder_add(b, (vela_str){NULL, (const uint8_t *)buf, len});
+}
+
+vela_str vela_builder_build(vela_array *b) {
+    return str_from((const char *)b->data, (size_t)b->len);
+}
+
+vela_str vela_from_int(int64_t n) {
+    char buf[24];
+    int len = snprintf(buf, sizeof buf, "%" PRId64, n);
+    return str_from(buf, (size_t)len);
 }

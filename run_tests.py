@@ -16,13 +16,16 @@ whose main file is main.vl. Comment lines at the very top of the .vl file
     // err: <text>    a line on stderr: the compiler's in tests/fail,
     //                the program's in tests/run
     // exit: <n>      the program's exit code (default 0)
+    // args: <words>  command-line arguments for the program, split like a shell would
     // dump: <what>   tests/dump only: `tokens` or `ast`, the dump that the
     //                `out:` lines are compared against
 
 The directory a test lives in decides what is checked:
 
     tests/run/    must compile; the program runs; stdout, stderr and the
-                  exit code must match exactly
+                  exit code must match exactly. It runs in a scratch
+                  directory holding a copy of the test's files, so it can
+                  read them and write files of its own
     tests/fail/   the compiler must reject it with exit code 1, and its
                   stderr must match exactly
     tests/dump/   `vela tokens` or `vela ast` must print exactly the `out:` lines
@@ -38,6 +41,7 @@ import difflib
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -61,7 +65,7 @@ STRICT_CFLAGS = (
 # behaviour, and, when the program exits, any memory it never freed.
 SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all"
 
-HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump):(.*)$")
+HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args):(.*)$")
 COMPILE_TIMEOUT = 60
 RUN_TIMEOUT = 10
 
@@ -72,6 +76,7 @@ class Expectations:
     err: list[str] = field(default_factory=list)
     exit: int = 0
     dump: str | None = None
+    args: list[str] = field(default_factory=list)
 
 
 def read_expectations(path: Path) -> Expectations:
@@ -92,6 +97,8 @@ def read_expectations(path: Path) -> Expectations:
             expect.err.append(value)
         elif key == "exit":
             expect.exit = int(value)
+        elif key == "args":
+            expect.args = shlex.split(value)
         else:
             expect.dump = value.strip()
     return expect
@@ -132,9 +139,14 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
 
         if built.returncode != 0:
             return [f"compiler exited with {built.returncode}:", *built.stderr.splitlines()]
+        workdir = Path(tmp) / "work"
+        if path.name == "main.vl" and path.parent.parent.name == "run":
+            shutil.copytree(path.parent, workdir)  # a multi-file test: its files too
+        else:
+            workdir.mkdir()
         try:
             ran = subprocess.run(
-                [str(exe)], cwd=path.parent, env=env, capture_output=True, text=True,
+                [str(exe), *expect.args], cwd=workdir, env=env, capture_output=True, text=True,
                 timeout=RUN_TIMEOUT,
             )
         except subprocess.TimeoutExpired:

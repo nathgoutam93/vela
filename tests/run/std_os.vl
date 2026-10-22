@@ -1,0 +1,32 @@
+// os: arguments (the program's name first), printing to stderr, and
+// exiting with a code. Everything printed before os.exit appears.
+// args: one "two words" 3
+// out: 4
+// out: one
+// out: two words
+// out: 3
+// out: done
+// err: to stderr
+// err: 42
+// err: true
+// exit: 3
+import os
+
+fn finish(code: Int) {
+    let keep = ["values", "still", "alive"]
+    print("done")
+    os.exit(code)
+}
+
+fn main() {
+    let args = os.args()
+    print(len(args))
+    for a in args[1..len(args)] {
+        print(a)
+    }
+    os.eprint("to stderr")
+    os.eprint(42)
+    os.eprint(true)
+    finish(3)
+    print("not reached")
+}

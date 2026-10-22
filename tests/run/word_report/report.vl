@@ -1,0 +1,77 @@
+// Counts to a report: the most frequent words first, with a bar each.
+import maps
+import strings
+
+pub type Count = struct {
+    word: Str
+    n: Int
+}
+
+pub fn render(total: Int, counts: Map[Str, Int], top: Int) -> Str {
+    let ranked = rank(counts)
+    let mut b = strings.builder()
+    strings.add(b, "words: ")
+    strings.add_int(b, total)
+    strings.add(b, "\ndistinct: ")
+    strings.add_int(b, len(ranked))
+    strings.add(b, "\n")
+    let mut i = 0
+    for i < len(ranked) && i < top {
+        let c = ranked[i]
+        strings.add(b, "\n")
+        strings.add(b, c.word)
+        let mut pad = len(c.word)
+        for pad < 8 {
+            strings.add_byte(b, ' ')
+            pad = pad + 1
+        }
+        strings.add_int(b, c.n)
+        strings.add_byte(b, ' ')
+        for _ in 0..c.n {
+            strings.add_byte(b, '#')
+        }
+        i = i + 1
+    }
+    strings.add(b, "\n")
+    return strings.build(b)
+}
+
+// Most frequent first; equally frequent words alphabetically. An
+// insertion sort: plenty for a few hundred words.
+fn rank(counts: Map[Str, Int]) -> [Count] {
+    let mut out: [Count] = []
+    for w in maps.keys(counts) {
+        push(out, Count { word: w, n: counts[w] })
+    }
+    let mut i = 1
+    for i < len(out) {
+        let item = out[i]
+        let mut j = i - 1
+        for j >= 0 && before(item, out[j]) {
+            out[j + 1] = out[j]
+            j = j - 1
+        }
+        out[j + 1] = item
+        i = i + 1
+    }
+    return out
+}
+
+fn before(a: Count, b: Count) -> Bool {
+    if a.n != b.n {
+        return a.n > b.n
+    }
+    return less(a.word, b.word)
+}
+
+// Byte order, which for lower-case ASCII words is alphabetical order.
+fn less(a: Str, b: Str) -> Bool {
+    let mut i = 0
+    for i < len(a) && i < len(b) {
+        if a[i] != b[i] {
+            return a[i] < b[i]
+        }
+        i = i + 1
+    }
+    return len(a) < len(b)
+}

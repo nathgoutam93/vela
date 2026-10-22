@@ -35,12 +35,12 @@ from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, Expr,
     ExprStmt, Field, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let, MapLit, Match,
     MatchStmt, Name, Pattern, PBind, PLit, Program, PRange, PVariant, PWild, Return, Slice, Stmt,
-    StrLit, StructDecl, StructLit, TypeName, Unary,
+    StrLit, StructDecl, StructLit, Try, TypeName, Unary,
 )
 from errors import CompileError, ErrorList
 from modules import STD_MODULES, Module
 from typesys import (
-    BOOL, BUILTIN_VARIANTS, BYTE, ERROR, GENERICS, INT, MAP_KEYS, PRIMITIVES, STR, ArrayType,
+    BOOL, BUILDER, BUILTIN_VARIANTS, BYTE, ERROR, GENERICS, INT, MAP_KEYS, PRIMITIVES, STR, ArrayType,
     EnumType, MapType, StructType, Type, TypeTable, Variant, viewpoint,
 )
 
@@ -51,7 +51,25 @@ NO_VALUE = None  # the "type" of a call that returns nothing
 # `maps.get(m, k)`. push and remove change their first argument, so it must
 # be a place that can change: a `let mut` variable, or a part of one.
 PRELUDE = frozenset({"print", "len", "push", "int", "byte"})
-BUILTINS = PRELUDE.union(*STD_MODULES.values())
+BUILTINS = PRELUDE | {f"{m}.{f}" for m, fns in STD_MODULES.items() for f in fns}
+
+# The built-in functions whose types do not depend on their arguments:
+# parameter types and result type (NO_VALUE for none), made on demand so a
+# program that never reads a file gets no Result[Str, Str] type.
+SIGNATURES: dict[str, Callable[[TypeTable], tuple[list[Type], Type | None]]] = {
+    "files.read": lambda t: ([STR], t.result(STR, STR)),  # the contents, or why not
+    "files.write": lambda t: ([STR, STR], t.result(INT, STR)),  # the number of bytes written
+    "os.args": lambda t: ([], t.array(STR)),  # the program's name first, as in C and Go
+    "os.exit": lambda t: ([INT], NO_VALUE),
+    "strings.builder": lambda t: ([], BUILDER),
+    "strings.add": lambda t: ([BUILDER, STR], NO_VALUE),
+    "strings.add_byte": lambda t: ([BUILDER, BYTE], NO_VALUE),
+    "strings.add_int": lambda t: ([BUILDER, INT], NO_VALUE),
+    "strings.build": lambda t: ([BUILDER], STR),
+    "strings.from_int": lambda t: ([INT], STR),
+}
+# Like push, these change their first argument, which must be a place.
+CHANGES_FIRST = frozenset({"strings.add", "strings.add_byte", "strings.add_int"})
 PRINTABLE = (INT, BYTE, BOOL, STR)
 
 ARITHMETIC = frozenset({"+", "-", "*", "/", "%"})
@@ -315,7 +333,7 @@ class Checker:
         """The pub function `module.name`, or the name of a standard
         module's function (None once the reason is reported)."""
         if name in module.std:
-            return name
+            return f"{module.name}.{name}"
         f = module.fns.get(name)
         if f is None:
             if name in module.types:
@@ -359,9 +377,11 @@ class Checker:
         if isinstance(s, Block):
             self.block(s)
         elif isinstance(s, ExprStmt):
-            if not isinstance(s.expr, Call):
+            call = s.expr.inner if isinstance(s.expr, Try) else s.expr
+            if not isinstance(call, Call):
                 # `1 + 2` on a line by itself computes a value and throws it
                 # away, which is almost always a mistake. Go rejects it too.
+                # `f(x)?` may stand alone: it can return early.
                 self.report(s.expr, "this value is not used; only a call can stand alone as a statement")
             self.infer(s.expr)  # a call's result may be ignored
         elif isinstance(s, Let):
@@ -775,6 +795,8 @@ class Checker:
             return self.match_expr(e)
         if isinstance(e, Index):
             return self.index(e)
+        if isinstance(e, Try):
+            return self.try_expr(e)
         if isinstance(e, Slice):
             return self.slice(e)
         if isinstance(e, ArrayLit):
@@ -842,6 +864,33 @@ class Checker:
         self.infer(e.index)
         return ERROR
 
+    def try_expr(self, e: Try) -> Type:
+        """`x?` on a Result: the value inside an Ok, or else the function
+        returns the Err at once. The function must return a Result with the
+        same error type, which is passed on unchanged. On an Option the
+        same with Some and None."""
+        t = self.value(e.inner)
+        if t is ERROR:
+            return ERROR
+        if not (isinstance(t, EnumType) and t.builtin):
+            self.report(e, f"'?' needs a Result or an Option, found {t}")
+            return ERROR
+        f = self.fn
+        assert f is not None
+        result = f.sig.result
+        returns = "returns nothing" if result is None else f"returns {result}"
+        kind = t.name  # "Result" or "Option"
+        if result is ERROR:
+            pass  # the unknown result type is already reported
+        elif not (isinstance(result, EnumType) and result.builtin and result.name == kind):
+            passes = "an Err" if kind == "Result" else "None"
+            self.report(e, f"'?' returns {passes} from '{f.name}', so '{f.name}' must return "
+                           f"{'a Result' if kind == 'Result' else 'an Option'}, but it {returns}")
+        elif kind == "Result" and result.args[1] is not t.args[1] and ERROR not in (result.args[1], t.args[1]):
+            self.report(e, f"'?' would return this {t}'s error, which is {t.args[1]}, but '{f.name}' "
+                           f"returns {result}")
+        return t.args[0]
+
     def slice(self, e: Slice) -> Type:
         t = self.value(e.obj)
         for bound in (e.start, e.end):
@@ -901,7 +950,7 @@ class Checker:
             what = module.types.get(e.name) or module.fns.get(e.name) or (e.name in module.std) or None
             if what is None:
                 self.report(e, f"module '{module.name}' has no '{e.name}'")
-            elif isinstance(what, (StructType, EnumType)):
+            elif isinstance(what, Type):
                 self.report(e, f"'{module.name}.{e.name}' is a type, not a value")
             else:
                 self.report(e, f"'{module.name}.{e.name}' is a function; call it as {module.name}.{e.name}(...)")
@@ -1064,6 +1113,12 @@ class Checker:
                     self.report(callee, f"'{enum}' has no variant '{callee.name}'")
                     return None
                 return (enum, variant)
+        if (isinstance(callee, Field) and isinstance(callee.obj, Name) and not self.lookup_local(callee.obj.name)
+                and callee.obj.name not in self.types):
+            # Vela has no methods, so `x.f(...)` can only call into a module.
+            name = callee.obj.name
+            self.report(callee.obj, f"unknown module '{name}'; is `import {name}` missing?")
+            return None
         if not isinstance(callee, Name):
             self.report(callee, "only a named function can be called")
             return None
@@ -1093,19 +1148,23 @@ class Checker:
         return True
 
     def builtin(self, call: Call, name: str, written: str) -> Type | None:
-        """A call to a built-in function (see BUILTINS), written as `written`:
-        `len` or `maps.get`."""
-        want = {"print": 1, "len": 1, "int": 1, "byte": 1, "keys": 1}.get(name, 2)
+        """A call to a built-in function, written as `written`: one of the
+        prelude's (`len`) or of a built-in module's (`maps.get`, named by
+        `name`). The ones with fixed types are in SIGNATURES; the others,
+        which work on many types, have their own rules below."""
+        if name in SIGNATURES:
+            return self.fixed_builtin(call, name, written)
+        want = {"print": 1, "os.eprint": 1, "len": 1, "int": 1, "byte": 1, "maps.keys": 1}.get(name, 2)
         if not self.arity(call, written, want):
             for arg in call.args:
                 self.infer(arg)
-            return {"print": NO_VALUE, "push": NO_VALUE, "remove": NO_VALUE, "len": INT, "int": INT,
-                    "byte": BYTE, "has": BOOL}.get(name, ERROR)
+            return {"print": NO_VALUE, "os.eprint": NO_VALUE, "push": NO_VALUE, "maps.remove": NO_VALUE,
+                    "len": INT, "int": INT, "byte": BYTE, "maps.has": BOOL}.get(name, ERROR)
         args = call.args
-        if name == "print":
+        if name in ("print", "os.eprint"):
             t = self.value(args[0])
             if t not in PRINTABLE and t is not ERROR:
-                self.report(args[0], f"print takes an Int, Byte, Bool or Str, not {t}")
+                self.report(args[0], f"{written} takes an Int, Byte, Bool or Str, not {t}")
             return NO_VALUE
         if name == "len":
             t = self.value(args[0])
@@ -1127,22 +1186,37 @@ class Checker:
                     self.report(args[0], f"push needs an array, not {t}")
                 self.infer(args[1])
             return NO_VALUE
-        # has, get, remove and keys take a map.
-        t = self.place(args[0], "remove from") if name == "remove" else self.value(args[0])
+        # maps.has, maps.get, maps.remove and maps.keys take a map.
+        t = self.place(args[0], "remove from") if name == "maps.remove" else self.value(args[0])
         if not isinstance(t, MapType):
             if t is not ERROR:
                 self.report(args[0], f"{written} needs a map, not {t}")
             for arg in args[1:]:
                 self.infer(arg)
-            return {"has": BOOL, "remove": NO_VALUE}.get(name, ERROR)
-        if name == "keys":
+            return {"maps.has": BOOL, "maps.remove": NO_VALUE}.get(name, ERROR)
+        if name == "maps.keys":
             return self.table.array(t.key)
         self.check(args[1], t.key, lambda found: f"the keys of {t} are {t.key}, but this is {found}")
-        if name == "has":
+        if name == "maps.has":
             return BOOL
-        if name == "get":
+        if name == "maps.get":
             return self.table.option(t.value)
         return NO_VALUE
+
+    def fixed_builtin(self, call: Call, name: str, written: str) -> Type | None:
+        params, result = SIGNATURES[name](self.table)
+        if not self.arity(call, written, len(params)):
+            for arg in call.args:
+                self.infer(arg)
+            return result
+        for i, (arg, want) in enumerate(zip(call.args, params), start=1):
+            if i == 1 and name in CHANGES_FIRST:
+                t = self.place(arg, "add to")
+                if t is not want and t is not ERROR:
+                    self.report(arg, f"{written} needs a {want}, not {t}")
+            else:
+                self.check(arg, want, lambda found: f"argument {i} of '{written}' must be {want}, found {found}")
+        return result
 
 
 def bind_quietly(p: Pattern, bindings: dict[str, Local]) -> None:
@@ -1183,6 +1257,8 @@ def terminates(s: Stmt) -> bool:
     """
     if isinstance(s, Return):
         return True
+    if isinstance(s, ExprStmt) and isinstance(s.expr, Call) and s.expr.target == "os.exit":
+        return True  # it never comes back
     if isinstance(s, Block):
         return bool(s.stmts) and terminates(s.stmts[-1])
     if isinstance(s, If):

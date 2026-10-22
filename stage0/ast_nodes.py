@@ -137,6 +137,16 @@ class Index:
 
 
 @dataclass
+class Try:
+    """`inner?`: the value inside an Ok or Some, or an early return of the
+    Err or None."""
+    inner: Expr
+    line: int  # the `?`
+    col: int
+    ty: Any = checked()
+
+
+@dataclass
 class Slice:
     """`obj[start..end]`: part of a Str or an array, from start up to end - 1."""
     obj: Expr
@@ -260,7 +270,7 @@ class Match:
 
 
 Expr = (IntLit | ByteLit | BoolLit | StrLit | Name | Unary | Binary | Call | Field | Index
-        | Slice | ArrayLit | MapLit | StructLit | Match)
+        | Try | Slice | ArrayLit | MapLit | StructLit | Match)
 
 
 # ---- Statements ----
@@ -564,6 +574,8 @@ def sx_expr(e: Expr) -> Any:
         return [".", sx_expr(e.obj), e.name]
     if isinstance(e, Index):
         return ["[]", sx_expr(e.obj), sx_expr(e.index)]
+    if isinstance(e, Try):
+        return ["?", sx_expr(e.inner)]
     if isinstance(e, Slice):
         return ["[..]", sx_expr(e.obj), sx_expr(e.start), sx_expr(e.end)]
     if isinstance(e, ArrayLit):

@@ -1,0 +1,26 @@
+// A program that cannot read its input says why on stderr and exits with
+// a code of its own choosing.
+// err: error: cannot read no_such_input.txt: No such file or directory
+// exit: 1
+import files
+import os
+
+fn first_line(path: Str) -> Result[Str, Str] {
+    let text = files.read(path)?
+    for i in 0..len(text) {
+        if text[i] == '\n' {
+            return Ok(text[0..i])
+        }
+    }
+    return Ok(text)
+}
+
+fn main() {
+    match first_line("no_such_input.txt") {
+        Ok(line) => print(line)
+        Err(e) => {
+            os.eprint("error: " + e)
+            os.exit(1)
+        }
+    }
+}

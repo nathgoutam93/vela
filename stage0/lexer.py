@@ -33,13 +33,13 @@ BOOL_WORDS = frozenset({"true", "false"})
 # is one token, not two `=`, and `..=` is not `..` then `=`.
 OPERATORS_3 = frozenset({"..="})
 OPERATORS_2 = frozenset({"==", "!=", "<=", ">=", "&&", "||", "..", "->", "=>"})
-OPERATORS_1 = frozenset("()+-*/%,;=<>!{}:.[]")
+OPERATORS_1 = frozenset("()+-*/%,;=<>!{}:.[]?")
 
 # The newline rule: after a line's last token, insert `;` if that token is
-# one of these. Go's list also has `++ --`; ours gains `?` in M7, because
+# one of these. Go's list also has `++ --`; ours has `?`, because
 # `let n = parse(x)?` ends a statement with it.
 ENDS_STATEMENT = frozenset(
-    {"ident", "int", "bool", "str", "byte", ")", "]", "}", "break", "continue", "return"}
+    {"ident", "int", "bool", "str", "byte", ")", "]", "}", "?", "break", "continue", "return"}
 )
 
 # Escapes allowed in string literals and the byte each stands for.

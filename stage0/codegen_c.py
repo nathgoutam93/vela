@@ -46,7 +46,7 @@ from ast_nodes import (
     Arm, ArrayLit, Assign, Binary, Block, BoolLit, Break, ByteLit, Call, Continue, Expr, ExprStmt,
     Field, FnDecl, For, ForEach, ForRange, If, Index, IntLit, Let, MapLit, Match, MatchStmt, Name,
     Pattern, PBind, PLit, PRange, PVariant, PWild, Return, Slice, Stmt, StrLit,
-    StructLit, Unary,
+    StructLit, Try, Unary,
 )
 from c_layout import Layout, mangle
 from checker import Local
@@ -55,6 +55,10 @@ from typesys import BOOL, BYTE, INT, STR, ArrayType, EnumType, MapType, StructTy
 
 ARITHMETIC = {"+": "add", "-": "sub", "*": "mul", "/": "div", "%": "rem"}
 PRINT = {INT: "vela_print_int", BYTE: "vela_print_int", BOOL: "vela_print_bool", STR: "vela_print_str"}
+# The rest of the built-in functions with a direct runtime equivalent.
+RUNTIME_CALLS = {
+    "os.args": "vela_os_args", "strings.build": "vela_builder_build", "strings.from_int": "vela_from_int",
+}
 
 
 def generate(program: list[Module], table: TypeTable) -> str:
@@ -81,7 +85,8 @@ def generate(program: list[Module], table: TypeTable) -> str:
         out += ["", *FunctionGen(m.path, layout).function(f)]
     out += [
         "",
-        "int main(void) {",
+        "int main(int argc, char **argv) {",
+        "    vela_init(argc, argv);",
         "    f_main();",
         "    return 0;",
         "}",
@@ -266,6 +271,7 @@ class FunctionGen:
     # ---- Functions and statements ----
 
     def function(self, f: FnDecl) -> list[str]:
+        self.fn = f
         self.push_frame("function")
         names = []
         for p in f.params:
@@ -598,6 +604,8 @@ class FunctionGen:
             return Value(member, t)
         if isinstance(e, Index):
             return self.index(e)
+        if isinstance(e, Try):
+            return self.try_value(e)
         if isinstance(e, Slice):
             obj = self.expr(e.obj).c
             start = self.expr(e.start).c
@@ -631,6 +639,41 @@ class FunctionGen:
             self.match(e.scrutinee, e.arms, arm_value)
             return self.own(result, t)
         raise AssertionError(f"cannot generate code for {e!r}")
+
+    def try_value(self, e: Try) -> Value:
+        """`x?`: if x is an Err (or None), return it from the function now,
+        releasing everything that is live, exactly as `return` does.
+        Otherwise the value inside the Ok (or Some), borrowed from x.
+
+            if (_t1.tag == Result_Int_Str_Err) {
+                vela_str_retain(_t1.as.m_Err._0);
+                Result_Bool_Str _t2 = (Result_Bool_Str){ .tag = Result_Bool_Str_Err, .as.m_Err = { ._0 = _t1.as.m_Err._0 } };
+                ...releases...
+                return _t2;
+            }
+            ... _t1.as.m_Ok._0 ...
+        """
+        value = self.expr(e.inner)
+        t = e.inner.ty
+        result = self.fn.sig.result
+        fail, ok = ("Err", "Ok") if t.name == "Result" else ("None", "Some")
+        r = self.c_type(result)
+        self.open(f"if ({value.c}.tag == {self.layout.tag(t, fail)}) {{")
+        returned = self.new_temp()
+        if fail == "Err":
+            # The error moves into the function's own Result type, which may
+            # differ from x's (Result[Int, Str] into Result[Bool, Str]); it
+            # gets a reference of its own, since x is released below.
+            err = self.payload(value.c, t, t.variant("Err"), 0)
+            self.emit(self.layout.retain(t.args[1], err))
+            self.emit(f"{r} {returned} = ({r}){{ .tag = {self.layout.tag(result, 'Err')}, "
+                      f".as.m_Err = {{ ._0 = {err} }} }};")
+        else:
+            self.emit(f"{r} {returned} = ({r}){{ .tag = {self.layout.tag(result, 'None')} }};")
+        self.release_until(None)
+        self.emit(f"return {returned};")
+        self.close()
+        return Value(self.payload(value.c, t, t.variant(ok), 0), e.ty)
 
     def index(self, e: Index) -> Value:
         """Reading `xs[i]`, `s[i]` or `m[k]`: the element is copied into a
@@ -705,10 +748,30 @@ class FunctionGen:
     def builtin(self, e: Call) -> Value:
         name = e.target
         args = e.args
-        if name == "print":
+        if name in ("print", "os.eprint"):
             arg = self.expr(args[0])
-            self.emit(f"{PRINT[arg.ty]}({arg.c});")
+            func = PRINT[arg.ty] if name == "print" else PRINT[arg.ty].replace("print", "eprint")
+            self.emit(f"{func}({arg.c});")
             return Value("", None)
+        if name in RUNTIME_CALLS:
+            values = [self.expr(a).c for a in args]
+            return self.store(e.ty, f"{RUNTIME_CALLS[name]}({', '.join(values)})")
+        if name == "os.exit":
+            code = self.expr(args[0]).c
+            self.emit(f"vela_os_exit({code}, {self.loc(e)});")
+            return Value("", None)
+        if name == "strings.builder":
+            return self.store(e.ty, "vela_array_new(&vela_type_byte, 0)")
+        if name in ("strings.add", "strings.add_byte", "strings.add_int"):
+            value = self.expr(args[1]).c  # the value first, then the place: left to right
+            b = self.writable(args[0])
+            if name == "strings.add_byte":
+                self.emit(f"vela_array_push({b}, {self.addr('uint8_t', value)});")
+            else:
+                self.emit(f"vela_builder_{name[8:]}({b}, {value});")
+            return Value("", None)
+        if name in ("files.read", "files.write"):
+            return self.file_call(e)
         if name == "len":
             arg = self.expr(args[0])
             length = f"{arg.c}.len" if arg.ty is STR else f"{arg.c}->len"
@@ -727,19 +790,19 @@ class FunctionGen:
         mt = args[0].ty
         assert isinstance(mt, MapType)
         k = self.c_type(mt.key)
-        if name == "remove":
+        if name == "maps.remove":
             key = self.expr(args[1]).c
             m = self.writable(args[0])
             self.emit(f"(void)vela_map_remove({m}, {self.addr(k, key)});")
             return Value("", None)
         m = self.expr(args[0]).c
-        if name == "keys":
+        if name == "maps.keys":
             return self.store(e.ty, f"vela_map_keys({m})")
         key = self.expr(args[1]).c
         found = self.new_temp()
         v = self.c_type(mt.value)
         self.emit(f"{v} *{found} = vela_map_find({m}, {self.addr(k, key)});")
-        if name == "has":
+        if name == "maps.has":
             return Value(self.scalar(BOOL, f"{found} != NULL"), BOOL)
         # get: Some(a copy of the value), or None.
         opt = e.ty
@@ -754,6 +817,26 @@ class FunctionGen:
         self.emit(f"{result} = ({self.c_type(opt)}){{ .tag = {self.layout.tag(opt, 'None')} }};")
         self.close()
         return self.own(result, opt)
+
+    def file_call(self, e: Call) -> Value:
+        """files.read and files.write. The runtime reports success with a
+        bool and fills in the contents or the error message; this builds
+        the Result from them."""
+        args = [self.expr(a).c for a in e.args]
+        r = e.ty
+        text = self.new_temp()  # the contents, or the error message
+        ok = self.new_temp()
+        self.emit(f"vela_str {text} = VELA_STR(\"\", 0);")
+        if e.target == "files.read":
+            self.emit(f"bool {ok} = vela_files_read({args[0]}, &{text});")
+            success = text
+        else:
+            self.emit(f"bool {ok} = vela_files_write({args[0]}, {args[1]}, &{text});")
+            success = f"{args[1]}.len"
+        rt = self.c_type(r)
+        ok_value = f"({rt}){{ .tag = {self.layout.tag(r, 'Ok')}, .as.m_Ok = {{ ._0 = {success} }} }}"
+        err_value = f"({rt}){{ .tag = {self.layout.tag(r, 'Err')}, .as.m_Err = {{ ._0 = {text} }} }}"
+        return self.store(r, f"{ok} ? {ok_value} : {err_value}")
 
     def call_stmt(self, e: Expr) -> None:
         """A call whose result, if any, is thrown away (at the statement's end)."""

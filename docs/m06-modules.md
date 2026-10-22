@@ -462,3 +462,7 @@ Recorded in the roadmap:
    `?` will be an operator, not a function. Does that split suit you, or
    would you rather have one `std` module, or put some of these in the
    prelude?
+
+**Answered after M6:** keep the name Vela; a `pub` type showing all its
+fields is fine until after bootstrap; M7 uses the planned split into
+standard modules (see `m07-errors-files-stdlib.md`).

@@ -1,0 +1,65 @@
+// strings: a Builder is a value like an array. Copying one and adding to
+// the copy leaves the original alone; building does not empty it.
+// out: hello, world
+// out: -9223372036854775808 0 9223372036854775807
+// out: [abc] []
+// out: abc|abcdef
+// out: 3
+// out: 1,2,3,4,5
+// out: x
+import strings
+
+type Doc = struct {
+    title: Str
+    body: strings.Builder
+}
+
+fn join(xs: [Int], sep: Str) -> Str {
+    let mut b = strings.builder()
+    let mut first = true
+    for x in xs {
+        if !first {
+            strings.add(b, sep)
+        }
+        strings.add_int(b, x)
+        first = false
+    }
+    return strings.build(b)
+}
+
+fn main() {
+    let mut b = strings.builder()
+    strings.add(b, "hello")
+    strings.add_byte(b, ',')
+    strings.add_byte(b, ' ')
+    strings.add(b, "world")
+    print(strings.build(b))
+
+    let mut n = strings.builder()
+    strings.add_int(n, -9223372036854775807 - 1)
+    strings.add(n, " ")
+    strings.add_int(n, 0)
+    strings.add(n, " " + strings.from_int(9223372036854775807))
+    print(strings.build(n))
+
+    let mut a = strings.builder()
+    strings.add(a, "abc")
+    let empty = strings.builder()
+    print("[" + strings.build(a) + "] [" + strings.build(empty) + "]")
+
+    let mut c = a
+    strings.add(c, "def")
+    print(strings.build(a) + "|" + strings.build(c))
+
+    let mut d = Doc { title: "t", body: strings.builder() }
+    strings.add(d.body, "one")
+    let docs = [d, d]
+    print(len(strings.build(docs[1].body)))
+
+    print(join([1, 2, 3, 4, 5], ","))
+    let o: Option[strings.Builder] = Some(a)
+    match o {
+        Some(_) => print("x")
+        None => print("none")
+    }
+}

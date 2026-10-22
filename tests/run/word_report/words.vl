@@ -1,0 +1,38 @@
+// Text to words, and words to counts.
+import bytes
+import maps
+import strings
+
+// The words of `text`, lower-cased. A word is a run of ASCII letters, so
+// "don't" is the two words "don" and "t".
+pub fn split(text: Str) -> [Str] {
+    let mut words: [Str] = []
+    let mut b = strings.builder()
+    let mut in_word = false
+    for c in text {
+        if bytes.is_letter(c) {
+            strings.add_byte(b, bytes.to_lower(c))
+            in_word = true
+        } else if in_word {
+            push(words, strings.build(b))
+            b = strings.builder()
+            in_word = false
+        }
+    }
+    if in_word {
+        push(words, strings.build(b))
+    }
+    return words
+}
+
+// How often each word occurs, in order of first appearance.
+pub fn count(words: [Str]) -> Map[Str, Int] {
+    let mut counts: Map[Str, Int] = [:]
+    for w in words {
+        match maps.get(counts, w) {
+            Some(n) => counts[w] = n + 1
+            None => counts[w] = 1
+        }
+    }
+    return counts
+}
