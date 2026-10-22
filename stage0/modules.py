@@ -134,7 +134,10 @@ class Loader:
             return
         path = os.path.join(self.directory, imp.name + ".vl")
         shown = path
-        if (STD_DIR / (imp.name + ".vl")).is_file():
+        # The program's own file first, then the standard one (a bug fix
+        # made in M10c: with std/ first, adding a module to std/ took the
+        # place of one a program already had).
+        if not os.path.isfile(path) and (STD_DIR / (imp.name + ".vl")).is_file():
             path = str(STD_DIR / (imp.name + ".vl"))
             shown = f"std/{imp.name}.vl"
         known = self.by_path.get(os.path.normpath(path))

@@ -156,18 +156,29 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
         ld.modules[importer].imports[imp.name] = std
         return
     }
+    // The program's own file first, then the standard one: a module added
+    // to std/ never takes the place of one a program already has (M10c;
+    // until then std/ came first).
     let mut path = join(ld.directory, imp.name + ".vl")
     let mut shown = path
     let mut source = ""
     let mut have_source = false
-    match files.read(join(ld.std_dir, imp.name + ".vl")) {
+    match files.read(path) {
         Ok(text) => {
-            path = join(ld.std_dir, imp.name + ".vl")
-            shown = "std/" + imp.name + ".vl"
             source = text
             have_source = true
         }
-        Err(_) => {}
+        Err(_) => {
+            match files.read(join(ld.std_dir, imp.name + ".vl")) {
+                Ok(text) => {
+                    path = join(ld.std_dir, imp.name + ".vl")
+                    shown = "std/" + imp.name + ".vl"
+                    source = text
+                    have_source = true
+                }
+                Err(_) => {}
+            }
+        }
     }
     let mut known = -1
     match maps.get(ld.by_path, normpath(path)) {
