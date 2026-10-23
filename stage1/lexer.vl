@@ -1,6 +1,6 @@
-// Stage 1 lexer: source bytes in, tokens out. A port of stage0/lexer.py,
-// which explains the rules; this file follows it function by function, and
-// its tokens and messages are byte for byte the same.
+// The lexer: source bytes in, tokens out, and the messages for what is
+// not a token. Every rule is in the functions below; the walkthroughs in
+// docs/ (m01 on) say why.
 import errors
 import strings
 import chars

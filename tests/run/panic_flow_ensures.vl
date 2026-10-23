@@ -1,0 +1,23 @@
+// An ensures clause runs at every return. A mut parameter's value at an
+// early return is not the one after the last statement, so the overflow
+// check in the clause must stay.
+// out: start
+// err: panic_flow_ensures.vl:10:15: panic: integer overflow
+// exit: 101
+import strings
+
+fn bump(n: mut Int, big: Bool) -> Int
+    ensures n + 1 > 0 {
+    if big {
+        n = 9223372036854775807
+        return 0
+    }
+    n = 1
+    return 1
+}
+
+fn main() {
+    print("start")
+    let mut x = 10
+    print(strings.from_int(bump(mut x, true)))
+}

@@ -10,6 +10,7 @@
 #include <math.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <inttypes.h>
@@ -108,7 +109,7 @@ static bool eq_byte(const void *a, const void *b) { return *(const uint8_t *)a =
 static uint64_t hash_bool(const void *v) { return hash_u64(*(const bool *)v); }
 static bool eq_bool(const void *a, const void *b) { return *(const bool *)a == *(const bool *)b; }
 
-static uint64_t hash_str(const void *v) {
+static inline uint64_t hash_str(const void *v) {
     // Word at a time (M16b), and the last bytes in at most two loads that
     // may overlap, as wyhash reads them. A map's order is the order of
     // insertion, so the hash decides only where an entry's number goes in
@@ -327,10 +328,12 @@ vela_array *vela_array_slice(vela_array *a, int64_t lo, int64_t hi, const char *
 // Entries live in insertion order in three parallel arrays (keys, values,
 // live). `index` is an open-addressing hash table holding entry numbers:
 // a lookup hashes the key, then walks the table from that slot until it
-// finds the key or an empty slot. A removed entry stays in the table, marked
-// not live, so the walk does not stop early; rebuilding the table drops them.
+// finds the key or an empty slot. A removed entry stays in the arrays,
+// marked not live, and its slot becomes MAP_GONE, which a walk goes past
+// instead of stopping; rebuilding the table drops both.
 
 #define MAP_EMPTY (-1)
+#define MAP_GONE (-2)  // a removed entry's slot: a walk goes past it
 #define MAP_ENTRY_MASK UINT64_C(0x0000ffffffffffff)
 #define MAP_TAG_MASK UINT64_C(0x7fff000000000000)
 
@@ -448,14 +451,21 @@ void vela_map_share(vela_map *m) {
 }
 
 // The entry number holding `key`, or -1.
-static int64_t map_lookup_hashed(vela_map *m, const void *key, uint64_t h) {
+// Inline in its callers (M18), so a lookup is one call, not three. Every
+// entry the index holds is live: a removed one's slot is MAP_GONE.
+static inline __attribute__((always_inline)) int64_t map_lookup_hashed(vela_map *m, const void *key, uint64_t h) {
     uint64_t mask = (uint64_t)(m->index_cap - 1);
     for (uint64_t s = h & mask;; s = (s + 1) & mask) {
         int64_t entry = m->index[s];
-        if (entry == MAP_EMPTY) return -1;
+        if (entry < 0) {
+            if (entry == MAP_EMPTY) return -1;
+            continue;  // MAP_GONE
+        }
         if (((uint64_t)entry & MAP_TAG_MASK) != (h & MAP_TAG_MASK)) continue;
         int64_t i = (int64_t)((uint64_t)entry & MAP_ENTRY_MASK);
-        if (m->hashes[i] == h && m->live[i] && key_eq(m, key, map_key(m, i))) return i;
+        // The 15 bits of the hash beside the entry already rule out all but
+        // one in 32768 others: the key itself decides, without its full hash.
+        if (key_eq(m, key, map_key(m, i))) return i;
     }
 }
 
@@ -554,6 +564,16 @@ bool vela_map_remove(vela_map *m, const void *key) {
     release_elem(m->value, map_value(m, i));
     m->live[i] = false;
     m->len--;
+    // The entry's slot is on the walk from its hash's slot, before any
+    // empty one.
+    uint64_t mask = (uint64_t)(m->index_cap - 1);
+    for (uint64_t s = m->hashes[i] & mask;; s = (s + 1) & mask) {
+        int64_t entry = m->index[s];
+        if (entry >= 0 && (int64_t)((uint64_t)entry & MAP_ENTRY_MASK) == i) {
+            m->index[s] = MAP_GONE;
+            break;
+        }
+    }
     return true;
 }
 
@@ -904,25 +924,29 @@ bool vela_files_read(vela_str path, vela_str *out) {
         *out = file_error("cannot read", path, strerror(errno));
         return false;
     }
-    // Read in chunks into a growing buffer: the size of a pipe or a
-    // terminal is not known in advance.
+    // Read straight into the string's own object (M18), so the bytes are
+    // written once. A regular file's size is known: one read takes it all,
+    // and the byte to spare shows the end. A pipe or a terminal grows the
+    // object in chunks.
     size_t cap = 4096, len = 0;
-    char *buf = vela_alloc(cap);
+    struct stat st;
+    if (fstat(fileno(f), &st) == 0 && S_ISREG(st.st_mode) && st.st_size >= 0) cap = (size_t)st.st_size + 1;
+    vela_strobj *obj = vela_alloc(sizeof(vela_strobj) + cap);
     for (;;) {
-        len += fread(buf + len, 1, cap - len, f);
+        len += fread(obj->bytes + len, 1, cap - len, f);
         if (len < cap) break;
         cap *= 2;
-        buf = vela_realloc(buf, cap);
+        obj = vela_realloc(obj, sizeof(vela_strobj) + cap);
     }
     int failed = ferror(f) ? errno : 0;
     fclose(f);
     if (failed) {
-        free(buf);
+        free(obj);
         *out = file_error("cannot read", path, strerror(failed));
         return false;
     }
-    *out = str_from(buf, len);
-    free(buf);
+    obj->rc = 1;
+    *out = (vela_str){obj, obj->bytes, (int64_t)len};
     return true;
 }
 
@@ -1325,8 +1349,8 @@ bool vela_os_env(vela_str name, vela_str *out) {
 static int64_t workers = 0;  // 0 until first asked
 
 // math.sqrt for the native backend, with the machine's own instruction,
-// so that the runtime needs no libm: programs that Stage 0 compiles are
-// linked without -lm. IEEE square roots are correctly rounded, so this is
+// so that the call needs nothing from libm, which every program links
+// all the same (M16). IEEE square roots are correctly rounded, so this is
 // the same value sqrt() gives; a negative number gives a NaN.
 double vela_math_sqrt(double x) {
 #if defined(__x86_64__)

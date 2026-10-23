@@ -187,7 +187,7 @@ the answer says why:
 
 ```
 renaming 'sub' to 'o' would be an error: orders.vl:39:9: error: 'o' is already declared in this block, at 37:17
-renaming 'i' to 'n' would change what 'n' means at rename_refused.vl:12:21; choose another name
+renaming 'i' to 'n' would change what 'n' means at rename_refused.vl:11:21; choose another name
 ```
 
 Shadowing that changes nothing is allowed. Renaming the local `sub` to

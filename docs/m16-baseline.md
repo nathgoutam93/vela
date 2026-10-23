@@ -124,10 +124,10 @@ This is n-body's `bodies[i].vx = bodies[i].vx - dx * mj` in the
 generated C:
 
 ```c
-t_Body _t26 = *(t_Body *)vela_array_at((*v_bodies), v_i, "bench/nbody/main.vl:92:34");
+t_Body _t26 = *(t_Body *)vela_array_at((*v_bodies), v_i, "bench/nbody/main.vl:91:34");
 double _t28 = (_t26.m_vx - _t27);
 vela_array_unique(&(*v_bodies));
-(*(t_Body *)vela_array_at((*v_bodies), v_i, "bench/nbody/main.vl:92:19")).m_vx = _t28;
+(*(t_Body *)vela_array_at((*v_bodies), v_i, "bench/nbody/main.vl:91:19")).m_vx = _t28;
 ```
 
 - **The calls.** `vela_array_at` (bounds check and address) and

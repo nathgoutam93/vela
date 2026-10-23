@@ -1,4 +1,4 @@
-# Next performance round: implementation, target still open
+# Next performance round: implementation, review and results
 
 The target is a geometric mean at most 1.05× C over the existing eight
 release-backend benchmarks, no benchmark over 1.2× C, and no regression
@@ -125,3 +125,93 @@ VELA_ROOT=OLD_ROOT python3 bench/profile.py \
   --compiler OLD_ROOT/build/vela --json profile-before.json
 python3 bench/profile.py --json profile-after.json
 ```
+
+## Review on the Linux/GCC host, and what it changed
+
+The commit above was reviewed and measured on the Linux/GCC host used for
+M18, where everything the macOS host could not run was run: all 286 tests
+natively and through C on gcc and clang, under AddressSanitizer and
+ThreadSanitizer on both backends, and with natively, ASan- and TSan-built
+compilers; both fixed points hold. The review found one bug and one
+compile-time problem, and two benchmarks were still over 1.2.
+
+**An overflow check left out in `ensures` (fixed).** The flow walk
+checked `ensures` clauses in the state after the last statement, but a
+clause runs at every return. With `mut` parameters now tracked, a clause
+reading one could lose its check:
+
+```vela
+fn bump(n: mut Int, big: Bool) -> Int
+    ensures n + 1 > 0 {
+    if big {
+        n = 9223372036854775807
+        return 0
+    }
+    n = 1
+    return 1
+}
+```
+
+`n + 1` became a plain C `+` (the last state says n is 1), overflowed at
+the early return, and reported "ensures failed" instead of "integer
+overflow". The clauses are now walked with the parameters' whole-function
+ranges, as at entry (`tests/run/panic_flow_ensures.vl`).
+
+**Compile time exponential in loop nesting (fixed).** Each round of a
+loop's search for its invariant ran every inner loop's own search again:
+eight nested loops took 1.8 s to compile, about five times more per
+level. Now, inside an outer search, an inner loop only forgets what it can
+change (the variables it assigns or passes as `mut`); its own search runs
+once, in the walk that records proofs. Eight nested loops: 0.004 s. The C
+for all eight benchmarks is unchanged by this.
+
+**Self-translation.** Besides the analysis itself, two copies of large
+values cost instructions: passing `w.k` beside `mut w.env` (a call with a
+`mut` argument retains its other arguments, here the whole checked
+program) and reading `g` inside `emit(mut g, ...)`, which copied the
+code generator's state at every element access and in every loop scan.
+Calls now pass the walk or the scan's own struct alone, and writes to a
+shared Env are skipped when they change nothing. The compiler translates
+itself in 1,682 M instructions, from 1,830 M for the commit above and
+1,526 M for M18. The source grew 4.2% in this round, so the analysis
+costs about 6% per line of input over M18: not fully recovered.
+
+**word-frequency.** `files.read` read into a buffer that doubled as it
+grew, then copied it into the string: the text was written twice. It now
+reads straight into the string's object, sized from the file when it is a
+regular file. Map lookups are one call instead of three (`hash_str` and
+the lookup inline), and a removed entry's slot is marked gone instead of
+the lookup testing every entry's `live` flag.
+
+**fannkuch.** C cannot tell that a store to an Int element does not
+change the array's header (also Ints), so after every write it loaded the
+length and the elements' address again. An array a loop writes in place,
+and cannot push to, reassign or pass as `mut`, now has both in C locals
+before the loop (`vela_at_in`; `tests/run/loop_cached_arrays.vl`,
+`tests/run/panic_cached_index.vl`). Only arrays the loop writes: for
+fasta's read-only `cum`, the locals across `next_random`'s calls cost
+more than they saved.
+
+Back to back on the Linux host, best of seven (`bench/after-flow-linux.json`):
+
+| Benchmark | M18 | Commit above | Now |
+| --- | --- | --- | --- |
+| n-body | 1.12 | 0.99 | 0.98 |
+| spectral-norm | 1.04 | 0.98 | 1.01 |
+| fannkuch-redux | 1.25 | 1.21 | 1.20 |
+| binary-trees | 1.25 | 1.06 | 1.09 |
+| mandelbrot | 0.99 | 0.98 | 1.00 |
+| fasta | 1.25 | 1.16 | 1.14 |
+| k-nucleotide | 0.92 | 0.89 | 0.76 |
+| word-frequency | 1.50 | 1.41 | 1.24 |
+| **geometric mean** | 1.15 | 1.07 | **1.04** |
+
+Timings on this host move by up to 0.1 between runs for the two closest
+to 1.2, so fannkuch and word-frequency were timed again, fifteen runs
+three times: fannkuch 1.14 to 1.17, word-frequency 1.14 to 1.18. The M18
+column comes from an earlier back-to-back run of the same kind.
+
+Against the target: the geometric mean is within 1.05, and no benchmark
+is over 1.2 in the repeated runs, the closest being at 1.2 in a single
+run. Compiler self-translation is not back to M18's cost per line (about
+6% over).

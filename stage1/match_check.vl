@@ -1,10 +1,10 @@
-// Exhaustiveness and redundancy checking for `match`: a port of
-// stage0/exhaustiveness.py, which explains Maranget's usefulness algorithm.
+// Exhaustiveness and redundancy checking for `match`, by Maranget's
+// usefulness algorithm ("Warnings for pattern matching", 2007).
 //
-// One difference: Python's integers have no limit, so Stage 0 cuts Int
-// ranges at `hi + 1` even when hi is the largest Int. Here a piece is
-// described by where it starts, and the last one ends where the range
-// does, so nothing overflows; the pieces are the same.
+// Int ranges are cut into pieces, each described by where it starts,
+// not by where it ends: the last one ends where the range does, so
+// nothing overflows even when a range ends at the largest Int. (Python's
+// Stage 0, with integers that have no limit, cut them at `hi + 1`.)
 import strings
 import types
 

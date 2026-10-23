@@ -234,7 +234,7 @@ body's `{` ends the last one.
   function, with both sides of a comparison:
 
   ```
-  contracts_and_fakes.vl:29:16: panic: requires of 'half' failed: n >= 0 (left: -1, right: 0)
+  contracts_and_fakes.vl:28:16: panic: requires of 'half' failed: n >= 0 (left: -1, right: 0)
   ```
 
 **Always checked, never compiled out**, like `assert`. A broken

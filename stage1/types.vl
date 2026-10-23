@@ -1,5 +1,5 @@
-// Vela's types, as in stage0/typesys.py. Stage 0 has one Python object per
-// type; here a type is a number, its index in a Table, so types compare
+// Vela's types. Rather than an object for each
+// type, a type is a number, its index in a Table, so types compare
 // with == like any Int.
 //
 // The built-in types have fixed numbers (ERROR, INT, ...). User structs and
@@ -7,7 +7,7 @@
 // and map types are interned: asked for the same arguments twice, the
 // table gives back the same number. The table remembers the order in which
 // they were first asked for, because the C code generator defines them in
-// that order, and its output must match Stage 0's byte for byte.
+// that order, and its output must not depend on anything else.
 //
 // Generics (M10a). A type parameter, the `T` of `fn first[T]` or `type
 // Pair[A, B]`, is a type of its own (tag Param). A generic struct or enum is

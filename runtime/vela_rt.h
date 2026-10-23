@@ -285,6 +285,12 @@ static inline void *vela_at(vela_array *a, int64_t i, size_t size, const char *l
     return a->data + size * (size_t)i;
 }
 
+// vela_at for an array whose data and length a loop keeps in locals (M18).
+static inline void *vela_at_in(unsigned char *data, int64_t len, int64_t i, size_t size, const char *loc) {
+    if (__builtin_expect((uint64_t)i >= (uint64_t)len, 0)) vela_panic(loc, "index out of range");
+    return data + size * (size_t)i;
+}
+
 static inline void vela_unique(vela_array **ap) {
     if (__builtin_expect(!vela_rc_unique(&(*ap)->rc), 0)) vela_array_unique(ap);
 }

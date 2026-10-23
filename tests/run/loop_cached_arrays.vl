@@ -1,0 +1,84 @@
+// A loop keeps an array's length and elements' address in C locals when
+// it cannot move them (M18): reads and writes in place only. A loop that
+// pushes to the array, gives it a new value or passes it as mut must not.
+// out: 6 | 3 2 1
+// out: 4
+// out: 9 9
+// out: 1 2 3 0
+// out: 10 20
+import strings
+
+fn show(xs: [Int]) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(xs) {
+        if i > 0 {
+            strings.add(mut b, " ")
+        }
+        strings.add(mut b, strings.from_int(xs[i]))
+    }
+    return strings.build(b)
+}
+
+fn grow(xs: mut [Int]) {
+    push(mut xs, 0)
+}
+
+fn main() {
+    // In place: reads and writes through the locals.
+    let mut a = [1, 2, 3]
+    let mut sum = 0
+    for i in 0..len(a) {
+        sum = sum + a[i]
+    }
+    let mut i = 0
+    let mut j = len(a) - 1
+    for i < j {
+        let t = a[i]
+        a[i] = a[j]
+        a[j] = t
+        i = i + 1
+        j = j - 1
+    }
+    print(strings.from_int(sum) + " | " + show(a))
+
+    // Pushes move the elements: each read must see the array as it is now.
+    let mut b = [1]
+    let mut k = 0
+    for k < 3 {
+        push(mut b, b[k] + 1)
+        k = k + 1
+    }
+    print(strings.from_int(b[3]))
+
+    // A new value in the loop.
+    let mut c = [1, 2]
+    let mut total = 0
+    for n in 0..2 {
+        if n == 1 {
+            c = [9, 9]
+        }
+        total = total + c[n]
+    }
+    print(strings.from_int(c[0]) + " " + strings.from_int(c[1]))
+
+    // Passed as mut, which may grow it.
+    let mut d = [1, 2, 3]
+    for n in 0..1 {
+        grow(mut d)
+        d[3] = d[3]
+    }
+    print(show(d))
+
+    // An inner loop that grows an array the outer loop only reads.
+    let mut e = [10]
+    for n in 0..2 {
+        if n == 0 {
+            for m in 0..1 {
+                push(mut e, 20)
+            }
+        }
+        if n == 1 {
+            print(strings.from_int(e[0]) + " " + strings.from_int(e[1]))
+        }
+    }
+}

@@ -1,11 +1,11 @@
-// Stage 1 parser: tokens in, a syntax tree out. A port of stage0/parser.py,
-// which explains the grammar and the error recovery.
+// The parser: tokens in, a syntax tree out, with error recovery: one
+// syntax error per statement, and parsing goes on after it.
 //
-// Stage 0 raises an exception for a syntax error and catches it where it
+// A syntax error is not an exception caught where the parser
 // recovers. Here a function that can fail returns a Result, `?` passes the
 // error up, and the recovery points (block, program) match on it. The
 // parser's state is a `mut` parameter, so after an error it is exactly
-// where the error left it, as in Stage 0.
+// where the error left it.
 import ast
 import errors
 import lexer

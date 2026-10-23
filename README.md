@@ -7,7 +7,8 @@ milestone has a walkthrough in [`docs/`](docs/).
 ## Requirements
 
 - gcc or clang, on Linux or macOS. Set `VELA_CC=clang` to choose.
-- Python 3.10 or newer, only for the test scripts.
+- Python 3.10 or newer, for the test scripts, the benchmarks (`bench/`) and
+  the agent evaluation (`eval/`).
 
 ## Building
 
@@ -81,16 +82,17 @@ checker that reports every error in one run, structs, enums, `match` and
 several files (`import`, `pub`), the `?` operator, a standard library for
 files, arguments, exit codes and string building, and Stage 1: the compiler
 rewritten in Vela. M9 reached the fixed point and retired Python from the
-build; the first compiler, Stage 0 in Python, was removed after M18. M10a added generics
-(`fn largest[T: Ord]`, `type Box[T]`), `test` blocks with `assert`, a
-formatter and JSON errors; M10b added function values (`fn(Int) -> Str`),
-effects (`uses fs, os`), fakes for tests (`with files = ...`), contracts
-(`requires`, `ensures`) and warnings; M10c added closures
-(`fn(x) => x * k`), `Float`, and `std/text.vl`. M12 added a language
-server (`vela lsp`) and `vela query` for agents, with a JSON module and
-reading from stdin. M13 added structured concurrency: `tasks.map(xs, f)`
-runs f on every core and returns the results in order, safely, since
-values are copies; the compiler uses it to compile its C in parallel.
+build; the first compiler, Stage 0 in Python, was removed after M18. M10a
+added generics (`fn largest[T: Ord]`, `type Box[T]`), `test` blocks with
+`assert`, a formatter and JSON errors; M10b added function values
+(`fn(Int) -> Str`), effects (`uses fs, os`), fakes for tests
+(`with files = ...`), contracts (`requires`, `ensures`) and warnings;
+M10c added closures (`fn(x) => x * k`), `Float`, and `std/text.vl`.
+M12 added a language server (`vela lsp`) and `vela query` for agents,
+with a JSON module and reading from stdin. M13 added structured
+concurrency: `tasks.map(xs, f)` runs f on every core and returns the
+results in order, safely, since values are copies; the compiler uses it
+to compile its C in parallel.
 M14 added packages: git repositories or directories named in `vela.mod`,
 fetched by `vela get` and pinned in `vela.lock`; builds never use the
 network. M12b added completion and rename to the language server and
@@ -119,9 +121,10 @@ benchmarks): overflow checks left out where the ranges of the values
 prove they cannot fail, copy-on-write checked once per variable or once
 before a loop, one allocation per array, a map write after a lookup that
 reuses it, and free lists for small objects.
-The next performance round is implemented for review, but has not met all
-its acceptance limits; see [`docs/performance-next-round.md`](docs/performance-next-round.md)
-for changes, measurements and remaining work.
+The round after it (flow-sensitive ranges, bounds checks proved away,
+compact enum boxes, faster maps and file reads) brought the geometric
+mean to 1.04, no benchmark over 1.2; see
+[`docs/performance-next-round.md`](docs/performance-next-round.md).
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.

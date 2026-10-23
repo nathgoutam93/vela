@@ -1,12 +1,12 @@
-// Stage 1 checker: a port of stage0/checker.py, which explains the rules.
-// Every message, and the order in which types are created, matches Stage 0.
+// The type checker: types, names, effects and every error message.
+// It reports all of a program's errors in one run, sorted (errors.vl).
 //
-// Stage 0 writes its findings onto the syntax tree. Here they go into
+// Its findings go into
 // arrays indexed by node id (ty, refs, breaks), and the checker's state is
 // one `mut` value threaded through every function.
 //
-// Stage 0 passes messages as functions of the type found (`lambda found:
-// ...`). Vela has no function values, so a message is a Msg: the text
+// A message that names the type found is a Msg (this file predates
+// function values, M10b): the text
 // before and after where the type goes.
 import ast
 import errors

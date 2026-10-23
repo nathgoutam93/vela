@@ -1,11 +1,11 @@
-// The syntax tree, as in stage0/ast_nodes.py, and its `vela ast` dump.
+// The syntax tree and its `vela ast` dump.
 //
-// Stage 0 records the checker's findings on the nodes themselves. Vela
+// The checker's findings are not written onto the nodes: Vela
 // values cannot be changed through a shared tree, so instead every
 // expression, statement and pattern gets a number, `id`, unique in its
 // program, and the checker keeps what it finds in arrays indexed by it.
 //
-// Where Stage 0 has `None` for a missing part, this file has "" for a
+// A missing part is "" for a
 // missing name (a module, an enum) and Option for a missing node.
 import strings
 

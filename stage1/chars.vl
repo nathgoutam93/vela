@@ -1,6 +1,6 @@
-// Small text helpers that Python gives Stage 0 for free: hex numbers,
+// Small text helpers, as Python spells them: hex numbers,
 // Python's chr() of a byte, and UTF-8 checking the way Python's decoder
-// does it. Messages must come out byte for byte as Stage 0's.
+// does it. Messages quote bytes the way the first compiler's did.
 import strings
 
 // `0x1f`: two lower-case hex digits, as Python's f"0x{c:02x}".

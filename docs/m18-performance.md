@@ -114,7 +114,7 @@ fn eval_a(i: Int, j: Int) -> Float {
 int64_t _t1 = (v_i + v_j);
 int64_t _t2 = (v_i + v_j);
 int64_t _t3 = (_t2 + 1);
-int64_t _t4 = vela_mul(_t1, _t3, "bench/spectralnorm/main.vl:11:32");  // 2^49 * 2^49 can overflow
+int64_t _t4 = vela_mul(_t1, _t3, "bench/spectralnorm/main.vl:10:32");  // 2^49 * 2^49 can overflow
 int64_t _t5 = (_t4 / 2);
 int64_t _t6 = (_t5 + v_i);  // _t4 is within the Int range, so half of it plus 2^48 fits
 int64_t _t7 = (_t6 + 1);

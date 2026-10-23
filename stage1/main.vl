@@ -1,4 +1,4 @@
-// The Vela compiler's command line: the Vela version of stage0/main.py.
+// The Vela compiler's command line.
 //
 //     vela build FILE [-o EXE]    compile to an executable
 //     vela run FILE [ARGS...]     compile to a temporary executable and run it

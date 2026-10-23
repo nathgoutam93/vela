@@ -439,6 +439,23 @@ fn tracked(k: checker.Checked, as_value: Map[Int, Bool], id: Int, i: Int) -> Boo
 fn walk_fn(w: mut Walk, id: Int) {
     let f = w.k.fns[id]
     w.fn_id = id
+    enter(mut w, id)
+    for e in f.decl.requires {
+        walk_expr(mut w, e)
+    }
+    walk_block(mut w, f.decl.body)
+    // The ensures clauses run at every return, not only after the last
+    // statement: a mut parameter may hold anything it is ever given there,
+    // which is its whole-function range, as at entry.
+    enter(mut w, id)
+    for e in f.decl.ensures {
+        walk_expr(mut w, e)
+    }
+}
+
+// The facts at a function's entry: its parameters' ranges, nothing else.
+fn enter(w: mut Walk, id: Int) {
+    let f = w.k.fns[id]
     w.env.locals = [:]
     w.env.limits = [:]
     w.dead = false
@@ -446,13 +463,6 @@ fn walk_fn(w: mut Walk, id: Int) {
         if i < len(f.param_locals) && i < len(w.env.params[id]) && tracked(w.k, w.as_value, id, i) {
             w.env.locals[f.param_locals[i]] = w.env.params[id][i]
         }
-    }
-    for e in f.decl.requires {
-        walk_expr(mut w, e)
-    }
-    walk_block(mut w, f.decl.body)
-    for e in f.decl.ensures {
-        walk_expr(mut w, e)
     }
 }
 
@@ -537,8 +547,17 @@ fn invalidate(env: mut Env, l: Int) {
     if l < 0 {
         return
     }
-    maps.remove(mut env.locals, l)
-    maps.remove(mut env.limits, l)
+    // Only real changes write: an Env is often shared with a saved copy
+    // (an if's state before its branches), and a write copies it.
+    if maps.has(env.locals, l) {
+        maps.remove(mut env.locals, l)
+    }
+    if len(env.limits) == 0 {
+        return
+    }
+    if maps.has(env.limits, l) {
+        maps.remove(mut env.limits, l)
+    }
     for id in maps.keys(env.limits) {
         if env.limits[id].container == l {
             maps.remove(mut env.limits, id)
@@ -550,7 +569,14 @@ fn set_local(w: mut Walk, l: Int, e: ast.Expr) {
     if l < 0 {
         return
     }
-    let r = w.last
+    let mut r = w.last
+    if !w.detailed {
+        // Parameter inference works out ranges only where they are used.
+        r = full()
+        if is_int(w.k, e) && stable(e) {
+            r = of(w.k, w.env, e)
+        }
+    }
     let bound = limit(w.k, w.env, e)
     invalidate(mut w.env, l)
     if w.k.locals[l].ty == types.INT() {
@@ -615,12 +641,12 @@ fn same(a: Env, b: Env) -> Bool {
     return true
 }
 
-fn narrow(k: checker.Checked, env: mut Env, e: ast.Expr, r: Range) {
-    let l = local_of(k, e.id)
-    if l < 0 || !is_int(k, e) {
+fn narrow(w: mut Walk, e: ast.Expr, r: Range) {
+    let l = local_of(w.k, e.id)
+    if l < 0 || !is_int(w.k, e) {
         return
     }
-    let old = of(k, env, e)
+    let old = of(w.k, w.env, e)
     let mut out = old
     if r.lo > old.lo {
         out.lo = r.lo
@@ -628,50 +654,52 @@ fn narrow(k: checker.Checked, env: mut Env, e: ast.Expr, r: Range) {
     if r.hi < old.hi {
         out.hi = r.hi
     }
-    env.locals[l] = out
+    if out.lo != old.lo || out.hi != old.hi {
+        w.env.locals[l] = out  // only a change writes, as in invalidate
+    }
 }
 
-fn comparison(k: checker.Checked, env: mut Env, op: Str, x: ast.Expr, y: ast.Expr) {
-    let a = of(k, env, x)
-    let b = of(k, env, y)
-    let l = local_of(k, x.id)
+fn comparison(w: mut Walk, op: Str, x: ast.Expr, y: ast.Expr) {
+    let a = of(w.k, w.env, x)
+    let b = of(w.k, w.env, y)
+    let l = local_of(w.k, x.id)
     if op == "<" || op == "<=" {
         let mut offset = 0
         if op == "<" {
             offset = -1
         }
-        narrow(k, mut env, x, Range { lo: min_int(), hi: sat_add(b.hi, offset) })
-        narrow(k, mut env, y, Range { lo: sat_sub(a.lo, offset), hi: max_int() })
-        if l >= 0 && is_int(k, x) {
-            match limit(k, env, y) {
-                Some(bound) => env.limits[l] = Limit { container: bound.container, offset: sat_add(bound.offset, offset) }
+        narrow(mut w, x, Range { lo: min_int(), hi: sat_add(b.hi, offset) })
+        narrow(mut w, y, Range { lo: sat_sub(a.lo, offset), hi: max_int() })
+        if l >= 0 && is_int(w.k, x) {
+            match limit(w.k, w.env, y) {
+                Some(bound) => w.env.limits[l] = Limit { container: bound.container, offset: sat_add(bound.offset, offset) }
                 None => {}
             }
         }
     } else if op == "==" {
-        narrow(k, mut env, x, b)
-        narrow(k, mut env, y, a)
-        if l >= 0 && is_int(k, x) {
-            match limit(k, env, y) {
-                Some(bound) => env.limits[l] = bound
+        narrow(mut w, x, b)
+        narrow(mut w, y, a)
+        if l >= 0 && is_int(w.k, x) {
+            match limit(w.k, w.env, y) {
+                Some(bound) => w.env.limits[l] = bound
                 None => {}
             }
         }
     } else if op == "!=" {
         if b.lo == b.hi {
             if a.lo == b.lo {
-                narrow(k, mut env, x, Range { lo: sat_add(a.lo, 1), hi: max_int() })
+                narrow(mut w, x, Range { lo: sat_add(a.lo, 1), hi: max_int() })
             } else if a.hi == b.hi {
-                narrow(k, mut env, x, Range { lo: min_int(), hi: sat_sub(a.hi, 1) })
+                narrow(mut w, x, Range { lo: min_int(), hi: sat_sub(a.hi, 1) })
             }
         }
         if l >= 0 {
-            match limit(k, env, x) {
+            match limit(w.k, w.env, x) {
                 Some(left) => {
-                    match exact_limit(k, env, y) {
+                    match exact_limit(w.k, w.env, y) {
                         Some(right) => {
                             if left.container == right.container && left.offset == right.offset {
-                                env.limits[l] = Limit { container: left.container, offset: sat_sub(left.offset, 1) }
+                                w.env.limits[l] = Limit { container: left.container, offset: sat_sub(left.offset, 1) }
                             }
                         }
                         None => {}
@@ -699,20 +727,20 @@ fn stable_args(args: [ast.Expr]) -> Bool {
     return true
 }
 
-fn refine(k: checker.Checked, env: mut Env, e: ast.Expr, truth: Bool) {
+fn refine(w: mut Walk, e: ast.Expr, truth: Bool) {
     if !stable(e) {
         return
     }
     match e.kind {
         ast.ExprKind.Unary(op, x) => {
             if op == "!" {
-                refine(k, mut env, x, !truth)
+                refine(mut w, x, !truth)
             }
         }
         ast.ExprKind.Binary(op, x, y) => {
             if op == "&&" && truth || op == "||" && !truth {
-                refine(k, mut env, x, truth)
-                refine(k, mut env, y, truth)
+                refine(mut w, x, truth)
+                refine(mut w, y, truth)
                 return
             }
             let mut cmp = op
@@ -728,11 +756,11 @@ fn refine(k: checker.Checked, env: mut Env, e: ast.Expr, truth: Bool) {
                 }
             }
             if cmp == ">" {
-                comparison(k, mut env, "<", y, x)
+                comparison(mut w, "<", y, x)
             } else if cmp == ">=" {
-                comparison(k, mut env, "<=", y, x)
+                comparison(mut w, "<=", y, x)
             } else {
-                comparison(k, mut env, cmp, x, y)
+                comparison(mut w, cmp, x, y)
             }
         }
         _ => {}
@@ -769,7 +797,7 @@ fn walk_loop(w: mut Walk, c: Option[ast.Expr], body: ast.Block, var: Int, r: Ran
         match c {
             Some(e) => {
                 walk_expr(mut w, e)
-                refine(w.k, mut w.env, e, true)
+                refine(mut w, e, true)
             }
             None => {}
         }
@@ -780,6 +808,16 @@ fn walk_loop(w: mut Walk, c: Option[ast.Expr], body: ast.Block, var: Int, r: Ran
         }
         w.env = after
         w.edges = edges
+        w.dead = false
+        return
+    }
+    if !w.record {
+        // Inside an outer loop's search for its invariant. Running this
+        // loop's own search on every round of the outer one would cost
+        // rounds^depth; the outer search needs only what can still be true
+        // after this loop, and anything this loop does not change still
+        // is. Its own search runs once, in the walk that records.
+        forget_changed(mut w, c, body)
         w.dead = false
         return
     }
@@ -797,7 +835,7 @@ fn walk_loop(w: mut Walk, c: Option[ast.Expr], body: ast.Block, var: Int, r: Ran
         match c {
             Some(e) => {
                 walk_expr(mut w, e)
-                refine(w.k, mut w.env, e, true)
+                refine(mut w, e, true)
             }
             None => {}
         }
@@ -839,7 +877,7 @@ fn walk_loop(w: mut Walk, c: Option[ast.Expr], body: ast.Block, var: Int, r: Ran
     match c {
         Some(e) => {
             walk_expr(mut w, e)
-            refine(w.k, mut w.env, e, true)
+            refine(mut w, e, true)
         }
         None => {}
     }
@@ -847,6 +885,168 @@ fn walk_loop(w: mut Walk, c: Option[ast.Expr], body: ast.Block, var: Int, r: Ran
     w.env = head
     w.edges = edges
     w.dead = false
+}
+
+// Forget what a loop can change: the variables it assigns or passes as
+// `mut`, and the bounds relative to them. A mut parameter keeps its
+// whole-function range.
+fn forget_changed(w: mut Walk, c: Option[ast.Expr], body: ast.Block) {
+    let mut changed: Map[Int, Bool] = [:]
+    match c {
+        Some(e) => changed_expr(w.k, e, mut changed)
+        None => {}
+    }
+    changed_block(w.k, body, mut changed)
+    let f = w.k.fns[w.fn_id]
+    for l in maps.keys(changed) {
+        invalidate(mut w.env, l)
+        for i in 0..len(f.param_locals) {
+            if f.param_locals[i] == l && f.mutable[i] && f.params[i] == types.INT() && i < len(w.env.params[w.fn_id]) {
+                w.env.locals[l] = w.env.params[w.fn_id][i]
+            }
+        }
+    }
+}
+
+fn changed_block(k: checker.Checked, b: ast.Block, out: mut Map[Int, Bool]) {
+    for st in b.stmts {
+        changed_stmt(k, st, mut out)
+    }
+}
+
+fn changed_stmt(k: checker.Checked, st: ast.Stmt, out: mut Map[Int, Bool]) {
+    match st.kind {
+        ast.StmtKind.Block(b) => changed_block(k, b, mut out)
+        ast.StmtKind.ExprStmt(e) => changed_expr(k, e, mut out)
+        ast.StmtKind.Let(_, _, _, v) => changed_expr(k, v, mut out)
+        ast.StmtKind.Assign(t, v) => {
+            changed_expr(k, v, mut out)
+            changed_expr(k, t, mut out)
+            match t.kind {
+                ast.ExprKind.Name(_) => {
+                    let l = local_of(k, t.id)
+                    if l >= 0 {
+                        out[l] = true
+                    }
+                }
+                _ => {}  // an element or a field: no variable's value or length changes
+            }
+        }
+        ast.StmtKind.If(c, b, e) => {
+            changed_expr(k, c, mut out)
+            changed_block(k, b, mut out)
+            match e {
+                ast.Else.NoElse => {}
+                ast.Else.ElseBlock(eb) => changed_block(k, eb, mut out)
+                ast.Else.ElseIf(inner) => changed_stmt(k, inner, mut out)
+            }
+        }
+        ast.StmtKind.For(c, b) => {
+            match c {
+                Some(e) => changed_expr(k, e, mut out)
+                None => {}
+            }
+            changed_block(k, b, mut out)
+        }
+        ast.StmtKind.ForRange(_, a, b, body) => {
+            changed_expr(k, a, mut out)
+            changed_expr(k, b, mut out)
+            changed_block(k, body, mut out)
+        }
+        ast.StmtKind.ForEach(_, xs, body) => {
+            changed_expr(k, xs, mut out)
+            changed_block(k, body, mut out)
+        }
+        ast.StmtKind.Return(v) => {
+            match v {
+                Some(e) => changed_expr(k, e, mut out)
+                None => {}
+            }
+        }
+        ast.StmtKind.MatchStmt(x, arms) => {
+            changed_expr(k, x, mut out)
+            changed_arms(k, arms, mut out)
+        }
+        ast.StmtKind.With(items, b) => {
+            for item in items {
+                changed_expr(k, item.value, mut out)
+            }
+            changed_block(k, b, mut out)
+        }
+        _ => {}
+    }
+}
+
+fn changed_arms(k: checker.Checked, arms: [ast.Arm], out: mut Map[Int, Bool]) {
+    for a in arms {
+        match a.body {
+            ast.ArmBody.Value(v) => changed_expr(k, v, mut out)
+            ast.ArmBody.Do(st) => changed_stmt(k, st, mut out)
+        }
+    }
+}
+
+// The variables passed as `mut` in `e`. A closure's body runs elsewhere
+// and cannot change the variables it captured.
+fn changed_expr(k: checker.Checked, e: ast.Expr, out: mut Map[Int, Bool]) {
+    if !ast.has_mut(e) {
+        match e.kind {
+            ast.ExprKind.Match(_, _) => {}  // an arm may be a statement
+            _ => return
+        }
+    }
+    match e.kind {
+        ast.ExprKind.MutArg(x) => {
+            let l = local_of(k, x.id)
+            if l >= 0 {
+                out[l] = true
+            }
+            changed_expr(k, x, mut out)
+        }
+        ast.ExprKind.Unary(_, x) => changed_expr(k, x, mut out)
+        ast.ExprKind.Binary(_, a, b) => {
+            changed_expr(k, a, mut out)
+            changed_expr(k, b, mut out)
+        }
+        ast.ExprKind.Call(f, args) => {
+            changed_expr(k, f, mut out)
+            for a in args {
+                changed_expr(k, a, mut out)
+            }
+        }
+        ast.ExprKind.Field(x, _) => changed_expr(k, x, mut out)
+        ast.ExprKind.Index(a, b) => {
+            changed_expr(k, a, mut out)
+            changed_expr(k, b, mut out)
+        }
+        ast.ExprKind.Try(x) => changed_expr(k, x, mut out)
+        ast.ExprKind.Slice(a, b, c) => {
+            changed_expr(k, a, mut out)
+            changed_expr(k, b, mut out)
+            changed_expr(k, c, mut out)
+        }
+        ast.ExprKind.ArrayLit(xs) => {
+            for x in xs {
+                changed_expr(k, x, mut out)
+            }
+        }
+        ast.ExprKind.MapLit(entries) => {
+            for en in entries {
+                changed_expr(k, en.key, mut out)
+                changed_expr(k, en.value, mut out)
+            }
+        }
+        ast.ExprKind.StructLit(_, _, fields) => {
+            for f in fields {
+                changed_expr(k, f.value, mut out)
+            }
+        }
+        ast.ExprKind.Match(x, arms) => {
+            changed_expr(k, x, mut out)
+            changed_arms(k, arms, mut out)
+        }
+        _ => {}
+    }
 }
 
 fn walk_stmt(w: mut Walk, s: ast.Stmt) {
@@ -867,13 +1067,13 @@ fn walk_stmt(w: mut Walk, s: ast.Stmt) {
         ast.StmtKind.If(c, b, e) => {
             walk_expr(mut w, c)
             let before = w.env
-            refine(w.k, mut w.env, c, true)
+            refine(mut w, c, true)
             walk_block(mut w, b)
             let yes = w.env
             let yes_dead = w.dead
             w.env = before
             w.dead = false
-            refine(w.k, mut w.env, c, false)
+            refine(mut w, c, false)
             match e {
                 ast.Else.NoElse => {}
                 ast.Else.ElseBlock(eb) => walk_block(mut w, eb)
@@ -981,22 +1181,29 @@ fn walk_call(w: mut Walk, e: ast.Expr, callee: ast.Expr, args: [ast.Expr]) {
         ast.ExprKind.Field(obj, _) => walk_expr(mut w, obj)
         _ => {}
     }
+    let mut callee_id = -1
+    let mut params: [Int] = []
+    let mut mutable: [Bool] = []
+    match w.k.refs[e.id] {
+        checker.Ref.Function(id) => {
+            callee_id = id
+            params = w.k.fns[id].params
+            mutable = w.k.fns[id].mutable
+        }
+        _ => {}
+    }
+    let steady = stable_args(args) && stable(callee)
     for i in 0..len(args) {
         walk_expr(mut w, args[i])
-        match w.k.refs[e.id] {
-            checker.Ref.Function(id) => {
-                if i < len(w.k.fns[id].params) && w.k.fns[id].params[i] == types.INT() && !w.k.fns[id].mutable[i] {
-                    let mut passed = w.last
-                    if !w.detailed {
-                        passed = of(w.k, w.env, args[i])
-                    }
-                    if !stable_args(args) || !stable(callee) {
-                        passed = full()
-                    }
-                    push(mut w.passed, Passed { callee: id, i: i, r: passed })
+        if callee_id >= 0 && i < len(params) && params[i] == types.INT() && !mutable[i] {
+            let mut passed = full()
+            if steady {
+                passed = w.last
+                if !w.detailed {
+                    passed = of(w.k, w.env, args[i])
                 }
             }
-            _ => {}
+            push(mut w.passed, Passed { callee: callee_id, i: i, r: passed })
         }
     }
     for i in 0..len(args) {
@@ -1091,10 +1298,7 @@ fn parameter_expr(w: mut Walk, e: ast.Expr) {
 fn walk_expr(w: mut Walk, e: ast.Expr) {
     if !w.detailed {
         parameter_expr(mut w, e)
-        w.last = full()
-        if is_int(w.k, e) && stable(e) {
-            w.last = of(w.k, w.env, e)
-        }
+        w.last = full()  // set_local and walk_call work out the ranges they need
         return
     }
     let mut result = full()
@@ -1118,7 +1322,7 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
             let left = w.last
             if op == "&&" || op == "||" {
                 let before = w.env
-                refine(w.k, mut w.env, l, op == "&&")
+                refine(mut w, l, op == "&&")
                 walk_expr(mut w, r)
                 w.env = merge(before, w.env)
             } else {
@@ -1178,7 +1382,7 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
                 let l = local_of(w.k, i.id)
                 let container = local_of(w.k, obj.id)
                 if l >= 0 && is_int(w.k, i) {
-                    narrow(w.k, mut w.env, i, Range { lo: 0, hi: max_len() - 1 })
+                    narrow(mut w, i, Range { lo: 0, hi: max_len() - 1 })
                     if container >= 0 {
                         w.env.limits[l] = Limit { container: container, offset: -1 }
                     }

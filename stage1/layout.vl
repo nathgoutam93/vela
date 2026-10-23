@@ -1,9 +1,9 @@
-// How Vela's types are laid out in C and how their memory is managed: a
-// port of stage0/c_layout.py, which explains tagged unions, boxing of
+// How Vela's types are laid out in C and how their memory is managed:
+// tagged unions, boxing of
 // recursive fields, managed types and the generated retain/release
-// functions. Since M10c the C is no longer Stage 0's line for line: share
-// functions for threads (M13) and names for packages' modules (M14) are
-// Stage 1's alone.
+// functions, share functions for threads (M13), names for packages'
+// modules (M14) and compact boxes for enums with one empty variant
+// (M18).
 import maps
 import strings
 import types

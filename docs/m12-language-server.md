@@ -30,7 +30,7 @@ file. All of this goes through Neovim's own LSP client.
 $ python3 run_tests.py
 239 passed, 0 failed  (compiler: /home/user/vela/build/vela)
 
-$ build/vela query type examples/orders/main.vl:36:20
+$ build/vela query type examples/orders/main.vl:35:20
 {
   "name": "parse",
   "kind": "function",

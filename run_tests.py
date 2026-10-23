@@ -49,7 +49,7 @@ every std/*.vl and packages/*/*.vl with tests in it must pass `vela test`, and t
 server must pass tests/lsp_client.py, a scripted editor, and, if Neovim is
 installed, tests/nvim_test.lua, which drives it from Neovim; packages must
 pass tests/pkg_test.py, with git repositories it makes, and the native backend
-tests/native_test.py (both Stage 1 only).
+tests/native_test.py.
 
 The compiler runs inside the test's directory and is given the bare file
 name, so messages read `name.vl:3:7: ...` wherever the repo is checked out.

@@ -1,6 +1,6 @@
-// Stage 1 C code generator: a port of stage0/codegen_c.py, which explains
-// the scheme (one C statement per operation, owned and borrowed values,
-// cleanup frames, copy-on-write). The C it writes is byte for byte Stage 0's.
+// The C code generator. The scheme: one C statement per operation, owned
+// and borrowed values, cleanup frames, copy-on-write, and since M18 the
+// checks that ranges.vl proves cannot fail left out.
 import ast
 import checker
 import errors
@@ -77,6 +77,10 @@ type Gen = struct {
     // Variables made unique before the loops being written, which nothing
     // in them can share (M18): their writes need no check.
     hoisted: [Str]
+    // Arrays whose length and elements' address a loop cannot change,
+    // loaded into C locals before it (M18): the place's C, to the local
+    // holding its data; the length is in the same name plus "n".
+    cached: Map[Str, Str]
     // What is known of Int values' ranges (M18, ranges.vl): an operation
     // that cannot overflow is plain C.
     env: ranges.Env
@@ -88,7 +92,7 @@ fn new_gen(k: checker.Checked, l: layout.Layout, id: Int, params: [Int], args: [
         k: k, l: l, filename: k.modules[k.fns[id].module].path, lines: [], depth: 1, temps: 0, names: [:],
         used: [:], frames: [], dead: false, current_fn: id, params: params, args: args,
         instance_names: instance_names, cname: cname, captures: [:], closure_result: -2, closures: 0, extra: [],
-        wrappers: [:], unique: [], found: [], hoisted: [], env: env,
+        wrappers: [:], unique: [], found: [], hoisted: [], cached: [:], env: env,
     }
 }
 
@@ -749,6 +753,7 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
             // Any statements the condition needs must run on every
             // iteration, so the test goes inside the loop.
             let hoisted = g.hoisted
+            let cached = g.cached
             hoist_unique(mut g, s)
             open(mut g, "for (;;) {")
             push_frame(mut g, "body")
@@ -768,6 +773,7 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
             pop_frame(mut g)
             close(mut g, "}")
             g.hoisted = hoisted
+            g.cached = cached
             // `for { ... }` with no break ends only by return: no code after it.
             match cond {
                 None => g.dead = !g.k.breaks[s.id]
@@ -780,6 +786,7 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
             let to = scalar(mut g, types.INT(), expr(mut g, end).c)
             let i = new_temp(mut g)
             let hoisted = g.hoisted
+            let cached = g.cached
             hoist_unique(mut g, s)
             open(mut g, "for (int64_t " + i + " = " + from + "; " + i + " < " + to + "; " + i + "++) {")
             push_frame(mut g, "body")
@@ -794,6 +801,7 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
             pop_frame(mut g)
             close(mut g, "}")
             g.hoisted = hoisted
+            g.cached = cached
         }
         ast.StmtKind.ForEach(_, iterable, body) => for_each(mut g, s, iterable, body)
         ast.StmtKind.Break => {
@@ -916,6 +924,7 @@ fn for_each(g: mut Gen, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
         length = it + ".len"
     }
     let hoisted = g.hoisted
+    let cached = g.cached
     hoist_unique(mut g, s)
     open(mut g, "for (int64_t " + i + " = 0; " + i + " < " + length + "; " + i + "++) {")
     push_frame(mut g, "body")
@@ -933,6 +942,7 @@ fn for_each(g: mut Gen, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
     pop_frame(mut g)
     close(mut g, "}")
     g.hoisted = hoisted
+    g.cached = cached
 }
 
 // A call, or a variant built with values (`Some(x)`). Afterwards no
@@ -1138,7 +1148,9 @@ fn assign(g: mut Gen, target: ast.Expr, v: ast.Expr) {
                 let index = expr(mut g, i).c
                 let elem = c_type(g, ty(g, target))
                 let slot = new_temp(mut g)
-                emit(mut g, elem + " *" + slot + " = " + element_address(g, target, elem, container, index, loc_of(g, target)) + ";")
+                // Worked out before emit: reading g in a call that also changes it copies all of it.
+                let address = element_address(g, target, elem, container, index, loc_of(g, target))
+                emit(mut g, elem + " *" + slot + " = " + address + ";")
                 emit(mut g, release(mut g, ty(g, target), "*" + slot))
                 emit(mut g, "*" + slot + " = " + c + ";")
             }
@@ -1193,14 +1205,23 @@ fn writable(g: mut Gen, e: ast.Expr) -> Str {
 // iterating over it, capturing it or giving the variable a new value.
 
 type LoopUses = struct {
+    k: checker.Checked  // here, not passed beside `mut u`, which would copy it at every call
     writes: [Int]  // locals written: an element, a push
+    grows: [Int]  // locals pushed to, whose elements may move
     shared: Map[Int, Bool]  // locals used in a way that could share them
 }
 
-fn shares(u: mut LoopUses, e: ast.Expr, g: Gen) {
-    let l = local_of(g, e.id)
+fn shares(u: mut LoopUses, e: ast.Expr) {
+    let l = ref_local(u.k, e.id)
     if l >= 0 {
         u.shared[l] = true
+    }
+}
+
+fn ref_local(k: checker.Checked, id: Int) -> Int {
+    return match k.refs[id] {
+        checker.Ref.Local(l) => l
+        _ => -1
     }
 }
 
@@ -1211,24 +1232,24 @@ fn is_name(e: ast.Expr) -> Bool {
     }
 }
 
-fn uses_expr(g: Gen, u: mut LoopUses, e: ast.Expr, in_closure: Bool) {
+fn uses_expr(u: mut LoopUses, e: ast.Expr, in_closure: Bool) {
     match e.kind {
-        ast.ExprKind.Name(_) => shares(mut u, e, g)
-        ast.ExprKind.Unary(_, x) => uses_expr(g, mut u, x, in_closure)
+        ast.ExprKind.Name(_) => shares(mut u, e)
+        ast.ExprKind.Unary(_, x) => uses_expr(mut u, x, in_closure)
         ast.ExprKind.Binary(_, l, r) => {
-            uses_expr(g, mut u, l, in_closure)
-            uses_expr(g, mut u, r, in_closure)
+            uses_expr(mut u, l, in_closure)
+            uses_expr(mut u, r, in_closure)
         }
         ast.ExprKind.Call(f, args) => {
             let mut name = ""
-            match g.k.refs[e.id] {
+            match u.k.refs[e.id] {
                 checker.Ref.Builtin(n) => name = n
                 _ => {}
             }
             let reads = name == "len" || name == "maps.get" || name == "maps.has" || name == "maps.keys"
             let pushes = name == "push" || name == "strings.add" || name == "strings.add_byte" || name == "strings.add_int" ||
                 name == "maps.remove"
-            uses_expr(g, mut u, f, in_closure)
+            uses_expr(mut u, f, in_closure)
             for i in 0..len(args) {
                 let a = args[i]
                 if i == 0 && reads && is_name(a) && !in_closure {
@@ -1237,135 +1258,136 @@ fn uses_expr(g: Gen, u: mut LoopUses, e: ast.Expr, in_closure: Bool) {
                 match a.kind {
                     ast.ExprKind.MutArg(x) => {
                         if i == 0 && pushes && is_name(x) && !in_closure {
-                            push(mut u.writes, local_of(g, x.id))
+                            push(mut u.writes, ref_local(u.k, x.id))
+                            push(mut u.grows, ref_local(u.k, x.id))
                         } else {
-                            uses_expr(g, mut u, x, in_closure)
+                            uses_expr(mut u, x, in_closure)
                         }
                     }
-                    _ => uses_expr(g, mut u, a, in_closure)
+                    _ => uses_expr(mut u, a, in_closure)
                 }
             }
         }
-        ast.ExprKind.Field(x, _) => uses_expr(g, mut u, x, in_closure)
+        ast.ExprKind.Field(x, _) => uses_expr(mut u, x, in_closure)
         ast.ExprKind.Index(x, i) => {
             if !is_name(x) || in_closure {
-                uses_expr(g, mut u, x, in_closure)
+                uses_expr(mut u, x, in_closure)
             }
-            uses_expr(g, mut u, i, in_closure)
+            uses_expr(mut u, i, in_closure)
         }
-        ast.ExprKind.Try(x) => uses_expr(g, mut u, x, in_closure)
-        ast.ExprKind.MutArg(x) => uses_expr(g, mut u, x, in_closure)
+        ast.ExprKind.Try(x) => uses_expr(mut u, x, in_closure)
+        ast.ExprKind.MutArg(x) => uses_expr(mut u, x, in_closure)
         ast.ExprKind.Slice(x, a, b) => {
-            uses_expr(g, mut u, x, in_closure)
-            uses_expr(g, mut u, a, in_closure)
-            uses_expr(g, mut u, b, in_closure)
+            uses_expr(mut u, x, in_closure)
+            uses_expr(mut u, a, in_closure)
+            uses_expr(mut u, b, in_closure)
         }
         ast.ExprKind.ArrayLit(xs) => {
             for x in xs {
-                uses_expr(g, mut u, x, in_closure)
+                uses_expr(mut u, x, in_closure)
             }
         }
         ast.ExprKind.MapLit(entries) => {
             for m in entries {
-                uses_expr(g, mut u, m.key, in_closure)
-                uses_expr(g, mut u, m.value, in_closure)
+                uses_expr(mut u, m.key, in_closure)
+                uses_expr(mut u, m.value, in_closure)
             }
         }
         ast.ExprKind.StructLit(_, _, fields) => {
             for f in fields {
-                uses_expr(g, mut u, f.value, in_closure)
+                uses_expr(mut u, f.value, in_closure)
             }
         }
         ast.ExprKind.Match(x, arms) => {
-            uses_expr(g, mut u, x, in_closure)
-            uses_arms(g, mut u, arms, in_closure)
+            uses_expr(mut u, x, in_closure)
+            uses_arms(mut u, arms, in_closure)
         }
-        ast.ExprKind.Closure(_, _, body, _) => uses_block(g, mut u, body, true)
+        ast.ExprKind.Closure(_, _, body, _) => uses_block(mut u, body, true)
         _ => {}
     }
 }
 
-fn uses_arms(g: Gen, u: mut LoopUses, arms: [ast.Arm], in_closure: Bool) {
+fn uses_arms(u: mut LoopUses, arms: [ast.Arm], in_closure: Bool) {
     for a in arms {
         match a.body {
-            ast.ArmBody.Value(v) => uses_expr(g, mut u, v, in_closure)
-            ast.ArmBody.Do(st) => uses_stmt(g, mut u, st, in_closure)
+            ast.ArmBody.Value(v) => uses_expr(mut u, v, in_closure)
+            ast.ArmBody.Do(st) => uses_stmt(mut u, st, in_closure)
         }
     }
 }
 
 // The place an assignment writes: an element of a variable is a write of
 // it; a variable itself gets a new value.
-fn uses_target(g: Gen, u: mut LoopUses, e: ast.Expr, in_closure: Bool) {
+fn uses_target(u: mut LoopUses, e: ast.Expr, in_closure: Bool) {
     match e.kind {
         ast.ExprKind.Index(x, i) => {
-            uses_expr(g, mut u, i, in_closure)
+            uses_expr(mut u, i, in_closure)
             if is_name(x) && !in_closure {
-                push(mut u.writes, local_of(g, x.id))
+                push(mut u.writes, ref_local(u.k, x.id))
             } else {
-                uses_target(g, mut u, x, in_closure)
+                uses_target(mut u, x, in_closure)
             }
         }
-        ast.ExprKind.Field(x, _) => uses_target(g, mut u, x, in_closure)
-        _ => uses_expr(g, mut u, e, in_closure)
+        ast.ExprKind.Field(x, _) => uses_target(mut u, x, in_closure)
+        _ => uses_expr(mut u, e, in_closure)
     }
 }
 
-fn uses_block(g: Gen, u: mut LoopUses, b: ast.Block, in_closure: Bool) {
+fn uses_block(u: mut LoopUses, b: ast.Block, in_closure: Bool) {
     for st in b.stmts {
-        uses_stmt(g, mut u, st, in_closure)
+        uses_stmt(mut u, st, in_closure)
     }
 }
 
-fn uses_stmt(g: Gen, u: mut LoopUses, st: ast.Stmt, in_closure: Bool) {
+fn uses_stmt(u: mut LoopUses, st: ast.Stmt, in_closure: Bool) {
     match st.kind {
-        ast.StmtKind.Block(b) => uses_block(g, mut u, b, in_closure)
-        ast.StmtKind.ExprStmt(e) => uses_expr(g, mut u, e, in_closure)
-        ast.StmtKind.Let(_, _, _, v) => uses_expr(g, mut u, v, in_closure)
+        ast.StmtKind.Block(b) => uses_block(mut u, b, in_closure)
+        ast.StmtKind.ExprStmt(e) => uses_expr(mut u, e, in_closure)
+        ast.StmtKind.Let(_, _, _, v) => uses_expr(mut u, v, in_closure)
         ast.StmtKind.Assign(target, v) => {
-            uses_expr(g, mut u, v, in_closure)
-            uses_target(g, mut u, target, in_closure)
+            uses_expr(mut u, v, in_closure)
+            uses_target(mut u, target, in_closure)
         }
         ast.StmtKind.If(cond, then, otherwise) => {
-            uses_expr(g, mut u, cond, in_closure)
-            uses_block(g, mut u, then, in_closure)
+            uses_expr(mut u, cond, in_closure)
+            uses_block(mut u, then, in_closure)
             match otherwise {
-                ast.Else.ElseBlock(b) => uses_block(g, mut u, b, in_closure)
-                ast.Else.ElseIf(inner) => uses_stmt(g, mut u, inner, in_closure)
+                ast.Else.ElseBlock(b) => uses_block(mut u, b, in_closure)
+                ast.Else.ElseIf(inner) => uses_stmt(mut u, inner, in_closure)
                 ast.Else.NoElse => {}
             }
         }
         ast.StmtKind.For(cond, body) => {
             match cond {
-                Some(c) => uses_expr(g, mut u, c, in_closure)
+                Some(c) => uses_expr(mut u, c, in_closure)
                 None => {}
             }
-            uses_block(g, mut u, body, in_closure)
+            uses_block(mut u, body, in_closure)
         }
         ast.StmtKind.ForRange(_, a, b, body) => {
-            uses_expr(g, mut u, a, in_closure)
-            uses_expr(g, mut u, b, in_closure)
-            uses_block(g, mut u, body, in_closure)
+            uses_expr(mut u, a, in_closure)
+            uses_expr(mut u, b, in_closure)
+            uses_block(mut u, body, in_closure)
         }
         ast.StmtKind.ForEach(_, it, body) => {
-            uses_expr(g, mut u, it, in_closure)
-            uses_block(g, mut u, body, in_closure)
+            uses_expr(mut u, it, in_closure)
+            uses_block(mut u, body, in_closure)
         }
         ast.StmtKind.Return(v) => {
             match v {
-                Some(e) => uses_expr(g, mut u, e, in_closure)
+                Some(e) => uses_expr(mut u, e, in_closure)
                 None => {}
             }
         }
         ast.StmtKind.MatchStmt(x, arms) => {
-            uses_expr(g, mut u, x, in_closure)
-            uses_arms(g, mut u, arms, in_closure)
+            uses_expr(mut u, x, in_closure)
+            uses_arms(mut u, arms, in_closure)
         }
         ast.StmtKind.With(items, b) => {
             for w in items {
-                uses_expr(g, mut u, w.value, in_closure)
+                uses_expr(mut u, w.value, in_closure)
             }
-            uses_block(g, mut u, b, in_closure)
+            uses_block(mut u, b, in_closure)
         }
         _ => {}
     }
@@ -1374,8 +1396,8 @@ fn uses_stmt(g: Gen, u: mut LoopUses, st: ast.Stmt, in_closure: Bool) {
 // Before a loop: make unique the arrays and maps declared before it that
 // it writes and cannot share, and remember them for its writes.
 fn hoist_unique(g: mut Gen, loop: ast.Stmt) {
-    let mut u = LoopUses { writes: [], shared: [:] }
-    uses_stmt(g, mut u, loop, false)
+    let mut u = LoopUses { k: g.k, writes: [], grows: [], shared: [:] }
+    uses_stmt(mut u, loop, false)
     let mut done: [Int] = []
     for l in u.writes {
         if l < 0 || maps.has(u.shared, l) || !maps.has(g.names, l) || maps.has(g.captures, l) {
@@ -1409,13 +1431,49 @@ fn hoist_unique(g: mut Gen, loop: ast.Stmt) {
         }
         push(mut g.hoisted, p)
     }
+    // Then the arrays the loop writes in place, whose length and elements'
+    // address cannot change in it: never pushed to, given a new value or
+    // passed as mut (those share them). C cannot tell that a store to an
+    // element does not change the array's header, and would load both
+    // again after every one. An array the loop only reads gains little,
+    // and the locals cost registers across the loop's calls.
+    let mut grows: Map[Int, Bool] = [:]
+    for l in u.grows {
+        grows[l] = true
+    }
+    for l in u.writes {
+        if l < 0 || maps.has(u.shared, l) || maps.has(grows, l) || !maps.has(g.names, l) || maps.has(g.captures, l) {
+            continue
+        }
+        if !types.is_array(g.k.table, local_ty(g, l)) {
+            continue
+        }
+        let p = local(mut g, l)
+        if maps.has(g.cached, p) {
+            continue
+        }
+        let d = new_temp(mut g)
+        emit(mut g, "unsigned char *" + d + " = " + p + "->data;")
+        emit(mut g, "int64_t " + d + "n = " + p + "->len;")
+        g.cached[p] = d
+    }
 }
 
 // The address of element `index` of the array `container`, checked to be
 // in bounds, as a pointer to `elem`, the element's C type. The check is
 // inline, in vela_rt.h, so the C compiler can see through it (M16b).
 fn element_address(g: Gen, e: ast.Expr, elem: Str, container: Str, index: Str, loc: Str) -> Str {
-    if maps.has(g.env.safe, e.id) && g.env.safe[e.id] {
+    let safe = maps.has(g.env.safe, e.id) && g.env.safe[e.id]
+    match maps.get(g.cached, container) {
+        Some(d) => {
+            if safe {
+                return "((" + elem + " *)" + d + " + " + index + ")"
+            }
+            return "(" + elem + " *)vela_at_in(" + d + ", " + d + "n, " + index + ", sizeof(" + elem + "), " + loc + ")"
+        }
+        None => {}
+    }
+    if safe {
         return "((" + elem + " *)" + container + "->data + " + index + ")"
     }
     return "(" + elem + " *)vela_at(" + container + ", " + index + ", sizeof(" + elem + "), " + loc + ")"
@@ -2088,7 +2146,8 @@ fn index(g: mut Gen, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Value {
         emit(mut g, elem + " " + temp + " = *(" + elem + " *)vela_map_at(" + o + ", " + ka + ", " + loc_of(g, e) + ");")
     } else {
         let ix = expr(mut g, i).c
-        emit(mut g, elem + " " + temp + " = *" + element_address(g, e, elem, o, ix, loc_of(g, e)) + ";")
+        let address = element_address(g, e, elem, o, ix, loc_of(g, e))  // before emit, as in assign
+        emit(mut g, elem + " " + temp + " = *" + address + ";")
     }
     return value(temp, ty(g, e))
 }

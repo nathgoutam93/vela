@@ -1,4 +1,4 @@
-// Errors in the program being compiled, as in stage0/errors.py: each has a
+// Errors in the program being compiled: each has a
 // file, a position and a message, and a phase reports all of its errors
 // sorted by file, then position, then message, without exact duplicates.
 import strings

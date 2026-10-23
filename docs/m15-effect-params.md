@@ -272,9 +272,9 @@ It runs the same on both backends and under AddressSanitizer.
 Hover shows the effects:
 
 ```
-$ vela query type effect_params.vl:28:18
+$ vela query type effect_params.vl:27:18
   "detail": "pub fn map[T, U](xs: [T], f: fn(T) -> U) -> [U] uses f",
-$ vela query type effect_params.vl:108:9
+$ vela query type effect_params.vl:107:9
   "detail": "let r: fn(Str) -> Int uses fs",
 ```
 
