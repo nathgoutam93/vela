@@ -25,8 +25,9 @@ pub type Layout = struct {
 // The C name of `name` in `module`, with the module's length in front so
 // two different pairs never give the same name (see Stage 0). A package's
 // own module, `greet.util`, cannot go into C as it is: each part goes in
-// with its length, after a P, which no other name starts with (they start
-// with a digit): `P5greet4util_hello`.
+// with its length, after a 0, which no other name starts with (a name in
+// the main module starts with a letter or _, another module's with its
+// length, which is never 0): `05greet4util_hello`.
 pub fn mangle(module: Str, name: Str) -> Str {
     if module == "" {
         return name
@@ -41,7 +42,7 @@ pub fn mangle(module: Str, name: Str) -> Str {
         return strings.from_int(len(module)) + module + "_" + name
     }
     let mut b = strings.builder()
-    strings.add_byte(mut b, 'P')
+    strings.add_byte(mut b, '0')
     let mut start = 0
     for i in 0..len(module) + 1 {
         if i == len(module) || module[i] == '.' {
@@ -57,7 +58,7 @@ pub fn mangle(module: Str, name: Str) -> Str {
 test "C names of a module's things" {
     assert(mangle("", "main") == "main")
     assert(mangle("lexer", "Token") == "5lexer_Token")
-    assert(mangle("greet.util", "hello") == "P5greet4util_hello")
+    assert(mangle("greet.util", "hello") == "05greet4util_hello")
 }
 
 fn primitive_c(t: Int) -> Str {

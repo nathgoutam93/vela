@@ -31,6 +31,7 @@ build/vela tokens hello.vl    # show the tokens
 build/vela ast hello.vl       # show the syntax tree
 build/vela query type hello.vl:12:7   # what the name there is, in JSON (also def, refs, symbols)
 build/vela lsp                # a language server on stdin and stdout, for editors
+build/vela get                # fetch the packages vela.mod names; write vela.lock
 python3 run_tests.py          # run the test suite with build/vela
 ```
 
@@ -48,7 +49,7 @@ then use it.
 stage1/      the compiler, written in Vela
 bootstrap/   the seed (Stage 1 compiled to C) and the bootstrap script
 examples/    larger programs: orders/ prices orders read from CSV;
-             mandelbrot/ renders rows on every core
+             mandelbrot/ renders rows on every core; receipt/ uses a package
 editors/     Neovim and VS Code support for `vela lsp`
 stage0/      the first compiler, in Python: frozen at M9 as the readable reference
 runtime/     C runtime linked into every program
@@ -83,7 +84,9 @@ server (`vela lsp`) and `vela query` for agents, with `std/json.vl` and
 reading from stdin. M13 added structured concurrency: `tasks.map(xs, f)`
 runs f on every core and returns the results in order, safely, since
 values are copies; the compiler uses it to compile its C in parallel.
-All of M10, M12 and M13 is in Stage 1 only.
+M14 added packages: git repositories or directories named in `vela.mod`,
+fetched by `vela get` and pinned in `vela.lock`; builds never use the
+network. All of M10 and M12 to M14 is in Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.
