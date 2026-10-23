@@ -125,6 +125,8 @@ The round after it (flow-sensitive ranges, bounds checks proved away,
 compact enum boxes, faster maps and file reads) brought the geometric
 mean to 1.04, no benchmark over 1.2; see
 [`docs/performance-next-round.md`](docs/performance-next-round.md).
+What comes next, toward a systems language that is also agent-first, is in
+[`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.
