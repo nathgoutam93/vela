@@ -1,0 +1,17 @@
+// vela query complete with part of a name typed: the names in scope that
+// start with it, innermost first, then the module's, the built-in ones and
+// the keywords. `count` is not given: it is declared after the cursor.
+// stage 1 only
+// command: query complete FILE:15:13
+import strings
+
+// How many there are.
+fn counted(xs: [Int]) -> Int {
+    return len(xs)
+}
+
+fn main() {
+    let columns = 3
+    print(co
+    let count = 2
+}

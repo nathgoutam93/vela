@@ -166,6 +166,7 @@ def start(compiler: list[str], cwd: Path, utf8: bool) -> Client:
                 "documentFormattingProvider"):
         expect(cap, caps.get(cap), True)
     expect("rename", caps.get("renameProvider"), {"prepareProvider": True})
+    expect("completion", caps.get("completionProvider"), {"triggerCharacters": ["."]})
     expect("sync", caps["textDocumentSync"]["change"], 1)
     c.notify("initialized", {})
     return c
@@ -225,6 +226,35 @@ def session(compiler: list[str], d: Path) -> None:
     c.notify("textDocument/didChange", {"textDocument": {"uri": shapes_uri, "version": 3},
                                         "contentChanges": [{"text": SHAPES}]})
     expect("main.vl is fine again", c.diagnostics(main_uri), [])
+
+    # Completion: after a module, an enum, a value; a name typed in part;
+    # and, with another line half typed too, from the last check that loaded.
+    def completions(text: str, line: int, character: int) -> list[str]:
+        nonlocal version
+        version += 1
+        c.notify("textDocument/didChange", {"textDocument": {"uri": main_uri, "version": version},
+                                            "contentChanges": [{"text": text}]})
+        c.diagnostics(main_uri)
+        got = c.result("textDocument/completion", position(main_uri, line, character))
+        return [i["label"] for i in sorted(got["items"], key=lambda i: i["sortText"])]
+
+    version = 3
+    lines = MAIN_FIXED.split("\n")
+    def with_line(n: int, text: str) -> str:
+        return "\n".join(lines[:n] + [text] + lines[n + 1:])
+    typed = "        total = total + shapes."
+    expect("after a module", completions(with_line(6, typed), 6, len(typed)), ["area", "Shape"])
+    expect("after an enum", completions(with_line(6, typed + "Shape."), 6, len(typed) + 6), ["Circle", "Rect"])
+    expect("a local, typed in part", completions(with_line(6, "        total = to"), 6, 18), ["total"])
+    expect("after a value", completions(with_line(8, "    print(all."), 8, 14), [])
+    two = with_line(6, typed).replace("    print(total)", "    print((")
+    expect("from the last check that loaded", completions(two, 6, len(typed)), ["area", "Shape"])
+    item = c.result("textDocument/completion", position(main_uri, 6, len(typed)))["items"][0]
+    expect("an item", (item["kind"], item["detail"], item["documentation"]["value"]),
+           (3, "pub fn area(s: Shape) -> Float", "The area of `s`."))
+    c.notify("textDocument/didChange", {"textDocument": {"uri": main_uri, "version": version + 1},
+                                        "contentChanges": [{"text": MAIN_FIXED}]})
+    expect("main.vl as it was", c.diagnostics(main_uri), [])
 
     # The outline of a file.
     syms = c.result("textDocument/documentSymbol", {"textDocument": {"uri": shapes_uri}})

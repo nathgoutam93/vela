@@ -1,0 +1,23 @@
+{
+  "prefix": "co",
+  "items": [
+    {
+      "name": "columns",
+      "kind": "local",
+      "detail": "let columns: Int",
+      "doc": null
+    },
+    {
+      "name": "counted",
+      "kind": "function",
+      "detail": "fn counted(xs: [Int]) -> Int",
+      "doc": "How many there are."
+    },
+    {
+      "name": "continue",
+      "kind": "keyword",
+      "detail": "continue",
+      "doc": null
+    }
+  ]
+}

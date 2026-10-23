@@ -35,6 +35,7 @@
 import ast
 import checker
 import codegen
+import complete
 import errors
 import files
 import format
@@ -75,6 +76,10 @@ fn main() {
     if command == "query" {
         if len(args) == 5 && args[2] == "rename" {
             rename.command(args[3], args[4], modules.join(root, "std"), false)
+            return
+        }
+        if len(args) == 4 && args[2] == "complete" {
+            complete.command(args[3], modules.join(root, "std"))
             return
         }
         query.command(args[2..len(args)], modules.join(root, "std"))

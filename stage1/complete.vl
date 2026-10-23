@@ -1,0 +1,533 @@
+// Completion (M12b): what may be written where the cursor is, for `vela
+// query complete` and the language server.
+//
+// The program is half typed at that moment: `p.` or `orders.su` is not
+// Vela yet. So the word at the cursor is replaced by a name of our own,
+// `vela_completion_`, and the program checked; the checker notes what is
+// in scope where it meets that name (checker.Completion), and the type of
+// `p` in `p.vela_completion_`. If the line does not parse that way, the
+// line is tried with what follows the cursor dropped and brackets closed,
+// then as only the name, then empty, which still says what the module
+// declares and imports. If none of those loads (another line is half
+// typed too), the last check of the program that did is used, if there
+// is one: the language server keeps it.
+//
+// After `p.`: p's fields. After `orders.`: what the module orders makes
+// public. After `Shape.` or `ast.ExprKind.`: the enum's variants.
+// Otherwise: the locals in scope, innermost first, then the module's
+// functions and types, the modules it imports, the built-in functions and
+// types, and the keywords. Only names starting with what is typed already
+// are given.
+// stage 1 only (it says `uses`)
+import ast
+import checker
+import files
+import index
+import json
+import maps
+import modules
+import query
+import strings
+import types
+
+pub type Item = struct {
+    name: Str
+    // "local", "parameter", "loop variable", "match binding", "type
+    // parameter", "function", "type", "field", "variant", "module",
+    // "built-in" or "keyword"
+    kind: Str
+    detail: Str
+    doc: Str
+}
+
+pub type Completions = struct {
+    prefix: Str  // what is typed of the name already
+    items: [Item]
+}
+
+fn placeholder() -> Str {
+    return "vela_completion_"
+}
+
+// What may be written at `line`:`col` (from 1, in bytes) of `path`, whose
+// text is `text`; `open` has the texts of other files to use, and `last`
+// the last check of the program that loaded, if any.
+pub fn complete(path: Str, text: Str, line: Int, col: Int, std_dir: Str, open: Map[Str, Str], last: [checker.Checked]) ->
+    Completions uses fs, os {
+    let lines = split_lines(text)
+    if line < 1 || line > len(lines) {
+        return Completions { prefix: "", items: [] }
+    }
+    let l = lines[line - 1]
+    let mut at = col - 1
+    if at > len(l) {
+        at = len(l)
+    }
+    if at < 0 {
+        at = 0
+    }
+    if in_string_or_comment(l[0..at]) {
+        return Completions { prefix: "", items: [] }
+    }
+    let mut start = at
+    for start > 0 && is_word_byte(l[start - 1]) {
+        start = start - 1
+    }
+    let mut end = at
+    for end < len(l) && is_word_byte(l[end]) {
+        end = end + 1
+    }
+    let prefix = l[start..at]
+    if len(prefix) > 0 && prefix[0] >= '0' && prefix[0] <= '9' {
+        return Completions { prefix: prefix, items: [] }  // a number
+    }
+    let member = start > 0 && l[start - 1] == '.'
+    let chain = qualifier(l, start)
+    // The lines to try in place of the cursor's line.
+    let p = placeholder()
+    let mut tries = [l[0..start] + p + l[end..len(l)], l[0..start] + p + closers(l[0..start])]
+    let mut written = p
+    if member && len(chain) > 0 {
+        written = join(chain, ".") + "." + p
+    }
+    if !member || len(chain) > 0 {
+        push(mut tries, indent(l) + written)
+    }
+    push(mut tries, "")
+    for t in tries {
+        let mut texts = open
+        texts[path] = joined_lines(lines, line, t)
+        let a = query.program_completing(path, std_dir, texts, p)
+        match a.checked {
+            Some(k) => return Completions { prefix: prefix, items: filtered(items(k, path, member, chain), prefix) }
+            None => {}
+        }
+    }
+    if len(last) == 1 {
+        return Completions { prefix: prefix, items: filtered(items(last[0], path, member, chain), prefix) }
+    }
+    return Completions { prefix: prefix, items: [] }
+}
+
+fn filtered(all: [Item], prefix: Str) -> [Item] {
+    let mut out: [Item] = []
+    let mut seen: Map[Str, Bool] = [:]
+    for it in all {
+        if it.name == placeholder() || maps.has(seen, it.name) {
+            continue
+        }
+        if len(it.name) >= len(prefix) && it.name[0..len(prefix)] == prefix {
+            seen[it.name] = true
+            push(mut out, it)
+        }
+    }
+    return out
+}
+
+// ---- What there is ----
+
+fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
+    let mut mi = -1
+    for i in 0..len(k.modules) {
+        if !k.modules[i].is_std && modules.normpath(k.modules[i].file) == modules.normpath(path) {
+            mi = i
+        }
+    }
+    if mi < 0 {
+        return []
+    }
+    let m = k.modules[mi]
+    let mut visible: Map[Str, Bool] = [:]
+    for l in k.completion.visible {
+        visible[k.locals[l].name] = true
+    }
+    if member {
+        // A module, or an enum, named before the dot.
+        if len(chain) > 0 && !maps.has(visible, chain[0]) {
+            match maps.get(m.imports, chain[0]) {
+                Some(target) => {
+                    if len(chain) == 1 {
+                        return module_items(k, target)
+                    }
+                    if len(chain) == 2 {
+                        match maps.get(k.modules[target].types, chain[1]) {
+                            Some(t) => return variants(k, t, mi)
+                            None => return []
+                        }
+                    }
+                    return []
+                }
+                None => {}
+            }
+            if len(chain) == 1 {
+                match maps.get(m.types, chain[0]) {
+                    Some(t) => return variants(k, t, mi)
+                    None => {}
+                }
+            }
+        }
+        // A value: its fields.
+        if len(k.completion.object) == 1 {
+            let t = k.ty[k.completion.object[0].id]
+            if t >= 0 && types.is_struct(k.table, t) {
+                return fields(k, t, mi)
+            }
+        }
+        return []
+    }
+    let mut out: [Item] = []
+    for l in k.completion.visible {
+        push(mut out, local_item(k, l, mi))
+    }
+    for name in k.completion.type_params {
+        push(mut out, Item { name: name, kind: "type parameter", detail: name, doc: "" })
+    }
+    let lines = index.source_lines(m.source)
+    for name in maps.keys(m.fns) {
+        let f = k.fns[m.fns[name]]
+        if !f.is_test {
+            push(mut out, Item {
+                name: name, kind: "function", detail: index.signature(f.decl), doc: index.comment_above(lines, f.decl.line),
+            })
+        }
+    }
+    for decl in m.program.types {
+        push(mut out, Item {
+            name: decl.name, kind: "type", detail: index.type_detail(decl), doc: index.comment_above(lines, decl.line),
+        })
+    }
+    for name in maps.keys(m.imports) {
+        let target = k.modules[m.imports[name]]
+        let mut doc = "A built-in module."
+        if !target.is_std {
+            doc = target.path
+        }
+        push(mut out, Item { name: name, kind: "module", detail: "import " + name, doc: doc })
+    }
+    for name in ["print", "len", "push", "int", "float", "byte", "assert"] {
+        push(mut out, builtin_item(name, name))
+    }
+    for name in ["Int", "Float", "Bool", "Byte", "Str", "Option", "Result", "Map"] {
+        push(mut out, Item { name: name, kind: "built-in", detail: name, doc: "A built-in type." })
+    }
+    for v in [["Some", "Some(T)"], ["None", "None"], ["Ok", "Ok(T)"], ["Err", "Err(E)"]] {
+        let mut of = "Option[T]"
+        if v[0] == "Ok" || v[0] == "Err" {
+            of = "Result[T, E]"
+        }
+        push(mut out, Item { name: v[0], kind: "variant", detail: of + "." + v[1], doc: "A built-in variant, of " + of + "." })
+    }
+    for w in ["let", "mut", "if", "else", "match", "for", "in", "return", "break", "continue", "fn", "type", "import", "pub",
+        "test", "uses", "with", "requires", "ensures", "true", "false"] {
+        push(mut out, Item { name: w, kind: "keyword", detail: w, doc: "" })
+    }
+    return out
+}
+
+fn builtin_item(name: Str, written: Str) -> Item {
+    let info = index.builtin_info(written)
+    if len(info) == 2 {
+        return Item { name: name, kind: "function", detail: info[0], doc: info[1] }
+    }
+    return Item { name: name, kind: "built-in", detail: written, doc: "" }
+}
+
+fn local_item(k: checker.Checked, l: Int, mi: Int) -> Item {
+    let local = k.locals[l]
+    let t = types.show(k.table, local.ty, k.modules[mi].name)
+    let mut kind = local.kind
+    let mut detail = local.name + ": " + t
+    if kind == "let" || kind == "let mut" {
+        detail = kind + " " + detail
+        kind = "local"
+    } else if kind == "mut parameter" {
+        detail = local.name + ": mut " + t
+        kind = "parameter"
+    }
+    return Item { name: local.name, kind: kind, detail: detail, doc: "" }
+}
+
+// What module `target` makes public.
+fn module_items(k: checker.Checked, target: Int) -> [Item] {
+    let m = k.modules[target]
+    let mut out: [Item] = []
+    if m.is_std {
+        for f in m.std {
+            push(mut out, builtin_item(f, m.name + "." + f))
+        }
+        if m.name == "strings" {
+            push(mut out, Item {
+                name: "Builder", kind: "type", detail: "strings.Builder", doc: "Makes a Str from many pieces: strings.builder().",
+            })
+        }
+        return out
+    }
+    let lines = index.source_lines(m.source)
+    for name in maps.keys(m.fns) {
+        let f = k.fns[m.fns[name]]
+        if f.decl.public && !f.is_test {
+            push(mut out, Item {
+                name: name, kind: "function", detail: index.signature(f.decl), doc: index.comment_above(lines, f.decl.line),
+            })
+        }
+    }
+    for decl in m.program.types {
+        if decl.public {
+            push(mut out, Item {
+                name: decl.name, kind: "type", detail: index.type_detail(decl), doc: index.comment_above(lines, decl.line),
+            })
+        }
+    }
+    return out
+}
+
+// The declaration of type `t` (of its generic declaration, for an
+// instance), and the module it is in; none for a built-in type.
+type Declared = struct {
+    decls: [ast.TypeDecl]
+    lines: [Str]
+}
+
+fn declared(k: checker.Checked, t: Int) -> Declared {
+    let mut info = types.get(k.table, t)
+    if info.origin >= 0 {
+        info = types.get(k.table, info.origin)
+    }
+    for m in k.modules {
+        if m.is_std || !m.has_program || m.name != info.module {
+            continue
+        }
+        for d in m.program.types {
+            if d.line == info.line && d.col == info.col {
+                return Declared { decls: [d], lines: index.source_lines(m.source) }
+            }
+        }
+    }
+    return Declared { decls: [], lines: [] }
+}
+
+fn fields(k: checker.Checked, t: Int, mi: Int) -> [Item] {
+    let info = types.get(k.table, t)
+    let d = declared(k, t)
+    let mut out: [Item] = []
+    for i in 0..len(info.fields) {
+        let f = info.fields[i]
+        let mut doc = ""
+        if len(d.decls) == 1 && i < len(d.decls[0].fields) {
+            let line = d.decls[0].fields[i].line
+            doc = index.joined(index.comment_above(d.lines, line), index.trailing_comment(d.lines, line))
+        }
+        push(mut out, Item {
+            name: f.name, kind: "field", detail: info.name + "." + f.name + ": " + types.show(k.table, f.ty, k.modules[mi].name),
+            doc: doc,
+        })
+    }
+    return out
+}
+
+fn variants(k: checker.Checked, t: Int, mi: Int) -> [Item] {
+    if !types.is_enum(k.table, t) {
+        return []
+    }
+    let info = types.get(k.table, t)
+    let d = declared(k, t)
+    let mut out: [Item] = []
+    if len(d.decls) == 0 {
+        return out
+    }
+    let decl = d.decls[0]
+    for v in decl.variants {
+        push(mut out, Item {
+            name: v.name, kind: "variant", detail: decl.name + "." + index.variant_text(v),
+            doc: index.joined(index.comment_above(d.lines, v.line), index.trailing_comment(d.lines, v.line)),
+        })
+    }
+    if len(out) == 0 && len(info.variants) > 0 {
+        for v in info.variants {
+            push(mut out, Item { name: v.name, kind: "variant", detail: info.name + "." + v.name, doc: "" })
+        }
+    }
+    return out
+}
+
+// ---- The text around the cursor ----
+
+fn is_word_byte(c: Byte) -> Bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_'
+}
+
+// The names of `a.b.` before the word starting at `start`, when that word
+// follows a dot and they are only names: ["a", "b"]; [] otherwise.
+fn qualifier(l: Str, start: Int) -> [Str] {
+    let mut out: [Str] = []
+    let mut dot = start - 1
+    for dot >= 0 && l[dot] == '.' {
+        let mut s = dot
+        for s > 0 && is_word_byte(l[s - 1]) {
+            s = s - 1
+        }
+        if s == dot || l[s] >= '0' && l[s] <= '9' {
+            return []  // `f(x).` or `xs[0].` or `1.`: not a name
+        }
+        let mut names = [l[s..dot]]
+        for n in out {
+            push(mut names, n)
+        }
+        out = names
+        dot = s - 1
+    }
+    if dot >= 0 && (l[dot] == ')' || l[dot] == ']') {
+        return []
+    }
+    return out
+}
+
+// Whether the end of `before` is inside a string, a character or a comment.
+fn in_string_or_comment(before: Str) -> Bool {
+    let mut quote: Byte = 0
+    let mut i = 0
+    for i < len(before) {
+        let c = before[i]
+        if quote != 0 {
+            if c == '\\' {
+                i = i + 1
+            } else if c == quote {
+                quote = 0
+            }
+        } else if c == '"' || c == '\'' {
+            quote = c
+        } else if c == '/' && i + 1 < len(before) && before[i + 1] == '/' {
+            return true
+        }
+        i = i + 1
+    }
+    return quote != 0
+}
+
+// What closes the brackets `before` opens: `)` for `f(a, `.
+fn closers(before: Str) -> Str {
+    let mut open: [Byte] = []
+    let mut quote: Byte = 0
+    let mut i = 0
+    for i < len(before) {
+        let c = before[i]
+        if quote != 0 {
+            if c == '\\' {
+                i = i + 1
+            } else if c == quote {
+                quote = 0
+            }
+        } else if c == '"' || c == '\'' {
+            quote = c
+        } else if c == '(' || c == '[' {
+            push(mut open, c)
+        } else if (c == ')' || c == ']') && len(open) > 0 {
+            open = open[0..len(open) - 1]
+        }
+        i = i + 1
+    }
+    let mut b = strings.builder()
+    let mut j = len(open) - 1
+    for j >= 0 {
+        if open[j] == '(' {
+            strings.add(mut b, ")")
+        } else {
+            strings.add(mut b, "]")
+        }
+        j = j - 1
+    }
+    return strings.build(b)
+}
+
+fn indent(l: Str) -> Str {
+    let mut n = 0
+    for n < len(l) && (l[n] == ' ' || l[n] == '\t') {
+        n = n + 1
+    }
+    return l[0..n]
+}
+
+fn split_lines(text: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(text) {
+        if text[i] == '\n' {
+            push(mut out, text[start..i])
+            start = i + 1
+        }
+    }
+    push(mut out, text[start..len(text)])
+    return out
+}
+
+// The text of `lines`, with line `n` (from 1) replaced by `l`.
+fn joined_lines(lines: [Str], n: Int, l: Str) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(lines) {
+        if i > 0 {
+            strings.add(mut b, "\n")
+        }
+        if i == n - 1 {
+            strings.add(mut b, l)
+        } else {
+            strings.add(mut b, lines[i])
+        }
+    }
+    return strings.build(b)
+}
+
+fn join(parts: [Str], sep: Str) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(parts) {
+        if i > 0 {
+            strings.add(mut b, sep)
+        }
+        strings.add(mut b, parts[i])
+    }
+    return strings.build(b)
+}
+
+// ---- vela query complete ----
+
+pub fn command(at: Str, std_dir: Str) uses fs, os {
+    let mut path = ""
+    let mut line = 0
+    let mut col = 0
+    match query.position(at) {
+        Some(p) => {
+            path = p.path
+            line = p.line
+            col = p.col
+        }
+        None => query.fail("a position is FILE:LINE:COL, not '" + at + "'")
+    }
+    let mut text = ""
+    match files.read(path) {
+        Ok(t) => text = t
+        Err(e) => query.fail(e)
+    }
+    let c = complete(path, text, line, col, std_dir, [:], [])
+    let mut out: [json.Json] = []
+    for it in c.items {
+        let mut doc = json.null()
+        if it.doc != "" {
+            doc = json.string(it.doc)
+        }
+        push(mut out, json.object([
+            json.member("name", json.string(it.name)), json.member("kind", json.string(it.kind)),
+            json.member("detail", json.string(it.detail)), json.member("doc", doc),
+        ]))
+    }
+    print(json.pretty(json.object([json.member("prefix", json.string(c.prefix)), json.member("items", json.array(out))])))
+}
+
+// ---- Tests ----
+
+test "the text around the cursor" {
+    let q = qualifier("    let x = ast.ExprKind.Na", 25)
+    assert(len(q) == 2 && q[0] == "ast" && q[1] == "ExprKind")
+    assert(len(qualifier("f(x).y", 5)) == 0 && len(qualifier("xs[0].", 6)) == 0 && len(qualifier("print(n)", 6)) == 0)
+    assert(in_string_or_comment("let s = \"a.b") && in_string_or_comment("x // p.") && !in_string_or_comment("f(\"a\", p."))
+    assert(closers("print(f(a, [1, p.") == "]))" && closers("g(\")\", ") == ")")
+    assert(indent("\t  x") == "\t  " && joined_lines(["a", "b", "c"], 2, "B") == "a\nB\nc")
+}

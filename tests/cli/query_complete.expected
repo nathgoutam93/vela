@@ -1,0 +1,23 @@
+{
+  "prefix": "",
+  "items": [
+    {
+      "name": "x",
+      "kind": "field",
+      "detail": "Point.x: Int",
+      "doc": "across"
+    },
+    {
+      "name": "y",
+      "kind": "field",
+      "detail": "Point.y: Int",
+      "doc": "up"
+    },
+    {
+      "name": "label",
+      "kind": "field",
+      "detail": "Point.label: Str",
+      "doc": null
+    }
+  ]
+}

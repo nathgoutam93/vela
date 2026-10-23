@@ -1,6 +1,6 @@
 -- Vela buffers: four-space indents, // comments, and `vela lsp` for errors
--- as you type, hover (K), go to definition, references, the outline and
--- formatting.
+-- as you type, hover (K), go to definition, references, the outline,
+-- formatting, rename and completion (<C-x><C-o>).
 --
 --   vim.g.vela_command        the server's command line (default {"vela", "lsp"})
 --   vim.g.vela_format_on_save true to format with `vela fmt` rules on :w
@@ -18,6 +18,9 @@ local file = vim.api.nvim_buf_get_name(0)
 if file == "" then
   return
 end
+
+-- Completion with <C-x><C-o>.
+vim.bo.omnifunc = "v:lua.vim.lsp.omnifunc"
 
 vim.lsp.start({
   name = "vela",

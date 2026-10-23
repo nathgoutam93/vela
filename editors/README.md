@@ -8,7 +8,12 @@ It gives:
   above its declaration;
 - go to definition and find references, across the files of a program;
 - the outline of a file;
-- formatting, by the same rules as `vela fmt`.
+- formatting, by the same rules as `vela fmt`;
+- rename, everywhere the name is used, refused when the new name would
+  change what another name means;
+- completion: after `p.` a value's fields, after `orders.` what the
+  module makes public, after `Shape.` an enum's variants, and otherwise the
+  names in scope, with their types and comments.
 
 Build the compiler first (`sh bootstrap/bootstrap.sh`), and put `build/vela`
 on your PATH, or give its full path in the settings below.
@@ -32,7 +37,8 @@ vim.g.vela_format_on_save = true
 
 Then Neovim's own LSP keys work: `K` for hover, and `gd` with
 `vim.lsp.buf.definition()`, `vim.lsp.buf.references()`,
-`vim.lsp.buf.document_symbol()` and `vim.lsp.buf.format()`.
+`vim.lsp.buf.document_symbol()`, `vim.lsp.buf.format()` and
+`vim.lsp.buf.rename()`; `<C-x><C-o>` completes.
 
 `tests/nvim_test.lua` drives this setup from a headless Neovim. `run_tests.py`
 runs it when `nvim` is installed.

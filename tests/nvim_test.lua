@@ -1,5 +1,6 @@
 -- Neovim with editors/nvim, driving `vela lsp` as a person would: open a
--- file with an error, see it, point at names, fix the error, format.
+-- file with an error, see it, point at names, fix the error, rename,
+-- complete, format.
 --
 --   nvim --headless --clean --cmd "set rtp^=editors/nvim" \
 --        --cmd "let g:vela_command = ['build/vela', 'lsp']" -l tests/nvim_test.lua
@@ -98,6 +99,19 @@ wait("the error to clear", function() return #vim.diagnostic.get(0) == 0 end)
 vim.api.nvim_buf_set_lines(0, 4, 4, false, { "    print(nope)" })
 wait("the new error", function() return #vim.diagnostic.get(0) > 0 end)
 expect("new diagnostic", vim.diagnostic.get(0)[1].message, "undefined name 'nope'")
+
+-- Rename, as :lua vim.lsp.buf.rename("sum") does it, on `total`.
+vim.api.nvim_win_set_cursor(0, { 4, 12 })
+vim.lsp.buf.rename("sum")
+wait("the rename", function() return vim.api.nvim_buf_get_lines(0, 3, 4, false)[1] == "    let mut sum = 0.0" end)
+expect("renamed", vim.api.nvim_buf_get_lines(0, 5, 8, false),
+  { "    for s in [shapes.Shape.Circle(1.0), shapes.Shape.Rect(2.0, 3.0)] {", "        sum = sum + shapes.area(s)", "    }" })
+
+-- Completion after `shapes.`, typed in place of the mistake.
+vim.api.nvim_buf_set_lines(0, 4, 5, false, { "    shapes." })
+local items = request("textDocument/completion", 4, 11).items
+table.sort(items, function(a, b) return a.sortText < b.sortText end)
+expect("completion", vim.tbl_map(function(i) return i.label end, items), { "area", "Shape" })
 
 -- Formatting another file, as :lua vim.lsp.buf.format() does.
 vim.cmd.edit(dir .. "/odd.vl")

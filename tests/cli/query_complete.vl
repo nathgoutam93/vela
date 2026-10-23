@@ -1,0 +1,17 @@
+// vela query complete: what may be written at a position, though the line
+// is half typed. Here, after `p.` on line 16: Point's fields, with their
+// types and comments.
+// stage 1 only
+// command: query complete FILE:16:13
+type Point = struct {
+    x: Int  // across
+    // up
+    y: Int
+    label: Str
+}
+
+fn main() {
+    let p = Point { x: 1, y: 2, label: "a" }
+    let total = 0
+    print(p.
+}

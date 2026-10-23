@@ -47,6 +47,13 @@ pub type Analysis = struct {
 // by path) instead of those files. Its tests are checked too, and it need
 // not have a main function.
 pub fn analyze(path: Str, source: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses fs, os {
+    return analyze_completing(path, source, std_dir, open, "")
+}
+
+// The same, noting what is in scope where the name `completing` is
+// (checker.Completion).
+pub fn analyze_completing(path: Str, source: Str, std_dir: Str, open: Map[Str, Str], completing: Str) -> Analysis
+    uses fs, os {
     let mut loaded = modules.load_open(path, source, std_dir, open)
     match packages.for_program(path) {
         Ok(pk) => loaded = modules.load_program(path, source, std_dir, open, pk)
@@ -59,13 +66,17 @@ pub fn analyze(path: Str, source: Str, std_dir: Str, open: Map[Str, Str]) -> Ana
     if len(loaded.errors) > 0 {
         return Analysis { loaded: loaded, checked: None, errors: errors.merged(loaded.errors, loaded.warnings) }
     }
-    let k = checker.check_program(loaded, true)
+    let k = checker.check_completing(loaded, true, completing)
     return Analysis { loaded: loaded, checked: Some(k), errors: errors.merged(k.errors, k.warnings) }
 }
 
 // The program `path` is checked as part of, as above, with `open` (texts by
 // path) read instead of those files.
 pub fn program_of(path: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses fs, os {
+    return program_completing(path, std_dir, open, "")
+}
+
+pub fn program_completing(path: Str, std_dir: Str, open: Map[Str, Str], completing: Str) -> Analysis uses fs, os {
     let main = modules.join(modules.dirname(path), "main.vl")
     if modules.normpath(main) != modules.normpath(path) {
         let mut text = ""
@@ -80,7 +91,7 @@ pub fn program_of(path: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses
             }
         }
         if found {
-            let a = analyze(main, text, std_dir, open)
+            let a = analyze_completing(main, text, std_dir, open, completing)
             for m in a.loaded.modules {
                 if !m.is_std && modules.normpath(m.file) == modules.normpath(path) {
                     return a
@@ -98,7 +109,7 @@ pub fn program_of(path: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses
             }
         }
     }
-    return analyze(path, source, std_dir, open)
+    return analyze_completing(path, source, std_dir, open, completing)
 }
 
 pub fn command(args: [Str], std_dir: Str) uses fs, os {

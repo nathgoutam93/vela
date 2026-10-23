@@ -79,6 +79,17 @@ pub type Checked = struct {
     breaks: [Bool]  // by node id: whether a `for` loop has a break
     targs: [[Int]]  // by node id: the type arguments of a call to a generic function
     closures: Map[Int, ClosureInfo]  // by node id
+    completion: Completion
+}
+
+// What is in scope where the name being completed is (M12b, complete.vl):
+// the program is checked with that name written as `name`.
+pub type Completion = struct {
+    name: Str  // "" when not completing
+    module: Int  // where it was met, or -1 if it was not
+    visible: [Int]  // the locals in scope there, innermost first, one per name
+    type_params: [Str]  // the type parameters in scope there
+    object: [ast.Expr]  // `x` when it is `x.name`: its type is in ty
 }
 
 type Loop = struct {
@@ -118,6 +129,7 @@ type Checker = struct {
     in_closures: [ClosureCtx]  // the closures being checked, innermost last
     pending: [Int]  // type parameters of a generic call whose arguments are being checked, still unknown
     direct: Int  // the node id of the function argument of tasks.map or tasks.each being checked, or -1
+    completion: Completion
 }
 
 pub fn check(loaded: modules.Loaded) -> Checked {
@@ -127,6 +139,12 @@ pub fn check(loaded: modules.Loaded) -> Checked {
 // `for_tests`: the program is checked to run its tests, so it need not
 // have a main function.
 pub fn check_program(loaded: modules.Loaded, for_tests: Bool) -> Checked {
+    return check_completing(loaded, for_tests, "")
+}
+
+// The program checked as for its tests, noting what is in scope where the
+// name `name` is (see Completion).
+pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> Checked {
     let mut ty: [Int] = []
     let mut refs: [Ref] = []
     let mut breaks: [Bool] = []
@@ -142,12 +160,14 @@ pub fn check_program(loaded: modules.Loaded, for_tests: Bool) -> Checked {
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
         undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
         in_closures: [], pending: [], defining: -1, expected: -2, direct: -1,
+        completion: Completion { name: name, module: -1, visible: [], type_params: [], object: [] },
     }
     c.warnings = loaded.warnings
     program(mut c, for_tests)
     return Checked {
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
         locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
+        completion: c.completion,
     }
 }
 
@@ -494,6 +514,9 @@ fn signatures(c: mut Checker) {
 
 // The type a TypeName in the source stands for (ERROR if unknown).
 fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
+    if t.module == "" {
+        completing(mut c, t.name, [])
+    }
     if t.name == "[]" {
         let elem = resolve_type(mut c, t.args[0])
         return types.array(mut c.table, elem)
@@ -975,6 +998,29 @@ fn std_hint(c: Checker, name: Str) -> Str {
         }
     }
     return ""
+}
+
+// The name being completed is `name`: note what is in scope, the first time.
+fn completing(c: mut Checker, name: Str, object: [ast.Expr]) {
+    if name != c.completion.name || c.completion.name == "" || c.completion.module >= 0 {
+        return
+    }
+    c.completion.module = c.current
+    c.completion.object = object
+    let mut seen: Map[Str, Bool] = [:]
+    let mut i = len(c.scopes) - 1
+    for i >= 0 {
+        for n in maps.keys(c.scopes[i]) {
+            if !maps.has(seen, n) {
+                seen[n] = true
+                push(mut c.completion.visible, c.scopes[i][n])
+            }
+        }
+        i = i - 1
+    }
+    for n in maps.keys(c.type_scope) {
+        push(mut c.completion.type_params, n)
+    }
 }
 
 // ---- Statements ----
@@ -1610,6 +1656,7 @@ fn was_undefined(c: Checker, name: Str) -> Bool {
 
 // What a name used as a value refers to; NoRef once the error is reported.
 fn resolve(c: mut Checker, e: ast.Expr, name: Str) -> Ref {
+    completing(mut c, name, [])
     let local = lookup_local(c, name)
     if local >= 0 {
         return Ref.Local(local)
@@ -2097,6 +2144,7 @@ fn enum_named(c: mut Checker, e: ast.Expr) -> Int {
 }
 
 fn field(c: mut Checker, e: ast.Expr, obj: ast.Expr, name: Str, expected: Int) -> Int {
+    completing(mut c, name, [obj])
     let module = module_named(c, obj)
     if module >= 0 {
         // `lexer.next` or `lexer.Token` as a value: say which it is.
@@ -3019,6 +3067,7 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
             return callee_value(mut c, callee)
         }
         ast.ExprKind.Name(name) => {
+            completing(mut c, name, [])
             let local = lookup_local(c, name)
             if local >= 0 {
                 if types.is_func(c.table, c.locals[local].ty) {

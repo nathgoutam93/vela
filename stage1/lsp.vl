@@ -1,6 +1,7 @@
 // `vela lsp`: a language server, so that an editor shows Vela's errors as
 // you type, the type of a name when you point at it, and where a name is
-// declared and used.
+// declared and used; renames a name (rename.vl) and completes one
+// (complete.vl).
 //
 // The Language Server Protocol is JSON-RPC over stdin and stdout. Each
 // message is a header, `Content-Length: N`, a blank line, and N bytes of
@@ -21,6 +22,7 @@
 // stage 1 only (it says `uses`)
 import ast
 import checker
+import complete
 import errors
 import files
 import format
@@ -40,6 +42,7 @@ type Server = struct {
     open: Map[Str, Str]  // the open files' texts, by path
     sources: Map[Str, Str]  // the text of every file of the programs checked, by path
     analyses: Map[Str, query.Analysis]  // the latest check of each open file, by path
+    loaded: Map[Str, checker.Checked]  // the latest that loaded, for completion while a line is half typed
     indexes: Map[Str, index.Index]  // made from an analysis when first asked for, by path
     shown: Map[Str, Bool]  // files the editor is showing diagnostics for
     utf8: Bool  // the editor counts characters in bytes, not UTF-16 units
@@ -48,7 +51,7 @@ type Server = struct {
 
 pub fn serve(std_dir: Str) uses fs, os {
     let mut s = Server {
-        std_dir: std_dir, open: [:], sources: [:], analyses: [:], indexes: [:], shown: [:], utf8: false,
+        std_dir: std_dir, open: [:], sources: [:], analyses: [:], loaded: [:], indexes: [:], shown: [:], utf8: false,
         shutting_down: false,
     }
     for {
@@ -156,6 +159,8 @@ fn handle(s: mut Server, m: json.Json) uses fs, os {
         send(reply(id, document_symbols(s, params)))
     } else if method == "textDocument/formatting" {
         send(reply(id, formatting(s, params)))
+    } else if method == "textDocument/completion" {
+        send(reply(id, completion(mut s, params)))
     } else if method == "textDocument/prepareRename" {
         send(prepare_rename(mut s, id, params))
     } else if method == "textDocument/rename" {
@@ -185,6 +190,7 @@ fn initialize(s: mut Server, params: json.Json) -> json.Json {
         json.member("referencesProvider", yes), json.member("documentSymbolProvider", yes),
         json.member("documentFormattingProvider", yes),
         json.member("renameProvider", json.object([json.member("prepareProvider", yes)])),
+        json.member("completionProvider", json.object([json.member("triggerCharacters", json.array([json.string(".")]))])),
     ])
     let info = json.object([json.member("name", json.string("vela")), json.member("version", json.string("0.12"))])
     return json.object([json.member("capabilities", capabilities), json.member("serverInfo", info)])
@@ -214,6 +220,7 @@ fn changed(s: mut Server, path: Str, text: Str) uses fs, os {
 fn closed(s: mut Server, path: Str) uses fs, os {
     maps.remove(mut s.open, path)
     maps.remove(mut s.analyses, path)
+    maps.remove(mut s.loaded, path)
     maps.remove(mut s.indexes, path)
     if maps.has(s.shown, path) {
         publish(mut s, path, [])
@@ -243,6 +250,10 @@ fn check(s: mut Server, path: Str) uses fs, os {
     }
     let a = query.program_of(path, s.std_dir, s.open)
     s.analyses[path] = a
+    match a.checked {
+        Some(k) => s.loaded[path] = k
+        None => {}
+    }
     let root = a.loaded.modules[0].file
     maps.remove(mut s.indexes, path)
     // Each file of the program gets its own errors, none being an answer
@@ -415,6 +426,65 @@ fn references(s: mut Server, params: json.Json) -> json.Json uses fs, os {
         None => {}
     }
     return json.array(out)
+}
+
+// The editor's numbers for kinds of completion.
+fn completion_kind(kind: Str) -> Int {
+    return match kind {
+        "function" => 3
+        "field" => 5
+        "type" => 22
+        "module" => 9
+        "variant" => 20
+        "keyword" => 14
+        "type parameter" => 25
+        "built-in" => 7
+        _ => 6  // a local, a parameter, a loop variable, a match binding
+    }
+}
+
+// What may be written at the cursor (see complete.vl), in order: the
+// editor is asked to keep it.
+fn completion(s: mut Server, params: json.Json) -> json.Json uses fs, os {
+    let path = uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), ""))
+    let mut text = ""
+    match maps.get(s.open, path) {
+        Some(t) => text = t
+        None => return json.null()
+    }
+    let pos = json.get(params, "position")
+    let line = json.int_or(json.get(pos, "line"), 0) + 1
+    let col = byte_col(s, path, line, json.int_or(json.get(pos, "character"), 0))
+    let mut last: [checker.Checked] = []
+    match maps.get(s.loaded, path) {
+        Some(k) => last = [k]
+        None => {}
+    }
+    let c = complete.complete(path, text, line, col, s.std_dir, s.open, last)
+    let mut out: [json.Json] = []
+    for i in 0..len(c.items) {
+        let it = c.items[i]
+        let mut ms = [
+            json.member("label", json.string(it.name)), json.member("kind", json.integer(completion_kind(it.kind))),
+            json.member("detail", json.string(it.detail)), json.member("sortText", json.string(sort_key(i))),
+        ]
+        if it.doc != "" {
+            push(mut ms, json.member("documentation", json.object([
+                json.member("kind", json.string("markdown")), json.member("value", json.string(it.doc)),
+            ])))
+        }
+        push(mut out, json.object(ms))
+    }
+    return json.object([json.member("isIncomplete", json.boolean(false)), json.member("items", json.array(out))])
+}
+
+// "0007": sorts as the number does.
+fn sort_key(i: Int) -> Str {
+    let mut k = strings.from_int(i)
+    for len(k) < 4 {
+        k = "0" + k
+    }
+    return k
 }
 
 // The name's range, if it can be renamed; otherwise an error saying why,

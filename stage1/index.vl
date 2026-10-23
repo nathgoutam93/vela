@@ -282,9 +282,64 @@ fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
         Some(d) => return d
         None => {}
     }
-    let d = add_def(mut b, def_at(name, "built-in", "", 0, 0, name, "A built-in " + what + "."))
+    let mut detail = name
+    let mut doc = "A built-in " + what + "."
+    let info = builtin_info(name)
+    if len(info) == 2 {
+        detail = info[0]
+        doc = info[1]
+    }
+    let d = add_def(mut b, def_at(name, "built-in", "", 0, 0, detail, doc))
     b.builtins[name] = d
     return d
+}
+
+// A built-in function's signature and what it does, as [detail, doc]; []
+// for a name that is not one. The checker has the rules (checker.builtin);
+// this is how hover and completion show them.
+pub fn builtin_info(name: Str) -> [Str] {
+    return match name {
+        "print" => ["fn print(x: Int | Byte | Float | Bool | Str)", "Prints x and a newline on stdout."]
+        "len" => ["fn len(x: Str | [T] | Map[K, V]) -> Int", "How many bytes a Str has, or elements an array or a map."]
+        "push" => ["fn push(xs: mut [T], x: T)", "Adds x at the end of xs."]
+        "int" => ["fn int(x: Byte | Float) -> Int", "A Byte as an Int, or a Float rounded toward zero."]
+        "float" => ["fn float(n: Int) -> Float", "n as a Float."]
+        "byte" => ["fn byte(n: Int) -> Byte", "n as a Byte; it panics unless 0 <= n <= 255."]
+        "assert" => ["fn assert(ok: Bool)", "Panics if ok is false; in a test, the test fails."]
+        "maps.has" => ["fn has(m: Map[K, V], key: K) -> Bool", "Whether m has key."]
+        "maps.get" => ["fn get(m: Map[K, V], key: K) -> Option[V]", "The value of key in m, or None."]
+        "maps.remove" => ["fn remove(m: mut Map[K, V], key: K)", "Removes key from m, if it is there."]
+        "maps.keys" => ["fn keys(m: Map[K, V]) -> [K]", "The keys of m, in the order they were added."]
+        "files.read" => ["fn read(path: Str) -> Result[Str, Str] uses fs", "The whole file, or why it cannot be read."]
+        "files.write" => ["fn write(path: Str, text: Str) -> Result[Int, Str] uses fs",
+            "Writes text to the file, replacing it; the number of bytes written."]
+        "files.remove" => ["fn remove(path: Str) -> Result[Unit, Str] uses fs", "Removes the file."]
+        "files.temp_dir" => ["fn temp_dir() -> Result[Str, Str] uses fs", "A new, empty directory for temporary files."]
+        "os.args" => ["fn args() -> [Str] uses os", "The program's command line, its own name first."]
+        "os.exit" => ["fn exit(code: Int) uses os", "Ends the program with the exit code."]
+        "os.eprint" => ["fn eprint(x: Int | Byte | Float | Bool | Str)", "Prints x and a newline on stderr."]
+        "os.run" => ["fn run(command: [Str]) -> Result[Int, Str] uses os",
+            "Runs the program command[0] with the rest as its arguments; its exit code."]
+        "os.output" => ["fn output(command: [Str]) -> Result[Str, Str] uses os",
+            "Runs the command as os.run does; what it prints on stdout, if it exits with 0."]
+        "os.env" => ["fn env(name: Str) -> Option[Str] uses os", "The environment variable, or None."]
+        "os.read_line" => ["fn read_line() -> Option[Str] uses os", "The next line of stdin, without its newline; None at the end."]
+        "os.read" => ["fn read(n: Int) -> Str uses os", "Up to n bytes of stdin; fewer only at its end."]
+        "os.write" => ["fn write(s: Str)", "Writes s on stdout, with no newline."]
+        "strings.builder" => ["fn builder() -> strings.Builder", "An empty Builder, to make a Str from many pieces."]
+        "strings.add" => ["fn add(b: mut strings.Builder, s: Str)", "Adds s at the end of b."]
+        "strings.add_byte" => ["fn add_byte(b: mut strings.Builder, c: Byte)", "Adds c at the end of b."]
+        "strings.add_int" => ["fn add_int(b: mut strings.Builder, n: Int)", "Adds n, in decimal, at the end of b."]
+        "strings.build" => ["fn build(b: strings.Builder) -> Str", "The Str b holds."]
+        "strings.from_int" => ["fn from_int(n: Int) -> Str", "n in decimal."]
+        "strings.from_float" => ["fn from_float(x: Float) -> Str", "x in the shortest form that reads back as x."]
+        "strings.parse_float" => ["fn parse_float(s: Str) -> Option[Float]", "The Float s writes, or None."]
+        "tasks.map" => ["fn map(xs: [T], f: fn(T) -> U) -> [U]",
+            "f of every element, on every core, in the elements' order; returns when all are done."]
+        "tasks.each" => ["fn each(xs: [T], f: fn(T))", "f of every element, on every core; returns when all are done."]
+        "tasks.workers" => ["fn workers() -> Int", "How many threads tasks.map and tasks.each use."]
+        _ => []
+    }
 }
 
 // `fn name[T: Ord](a: Int, b: mut [Str]) -> Str uses fs`, as written.
@@ -380,7 +435,7 @@ pub fn type_detail(t: ast.TypeDecl) -> Str {
     return strings.build(s)
 }
 
-fn variant_text(v: ast.VariantDecl) -> Str {
+pub fn variant_text(v: ast.VariantDecl) -> Str {
     if len(v.payload) == 0 {
         return v.name
     }
@@ -398,7 +453,7 @@ fn variant_text(v: ast.VariantDecl) -> Str {
 
 // ---- Comments ----
 
-fn source_lines(source: Str) -> [Str] {
+pub fn source_lines(source: Str) -> [Str] {
     let mut out: [Str] = []
     let mut start = 0
     for i in 0..len(source) + 1 {
@@ -448,7 +503,7 @@ fn join_lines(lines: [Str]) -> Str {
 }
 
 // The comment lines right above line `line` (1-based), in order.
-fn comment_above(lines: [Str], line: Int) -> Str {
+pub fn comment_above(lines: [Str], line: Int) -> Str {
     let mut first = line  // of the comment, once found
     for first > 1 && first - 1 <= len(lines) && is_comment(lines[first - 2]) {
         first = first - 1
@@ -460,7 +515,7 @@ fn comment_above(lines: [Str], line: Int) -> Str {
     return join_lines(out)
 }
 
-fn joined(a: Str, b: Str) -> Str {
+pub fn joined(a: Str, b: Str) -> Str {
     if a == "" || b == "" {
         return a + b
     }
@@ -468,7 +523,7 @@ fn joined(a: Str, b: Str) -> Str {
 }
 
 // A comment after the code on line `line`: `x: Int  // the count`.
-fn trailing_comment(lines: [Str], line: Int) -> Str {
+pub fn trailing_comment(lines: [Str], line: Int) -> Str {
     if line < 1 || line > len(lines) {
         return ""
     }
