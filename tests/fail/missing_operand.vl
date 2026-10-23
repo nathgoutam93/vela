@@ -1,4 +1,4 @@
-// err: missing_operand.vl:3:14: error: expected expression, found ')'
+// err: missing_operand.vl:3:14: error: expected expression, found ')' [E2020]
 fn main() {
     print(1 +)
 }

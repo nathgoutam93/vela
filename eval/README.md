@@ -27,11 +27,14 @@ python3 eval/summary.py results.jsonl --by category
 - **Keep this repository away from the agent.** `eval/tasks/*/hidden`
   holds the checks and `eval/tasks/*/solution` the answers.
 - **`--context`** on prepare.py chooses the documentation in `_vela/`:
-  - `docs` (the default): README, the walkthroughs, std and the examples;
+  - `guide` (the default): the compiler-generated `GUIDE.md` and std;
+  - `docs`: README, the walkthroughs, std and the examples;
   - `readme`: README and std;
   - `none`: std only.
 
-  Comparing them measures what the documentation is worth.
+  Comparing them measures what the documentation is worth. `guide` replaces
+  the milestone walkthroughs in normal agent runs. The installed compiler
+  finds runtime and std through PATH without a wrapper or VELA_ROOT.
 - **`grade.py`** runs the hidden checks on a copy of the workspace. It
   prints JSON and exits 0 when the task passed. `--results` appends the
   result as one line, with `--agent`, `--condition` and every `--meta`
@@ -87,8 +90,13 @@ cannot be done, shows up. It is in the default suite as
 `python3 eval/static.py` measures what can be measured without an agent:
 
 - how many diagnostics have a stable code and a mechanical fix;
-- how much there is to read;
+- how much there is to read, including `vela guide` (bytes/4 token estimate);
 - which questions `vela query` answers.
+
+`vela check --json` includes stable diagnostic codes and byte-offset edits;
+`vela explain CODE` explains a code and `vela fix FILE` applies available
+fixes. These tools are included in the evaluation prompt. `eval/m17-static.json`
+records the static result after M17; `eval/static.json` keeps the M16 baseline.
 
 ## What to record
 

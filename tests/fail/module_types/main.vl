@@ -1,19 +1,19 @@
 // Types from another module in patterns, struct literals and annotations.
 // Messages name them as this file writes them: geo.Point, geo.Dir. A
-// built-in function cannot be redefined in any module.
-// err: geo.vl:20:4: error: 'len' is a built-in function and cannot be redefined
-// err: main.vl:20:13: error: missing field 'y' in this 'geo.Point' value
-// err: main.vl:21:37: error: 'geo.Point' has no field 'z'
-// err: main.vl:22:13: error: 'geo.Dir' is an enum; build its values with geo.Dir.Variant
-// err: main.vl:23:17: error: type 'Hidden' is private to module 'geo'; declare it with 'pub' in geo.vl to use it here
-// err: main.vl:24:13: error: module 'geo' has no type 'Nope'
-// err: main.vl:27:9: error: 'geo.Point' is a struct, not an enum; match on its fields instead
-// err: main.vl:28:9: error: 'geo.Dir' has no variant 'East'
-// err: main.vl:29:9: error: geo.Dir.Step carries 1 value; write geo.Dir.Step(_) to ignore it
-// err: main.vl:30:9: error: unknown module 'nope'; is `import nope` missing?
-// err: main.vl:33:26: error: 'n' is declared as Int, but its value is geo.Dir
-// err: main.vl:34:22: error: argument 1 of 'geo.walk' must be geo.Dir, found geo.Point
-// err: main.vl:35:12: error: 'geo.Point' takes no type arguments
+// module may define built-in names; the remaining type mistakes are errors.
+// Defining geo.len is allowed.
+// err: main.vl:20:13: error: missing field 'y' in this 'geo.Point' value [E3129]
+// err: main.vl:21:37: error: 'geo.Point' has no field 'z' [E3128]
+// err: main.vl:22:13: error: 'geo.Dir' is an enum; build its values with geo.Dir.Variant [E3126]
+// err: main.vl:23:17: error: type 'Hidden' is private to module 'geo'; declare it with 'pub' in geo.vl to use it here [E3050]
+// err: main.vl:24:13: error: module 'geo' has no type 'Nope' [E3047]
+// err: main.vl:27:9: error: 'geo.Point' is a struct, not an enum; match on its fields instead [E3074]
+// err: main.vl:28:9: error: 'geo.Dir' has no variant 'East' [E3076]
+// err: main.vl:29:9: error: geo.Dir.Step carries 1 value; write geo.Dir.Step(_) to ignore it [E3077]
+// err: main.vl:30:9: error: unknown module 'nope'; is `import nope` missing? [E3045]
+// err: main.vl:33:26: error: 'n' is declared as Int, but its value is geo.Dir [E3093]
+// err: main.vl:34:22: error: argument 1 of 'geo.walk' must be geo.Dir, found geo.Point [E3093]
+// err: main.vl:35:12: error: 'geo.Point' takes no type arguments [E3028]
 import geo
 
 fn main() {

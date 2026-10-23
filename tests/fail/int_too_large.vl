@@ -1,4 +1,4 @@
-// err: int_too_large.vl:3:12: error: integer literal 9223372036854775808 does not fit in Int (max 9223372036854775807)
+// err: int_too_large.vl:3:12: error: integer literal 9223372036854775808 does not fit in Int (max 9223372036854775807) [E1005]
 fn main() {
     print(-9223372036854775808)
 }

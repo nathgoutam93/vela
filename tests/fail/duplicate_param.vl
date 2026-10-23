@@ -1,4 +1,4 @@
-// err: duplicate_param.vl:2:14: error: parameter 'a' is already declared
+// err: duplicate_param.vl:2:14: error: parameter 'a' is already declared [E3032]
 fn f(a: Int, a: Int) {
 }
 fn main() {

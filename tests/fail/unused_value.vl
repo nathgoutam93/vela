@@ -1,4 +1,4 @@
-// err: unused_value.vl:4:7: error: this value is not used; only a call can stand alone as a statement
+// err: unused_value.vl:4:7: error: this value is not used; only a call can stand alone as a statement [E3051]
 fn main() {
     print(1)
     1 + 2

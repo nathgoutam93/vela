@@ -1,4 +1,4 @@
-// err: let_missing_eq.vl:3:11: error: expected '=' after 'let x', found integer 5
+// err: let_missing_eq.vl:3:11: error: expected '=' after 'let x', found integer 5 [E2001]
 fn main() {
     let x 5
 }

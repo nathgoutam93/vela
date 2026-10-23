@@ -1,4 +1,4 @@
-// err: string_control_byte.vl:3:13: error: control byte 0x01 in string literal; use an escape
+// err: string_control_byte.vl:3:13: error: control byte 0x01 in string literal; use an escape [E1008]
 fn main() {
     print("a")
 }

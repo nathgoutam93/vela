@@ -1,4 +1,4 @@
-// err: range_not_int.vl:3:17: error: a range must be made of Int values, found Bool
+// err: range_not_int.vl:3:17: error: a range must be made of Int values, found Bool [E3093]
 fn main() {
     for i in 0..true {
     }

@@ -1,4 +1,4 @@
-// err: undefined_function.vl:3:5: error: undefined function 'prnt'
+// err: undefined_function.vl:3:5: error: undefined function 'prnt' [E3155]
 fn main() {
     prnt(1)
 }

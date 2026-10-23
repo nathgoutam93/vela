@@ -1,4 +1,4 @@
-// err: print_as_value.vl:3:11: error: 'print' is a function; call it as print(...)
+// err: print_as_value.vl:3:11: error: 'print' is a function; call it as print(...) [E3083]
 fn main() {
     print(print)
 }

@@ -1,4 +1,4 @@
-// err: type_not_int.vl:3:11: error: operator '!' needs Bool, found Int
+// err: type_not_int.vl:3:11: error: operator '!' needs Bool, found Int [E3095]
 fn main() {
     print(!1)
 }

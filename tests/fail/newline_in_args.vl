@@ -1,5 +1,5 @@
 // Go's rule: a line ending in `1` ends the statement, even inside ( ).
-// err: newline_in_args.vl:4:12: error: expected ',' or ')' in argument list, found newline
+// err: newline_in_args.vl:4:12: error: expected ',' or ')' in argument list, found newline [E2025]
 fn main() {
     print(1
     )

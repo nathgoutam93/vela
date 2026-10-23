@@ -307,6 +307,7 @@ fn publish(s: mut Server, file: Str, errs: [errors.CompileError]) {
         push(mut ds, json.object([
             json.member("range", word_range(s, file, e.line, e.col)), json.member("severity", json.integer(severity)),
             json.member("source", json.string("vela")), json.member("message", json.string(e.message)),
+            json.member("code", json.string(e.code)),
         ]))
     }
     if len(errs) > 0 {

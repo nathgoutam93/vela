@@ -1,4 +1,4 @@
-// err: if_not_bool.vl:3:8: error: the condition of 'if' must be Bool, found Int
+// err: if_not_bool.vl:3:8: error: the condition of 'if' must be Bool, found Int [E3093]
 fn main() {
     if 1 {
     }

@@ -1,4 +1,4 @@
-// err: arity_user.vl:6:11: error: add expects 2 arguments, got 1
+// err: arity_user.vl:6:11: error: add expects 2 arguments, got 1 [E3169]
 fn add(a: Int, b: Int) -> Int {
     return a + b
 }

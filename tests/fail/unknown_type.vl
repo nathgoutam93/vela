@@ -1,4 +1,4 @@
-// err: unknown_type.vl:2:9: error: unknown type 'Real'
+// err: unknown_type.vl:2:9: error: unknown type 'Real' [E3027]
 fn f(x: Real) {
 }
 fn main() {

@@ -1,0 +1,170 @@
+// Apply checked, non-overlapping diagnostic edits. A pass uses one source
+// snapshot; the next pass re-checks, so propagated effects are repaired too.
+import errors
+import files
+import modules
+import os
+import query
+import repairs
+import strings
+
+fn same(a: errors.Edit, b: errors.Edit) -> Bool {
+    return a.start == b.start && a.end == b.end && a.text == b.text && a.expected == b.expected
+}
+
+fn overlaps(a: errors.Edit, b: errors.Edit) -> Bool {
+    return a.start <= b.end && b.start <= a.end
+}
+
+fn local_file(loaded: modules.Loaded, shown: Str) -> Str {
+    for m in loaded.modules {
+        if m.path == shown && m.has_program && m.package == "" && !m.is_std {
+            return m.file
+        }
+    }
+    return ""
+}
+
+// Select whole fix groups; an overlapping group waits for the next pass.
+pub fn select(errs: [errors.CompileError], file: Str, source: Str) -> [errors.Edit] {
+    let mut selected: [errors.Edit] = []
+    for d in errs {
+        if len(d.fix) == 0 {
+            continue
+        }
+        let mut valid = true
+        let mut group: [errors.Edit] = []
+        for e in d.fix {
+            if e.file != file || e.start < 0 || e.end < e.start || e.end > len(source) {
+                valid = false
+                break
+            }
+            if source[e.start..e.end] != e.expected {
+                valid = false
+                break
+            }
+            let mut duplicate = false
+            for old in selected {
+                if same(e, old) {
+                    duplicate = true
+                } else if overlaps(e, old) {
+                    valid = false
+                }
+            }
+            for old in group {
+                if overlaps(e, old) {
+                    valid = false
+                }
+            }
+            if !duplicate {
+                push(mut group, e)
+            }
+        }
+        if valid {
+            for e in group {
+                push(mut selected, e)
+            }
+        }
+    }
+    // Apply from right to left: every offset still refers to the snapshot.
+    for i in 1..len(selected) {
+        let value = selected[i]
+        let mut j = i
+        for j > 0 && selected[j - 1].start < value.start {
+            selected[j] = selected[j - 1]
+            j = j - 1
+        }
+        selected[j] = value
+    }
+    return selected
+}
+
+pub fn apply(source: Str, edits: [errors.Edit]) -> Str {
+    let mut out = source
+    for e in edits {
+        out = out[0..e.start] + e.text + out[e.end..len(out)]
+    }
+    return out
+}
+
+pub fn command(path: Str, root: Str, dry: Bool) uses fs, os {
+    let mut count = 0
+    for pass in 0..32 {
+        let a = query.load(path, modules.join(root, "std"))
+        let mut changed = false
+        for m in a.loaded.modules {
+            let file = local_file(a.loaded, m.path)
+            if file == "" {
+                continue
+            }
+            let edits = select(a.errors, m.path, m.source)
+            if len(edits) == 0 {
+                continue
+            }
+            if len(repairs.validated(m.source, edits)) == 0 {
+                os.eprint("vela: error: combined fixes would introduce a syntax error in " + file + " [E6008]")
+                os.exit(1)
+            }
+            if dry {
+                print("would fix " + file + " (" + strings.from_int(len(edits)) + " edits)")
+                changed = true
+                continue
+            }
+            // Refuse a stale snapshot rather than overwriting concurrent work.
+            match files.read(file) {
+                Ok(now) => {
+                    if now != m.source {
+                        os.eprint("vela: error: file changed while preparing fixes: " + file + " [E6004]")
+                        os.exit(1)
+                    }
+                }
+                Err(e) => {
+                    os.eprint("vela: error: " + e + " [E6001]")
+                    os.exit(1)
+                }
+            }
+            match files.write(file, apply(m.source, edits)) {
+                Ok(_) => {}
+                Err(e) => {
+                    os.eprint("vela: error: " + e + " [E6001]")
+                    os.exit(1)
+                }
+            }
+            count = count + len(edits)
+            changed = true
+        }
+        if dry || !changed {
+            if count > 0 {
+                print("applied " + strings.from_int(count) + " edits")
+            }
+            let mut failed = dry && changed
+            for e in a.errors {
+                os.eprint(errors.render(e))
+                if !e.warning {
+                    failed = true
+                }
+            }
+            if failed {
+                os.exit(1)
+            }
+            return
+        }
+    }
+    os.eprint("vela: error: fixes did not converge after 32 passes; run vela check [E6005]")
+    os.exit(1)
+}
+
+test "fixes reject stale and overlapping edits and deduplicate identical ones" {
+    let one = errors.Edit { file: "x.vl", start: 0, end: 1, text: "z", expected: "a" }
+    let bad = errors.Edit { file: "x.vl", start: 1, end: 2, text: "q", expected: "wrong" }
+    let overlap = errors.Edit { file: "x.vl", start: 0, end: 2, text: "q", expected: "ab" }
+    let mut d = errors.at(1, 1, "E3061", "test")
+    d.fix = [one]
+    let mut stale = d
+    stale.fix = [bad]
+    let mut conflict = d
+    conflict.fix = [overlap]
+    let selected = select([d, d, stale, conflict], "x.vl", "abc")
+    assert(len(selected) == 1)
+    assert(apply("abc", selected) == "zbc")
+}

@@ -1,7 +1,7 @@
 // vela query with no answer: no name at the position (here, inside the
 // keyword `fn`), in JSON, with exit code 1.
 // command: query def FILE:6:2
-// out: {"error":"no name at query_errors.vl:6:2"}
+// out: {"error":"no name at query_errors.vl:6:2","code":"E6003"}
 // exit: 1
 fn main() {
     print(1)

@@ -1,12 +1,12 @@
 // Exhaustiveness and redundancy. Each missing case is named, with `_` for
 // parts that do not matter; Int needs a `_` arm.
-// err: match_coverage.vl:15:12: error: match is not exhaustive: Expr.Neg(_) is not covered
-// err: match_coverage.vl:20:5: error: match is not exhaustive: Some(_) is not covered
-// err: match_coverage.vl:26:5: error: match is not exhaustive: add a '_' arm for the Int values not listed
-// err: match_coverage.vl:32:5: error: match is not exhaustive: false is not covered
-// err: match_coverage.vl:39:9: error: this arm can never match: the arms above it cover every value it would
-// err: match_coverage.vl:45:9: error: this arm can never match: the arms above it cover every value it would
-// err: match_coverage.vl:50:5: error: match is not exhaustive: Expr.Neg(Expr.Num(_)) is not covered
+// err: match_coverage.vl:15:12: error: match is not exhaustive: Expr.Neg(_) is not covered [E3068]
+// err: match_coverage.vl:20:5: error: match is not exhaustive: Some(_) is not covered [E3068]
+// err: match_coverage.vl:26:5: error: match is not exhaustive: add a '_' arm for the Int values not listed [E3067]
+// err: match_coverage.vl:32:5: error: match is not exhaustive: false is not covered [E3068]
+// err: match_coverage.vl:39:9: error: this arm can never match: the arms above it cover every value it would [E3066]
+// err: match_coverage.vl:45:9: error: this arm can never match: the arms above it cover every value it would [E3066]
+// err: match_coverage.vl:50:5: error: match is not exhaustive: Expr.Neg(Expr.Num(_)) is not covered [E3068]
 type Expr = enum {
     Num(Int)
     Neg(Expr)

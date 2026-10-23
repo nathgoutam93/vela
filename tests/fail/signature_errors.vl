@@ -1,9 +1,9 @@
 // A bad signature is reported, but the function's body is still checked,
 // and calls to it are checked against what is known of it.
-// err: signature_errors.vl:7:9: error: unknown type 'Real'
-// err: signature_errors.vl:10:4: error: function 'f' is already defined at 7:4
-// err: signature_errors.vl:11:18: error: operator '+' needs Int operands, found Bool and Int
-// err: signature_errors.vl:15:11: error: f expects 1 argument, got 2
+// err: signature_errors.vl:7:9: error: unknown type 'Real' [E3027]
+// err: signature_errors.vl:10:4: error: function 'f' is already defined at 7:4 [E3021]
+// err: signature_errors.vl:11:18: error: operator '+' needs Int operands, found Bool and Int [E3107]
+// err: signature_errors.vl:15:11: error: f expects 1 argument, got 2 [E3169]
 fn f(x: Real) -> Int {
     return x + 1
 }

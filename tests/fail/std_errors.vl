@@ -1,19 +1,19 @@
 // Mistakes with the built-in modules.
-// err: std_errors.vl:22:24: error: argument 1 of 'files.read' must be Str, found Int
-// err: std_errors.vl:23:19: error: files.write expects 2 arguments, got 1
-// err: std_errors.vl:24:13: error: argument 1 of 'os.exit' must be Int, found Str
-// err: std_errors.vl:25:21: error: 'c' is declared as Str, but its value is [Str]
-// err: std_errors.vl:27:21: error: cannot change 'built', which was declared with 'let'; use 'let mut' to allow changes
-// err: std_errors.vl:29:24: error: argument 2 of 'strings.add' must be Str, found Int
-// err: std_errors.vl:30:29: error: 300 does not fit in a Byte (0 to 255)
-// err: std_errors.vl:31:11: error: print takes an Int, Byte, Float, Bool or Str, not strings.Builder
-// err: std_errors.vl:32:27: error: argument 1 of 'strings.build' must be strings.Builder, found Str
-// err: std_errors.vl:33:17: error: len takes a Str, an array or a map, not strings.Builder
-// err: std_errors.vl:34:15: error: os.eprint takes an Int, Byte, Float, Bool or Str, not [Int]
-// err: std_errors.vl:35:21: error: 'strings.Builder' is a type, not a value
-// err: std_errors.vl:36:12: error: module 'strings' has no type 'Nope'
-// err: std_errors.vl:37:16: error: module 'os' has no function 'missing'
-// err: std_errors.vl:38:13: error: unknown module 'bytes'; is `import bytes` missing?
+// err: std_errors.vl:22:24: error: argument 1 of 'files.read' must be Str, found Int [E3093]
+// err: std_errors.vl:23:19: error: files.write expects 2 arguments, got 1 [E3169]
+// err: std_errors.vl:24:13: error: argument 1 of 'os.exit' must be Int, found Str [E3093]
+// err: std_errors.vl:25:21: error: 'c' is declared as Str, but its value is [Str] [E3093]
+// err: std_errors.vl:27:21: error: cannot change 'built', which was declared with 'let'; use 'let mut' to allow changes [E3061]
+// err: std_errors.vl:29:24: error: argument 2 of 'strings.add' must be Str, found Int [E3093]
+// err: std_errors.vl:30:29: error: 300 does not fit in a Byte (0 to 255) [E3090]
+// err: std_errors.vl:31:11: error: print takes an Int, Byte, Float, Bool or Str, not strings.Builder [E3170]
+// err: std_errors.vl:32:27: error: argument 1 of 'strings.build' must be strings.Builder, found Str [E3093]
+// err: std_errors.vl:33:17: error: len takes a Str, an array or a map, not strings.Builder [E3171]
+// err: std_errors.vl:34:15: error: os.eprint takes an Int, Byte, Float, Bool or Str, not [Int] [E3170]
+// err: std_errors.vl:35:21: error: 'strings.Builder' is a type, not a value [E3117]
+// err: std_errors.vl:36:12: error: module 'strings' has no type 'Nope' [E3047]
+// err: std_errors.vl:37:16: error: module 'os' has no function 'missing' [E3049]
+// err: std_errors.vl:38:13: error: unknown module 'bytes'; is `import bytes` missing? [E3151]
 import files
 import os
 import strings

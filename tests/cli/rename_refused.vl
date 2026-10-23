@@ -2,7 +2,7 @@
 // means: the loop's `i` renamed to `n` would make `n + i` read `n + n`,
 // with no error to show it. Nothing is changed; exit code 1.
 // command: query rename FILE:10:9 n
-// out: {"error":"renaming 'i' to 'n' would change what 'n' means at rename_refused.vl:11:21; choose another name"}
+// out: {"error":"renaming 'i' to 'n' would change what 'n' means at rename_refused.vl:11:21; choose another name","code":"E6003"}
 // exit: 1
 fn main() {
     let n = 2

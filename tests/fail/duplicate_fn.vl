@@ -1,4 +1,4 @@
-// err: duplicate_fn.vl:4:4: error: function 'f' is already defined at 2:4
+// err: duplicate_fn.vl:4:4: error: function 'f' is already defined at 2:4 [E3021]
 fn f() {
 }
 fn f() {

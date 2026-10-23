@@ -1,4 +1,4 @@
-// err: leading_zero.vl:3:11: error: integer literal '007' has a leading zero
+// err: leading_zero.vl:3:11: error: integer literal '007' has a leading zero [E1004]
 fn main() {
     print(007)
 }

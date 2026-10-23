@@ -1,7 +1,7 @@
 // Float literals: a fraction or an exponent, digits on both sides of the
 // point, and no leading zero.
-// err: float_literals.vl:6:13: error: invalid number '1.5x'
-// err: float_literals.vl:7:13: error: number '01.5' has a leading zero
+// err: float_literals.vl:6:13: error: invalid number '1.5x' [E1001]
+// err: float_literals.vl:7:13: error: number '01.5' has a leading zero [E1002]
 fn main() {
     let a = 1.5x
     let b = 01.5

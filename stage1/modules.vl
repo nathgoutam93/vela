@@ -72,11 +72,11 @@ type Loader = struct {
 }
 
 // The built-in modules and their functions, in Stage 0's order.
-fn builtin_functions(name: Str) -> [Str] {
+pub fn builtin_functions(name: Str) -> [Str] {
     return match name {
         "maps" => ["has", "get", "remove", "keys"]
         "files" => ["read", "write", "remove", "temp_dir"]
-        "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write", "output"]
+        "os" => ["args", "executable", "exit", "eprint", "run", "env", "read_line", "read", "write", "output"]
         "strings" => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float", "parse_float"]
         "tasks" => ["map", "each", "workers"]
         "math" => ["sqrt"]
@@ -179,8 +179,8 @@ fn add_errors(ld: mut Loader, errs: [errors.CompileError], path: Str) {
     }
 }
 
-fn report(ld: mut Loader, importer: Int, imp: ast.Import, message: Str) {
-    let e = errors.CompileError {
+fn report(ld: mut Loader, importer: Int, imp: ast.Import, code: Str, message: Str) {
+    let e = errors.CompileError { code: code, fix: [],
         path: ld.modules[importer].path, line: imp.line, col: imp.col, message: message, warning: false,
     }
     errors.add(mut ld.errors, e)
@@ -204,7 +204,7 @@ fn builtin_module(ld: mut Loader, name: Str) -> Int {
 
 fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
     if maps.has(ld.modules[importer].imports, imp.name) {
-        report(mut ld, importer, imp, "'" + imp.name + "' is already imported")
+        report(mut ld, importer, imp, "E4001", "'" + imp.name + "' is already imported")
         return
     }
     if is_builtin_module(imp.name) {
@@ -259,7 +259,7 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
                         have_source = true
                     }
                     Err(_) => {
-                        report(mut ld, importer, imp, "package '" + imp.name + "' has no main module: there is no file " +
+                        report(mut ld, importer, imp, "E4002", "package '" + imp.name + "' has no main module: there is no file " +
                             path)
                         return
                     }
@@ -284,7 +284,7 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
     match maps.get(ld.by_name, name) {
         Some(other) => {
             if other != normpath(path) {
-                report(mut ld, importer, imp, "two different files would both be the module '" + name + "': " + other +
+                report(mut ld, importer, imp, "E4003", "two different files would both be the module '" + name + "': " + other +
                     " and " + normpath(path) + "; rename one of them")
                 return
             }
@@ -300,7 +300,7 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
         if ld.active[i] == known {
             let chain = ld.active[i..len(ld.active)]
             if len(chain) == 1 {
-                report(mut ld, importer, imp, "module '" + imp.name + "' imports itself")
+                report(mut ld, importer, imp, "E4004", "module '" + imp.name + "' imports itself")
             } else {
                 let mut names = strings.builder()
                 for m in chain {
@@ -308,7 +308,7 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
                     strings.add(mut names, " -> ")
                 }
                 strings.add(mut names, label(ld.modules[known]))
-                report(mut ld, importer, imp, "import cycle: " + strings.build(names) +
+                report(mut ld, importer, imp, "E4005", "import cycle: " + strings.build(names) +
                     "; modules cannot import each other, directly or through others")
             }
             return
@@ -319,7 +319,7 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
             match read(ld, path) {
                 Ok(text) => source = text
                 Err(_) => {
-                    report(mut ld, importer, imp, "cannot find module '" + imp.name + "': there is no file " + path +
+                    report(mut ld, importer, imp, "E4006", "cannot find module '" + imp.name + "': there is no file " + path +
                         moved_to_package(imp.name))
                     return
                 }
@@ -360,7 +360,7 @@ fn hides(ld: mut Loader, importer: Int, imp: ast.Import, path: Str, deps: [Str])
         whose = "package " + owner + "'s"
     }
     if has_word(deps, imp.name) {
-        let w = errors.CompileError {
+        let w = errors.CompileError { code: "E7004", fix: [],
             path: ld.modules[importer].path, line: imp.line, col: imp.col, warning: true,
             message: "'" + imp.name + "' is " + whose + " " + imp.name + ".vl, which hides the package " + imp.name +
                 " from vela.mod; rename the file to use the package",
@@ -374,7 +374,7 @@ fn hides(ld: mut Loader, importer: Int, imp: ast.Import, path: Str, deps: [Str])
     }
     match read(ld, std_path) {
         Ok(_) => {
-            let w = errors.CompileError {
+            let w = errors.CompileError { code: "E7005", fix: [],
                 path: ld.modules[importer].path, line: imp.line, col: imp.col, warning: true,
                 message: "'" + imp.name + "' is " + whose + " " + imp.name + ".vl, which hides the standard module " +
                     "std/" + imp.name + ".vl; rename the file to use the standard one",
@@ -486,4 +486,8 @@ test "paths" {
     assert(join("a", "b.vl") == "a/b.vl" && join("", "b.vl") == "b.vl" && join("a", "/x") == "/x")
     assert(stem("src/main.vl") == "main" && stem(".vl") == ".vl")
     assert(normpath("a/./b/../c") == "a/c" && normpath("../x") == "../x" && normpath("a/..") == ".")
+}
+
+pub fn builtin_modules() -> [Str] {
+    return ["maps", "files", "os", "strings", "tasks", "math"]
 }

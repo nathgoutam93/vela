@@ -1,5 +1,5 @@
 // All 13 keywords are reserved from M1, even before they mean anything.
-// err: keyword_as_name.vl:4:11: error: expected expression, found keyword 'import'
+// err: keyword_as_name.vl:4:11: error: expected expression, found keyword 'import' [E2020]
 fn main() {
     print(import)
 }

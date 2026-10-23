@@ -1,4 +1,4 @@
-// err: for_not_bool.vl:3:9: error: the condition of 'for' must be Bool, found Int
+// err: for_not_bool.vl:3:9: error: the condition of 'for' must be Bool, found Int [E3093]
 fn main() {
     for 0 {
     }

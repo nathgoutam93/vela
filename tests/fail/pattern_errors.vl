@@ -1,14 +1,14 @@
 // Patterns that cannot match the value's type, or are written wrongly.
-// err: pattern_errors.vl:17:9: error: this pattern is Bool, but the value being matched is Int
-// err: pattern_errors.vl:18:9: error: pattern None matches Option values, but the value being matched is Int
-// err: pattern_errors.vl:22:9: error: Expr.Num carries 1 value; write Expr.Num(_) to ignore it
-// err: pattern_errors.vl:23:9: error: Expr.Leaf carries no values; write it without parentheses
-// err: pattern_errors.vl:24:9: error: Expr.Add carries 2 values, but this pattern has 1
-// err: pattern_errors.vl:25:21: error: 'y' is bound twice in this pattern
-// err: pattern_errors.vl:26:9: error: 'Expr' has no variant 'Nope'
-// err: pattern_errors.vl:27:9: error: unknown type 'Foo'
-// err: pattern_errors.vl:28:9: error: 'Point' is a struct, not an enum; match on its fields instead
-// err: pattern_errors.vl:33:9: error: pattern Expr.Leaf matches Expr values, but the value being matched is Option[Int]
+// err: pattern_errors.vl:17:9: error: this pattern is Bool, but the value being matched is Int [E3081]
+// err: pattern_errors.vl:18:9: error: pattern None matches Option values, but the value being matched is Int [E3072]
+// err: pattern_errors.vl:22:9: error: Expr.Num carries 1 value; write Expr.Num(_) to ignore it [E3077]
+// err: pattern_errors.vl:23:9: error: Expr.Leaf carries no values; write it without parentheses [E3078]
+// err: pattern_errors.vl:24:9: error: Expr.Add carries 2 values, but this pattern has 1 [E3079]
+// err: pattern_errors.vl:25:21: error: 'y' is bound twice in this pattern [E3069]
+// err: pattern_errors.vl:26:9: error: 'Expr' has no variant 'Nope' [E3076]
+// err: pattern_errors.vl:27:9: error: unknown type 'Foo' [E3073]
+// err: pattern_errors.vl:28:9: error: 'Point' is a struct, not an enum; match on its fields instead [E3074]
+// err: pattern_errors.vl:33:9: error: pattern Expr.Leaf matches Expr values, but the value being matched is Option[Int] [E3075]
 type Expr = enum { Num(Int), Add(Expr, Expr), Leaf }
 type Point = struct { x: Int }
 fn main() {

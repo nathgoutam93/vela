@@ -1,8 +1,8 @@
 // Modules cannot import each other: a imports b and b imports a. A module
 // cannot import itself either. Each cycle is reported once, at the import
 // that closes it.
-// err: b.vl:1:8: error: import cycle: a -> b -> a; modules cannot import each other, directly or through others
-// err: c.vl:1:8: error: module 'c' imports itself
+// err: b.vl:1:8: error: import cycle: a -> b -> a; modules cannot import each other, directly or through others [E4005]
+// err: c.vl:1:8: error: module 'c' imports itself [E4004]
 import a
 import c
 

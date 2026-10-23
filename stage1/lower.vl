@@ -2853,6 +2853,11 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     if name == "os.args" {
         return own(mut g, reg_val(ccall(mut g, "vela_os_args", [], [], ir.RET_INT(), -1), t))
     }
+    if name == "os.executable" {
+        let out = slot_val(mut g, t)
+        ccall(mut g, "vela_os_executable", [], [], ir.RET_STR(), out.reg)
+        return own(mut g, out)
+    }
     if name == "strings.build" || name == "strings.from_int" || name == "strings.from_float" {
         let arg = scalar(mut g, expr(mut g, args[0]))
         let out = slot_val(mut g, t)

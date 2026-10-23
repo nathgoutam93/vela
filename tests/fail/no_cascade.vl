@@ -1,9 +1,9 @@
 // One mistake is reported once: `x` and `z` get the error type, and nothing
 // that uses them reports again, not even `x = 5`. `y` is still an Int, since
 // `*` always gives an Int, so the real mistake `"a" + y` is still found.
-// err: no_cascade.vl:8:17: error: undefined name 'missing'
-// err: no_cascade.vl:13:13: error: undefined function 'nothing_here'
-// err: no_cascade.vl:15:17: error: operator '+' joins two Strs, found Str and Int
+// err: no_cascade.vl:8:17: error: undefined name 'missing' [E3087]
+// err: no_cascade.vl:13:13: error: undefined function 'nothing_here' [E3155]
+// err: no_cascade.vl:15:17: error: operator '+' joins two Strs, found Str and Int [E3101]
 fn main() {
     let mut x = missing
     let y = x * 2

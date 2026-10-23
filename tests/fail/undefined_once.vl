@@ -1,8 +1,8 @@
 // An unknown name is reported at its first use in each function only:
 // one misspelling is one mistake, however often it is used.
-// err: undefined_once.vl:7:11: error: undefined name 'nope'
-// err: undefined_once.vl:10:13: error: undefined name 'nope'
-// err: undefined_once.vl:13:5: error: undefined function 'missing_fn'
+// err: undefined_once.vl:7:11: error: undefined name 'nope' [E3087]
+// err: undefined_once.vl:10:13: error: undefined name 'nope' [E3087]
+// err: undefined_once.vl:13:5: error: undefined function 'missing_fn' [E3155]
 fn helper() {
     print(nope)
 }

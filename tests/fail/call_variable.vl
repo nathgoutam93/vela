@@ -1,4 +1,4 @@
-// err: call_variable.vl:4:5: error: 'x' is a variable of type Int, not a function
+// err: call_variable.vl:4:5: error: 'x' is a variable of type Int, not a function [E3152]
 fn main() {
     let x = 1
     x(2)

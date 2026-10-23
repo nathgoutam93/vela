@@ -364,6 +364,8 @@ void vela_eprint_float(double x);
 void vela_init(int argc, char **argv);
 // os.args(): every argument, the program's own name first.
 vela_array *vela_os_args(void);
+// Absolute, resolved path to the running executable, independent of argv[0].
+vela_str vela_os_executable(void);
 
 // Fakes for `with` in tests: each setter takes the new value and returns
 // the old one, for the restore.

@@ -1,4 +1,4 @@
-// err: missing_return.vl:6:1: error: missing return: 'sign' returns Int, but the end of its body can be reached
+// err: missing_return.vl:6:1: error: missing return: 'sign' returns Int, but the end of its body can be reached [E3034]
 fn sign(n: Int) -> Int {
     if n < 0 {
         return -1

@@ -35,7 +35,7 @@ QUESTIONS = [
     ("What is this module's public API?", "partly", "symbols lists one file, private names too"),
     ("Which tests cover this function?", "no", ""),
     ("What breaks if I change this signature?", "no", ""),
-    ("What does this error mean, and how do I fix it?", "no", "messages say a fix in prose; no codes, no edits"),
+    ("What does this error mean, and how do I fix it?", "yes", "vela explain CODE; vela check --json includes edits; vela fix applies them"),
 ]
 
 
@@ -47,10 +47,12 @@ def diagnostics(vela: Path) -> dict[str, int]:
             continue
         done = subprocess.run([str(vela), "check", "--json", main.name], cwd=main.parent, capture_output=True,
                               text=True)
+        if done.returncode not in (0, 1):
+            raise RuntimeError(f"{main}: compiler exited {done.returncode}: {done.stderr}")
         try:
             found = json.loads(done.stdout).get("errors", [])
-        except json.JSONDecodeError:
-            continue
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"{main}: compiler did not emit diagnostic JSON: {done.stdout}") from e
         total += len(found)
         with_code += sum(1 for d in found if d.get("code"))
         with_fix += sum(1 for d in found if d.get("fix"))
@@ -67,11 +69,13 @@ def main() -> int:
     ap.add_argument("--json")
     ap.add_argument("--vela", default=str(ROOT / "build" / "vela"))
     opts = ap.parse_args()
-    d = diagnostics(Path(opts.vela))
+    d = diagnostics(Path(opts.vela).resolve())
+    guide = subprocess.run([str(Path(opts.vela).resolve()), "guide"], capture_output=True, check=True).stdout
     reading = {
         "README": size([ROOT / "README.md"]),
         "README and walkthroughs": size([ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]),
         "std": size(sorted((ROOT / "std").glob("*.vl"))),
+        "vela guide": {"bytes": len(guide), "tokens": len(guide) // 4},
     }
     answered = {k: sum(1 for _, a, _ in QUESTIONS if a == k) for k in ("yes", "partly", "no")}
     print(f"Diagnostics in tests/fail: {d['diagnostics']}; with a code: {d['with_code']}; "

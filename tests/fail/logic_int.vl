@@ -1,4 +1,4 @@
-// err: logic_int.vl:3:16: error: operator '&&' needs Bool operands, found Bool and Int
+// err: logic_int.vl:3:16: error: operator '&&' needs Bool operands, found Bool and Int [E3100]
 fn main() {
     print(true && 1)
 }

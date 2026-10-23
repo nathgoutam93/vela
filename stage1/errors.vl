@@ -4,6 +4,8 @@
 import strings
 
 pub type CompileError = struct {
+    code: Str
+    fix: [Edit]
     path: Str  // "" until whoever knows the file fills it in
     line: Int
     col: Int
@@ -11,21 +13,21 @@ pub type CompileError = struct {
     warning: Bool  // a warning: reported, but the program still compiles
 }
 
-pub fn at(line: Int, col: Int, message: Str) -> CompileError {
-    return CompileError { path: "", line: line, col: col, message: message, warning: false }
+pub fn at(line: Int, col: Int, code: Str, message: Str) -> CompileError {
+    return CompileError { code: code, fix: [], path: "", line: line, col: col, message: message, warning: false }
 }
 
-// `file:line:col: error: message`, or `warning:`
+// `file:line:col: error: message [CODE]`, or `warning:`
 pub fn render(e: CompileError) -> Str {
     let mut kind = ": error: "
     if e.warning {
         kind = ": warning: "
     }
-    return e.path + ":" + strings.from_int(e.line) + ":" + strings.from_int(e.col) + kind + e.message
+    return e.path + ":" + strings.from_int(e.line) + ":" + strings.from_int(e.col) + kind + e.message + " [" + e.code + "]"
 }
 
 fn same(a: CompileError, b: CompileError) -> Bool {
-    return a.path == b.path && a.line == b.line && a.col == b.col && a.message == b.message && a.warning == b.warning
+    return a.path == b.path && a.line == b.line && a.col == b.col && a.message == b.message && a.code == b.code && a.warning == b.warning
 }
 
 // Errors and warnings in one list, in the order they are reported.
@@ -37,14 +39,16 @@ pub fn merged(errs: [CompileError], warnings: [CompileError]) -> [CompileError] 
     return sorted(all)
 }
 
-// Adds `e` unless an identical error is already there.
-pub fn add(errors: mut [CompileError], e: CompileError) {
-    for old in errors {
-        if same(old, e) {
-            return
+// Adds `e` unless an identical error is already there; returns its index
+// so a caller can attach a fix even when the diagnostic was deduplicated.
+pub fn add(errors: mut [CompileError], e: CompileError) -> Int {
+    for i in 0..len(errors) {
+        if same(errors[i], e) {
+            return i
         }
     }
     push(mut errors, e)
+    return len(errors) - 1
 }
 
 pub fn has_error_at(errors: [CompileError], line: Int, col: Int) -> Bool {
@@ -85,4 +89,24 @@ pub fn sorted(errors: [CompileError]) -> [CompileError] {
         i = i + 1
     }
     return out
+}
+
+// Byte offsets in the original UTF-8 file: [start, end). expected guards
+// against stale edits. All edits of a diagnostic are applied together.
+pub type Edit = struct {
+    file: Str
+    start: Int
+    end: Int
+    text: Str
+    expected: Str
+}
+
+test "a duplicate keeps its diagnostic index for attaching fixes" {
+    let first = at(1, 1, "E3061", "first")
+    let second = at(2, 1, "E3061", "second")
+    let mut ds: [CompileError] = []
+    assert(add(mut ds, first) == 0)
+    assert(add(mut ds, second) == 1)
+    assert(add(mut ds, first) == 0)
+    assert(len(ds) == 2)
 }

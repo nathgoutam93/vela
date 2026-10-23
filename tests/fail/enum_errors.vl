@@ -1,17 +1,17 @@
 // Mistakes building enum values, Option and Result included.
-// err: enum_errors.vl:21:18: error: 'Expr' has no variant 'Foo'
-// err: enum_errors.vl:22:18: error: Expr.Num carries 1 value; write Expr.Num(...)
-// err: enum_errors.vl:23:18: error: Expr.Leaf carries no values; write it without parentheses
-// err: enum_errors.vl:24:18: error: Expr.Add carries 2 values, got 1
-// err: enum_errors.vl:25:22: error: value 1 of Expr.Num must be Int, found Bool
-// err: enum_errors.vl:27:13: error: Expr values cannot be compared with '=='; use match, or compare their fields
-// err: enum_errors.vl:28:13: error: cannot tell which Option this None is; give it a type, as in `let x: Option[Int] = None`
-// err: enum_errors.vl:29:13: error: cannot tell which Result this Ok(...) is; give it a type, as in `let r: Result[Int, Str] = Ok(...)`
-// err: enum_errors.vl:30:18: error: 'i' is declared as Int, but its value is None
-// err: enum_errors.vl:31:31: error: value 1 of Some must be Int, found Bool
-// err: enum_errors.vl:32:9: error: 'None' is a variant of Option and cannot be used as a name
-// err: enum_errors.vl:33:35: error: value 1 of Err must be Str, found Int
-// err: enum_errors.vl:35:13: error: Option[Int] values cannot be compared with '=='; use match, or compare their fields
+// err: enum_errors.vl:21:18: error: 'Expr' has no variant 'Foo' [E3120]
+// err: enum_errors.vl:22:18: error: Expr.Num carries 1 value; write Expr.Num(...) [E3121]
+// err: enum_errors.vl:23:18: error: Expr.Leaf carries no values; write it without parentheses [E3148]
+// err: enum_errors.vl:24:18: error: Expr.Add carries 2 values, got 1 [E3149]
+// err: enum_errors.vl:25:22: error: value 1 of Expr.Num must be Int, found Bool [E3093]
+// err: enum_errors.vl:27:13: error: Expr values cannot be compared with '=='; use match, or compare their fields [E3099]
+// err: enum_errors.vl:28:13: error: cannot tell which Option this None is; give it a type, as in `let x: Option[Int] = None` [E3084]
+// err: enum_errors.vl:29:13: error: cannot tell which Result this Ok(...) is; give it a type, as in `let r: Result[Int, Str] = Ok(...)` [E3140]
+// err: enum_errors.vl:30:18: error: 'i' is declared as Int, but its value is None [E3088]
+// err: enum_errors.vl:31:31: error: value 1 of Some must be Int, found Bool [E3093]
+// err: enum_errors.vl:32:9: error: 'None' is a variant of Option and cannot be used as a name [E3043]
+// err: enum_errors.vl:33:35: error: value 1 of Err must be Str, found Int [E3093]
+// err: enum_errors.vl:35:13: error: Option[Int] values cannot be compared with '=='; use match, or compare their fields [E3099]
 type Expr = enum {
     Num(Int)
     Add(Expr, Expr)

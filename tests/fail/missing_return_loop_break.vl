@@ -1,4 +1,4 @@
-// err: missing_return_loop_break.vl:7:1: error: missing return: 'f' returns Int, but the end of its body can be reached
+// err: missing_return_loop_break.vl:7:1: error: missing return: 'f' returns Int, but the end of its body can be reached [E3034]
 fn f() -> Int {
     for {
         break

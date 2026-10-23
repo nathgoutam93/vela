@@ -1,4 +1,4 @@
-// err: unclosed_group.vl:3:17: error: expected ')' to match '(' at 3:11, found newline
+// err: unclosed_group.vl:3:17: error: expected ')' to match '(' at 3:11, found newline [E2021]
 fn main() {
     print((1 + 2
     )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make a fresh workspace for one evaluation task.
 
-    python3 eval/prepare.py TASK DIR [--vela PATH] [--context docs|readme|none]
+    python3 eval/prepare.py TASK DIR [--vela PATH] [--context guide|docs|readme|none]
 
 DIR gets the task's starting files, TASK.md (the prompt to give the agent:
 the common preamble, AGENT_PROMPT.md, then the task), and `_vela/`: a
@@ -11,15 +11,16 @@ particular not this repository, which holds the hidden tests.
 
     export PATH="DIR/_vela/bin:$PATH"     then run the agent in DIR
 
---context says what documentation goes in `_vela/`: `docs` (the default:
-README, the walkthroughs, std and the examples), `readme` (README and std
-only) or `none` (std only), to measure what documentation is worth.
+--context says what documentation goes in `_vela/`: `guide` (the default:
+the compiler-generated GUIDE.md and std), `docs` (README, walkthroughs,
+std and examples), `readme` (README and std), or `none` (std only).
 """
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
-import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -39,16 +40,14 @@ def task_dir(name: str) -> Path:
 
 def install(vela: Path, dest: Path, context: str) -> None:
     (dest / "bin").mkdir(parents=True)
-    shutil.copy2(vela, dest / "bin" / "vela-compiler")
-    # The compiler finds its runtime and std two directories above its own
-    # path; called as plain `vela` from PATH it would not know that path,
-    # so a wrapper names it.
-    wrapper = dest / "bin" / "vela"
-    wrapper.write_text('#!/bin/sh\nhere="$(cd "$(dirname "$0")" && pwd)"\n'
-                       'VELA_ROOT="$here/.." exec "$here/vela-compiler" "$@"\n')
-    wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    shutil.copy2(vela, dest / "bin" / "vela")
     shutil.copytree(ROOT / "runtime", dest / "runtime")
     shutil.copytree(ROOT / "std", dest / "std")
+    if context == "guide":
+        guide = subprocess.run([str((dest / "bin" / "vela").resolve()), "guide"],
+                               env={**os.environ, "VELA_ROOT": str(dest.resolve())},
+                               capture_output=True, text=True, check=True)
+        (dest / "GUIDE.md").write_text(guide.stdout)
     if context in ("docs", "readme"):
         shutil.copy2(ROOT / "README.md", dest / "README.md")
     if context == "docs":
@@ -63,7 +62,11 @@ def prepare(task: Path, out: Path, vela: Path, context: str) -> None:
     workspace = task / "workspace"
     if workspace.is_dir():
         shutil.copytree(workspace, out, dirs_exist_ok=True)
-    prompt = (EVAL / "AGENT_PROMPT.md").read_text() + (task / "task.md").read_text()
+    prompt = (EVAL / "AGENT_PROMPT.md").read_text()
+    if context != "guide":
+        prompt = prompt.replace("- `_vela/GUIDE.md`: the compiler-generated language reference.\n",
+                                "- `_vela/`: the documentation supplied for this evaluation condition.\n")
+    prompt += (task / "task.md").read_text()
     (out / "TASK.md").write_text(prompt)
     install(vela, out / "_vela", context)
 
@@ -73,7 +76,7 @@ def main() -> int:
     ap.add_argument("task")
     ap.add_argument("dir")
     ap.add_argument("--vela", default=str(ROOT / "build" / "vela"))
-    ap.add_argument("--context", choices=["docs", "readme", "none"], default="docs")
+    ap.add_argument("--context", choices=["guide", "docs", "readme", "none"], default="guide")
     opts = ap.parse_args()
     task = task_dir(opts.task)
     out = Path(opts.dir).resolve()

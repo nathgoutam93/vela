@@ -1,4 +1,4 @@
-// err: extra_paren.vl:3:13: error: expected newline or ';' after statement, found ')'
+// err: extra_paren.vl:3:13: error: expected newline or ';' after statement, found ')' [E2009]
 fn main() {
     print(1))
 }

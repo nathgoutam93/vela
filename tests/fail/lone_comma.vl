@@ -1,4 +1,4 @@
-// err: lone_comma.vl:3:11: error: expected expression, found ','
+// err: lone_comma.vl:3:11: error: expected expression, found ',' [E2020]
 fn main() {
     print(,)
 }

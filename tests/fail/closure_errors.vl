@@ -1,10 +1,10 @@
 // Mistakes with closures.
-// err: closure_errors.vl:13:9: error: cannot assign to 'total' inside a function value: it has its own copy of 'total', made when it was created, and changes to the copy would be lost
-// err: closure_errors.vl:15:16: error: cannot tell the type of parameter 'x'; write it, as in fn(x: Int) => ...
-// err: closure_errors.vl:21:5: error: missing return: this function value returns Int, but the end of its body can be reached
-// err: closure_errors.vl:22:40: error: this function value returns Str, but this is Int
-// err: closure_errors.vl:25:13: error: 'break' is only allowed inside a loop
-// err: closure_errors.vl:28:40: error: '?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... }
+// err: closure_errors.vl:13:9: error: cannot assign to 'total' inside a function value: it has its own copy of 'total', made when it was created, and changes to the copy would be lost [E3060]
+// err: closure_errors.vl:15:16: error: cannot tell the type of parameter 'x'; write it, as in fn(x: Int) => ... [E3157]
+// err: closure_errors.vl:21:5: error: missing return: this function value returns Int, but the end of its body can be reached [E3159]
+// err: closure_errors.vl:22:40: error: this function value returns Str, but this is Int [E3093]
+// err: closure_errors.vl:25:13: error: 'break' is only allowed inside a loop [E3054]
+// err: closure_errors.vl:28:40: error: '?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... } [E3110]
 import files
 
 fn main() {

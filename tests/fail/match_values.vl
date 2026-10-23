@@ -1,9 +1,9 @@
 // A match used as a value, and the names its patterns bind.
-// err: match_values.vl:11:18: error: this arm is Str, but the first arm is Int
-// err: match_values.vl:14:17: error: print(...) does not produce a value
-// err: match_values.vl:15:18: error: print(...) does not produce a value
-// err: match_values.vl:20:13: error: cannot assign to match binding 'n'
-// err: match_values.vl:24:11: error: undefined name 'n'
+// err: match_values.vl:11:18: error: this arm is Str, but the first arm is Int [E3093]
+// err: match_values.vl:14:17: error: print(...) does not produce a value [E3094]
+// err: match_values.vl:15:18: error: print(...) does not produce a value [E3094]
+// err: match_values.vl:20:13: error: cannot assign to match binding 'n' [E3063]
+// err: match_values.vl:24:11: error: undefined name 'n' [E3087]
 fn main() {
     let b = true
     let x = match b {

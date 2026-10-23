@@ -1,8 +1,8 @@
 // A missing return in an imported module is reported in that module's
 // file, in order with the other errors. (Before M8, Stage 0 left the file
 // out of this one message; Stage 1's differential tests found it.)
-// err: main.vl:9:24: error: operator '+' needs Int operands, found Int and Bool
-// err: util.vl:5:1: error: missing return: 'half' returns Int, but the end of its body can be reached
+// err: main.vl:9:24: error: operator '+' needs Int operands, found Int and Bool [E3107]
+// err: util.vl:5:1: error: missing return: 'half' returns Int, but the end of its body can be reached [E3034]
 import util
 
 fn main() {

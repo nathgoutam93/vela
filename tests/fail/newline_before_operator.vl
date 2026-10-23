@@ -1,5 +1,5 @@
 // The operator must end the line, not start the next one.
-// err: newline_before_operator.vl:4:12: error: expected ',' or ')' in argument list, found newline
+// err: newline_before_operator.vl:4:12: error: expected ',' or ')' in argument list, found newline [E2025]
 fn main() {
     print(1
         + 2)

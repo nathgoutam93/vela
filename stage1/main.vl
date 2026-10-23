@@ -7,8 +7,11 @@
 //     vela c FILE                 print the generated C
 //     vela ir FILE                print the native backend's IR (see ir.vl)
 //     vela asm FILE               print the x86-64 assembly (see x64.vl)
-//     vela check FILE             report the program's errors, generate nothing
+//     vela check FILE             check a program or library, generate nothing
 //     vela check --json FILE      the same, as one JSON document on stdout
+//     vela explain CODE           explain a stable diagnostic code
+//     vela fix [--dry-run] FILE    apply diagnostic edits to local sources
+//     vela guide                  generate a compact language reference
 //     vela tokens FILE            print the token stream
 //     vela ast FILE               print the syntax tree
 //     vela fmt [-w | -l] FILE...  print the files formatted; -w rewrites them,
@@ -42,6 +45,9 @@ import checker
 import codegen
 import complete
 import errors
+import diagnostics
+import fixer
+import guide
 import files
 import format
 import ir
@@ -62,13 +68,41 @@ import x64
 fn main() {
     let args = os.args()
     if len(args) == 2 && args[1] == "lsp" {
-        lsp.serve(modules.join(root_dir(args[0]), "std"))
+        lsp.serve(modules.join(root_dir(), "std"))
+        return
+    }
+    if len(args) == 2 && args[1] == "guide" {
+        print(guide.reference(root_dir()))
         return
     }
     if len(args) < 2 || len(args) < 3 && args[1] != "get" {
         usage()
     }
     let command = args[1]
+    if command == "explain" {
+        if len(args) != 3 {
+            usage()
+        }
+        match diagnostics.explain(args[2]) {
+            Some(explanation) => print(explanation)
+            None => {
+                os.eprint("vela: error: unknown diagnostic code '" + args[2] + "' [E6006]")
+                os.exit(2)
+            }
+        }
+        return
+    }
+    if command == "fix" {
+        let root = root_dir()
+        if len(args) == 3 {
+            fixer.command(args[2], root, false)
+        } else if len(args) == 4 && args[2] == "--dry-run" {
+            fixer.command(args[3], root, true)
+        } else {
+            usage()
+        }
+        return
+    }
     if command == "get" {
         get_command(args[2..len(args)])
         return
@@ -81,7 +115,7 @@ fn main() {
         fmt(args[2..len(args)])
         return
     }
-    let root = root_dir(args[0])
+    let root = root_dir()
     if command == "query" {
         if len(args) == 5 && args[2] == "rename" {
             rename.command(args[3], args[4], modules.join(root, "std"), false)
@@ -135,7 +169,7 @@ fn main() {
     } else if command == "ast" {
         syntax_tree(path)
     } else if command == "check" {
-        checked(path, root)
+        checked_mode(path, root, true)
     } else if command == "ir" {
         print(ir.program_text(lowered(path, native_program(path, checked(path, root), false))))
     } else if command == "asm" {
@@ -151,26 +185,26 @@ fn main() {
 
 fn usage() uses os {
     os.eprint("usage: vela (build | run | test | c | ir | asm | check | tokens | ast | fmt | query) FILE, vela rename, vela lsp, " +
-        "vela get, or vela new")
+        "vela get, vela new, vela explain CODE, vela fix [--dry-run] FILE, or vela guide")
     os.exit(2)
 }
 
 // The directory holding runtime/ and std/.
-fn root_dir(program: Str) -> Str uses os {
+fn root_dir() -> Str uses os {
     match os.env("VELA_ROOT") {
         Some(r) => return r
         None => {}
     }
-    return modules.dirname(modules.dirname(program))
+    return modules.dirname(modules.dirname(os.executable()))
 }
 
 fn driver_error(message: Str) uses os {
-    os.eprint("vela: error: " + message)
+    os.eprint("vela: error: " + message + " [E6001]")
     os.exit(1)
 }
 
 fn internal_error(message: Str) uses os {
-    os.eprint("vela: internal compiler error: " + message)
+    os.eprint("vela: internal compiler error: " + message + " [E6002]")
     os.exit(70)
 }
 
@@ -221,11 +255,15 @@ fn syntax_tree(path: Str) uses fs, os {
 
 // Load and check a whole program; returns it checked, or stops with its errors.
 fn checked(path: Str, root: Str) -> checker.Checked uses fs, os {
+    return checked_mode(path, root, false)
+}
+
+fn checked_mode(path: Str, root: Str, library: Bool) -> checker.Checked uses fs, os {
     let loaded = load(path, read(path), root)
     if len(loaded.errors) > 0 {
         fail(path, loaded.errors)
     }
-    let result = checker.check(loaded)
+    let result = checker.check_program(loaded, library)
     if len(result.errors) > 0 {
         fail(path, errors.merged(result.errors, result.warnings))
     }
@@ -892,7 +930,8 @@ fn fmt(args: [Str]) uses fs, os {
 // `vela check --json`: every error the program has, for tools to read:
 //
 //     {"ok": false, "errors": [
-//       {"file": "a.vl", "line": 3, "col": 7, "severity": "error", "message": "..."}
+//       {"file": "a.vl", "line": 3, "col": 7, "severity": "error",
+//        "message": "...", "code": "E3093", "fix": []}
 //     ]}
 //
 // It exits 1 when there are errors, as `check` does.
@@ -901,7 +940,7 @@ fn check_json(path: Str, root: Str) uses fs, os {
     let mut failed = false
     match files.read(path) {
         Err(e) => {
-            push(mut errs, errors.CompileError { path: path, line: 0, col: 0, message: e, warning: false })
+            push(mut errs, errors.CompileError { code: "E7002", fix: [], path: path, line: 0, col: 0, message: e, warning: false })
             failed = true
         }
         Ok(source) => {
@@ -911,12 +950,12 @@ fn check_json(path: Str, root: Str) uses fs, os {
                 Err(e) => {
                     let at = modules.join(modules.dirname(path), "vela.mod")
                     // Only this: without the packages, what imports them cannot load either.
-                    loaded.errors = [errors.CompileError { path: at, line: 1, col: 1, message: e, warning: false }]
+                    loaded.errors = [errors.CompileError { code: "E7003", fix: [], path: at, line: 1, col: 1, message: e, warning: false }]
                 }
             }
             errs = loaded.errors
             if len(errs) == 0 {
-                let k = checker.check(loaded)
+                let k = checker.check_program(loaded, true)
                 failed = len(k.errors) > 0
                 errs = errors.merged(k.errors, k.warnings)
             } else {
@@ -947,7 +986,7 @@ fn check_json(path: Str, root: Str) uses fs, os {
             if e.warning {
                 severity = "warning"
             }
-            strings.add(mut b, ", \"severity\": \"" + severity + "\", \"message\": " + json_string(e.message) + "}")
+            strings.add(mut b, ", \"severity\": \"" + severity + "\", \"message\": " + json_string(e.message) + ", \"code\": " + json_string(e.code) + ", \"fix\": " + edits_json(e.fix) + "}")
             if i < len(errs) - 1 {
                 strings.add_byte(mut b, ',')
             }
@@ -1102,4 +1141,19 @@ test "the C is cut at the marks, into units of whole parts" {
     assert(len(c_parts(c, 1, 100)) == 1)
     // Never more units than parts.
     assert(len(c_parts(small, 8, 1)) == 2)
+}
+
+fn edits_json(edits: [errors.Edit]) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, "[")
+    for i in 0..len(edits) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        let e = edits[i]
+        strings.add(mut b, "{\"file\": " + json_string(e.file) + ", \"start\": " + strings.from_int(e.start) +
+            ", \"end\": " + strings.from_int(e.end) + ", \"text\": " + json_string(e.text) + ", \"expected\": " + json_string(e.expected) + "}")
+    }
+    strings.add(mut b, "]")
+    return strings.build(b)
 }

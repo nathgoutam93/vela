@@ -18,6 +18,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 
 void vela_panic(const char *loc, const char *msg) {
     // Flush first so everything the program printed appears before the panic.
@@ -838,6 +841,40 @@ void vela_eprint_str(vela_str x) {
 
 static int saved_argc;
 static char **saved_argv;
+
+// Ask the OS, rather than argv[0]: callers may use PATH or a symlink.
+vela_str vela_os_executable(void) {
+    size_t cap = 256;
+    for (;;) {
+        char *buffer = vela_alloc(cap);
+#if defined(__APPLE__)
+        uint32_t size = (uint32_t)cap;
+        if (_NSGetExecutablePath(buffer, &size) == 0) {
+            char *resolved = realpath(buffer, NULL);
+            free(buffer);
+            if (!resolved) vela_panic("os.executable", "cannot resolve executable path");
+            vela_str out = str_from(resolved, strlen(resolved));
+            free(resolved);
+            return out;
+        }
+        free(buffer);
+        cap = size;
+#elif defined(__linux__)
+        ssize_t n = readlink("/proc/self/exe", buffer, cap);
+        if (n < 0) vela_panic("os.executable", "cannot read executable path");
+        if ((size_t)n < cap) {
+            vela_str out = str_from(buffer, (size_t)n);
+            free(buffer);
+            return out;
+        }
+        free(buffer);
+        cap *= 2;
+#else
+        free(buffer);
+        vela_panic("os.executable", "unsupported platform");
+#endif
+    }
+}
 
 void vela_init(int argc, char **argv) {
     // Keep terminal output line buffered. Redirected output uses a larger

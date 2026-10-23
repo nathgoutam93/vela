@@ -1,13 +1,13 @@
 // Mistakes with mut parameters and arguments.
-// err: mut_errors.vl:23:5: error: cannot assign to parameter 'n'; declare it as `n: mut Int` to change the caller's value, or copy it into a `let mut`
-// err: mut_errors.vl:29:10: error: argument 1 of 'bump' is changed by the call; write `mut` before it
-// err: mut_errors.vl:30:14: error: cannot change 'fixed', which was declared with 'let'; use 'let mut' to allow changes
-// err: mut_errors.vl:31:18: error: argument 1 of 'read' is not a mut parameter; remove `mut`
-// err: mut_errors.vl:32:14: error: only a variable, or a field or element of one, can be changed
-// err: mut_errors.vl:33:17: error: 'x' is passed as mut twice in this call
-// err: mut_errors.vl:34:11: error: `mut` only goes before an argument for a mut parameter
-// err: mut_errors.vl:36:10: error: argument 1 of 'push' is changed by the call; write `mut` before it
-// err: mut_errors.vl:38:14: error: argument 1 of 'bump' must be Int, found Str
+// err: mut_errors.vl:23:5: error: cannot assign to parameter 'n'; declare it as `n: mut Int` to change the caller's value, or copy it into a `let mut` [E3062]
+// err: mut_errors.vl:29:10: error: argument 1 of 'bump' is changed by the call; write `mut` before it [E3143]
+// err: mut_errors.vl:30:14: error: cannot change 'fixed', which was declared with 'let'; use 'let mut' to allow changes [E3061]
+// err: mut_errors.vl:31:18: error: argument 1 of 'read' is not a mut parameter; remove `mut` [E3141]
+// err: mut_errors.vl:32:14: error: only a variable, or a field or element of one, can be changed [E3057]
+// err: mut_errors.vl:33:17: error: 'x' is passed as mut twice in this call [E3144]
+// err: mut_errors.vl:34:11: error: `mut` only goes before an argument for a mut parameter [E3096]
+// err: mut_errors.vl:36:10: error: argument 1 of 'push' is changed by the call; write `mut` before it [E3143]
+// err: mut_errors.vl:38:14: error: argument 1 of 'bump' must be Int, found Str [E3142]
 fn bump(n: mut Int) {
     n = n + 1
 }

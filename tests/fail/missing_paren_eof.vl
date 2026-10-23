@@ -1,4 +1,4 @@
 // No newline at the end of this file.
-// err: missing_paren_eof.vl:4:12: error: expected ',' or ')' in argument list, found end of file
+// err: missing_paren_eof.vl:4:12: error: expected ',' or ')' in argument list, found end of file [E2025]
 fn main() {
     print(1

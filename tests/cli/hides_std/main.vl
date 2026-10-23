@@ -2,7 +2,7 @@
 // with a warning (M12), once, where it is first imported: in shout.vl, which
 // is loaded before main.vl goes on to its second import.
 // command: check
-// err: shout.vl:1:8: warning: 'text' is this program's text.vl, which hides the standard module std/text.vl; rename the file to use the standard one
+// err: shout.vl:1:8: warning: 'text' is this program's text.vl, which hides the standard module std/text.vl; rename the file to use the standard one [E7005]
 import shout
 import text
 

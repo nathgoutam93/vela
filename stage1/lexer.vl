@@ -156,6 +156,10 @@ pub fn is_keyword(k: Kind) -> Bool {
     }
 }
 
+pub fn keywords() -> [Kind] {
+    return [Kind.Fn, Kind.Let, Kind.Mut, Kind.If, Kind.Else, Kind.Match, Kind.For, Kind.In, Kind.Return, Kind.Break, Kind.Continue, Kind.Type, Kind.Import, Kind.Pub, Kind.Test, Kind.Uses, Kind.With]
+}
+
 fn keyword(word: Str) -> Option[Kind] {
     return match word {
         "fn" => Some(Kind.Fn)
@@ -322,8 +326,8 @@ fn add(lx: mut Lexer, kind: Kind, text: Str, start: Int, value: Str) {
     push(mut lx.tokens, Token { kind: kind, text: text, line: lx.line, col: col(lx, start), value: value })
 }
 
-fn error(lx: mut Lexer, start: Int, message: Str) {
-    errors.add(mut lx.errors, errors.at(lx.line, col(lx, start), message))
+fn error(lx: mut Lexer, start: Int, code: Str, message: Str) {
+    errors.add(mut lx.errors, errors.at(lx.line, col(lx, start), code, message))
 }
 
 fn insert_semicolon(lx: mut Lexer, text: Str) {
@@ -414,12 +418,12 @@ fn number(lx: mut Lexer) {
             for is_ident_char(peek(lx, 0)) {
                 lx.pos = lx.pos + 1
             }
-            error(mut lx, start, "invalid number '" + lx.src[start..lx.pos] + "'")
+            error(mut lx, start, "E1001", "invalid number '" + lx.src[start..lx.pos] + "'")
             return
         }
         let whole = lx.src[start..int_end]
         if len(whole) > 1 && whole[0] == '0' {
-            error(mut lx, start, "number '" + lx.src[start..lx.pos] + "' has a leading zero")
+            error(mut lx, start, "E1002", "number '" + lx.src[start..lx.pos] + "' has a leading zero")
         }
         add(mut lx, Kind.Float, lx.src[start..lx.pos], start, "")
         return
@@ -429,14 +433,14 @@ fn number(lx: mut Lexer) {
         for is_ident_char(peek(lx, 0)) {
             lx.pos = lx.pos + 1
         }
-        error(mut lx, start, "invalid number '" + lx.src[start..lx.pos] + "'")
+        error(mut lx, start, "E1003", "invalid number '" + lx.src[start..lx.pos] + "'")
         return
     }
     let digits = lx.src[start..lx.pos]
     if len(digits) > 1 && digits[0] == '0' {
-        error(mut lx, start, "integer literal '" + digits + "' has a leading zero")
+        error(mut lx, start, "E1004", "integer literal '" + digits + "' has a leading zero")
     } else if too_big(digits) {
-        error(mut lx, start, "integer literal " + digits + " does not fit in Int (max 9223372036854775807)")
+        error(mut lx, start, "E1005", "integer literal " + digits + " does not fit in Int (max 9223372036854775807)")
     }
     add(mut lx, Kind.Int, digits, start, "")
 }
@@ -467,7 +471,7 @@ fn string(lx: mut Lexer) {
         let c = peek(lx, 0)
         if c == -1 || c == int('\n') {
             // Stop at the end of the line, so the next line lexes normally.
-            error(mut lx, start, "string literal is not closed before the end of the line")
+            error(mut lx, start, "E1006", "string literal is not closed before the end of the line")
             return
         }
         lx.pos = lx.pos + 1
@@ -482,13 +486,13 @@ fn string(lx: mut Lexer) {
                 if e != -1 && e != int('\n') {
                     shown = chars.chr(e)
                 }
-                error(mut lx, lx.pos - 1, "unknown escape '\\" + shown + "'; use \\n \\t \\r \\0 \\\\ or \\\"")
+                error(mut lx, lx.pos - 1, "E1007", "unknown escape '\\" + shown + "'; use \\n \\t \\r \\0 \\\\ or \\\"")
                 continue  // keep scanning the string, so its end is found
             }
             strings.add_byte(mut value, byte(decoded))
             lx.pos = lx.pos + 1
         } else if c < 32 && c != int('\t') {
-            error(mut lx, lx.pos - 1, "control byte " + chars.hex2(c) + " in string literal; use an escape")
+            error(mut lx, lx.pos - 1, "E1008", "control byte " + chars.hex2(c) + " in string literal; use an escape")
         } else {
             strings.add_byte(mut value, byte(c))
         }
@@ -496,7 +500,7 @@ fn string(lx: mut Lexer) {
     let raw = lx.src[start + 1..lx.pos - 1]
     let bad = chars.first_invalid(raw)
     if bad >= 0 {
-        error(mut lx, start + 1 + bad, "string literal is not valid UTF-8")
+        error(mut lx, start + 1 + bad, "E1009", "string literal is not valid UTF-8")
     }
     add(mut lx, Kind.Str, chars.replace_invalid(lx.src[start..lx.pos]), start, strings.build(value))
 }
@@ -527,7 +531,7 @@ fn byte_literal(lx: mut Lexer) {
     }
     let newline = find(lx.src, '\n', start)
     if end < 0 || 0 <= newline && newline < end {
-        error(mut lx, start, "byte literal is not closed; write one character between quotes, as in 'a'")
+        error(mut lx, start, "E1010", "byte literal is not closed; write one character between quotes, as in 'a'")
         lx.pos = lx.pos + 1
         return
     }
@@ -548,20 +552,20 @@ fn byte_literal(lx: mut Lexer) {
         } else if escape(e) >= 0 {
             value = escape(e)
         } else {
-            error(mut lx, start + 1, "unknown escape '\\" + chars.chr(e) + "'; use \\n \\t \\r \\0 \\\\ \\' or \\\"")
+            error(mut lx, start + 1, "E1011", "unknown escape '\\" + chars.chr(e) + "'; use \\n \\t \\r \\0 \\\\ \\' or \\\"")
             return
         }
     } else if len(body) == 1 && body[0] >= ' ' && body[0] < 127 && body[0] != '\\' {
         value = int(body[0])
     } else if len(body) == 0 {
-        error(mut lx, start, "empty byte literal; write one character between quotes, as in 'a'")
+        error(mut lx, start, "E1012", "empty byte literal; write one character between quotes, as in 'a'")
         return
     } else if body[0] >= 128 {
-        error(mut lx, start, "a byte literal holds one byte, but " + shown + " is " +
+        error(mut lx, start, "E1013", "a byte literal holds one byte, but " + shown + " is " +
             strings.from_int(len(body)) + " bytes in UTF-8; use a Str instead")
         return
     } else {
-        error(mut lx, start, "a byte literal holds one character, as in 'a', not " + shown)
+        error(mut lx, start, "E1014", "a byte literal holds one character, as in 'a', not " + shown)
         return
     }
     let mut b = strings.builder()
@@ -606,13 +610,13 @@ fn unexpected(lx: mut Lexer, c: Int) {
         for peek(lx, 0) >= 128 && peek(lx, 0) <= 191 {
             lx.pos = lx.pos + 1
         }
-        error(mut lx, start, "unexpected byte " + chars.hex2(c) + "; non-ASCII text is only allowed in comments and strings")
+        error(mut lx, start, "E1015", "unexpected byte " + chars.hex2(c) + "; non-ASCII text is only allowed in comments and strings")
     } else if c == int('&') || c == int('|') {
-        error(mut lx, start, "unexpected character '" + chars.chr(c) + "'; did you mean '" + chars.chr(c) + chars.chr(c) + "'?")
+        error(mut lx, start, "E1016", "unexpected character '" + chars.chr(c) + "'; did you mean '" + chars.chr(c) + chars.chr(c) + "'?")
     } else if c >= 33 && c <= 126 {
-        error(mut lx, start, "unexpected character '" + chars.chr(c) + "'")
+        error(mut lx, start, "E1017", "unexpected character '" + chars.chr(c) + "'")
     } else {
-        error(mut lx, start, "unexpected control byte " + chars.hex2(c))
+        error(mut lx, start, "E1018", "unexpected control byte " + chars.hex2(c))
     }
 }
 

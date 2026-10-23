@@ -1,4 +1,4 @@
-// err: assign_param.vl:3:5: error: cannot assign to parameter 'n'; declare it as `n: mut Int` to change the caller's value, or copy it into a `let mut`
+// err: assign_param.vl:3:5: error: cannot assign to parameter 'n'; declare it as `n: mut Int` to change the caller's value, or copy it into a `let mut` [E3062]
 fn f(n: Int) {
     n = 1
 }

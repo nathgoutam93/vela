@@ -1,16 +1,16 @@
-// err: tasks_errors.vl:26:18: error: 'sizes' uses fs, through the function given to tasks.map, but does not say so; add `uses fs` after its signature
-// err: tasks_errors.vl:30:18: error: 'sizes_named' uses fs, through the function given to tasks.map, but does not say so; add `uses fs` after its signature
-// err: tasks_errors.vl:42:34: warning: 'nested' says `uses fs` but uses nothing of it
-// err: tasks_errors.vl:50:31: error: the function given to tasks.map returns nothing, so there are no results to collect; use tasks.each
-// err: tasks_errors.vl:53:23: error: argument 1 of 'tasks.map' must be an array, found Int
-// err: tasks_errors.vl:54:28: error: argument 2 of 'tasks.map' must be a function taking one Int, found fn(Str) -> Str
-// err: tasks_errors.vl:55:11: error: tasks.each expects 2 arguments, got 1
-// err: tasks_errors.vl:56:23: error: cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`
-// err: tasks_errors.vl:56:30: error: cannot tell the type of parameter 'x'; write it, as in fn(x: Int) => ...
-// err: tasks_errors.vl:57:19: error: tasks.each(...) does not produce a value
-// err: tasks_errors.vl:57:40: error: this function value does not return a value, so 'return' cannot have one
-// err: tasks_errors.vl:58:24: error: 'n' is declared as Str, but its value is Int
-// err: tasks_errors.vl:63:9: error: 'with' cannot be used inside a function value; put the function value inside the 'with' instead
+// err: tasks_errors.vl:26:18: error: 'sizes' uses fs, through the function given to tasks.map, but does not say so; add `uses fs` after its signature [E3036]
+// err: tasks_errors.vl:30:18: error: 'sizes_named' uses fs, through the function given to tasks.map, but does not say so; add `uses fs` after its signature [E3036]
+// err: tasks_errors.vl:42:34: warning: 'nested' says `uses fs` but uses nothing of it [E7008]
+// err: tasks_errors.vl:50:31: error: the function given to tasks.map returns nothing, so there are no results to collect; use tasks.each [E3165]
+// err: tasks_errors.vl:53:23: error: argument 1 of 'tasks.map' must be an array, found Int [E3162]
+// err: tasks_errors.vl:54:28: error: argument 2 of 'tasks.map' must be a function taking one Int, found fn(Str) -> Str [E3163]
+// err: tasks_errors.vl:55:11: error: tasks.each expects 2 arguments, got 1 [E3169]
+// err: tasks_errors.vl:56:23: error: cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []` [E3114]
+// err: tasks_errors.vl:56:30: error: cannot tell the type of parameter 'x'; write it, as in fn(x: Int) => ... [E3157]
+// err: tasks_errors.vl:57:19: error: tasks.each(...) does not produce a value [E3094]
+// err: tasks_errors.vl:57:40: error: this function value does not return a value, so 'return' cannot have one [E3161]
+// err: tasks_errors.vl:58:24: error: 'n' is declared as Str, but its value is Int [E3093]
+// err: tasks_errors.vl:63:9: error: 'with' cannot be used inside a function value; put the function value inside the 'with' instead [E3037]
 import files
 import tasks
 

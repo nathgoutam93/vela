@@ -1,4 +1,4 @@
-// err: control_byte.vl:3:11: error: unexpected control byte 0x07
+// err: control_byte.vl:3:11: error: unexpected control byte 0x07 [E1018]
 fn main() {
     print(1)
 }

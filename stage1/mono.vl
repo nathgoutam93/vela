@@ -213,7 +213,7 @@ fn expr(w: mut Walk, e: ast.Expr) {
                 if deepest > max_depth() {
                     if len(w.out.errors) == 0 {
                         let name = w.k.fns[id].decl.name
-                        push(mut w.out.errors, errors.CompileError {
+                        push(mut w.out.errors, errors.CompileError { code: "E7006", fix: [],
                             path: w.path, line: e.line, col: e.col, warning: false,
                             message: "'" + name + "' is called here with types that grow without end, as generic " +
                                 "functions that call each other with bigger types do (f[T] calling g[[T]])",

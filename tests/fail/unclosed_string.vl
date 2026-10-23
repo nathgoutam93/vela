@@ -1,4 +1,4 @@
-// err: unclosed_string.vl:3:11: error: string literal is not closed before the end of the line
+// err: unclosed_string.vl:3:11: error: string literal is not closed before the end of the line [E1006]
 fn main() {
     print("abc)
 }

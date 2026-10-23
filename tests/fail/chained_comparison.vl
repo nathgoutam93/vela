@@ -1,4 +1,4 @@
-// err: chained_comparison.vl:3:17: error: comparisons cannot be chained; use && to combine them, as in a < b && b < c
+// err: chained_comparison.vl:3:17: error: comparisons cannot be chained; use && to combine them, as in a < b && b < c [E2019]
 fn main() {
     print(1 < 2 < 3)
 }

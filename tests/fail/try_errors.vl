@@ -1,13 +1,13 @@
 // Mistakes with `?`: on something that is not a Result or an Option, in a
 // function that cannot pass the failure on, or with a different error type.
-// err: try_errors.vl:20:15: error: '?' returns an Err from 'plain', so 'plain' must return a Result, but it returns Int
-// err: try_errors.vl:24:16: error: '?' returns None from 'nothing', so 'nothing' must return an Option, but it returns nothing
-// err: try_errors.vl:28:18: error: '?' would return this Result[Int, Str]'s error, which is Str, but 'wrong_error' returns Result[Int, Int]
-// err: try_errors.vl:32:20: error: '?' returns an Err from 'mixed', so 'mixed' must return a Result, but it returns Option[Int]
-// err: try_errors.vl:36:18: error: '?' returns None from 'mixed_back', so 'mixed_back' must return an Option, but it returns Result[Int, Str]
-// err: try_errors.vl:41:16: error: '?' needs a Result or an Option, found Int
-// err: try_errors.vl:46:6: error: this value is not used; only a call can stand alone as a statement
-// err: try_errors.vl:51:16: error: '?' returns an Err from 'main', so 'main' must return a Result, but it returns nothing
+// err: try_errors.vl:20:15: error: '?' returns an Err from 'plain', so 'plain' must return a Result, but it returns Int [E3111]
+// err: try_errors.vl:24:16: error: '?' returns None from 'nothing', so 'nothing' must return an Option, but it returns nothing [E3111]
+// err: try_errors.vl:28:18: error: '?' would return this Result[Int, Str]'s error, which is Str, but 'wrong_error' returns Result[Int, Int] [E3112]
+// err: try_errors.vl:32:20: error: '?' returns an Err from 'mixed', so 'mixed' must return a Result, but it returns Option[Int] [E3111]
+// err: try_errors.vl:36:18: error: '?' returns None from 'mixed_back', so 'mixed_back' must return an Option, but it returns Result[Int, Str] [E3111]
+// err: try_errors.vl:41:16: error: '?' needs a Result or an Option, found Int [E3109]
+// err: try_errors.vl:46:6: error: this value is not used; only a call can stand alone as a statement [E3051]
+// err: try_errors.vl:51:16: error: '?' returns an Err from 'main', so 'main' must return a Result, but it returns nothing [E3111]
 fn r() -> Result[Int, Str] {
     return Ok(1)
 }

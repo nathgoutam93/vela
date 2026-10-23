@@ -1,4 +1,4 @@
-// err: void_value.vl:5:13: error: nothing(...) does not produce a value
+// err: void_value.vl:5:13: error: nothing(...) does not produce a value [E3094]
 fn nothing() {
 }
 fn main() {

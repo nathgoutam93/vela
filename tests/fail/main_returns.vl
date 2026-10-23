@@ -1,4 +1,4 @@
-// err: main_returns.vl:2:4: error: main must take no parameters and return nothing
+// err: main_returns.vl:2:4: error: main must take no parameters and return nothing [E3002]
 fn main() -> Int {
     return 0
 }

@@ -1,21 +1,21 @@
 // Errors in generic code: bounds not met, type arguments that cannot be
 // worked out, operations a type parameter does not allow.
-// err: generics_errors.vl:24:19: error: 'Grow' can only contain itself with its own type parameters, as in Grow[T]
-// err: generics_errors.vl:37:14: error: T values cannot be compared with '=='; declare the type parameter as `T: Eq`
-// err: generics_errors.vl:41:14: error: operator '<' needs values that can be ordered; declare the type parameter as `T: Ord`
-// err: generics_errors.vl:52:10: error: unknown bound 'Wobbly'; the bounds are Eq (==), Ord (<) and Key (map keys)
-// err: generics_errors.vl:52:26: error: type parameter 'T' is declared twice
-// err: generics_errors.vl:57:12: error: 'deeper' calls itself with [T] for T; a generic function can only call itself with its own type parameters
-// err: generics_errors.vl:61:14: error: T has no fields
-// err: generics_errors.vl:65:12: error: 'Box' needs 1 type argument, as in Box[Int]
-// err: generics_errors.vl:66:12: error: 'Box' needs 1 type argument, as in Box[Int]
-// err: generics_errors.vl:67:5: error: 'biggest' needs T to be ordered by <, as Int, Byte, Float and Str are, but here T is Point
-// err: generics_errors.vl:68:13: error: cannot tell what T is in this call to 'make'; give the result a type, as in `let x: [Int] = make(...)`
-// err: generics_errors.vl:69:18: error: cannot tell which Tree this Tree.Leaf is; give it a type, as in `let x: Tree[Int] = Tree.Leaf`
-// err: generics_errors.vl:70:34: error: value 1 of Tree.Node must be Str, found Int
-// err: generics_errors.vl:71:29: error: 'Box' has no field 'extra'
-// err: generics_errors.vl:72:36: error: field 'value' of 'Box' must be Int, found Str
-// err: generics_errors.vl:73:16: error: Map keys must be Int, Byte, Bool or Str, not Box[Int]
+// err: generics_errors.vl:24:19: error: 'Grow' can only contain itself with its own type parameters, as in Grow[T] [E3030]
+// err: generics_errors.vl:37:14: error: T values cannot be compared with '=='; declare the type parameter as `T: Eq` [E3098]
+// err: generics_errors.vl:41:14: error: operator '<' needs values that can be ordered; declare the type parameter as `T: Ord` [E3105]
+// err: generics_errors.vl:52:10: error: unknown bound 'Wobbly'; the bounds are Eq (==), Ord (<) and Key (map keys) [E3009]
+// err: generics_errors.vl:52:26: error: type parameter 'T' is declared twice [E3007]
+// err: generics_errors.vl:57:12: error: 'deeper' calls itself with [T] for T; a generic function can only call itself with its own type parameters [E3145]
+// err: generics_errors.vl:61:14: error: T has no fields [E3123]
+// err: generics_errors.vl:65:12: error: 'Box' needs 1 type argument, as in Box[Int] [E3029]
+// err: generics_errors.vl:66:12: error: 'Box' needs 1 type argument, as in Box[Int] [E3029]
+// err: generics_errors.vl:67:5: error: 'biggest' needs T to be ordered by <, as Int, Byte, Float and Str are, but here T is Point [E3031]
+// err: generics_errors.vl:68:13: error: cannot tell what T is in this call to 'make'; give the result a type, as in `let x: [Int] = make(...)` [E3137]
+// err: generics_errors.vl:69:18: error: cannot tell which Tree this Tree.Leaf is; give it a type, as in `let x: Tree[Int] = Tree.Leaf` [E3122]
+// err: generics_errors.vl:70:34: error: value 1 of Tree.Node must be Str, found Int [E3093]
+// err: generics_errors.vl:71:29: error: 'Box' has no field 'extra' [E3131]
+// err: generics_errors.vl:72:36: error: field 'value' of 'Box' must be Int, found Str [E3093]
+// err: generics_errors.vl:73:16: error: Map keys must be Int, Byte, Bool or Str, not Box[Int] [E3026]
 type Box[T] = struct {
     value: T
 }

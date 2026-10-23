@@ -52,7 +52,7 @@ pub fn format(src: Str) -> Result[Str, [errors.CompileError]] {
         if differs >= 0 && differs < len(lexed.tokens) {
             at = lexed.tokens[differs]
         }
-        let e = errors.at(at.line, at.col, "internal error: formatting would change this file's meaning here; please report it")
+        let e = errors.at(at.line, at.col, "E5001", "internal error: formatting would change this file's meaning here; please report it")
         return Err([e])
     }
     return Ok(out)

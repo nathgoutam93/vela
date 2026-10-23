@@ -1,4 +1,4 @@
-// err: else_new_line.vl:6:5: error: 'else' must be on the same line as the '}' before it
+// err: else_new_line.vl:6:5: error: 'else' must be on the same line as the '}' before it [E2014]
 fn main() {
     if true {
         print(1)

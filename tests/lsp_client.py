@@ -295,7 +295,7 @@ def session(compiler: list[str], d: Path) -> None:
     }})
     reply = c.request("textDocument/rename", {**position(main_uri, 4, 13), "newName": "all"})
     expect("a rename that would be an error", reply.get("error", {}).get("message"),
-           f"renaming 'total' to 'all' would be an error: {main}:5:13: error: 'all' is already declared in this block, at 4:9")
+           f"renaming 'total' to 'all' would be an error: {main}:5:13: error: 'all' is already declared in this block, at 4:9 [E3055]")
 
     # A request it does not know gets an error, and the server goes on.
     reply = c.request("textDocument/codeAction", {**position(main_uri, 4, 13), "context": {"diagnostics": []}})

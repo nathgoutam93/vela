@@ -29,7 +29,10 @@ build/vela fmt -w hello.vl    # format it in place (-l lists unformatted files)
 build/vela c hello.vl         # show the generated C
 build/vela asm hello.vl       # show the x86-64 assembly of the native backend (ir: its IR)
 VELA_BACKEND=c build/vela run hello.vl   # through C (run and test are native on Linux x86-64)
-build/vela check hello.vl     # report errors only (--json for tools)
+build/vela check hello.vl     # check a program or library (--json for codes and edits)
+build/vela explain E3036      # explain a diagnostic code
+build/vela fix hello.vl       # apply available fixes (--dry-run to preview)
+build/vela guide              # compact generated language reference
 build/vela tokens hello.vl    # show the tokens
 build/vela ast hello.vl       # show the syntax tree
 build/vela query type hello.vl:12:7   # what the name there is, in JSON (also def, refs, symbols, complete)
@@ -125,9 +128,17 @@ The round after it (flow-sensitive ranges, bounds checks proved away,
 compact enum boxes, faster maps and file reads) brought the geometric
 mean to 1.04, no benchmark over 1.2; see
 [`docs/performance-next-round.md`](docs/performance-next-round.md).
+M17 adds agent tooling: checks for library modules, built-in function names
+in modules, executable discovery through PATH and symlinks, stable diagnostic
+codes with `vela explain`, machine-applicable edits with `vela fix`, and
+`vela guide`, generated from compiler metadata and the installed standard
+library. The agent evaluation uses the guide by default. See
+[`docs/m17-agent-tooling.md`](docs/m17-agent-tooling.md).
 What comes next, toward a systems language that is also agent-first, is in
 [`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
 See `docs/` for a walkthrough of each milestone.
+Tooling discoveries and outstanding validation are tracked in
+[`docs/tooling-backlog.md`](docs/tooling-backlog.md) throughout milestone work.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.
 

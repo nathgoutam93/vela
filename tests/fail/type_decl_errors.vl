@@ -1,14 +1,14 @@
 // Mistakes in type declarations, all reported in one run.
-// err: type_decl_errors.vl:13:6: error: type 'A' is already defined at 12:6
-// err: type_decl_errors.vl:14:6: error: 'Option' is a built-in type and cannot be redefined
-// err: type_decl_errors.vl:15:6: error: struct 'E' needs at least one field
-// err: type_decl_errors.vl:16:6: error: enum 'F' needs at least one variant
-// err: type_decl_errors.vl:17:27: error: field 'x' is already declared in 'P'
-// err: type_decl_errors.vl:18:23: error: variant 'A' is already declared in 'K'
-// err: type_decl_errors.vl:19:22: error: unknown type 'Real'
-// err: type_decl_errors.vl:19:31: error: Option needs 1 type argument, as in Option[Int]
-// err: type_decl_errors.vl:19:42: error: Result needs 2 type arguments, as in Result[Int, Str]
-// err: type_decl_errors.vl:19:58: error: 'Int' takes no type arguments
+// err: type_decl_errors.vl:13:6: error: type 'A' is already defined at 12:6 [E3006]
+// err: type_decl_errors.vl:14:6: error: 'Option' is a built-in type and cannot be redefined [E3005]
+// err: type_decl_errors.vl:15:6: error: struct 'E' needs at least one field [E3010]
+// err: type_decl_errors.vl:16:6: error: enum 'F' needs at least one variant [E3012]
+// err: type_decl_errors.vl:17:27: error: field 'x' is already declared in 'P' [E3011]
+// err: type_decl_errors.vl:18:23: error: variant 'A' is already declared in 'K' [E3013]
+// err: type_decl_errors.vl:19:22: error: unknown type 'Real' [E3027]
+// err: type_decl_errors.vl:19:31: error: Option needs 1 type argument, as in Option[Int] [E3025]
+// err: type_decl_errors.vl:19:42: error: Result needs 2 type arguments, as in Result[Int, Str] [E3025]
+// err: type_decl_errors.vl:19:58: error: 'Int' takes no type arguments [E3028]
 type A = struct { x: Int }
 type A = struct { y: Int }
 type Option = enum { X }

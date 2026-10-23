@@ -1,4 +1,4 @@
-// err: two_statements_one_line.vl:3:14: error: expected newline or ';' after statement, found identifier 'print'
+// err: two_statements_one_line.vl:3:14: error: expected newline or ';' after statement, found identifier 'print' [E2009]
 fn main() {
     print(1) print(2)
 }

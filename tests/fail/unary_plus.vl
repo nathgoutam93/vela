@@ -1,4 +1,4 @@
-// err: unary_plus.vl:3:11: error: expected expression, found '+'
+// err: unary_plus.vl:3:11: error: expected expression, found '+' [E2020]
 fn main() {
     print(+1)
 }

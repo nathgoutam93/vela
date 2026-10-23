@@ -8,7 +8,7 @@ Write the module `stack.vl`, a stack that holds values of any one type:
     pub fn peek[T](s: Stack[T]) -> Option[T]        // the top, without removing it
     pub fn size[T](s: Stack[T]) -> Int
 
-(A module cannot define a function called `push`: it is a built-in.)
+(The API uses `add`; modules may also define built-in names such as `push`.)
 
 It is used like this:
 

@@ -1,6 +1,6 @@
 // Errors are reported one phase at a time: a lexical error stops the
 // compiler before parsing, so the type error on line 2 waits for the next run.
-// err: one_phase_at_a_time.vl:6:13: error: unexpected character '#'
+// err: one_phase_at_a_time.vl:6:13: error: unexpected character '#' [E1017]
 fn main() {
     print(1 + true)
     print(1 # 2)

@@ -1,14 +1,14 @@
 // Mistakes with function values.
-// err: function_value_errors.vl:27:13: error: 'grow' has a mut parameter, so it cannot be used as a value
-// err: function_value_errors.vl:28:13: error: cannot tell what T is in 'first' used as a value; give it a type, as in `let f: fn([Int]) -> Int = first`
-// err: function_value_errors.vl:29:18: error: 'maps.get' is a built-in function, which cannot be used as a value; wrap it in a function of your own
-// err: function_value_errors.vl:30:29: error: 'f' is declared as fn(Str) -> Int, but its value is fn(Int) -> Int
-// err: function_value_errors.vl:32:5: error: 'n' is a variable of type Int, not a function
-// err: function_value_errors.vl:33:11: error: double expects 1 argument, got 2
-// err: function_value_errors.vl:33:24: error: cannot compare Int with fn(Int) -> Int
-// err: function_value_errors.vl:35:7: error: argument 1 must be Int, found Str
-// err: function_value_errors.vl:36:7: error: a function value has no mut parameters; remove `mut`
-// err: function_value_errors.vl:37:11: error: 'len' is a function; call it as len(...)
+// err: function_value_errors.vl:27:13: error: 'grow' has a mut parameter, so it cannot be used as a value [E3166]
+// err: function_value_errors.vl:28:13: error: cannot tell what T is in 'first' used as a value; give it a type, as in `let f: fn([Int]) -> Int = first` [E3137]
+// err: function_value_errors.vl:29:18: error: 'maps.get' is a built-in function, which cannot be used as a value; wrap it in a function of your own [E3118]
+// err: function_value_errors.vl:30:29: error: 'f' is declared as fn(Str) -> Int, but its value is fn(Int) -> Int [E3093]
+// err: function_value_errors.vl:32:5: error: 'n' is a variable of type Int, not a function [E3152]
+// err: function_value_errors.vl:33:11: error: double expects 1 argument, got 2 [E3169]
+// err: function_value_errors.vl:33:24: error: cannot compare Int with fn(Int) -> Int [E3097]
+// err: function_value_errors.vl:35:7: error: argument 1 must be Int, found Str [E3093]
+// err: function_value_errors.vl:36:7: error: a function value has no mut parameters; remove `mut` [E3168]
+// err: function_value_errors.vl:37:11: error: 'len' is a function; call it as len(...) [E3083]
 import maps
 
 fn grow(xs: mut [Int]) {

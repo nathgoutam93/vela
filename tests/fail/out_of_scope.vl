@@ -1,4 +1,4 @@
-// err: out_of_scope.vl:6:11: error: undefined name 'y'
+// err: out_of_scope.vl:6:11: error: undefined name 'y' [E3087]
 fn main() {
     if true {
         let y = 1

@@ -1,4 +1,4 @@
-// err: unexpected_char.vl:3:13: error: unexpected character '$'
+// err: unexpected_char.vl:3:13: error: unexpected character '$' [E1017]
 fn main() {
     print(1 $ 2)
 }

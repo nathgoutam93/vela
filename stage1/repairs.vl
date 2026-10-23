@@ -1,0 +1,204 @@
+// Machine-applicable edits are constructed from tokens and declarations,
+// never by parsing diagnostic prose. Positions count bytes in original text.
+import ast
+import errors
+import lexer
+import modules
+import parser
+
+pub fn offset(source: Str, line: Int, col: Int) -> Int {
+    let mut row = 1
+    let mut start = 0
+    for i in 0..len(source) {
+        if row == line {
+            start = i
+            break
+        }
+        if source[i] == '\n' {
+            row = row + 1
+            start = i + 1
+        }
+    }
+    if row != line || col < 1 || start + col - 1 > len(source) {
+        return -1
+    }
+    return start + col - 1
+}
+
+pub fn edit(source: Str, file: Str, start: Int, end: Int, replacement: Str) -> [errors.Edit] {
+    if start < 0 || end < start || end > len(source) {
+        return []
+    }
+    return [errors.Edit { file: file, start: start, end: end, text: replacement, expected: source[start..end] }]
+}
+
+pub fn insert(source: Str, file: Str, line: Int, col: Int, replacement: Str) -> [errors.Edit] {
+    let at = offset(source, line, col)
+    return edit(source, file, at, at, replacement)
+}
+
+// Add to the declaration's effect list, before contracts and its body.
+pub fn effect(source: Str, file: Str, f: ast.FnDecl, name: Str) -> [errors.Edit] {
+    let toks = lexer.tokenize(source).tokens
+    let mut start_line = f.line
+    let mut start_col = f.col
+    if f.effects_line > 0 {
+        start_line = f.effects_line
+        start_col = f.effects_col
+    }
+    let mut depth = 0
+    let mut previous = -1
+    for t in toks {
+        if t.line < start_line || t.line == start_line && t.col < start_col || t.kind == lexer.Kind.Semi {
+            continue
+        }
+        let at = offset(source, t.line, t.col)
+        if depth == 0 && (t.kind == lexer.Kind.LBrace || t.text == "requires" || t.text == "ensures") {
+            if previous < 0 {
+                return []
+            }
+            let mut text = " uses " + name
+            if f.effects_line > 0 {
+                text = ", " + name
+            }
+            return edit(source, file, previous, previous, text)
+        }
+        if t.kind == lexer.Kind.LParen || t.kind == lexer.Kind.LBracket {
+            depth = depth + 1
+        } else if t.kind == lexer.Kind.RParen || t.kind == lexer.Kind.RBracket {
+            depth = depth - 1
+        }
+        previous = at + len(t.text)
+    }
+    return []
+}
+
+pub fn unused_effect(source: Str, file: Str, f: ast.FnDecl, name: Str) -> [errors.Edit] {
+    let toks = lexer.tokenize(source).tokens
+    let start = offset(source, f.effects_line, f.effects_col)
+    let mut previous = -1
+    for i in 0..len(toks) {
+        let t = toks[i]
+        if t.line < f.effects_line || t.line == f.effects_line && t.col < f.effects_col {
+            continue
+        }
+        let at = offset(source, t.line, t.col)
+        if t.kind == lexer.Kind.LBrace || t.text == "requires" || t.text == "ensures" {
+            break
+        }
+        if t.kind == lexer.Kind.Ident && t.text == name {
+            if len(f.effects) == 1 {
+                for comment in lexer.tokenize(source).comments {
+                    let position = offset(source, comment.line, comment.col)
+                    if position >= start && position < at {
+                        return []
+                    }
+                }
+                return edit(source, file, start, at + len(t.text), "")
+            }
+            let mut result = edit(source, file, at, at + len(t.text), "")
+            if i + 1 < len(toks) && toks[i + 1].kind == lexer.Kind.Comma {
+                let comma = offset(source, toks[i + 1].line, toks[i + 1].col)
+                for e in edit(source, file, comma, comma + 1, "") {
+                    push(mut result, e)
+                }
+            } else if previous >= 0 && toks[previous].kind == lexer.Kind.Comma {
+                let comma = offset(source, toks[previous].line, toks[previous].col)
+                for e in edit(source, file, comma, comma + 1, "") {
+                    push(mut result, e)
+                }
+            } else {
+                return []
+            }
+            return result
+        }
+        if t.kind != lexer.Kind.Semi {
+            previous = i
+        }
+    }
+    return []
+}
+
+pub fn mutable_local(source: Str, file: Str, line: Int, col: Int) -> [errors.Edit] {
+    let toks = lexer.tokenize(source).tokens
+    for i in 1..len(toks) {
+        let t = toks[i]
+        if t.line == line && t.col == col && t.kind == lexer.Kind.Ident && toks[i - 1].kind == lexer.Kind.Let {
+            return insert(source, file, line, col, "mut ")
+        }
+    }
+    return []
+}
+
+pub fn remove_mut(source: Str, file: Str, line: Int, col: Int) -> [errors.Edit] {
+    let at = offset(source, line, col)
+    if at >= 0 && at + 3 <= len(source) && source[at..at + 3] == "mut" {
+        return edit(source, file, at, at + 3, "")
+    }
+    return []
+}
+
+pub fn import_module(source: Str, file: Str, name: Str) -> [errors.Edit] {
+    if modules.is_builtin_module(name) || name == "bytes" || name == "lists" || name == "text" {
+        return edit(source, file, 0, 0, "import " + name + "\n")
+    }
+    return []
+}
+
+// Fields/indexes store their diagnostic position at the field/bracket.
+// Find the root and include grouping parentheses before inserting `mut`.
+pub fn mut_argument(source: Str, file: Str, arg: ast.Expr) -> [errors.Edit] {
+    let mut root = arg
+    for {
+        match root.kind {
+            ast.ExprKind.Field(obj, _) => root = obj
+            ast.ExprKind.Index(obj, _) => root = obj
+            ast.ExprKind.Name(_) => break
+            _ => return []
+        }
+    }
+    let toks = lexer.tokenize(source).tokens
+    for i in 0..len(toks) {
+        if toks[i].line == root.line && toks[i].col == root.col {
+            let mut first = i
+            for first > 1 && toks[first - 1].kind == lexer.Kind.LParen {
+                let before = toks[first - 2].kind
+                if before == lexer.Kind.Ident || before == lexer.Kind.RParen || before == lexer.Kind.RBracket {
+                    break
+                }
+                first = first - 1
+            }
+            return insert(source, file, toks[first].line, toks[first].col, "mut ")
+        }
+    }
+    return []
+}
+
+// Do not advertise a mechanical fix that would introduce a syntax error.
+pub fn validated(source: Str, edits: [errors.Edit]) -> [errors.Edit] {
+    if len(edits) == 0 {
+        return []
+    }
+    let mut ordered = edits
+    for i in 1..len(ordered) {
+        let e = ordered[i]
+        let mut j = i
+        for j > 0 && ordered[j - 1].start < e.start {
+            ordered[j] = ordered[j - 1]
+            j = j - 1
+        }
+        ordered[j] = e
+    }
+    let mut out = source
+    for e in ordered {
+        if e.start < 0 || e.end < e.start || e.end > len(out) || out[e.start..e.end] != e.expected {
+            return []
+        }
+        out = out[0..e.start] + e.text + out[e.end..len(out)]
+    }
+    let lexed = lexer.tokenize(out)
+    if len(lexed.errors) > 0 || len(parser.parse(lexed.tokens, 0).errors) > 0 {
+        return []
+    }
+    return edits
+}

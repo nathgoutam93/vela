@@ -1,6 +1,6 @@
 // A test is named by a string, and is never pub.
-// err: test_syntax.vl:7:6: error: expected the test's name, a string, after 'test', found identifier 'name'
-// err: test_syntax.vl:10:5: error: expected 'fn' or 'type' after 'pub', found keyword 'test'
+// err: test_syntax.vl:7:6: error: expected the test's name, a string, after 'test', found identifier 'name' [E2006]
+// err: test_syntax.vl:10:5: error: expected 'fn' or 'type' after 'pub', found keyword 'test' [E2007]
 fn main() {
 }
 

@@ -2359,7 +2359,7 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         emit(mut g, func + "(" + arg.c + ");")
         return no_value()
     }
-    if name == "os.args" || name == "strings.build" || name == "strings.from_int" || name == "strings.from_float" {
+    if name == "os.args" || name == "os.executable" || name == "strings.build" || name == "strings.from_int" || name == "strings.from_float" {
         let mut cs = strings.builder()
         for i in 0..len(args) {
             if i > 0 {
@@ -2369,6 +2369,7 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         }
         let func = match name {
             "os.args" => "vela_os_args"
+            "os.executable" => "vela_os_executable"
             "strings.build" => "vela_builder_build"
             "strings.from_float" => "vela_from_float"
             _ => "vela_from_int"

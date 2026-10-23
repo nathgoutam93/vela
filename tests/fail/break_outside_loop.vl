@@ -1,4 +1,4 @@
-// err: break_outside_loop.vl:3:5: error: 'break' is only allowed inside a loop
+// err: break_outside_loop.vl:3:5: error: 'break' is only allowed inside a loop [E3054]
 fn main() {
     break
 }

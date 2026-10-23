@@ -129,8 +129,8 @@ fn max0(n: Int) -> Int {
     return n
 }
 
-fn error(tok: lexer.Token, message: Str) -> errors.CompileError {
-    return errors.at(tok.line, tok.col, message)
+fn error(tok: lexer.Token, code: Str, message: Str) -> errors.CompileError {
+    return errors.at(tok.line, tok.col, code, message)
 }
 
 fn found(tok: lexer.Token) -> Str {
@@ -140,7 +140,7 @@ fn found(tok: lexer.Token) -> Str {
 fn expect(p: mut Parser, kind: lexer.Kind, context: Str) -> Result[lexer.Token, errors.CompileError] {
     let tok = peek(p, 0)
     if tok.kind != kind {
-        return Err(error(tok, "expected '" + lexer.kind_name(kind) + "' " + context + found(tok)))
+        return Err(error(tok, "E2001", "expected '" + lexer.kind_name(kind) + "' " + context + found(tok)))
     }
     return Ok(advance(mut p))
 }
@@ -148,7 +148,7 @@ fn expect(p: mut Parser, kind: lexer.Kind, context: Str) -> Result[lexer.Token, 
 fn expect_name(p: mut Parser, context: Str) -> Result[lexer.Token, errors.CompileError] {
     let tok = peek(p, 0)
     if tok.kind != lexer.Kind.Ident {
-        return Err(error(tok, "expected a name " + context + found(tok)))
+        return Err(error(tok, "E2002", "expected a name " + context + found(tok)))
     }
     return Ok(advance(mut p))
 }
@@ -174,7 +174,7 @@ fn pattern_node(p: mut Parser, kind: ast.PatternKind, line: Int, col: Int) -> as
 // each item: an error at the end of the file.
 fn list_not_ended(p: Parser, what: Str) -> Result[Unit, errors.CompileError] {
     if peek(p, 0).kind == lexer.Kind.Eof {
-        return Err(error(peek(p, 0), "expected '}' to close the " + what + ", found end of file"))
+        return Err(error(peek(p, 0), "E2003", "expected '}' to close the " + what + ", found end of file"))
     }
     return Ok(())
 }
@@ -185,7 +185,7 @@ fn list_separator(p: mut Parser, what: Str) -> Result[Unit, errors.CompileError]
     if tok.kind == lexer.Kind.Comma || tok.kind == lexer.Kind.Semi {
         advance(mut p)
     } else if tok.kind != lexer.Kind.RBrace {
-        return Err(error(tok, "expected ',' or a new line in the " + what + found(tok)))
+        return Err(error(tok, "E2004", "expected ',' or a new line in the " + what + found(tok)))
     }
     return Ok(())
 }
@@ -223,7 +223,7 @@ fn declaration(p: mut Parser, imports: mut [ast.Import], types: mut [ast.TypeDec
         advance(mut p)
         if len(types) > 0 || len(fns) > 0 || len(tests) > 0 {
             // Go's rule: the imports are all at the top.
-            return Err(error(tok, "imports must come before all declarations"))
+            return Err(error(tok, "E2005", "imports must come before all declarations"))
         }
         let name = expect_name(mut p, "of a module after 'import'")?
         push(mut imports, ast.Import { name: name.text, line: name.line, col: name.col })
@@ -234,7 +234,7 @@ fn declaration(p: mut Parser, imports: mut [ast.Import], types: mut [ast.TypeDec
         advance(mut p)
         let name = peek(p, 0)
         if name.kind != lexer.Kind.Str {
-            return Err(error(name, "expected the test's name, a string, after 'test'" + found(name)))
+            return Err(error(name, "E2006", "expected the test's name, a string, after 'test'" + found(name)))
         }
         advance(mut p)
         let body = block(mut p, "to start the body of test " + name.text)?
@@ -257,9 +257,9 @@ fn declaration(p: mut Parser, imports: mut [ast.Import], types: mut [ast.TypeDec
         push(mut types, t)
     } else if public {
         advance(mut p)  // so recovery does not stop at it, if it is `import`
-        return Err(error(tok, "expected 'fn' or 'type' after 'pub'" + found(tok)))
+        return Err(error(tok, "E2007", "expected 'fn' or 'type' after 'pub'" + found(tok)))
     } else {
-        return Err(error(tok, "expected 'fn' or 'type'" + found(tok) + "; only functions and types " +
+        return Err(error(tok, "E2008", "expected 'fn' or 'type'" + found(tok) + "; only functions and types " +
             "can be declared at the top level, and statements go inside functions"))
     }
     end_of_item(mut p, "declaration")?
@@ -291,7 +291,7 @@ fn end_of_item(p: mut Parser, what: Str) -> Result[Unit, errors.CompileError] {
     if tok.kind == lexer.Kind.Semi {
         advance(mut p)
     } else if tok.kind != lexer.Kind.Eof && tok.kind != lexer.Kind.RBrace {
-        return Err(error(tok, "expected newline or ';' after " + what + found(tok)))
+        return Err(error(tok, "E2009", "expected newline or ';' after " + what + found(tok)))
     }
     return Ok(())
 }
@@ -318,7 +318,7 @@ fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
     }
     let tok = peek(p, 0)
     if tok.kind != lexer.Kind.RParen {
-        return Err(error(tok, "expected ',' or ')' in parameter list" + found(tok)))
+        return Err(error(tok, "E2010", "expected ',' or ')' in parameter list" + found(tok)))
     }
     advance(mut p)
     let mut result: Option[ast.TypeName] = None
@@ -405,7 +405,7 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
         advance(mut p)
         return Ok(decl)
     }
-    return Err(error(kind, "expected 'struct' or 'enum' after 'type " + name.text + " ='" + found(kind)))
+    return Err(error(kind, "E2011", "expected 'struct' or 'enum' after 'type " + name.text + " ='" + found(kind)))
 }
 
 // Skip the line end before `uses`, `requires` or `ensures` on a line of its
@@ -578,7 +578,7 @@ fn block(p: mut Parser, context: Str) -> Result[ast.Block, errors.CompileError] 
             // Every enclosing block hits this too; the error list keeps one
             // copy. If a statement already failed here, that error says it all.
             if !errors.has_error_at(p.errors, tok.line, tok.col) {
-                errors.add(mut p.errors, error(tok, "expected '}' to close the block, found end of file"))
+                errors.add(mut p.errors, error(tok, "E2012", "expected '}' to close the block, found end of file"))
             }
             p.open_parens = saved_parens
             p.open_braces = saved_braces
@@ -663,11 +663,11 @@ fn statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
         return with_stmt(mut p)
     }
     if k == lexer.Kind.Import {
-        return Err(error(tok, "imports go at the top of the file, before all declarations"))
+        return Err(error(tok, "E2013", "imports go at the top of the file, before all declarations"))
     }
     if k == lexer.Kind.Else {
         // The newline rule put a `;` after the `}`, ending the `if`.
-        return Err(error(tok, "'else' must be on the same line as the '}' before it"))
+        return Err(error(tok, "E2014", "'else' must be on the same line as the '}' before it"))
     }
     return simple_statement(mut p)
 }
@@ -840,7 +840,7 @@ fn pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
     if k == lexer.Kind.Int || k == lexer.Kind.Byte || k == lexer.Kind.Minus && peek(p, 1).kind == lexer.Kind.Int {
         let lo = number_literal(mut p)?
         if peek(p, 0).kind == lexer.Kind.DotDot {
-            return Err(error(peek(p, 0), "a range in a pattern includes its end: write ..= instead of .."))
+            return Err(error(peek(p, 0), "E2015", "a range in a pattern includes its end: write ..= instead of .."))
         }
         if peek(p, 0).kind != lexer.Kind.DotDotEq {
             return Ok(pattern_node(mut p, ast.PatternKind.Lit(lo), tok.line, tok.col))
@@ -848,7 +848,7 @@ fn pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
         advance(mut p)
         let next = peek(p, 0).kind
         if next != lexer.Kind.Int && next != lexer.Kind.Byte && next != lexer.Kind.Minus {
-            return Err(error(peek(p, 0), "expected the end of the range" + found(peek(p, 0))))
+            return Err(error(peek(p, 0), "E2016", "expected the end of the range" + found(peek(p, 0))))
         }
         let hi = number_literal(mut p)?
         return Ok(pattern_node(mut p, ast.PatternKind.Range(lo, hi), tok.line, tok.col))
@@ -864,7 +864,7 @@ fn pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
         return Ok(pattern_node(mut p, ast.PatternKind.Lit(lit), tok.line, tok.col))
     }
     if k != lexer.Kind.Ident {
-        return Err(error(tok, "expected a pattern" + found(tok)))
+        return Err(error(tok, "E2017", "expected a pattern" + found(tok)))
     }
     advance(mut p)
     if tok.text == "_" {
@@ -922,7 +922,7 @@ fn number_literal(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
     if tok.kind == lexer.Kind.Minus {
         let num = advance(mut p)
         if num.kind != lexer.Kind.Int {
-            return Err(error(num, "expected a number after '-'" + found(num)))
+            return Err(error(num, "E2018", "expected a number after '-'" + found(num)))
         }
         return Ok(expr(mut p, ast.ExprKind.IntLit(-digits_value(num.text)), tok.line, tok.col))
     }
@@ -971,7 +971,7 @@ fn expression(p: mut Parser, min_bp: Int) -> Result[ast.Expr, errors.CompileErro
             left = expr(mut p, ast.ExprKind.Try(left), tok.line, tok.col)
         } else if left_power(k) >= 0 && left_power(k) >= min_bp {
             if is_comparison(k) && after_comparison {
-                return Err(error(tok, "comparisons cannot be chained; use && to combine them, as in a < b && b < c"))
+                return Err(error(tok, "E2019", "comparisons cannot be chained; use && to combine them, as in a < b && b < c"))
             }
             advance(mut p)
             let right = expression(mut p, left_power(k) + 1)?
@@ -990,7 +990,7 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
     if !starts_expression(tok.kind) {
         // Not consumed: in `return 1 +` before a `}`, the `}` still has to
         // close the block.
-        return Err(error(tok, "expected expression" + found(tok)))
+        return Err(error(tok, "E2020", "expected expression" + found(tok)))
     }
     advance(mut p)
     let k = tok.kind
@@ -1039,7 +1039,7 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
         let inner = nested_expression(mut p)?
         let close = peek(p, 0)
         if close.kind != lexer.Kind.RParen {
-            return Err(error(close, "expected ')' to match '(' at " + strings.from_int(tok.line) + ":" +
+            return Err(error(close, "E2021", "expected ')' to match '(' at " + strings.from_int(tok.line) + ":" +
                 strings.from_int(tok.col) + found(close)))
         }
         advance(mut p)
@@ -1114,7 +1114,7 @@ fn collection_lit(p: mut Parser, open: lexer.Token) -> Result[ast.Expr, errors.C
     let mut entries: [ast.MapEntry] = []
     for peek(p, 0).kind != lexer.Kind.RBracket {
         if peek(p, 0).kind == lexer.Kind.Eof {
-            return Err(error(peek(p, 0), "expected ']' to close the list, found end of file"))
+            return Err(error(peek(p, 0), "E2022", "expected ']' to close the list, found end of file"))
         }
         let item = nested_expression(mut p)?
         if peek(p, 0).kind == lexer.Kind.Colon && len(elems) == 0 {
@@ -1122,7 +1122,7 @@ fn collection_lit(p: mut Parser, open: lexer.Token) -> Result[ast.Expr, errors.C
             let value = nested_expression(mut p)?
             push(mut entries, ast.MapEntry { key: item, value: value })
         } else if len(entries) > 0 {
-            return Err(error(peek(p, 0), "expected ':' and a value after this key" + found(peek(p, 0))))
+            return Err(error(peek(p, 0), "E2023", "expected ':' and a value after this key" + found(peek(p, 0))))
         } else {
             push(mut elems, item)
         }
@@ -1130,7 +1130,7 @@ fn collection_lit(p: mut Parser, open: lexer.Token) -> Result[ast.Expr, errors.C
         if tok.kind == lexer.Kind.Comma || tok.kind == lexer.Kind.Semi {
             advance(mut p)
         } else if tok.kind != lexer.Kind.RBracket {
-            return Err(error(tok, "expected ',' or ']' in the list" + found(tok)))
+            return Err(error(tok, "E2024", "expected ',' or ']' in the list" + found(tok)))
         }
     }
     advance(mut p)
@@ -1182,7 +1182,7 @@ fn call(p: mut Parser, callee: ast.Expr) -> Result[ast.Expr, errors.CompileError
     }
     let tok = peek(p, 0)
     if tok.kind != lexer.Kind.RParen {
-        return Err(error(tok, "expected ',' or ')' in argument list" + found(tok)))
+        return Err(error(tok, "E2025", "expected ',' or ')' in argument list" + found(tok)))
     }
     advance(mut p)
     return Ok(expr(mut p, ast.ExprKind.Call(callee, args), callee.line, callee.col))

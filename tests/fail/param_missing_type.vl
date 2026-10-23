@@ -1,4 +1,4 @@
-// err: param_missing_type.vl:2:7: error: expected ':' and a type after parameter 'a', found ')'
+// err: param_missing_type.vl:2:7: error: expected ':' and a type after parameter 'a', found ')' [E2001]
 fn f(a) {
 }
 fn main() {

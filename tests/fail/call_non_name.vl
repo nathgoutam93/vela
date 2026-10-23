@@ -1,4 +1,4 @@
-// err: call_non_name.vl:3:11: error: only a function can be called, and this is Int
+// err: call_non_name.vl:3:11: error: only a function can be called, and this is Int [E3156]
 fn main() {
     print(5(1))
 }

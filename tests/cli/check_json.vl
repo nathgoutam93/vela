@@ -1,9 +1,9 @@
 // `vela check --json`: every error as JSON, for tools.
 // command: check --json
 // out: {"ok": false, "errors": [
-// out:   {"file": "check_json.vl", "line": 10, "col": 18, "severity": "error", "message": "'x' is declared as Int, but its value is Str"},
-// out:   {"file": "check_json.vl", "line": 11, "col": 5, "severity": "error", "message": "undefined function 'say'"},
-// out:   {"file": "check_json.vl", "line": 12, "col": 15, "severity": "error", "message": "operator '+' joins two Strs, found Str and Int"}
+// out:   {"file": "check_json.vl", "line": 10, "col": 18, "severity": "error", "message": "'x' is declared as Int, but its value is Str", "code": "E3093", "fix": []},
+// out:   {"file": "check_json.vl", "line": 11, "col": 5, "severity": "error", "message": "undefined function 'say'", "code": "E3155", "fix": []},
+// out:   {"file": "check_json.vl", "line": 12, "col": 15, "severity": "error", "message": "operator '+' joins two Strs, found Str and Int", "code": "E3101", "fix": []}
 // out: ]}
 // exit: 1
 fn main() {

@@ -14,6 +14,11 @@ Two tracks, alternated:
 
 Then M29 shows it all holds up on real programs, and M30 is 1.0.
 
+Tooling friction discovered while implementing these milestones is recorded
+in [the tooling backlog](tooling-backlog.md), with evidence, workarounds, and
+acceptance checks. Review it at milestone boundaries; it also tracks the
+remaining M17 validation.
+
 ## Order and what each needs
 
 ```
@@ -38,6 +43,9 @@ it. M28 could come any time after M20; it is late because it is worth
 most once programs are large.
 
 ## M17: Agent tooling I
+
+**Status:** implemented; see [the walkthrough](m17-agent-tooling.md) for
+measurements and remaining platform validation.
 
 **Needs:** nothing before it.
 

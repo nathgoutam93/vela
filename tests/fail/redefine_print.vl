@@ -1,4 +1,4 @@
-// err: redefine_print.vl:2:4: error: 'print' is a built-in function and cannot be redefined
+// err: redefine_print.vl:2:4: error: 'print' is a built-in function and cannot be redefined [E3020]
 fn print(x: Int) {
 }
 fn main() {
