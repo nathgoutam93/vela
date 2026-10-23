@@ -1065,16 +1065,16 @@ bool vela_os_env(vela_str name, vela_str *out) {
 
 // ---- tasks ----
 //
-// Structured: a call starts its threads, works alongside them, and returns
-// once all are done, so no thread outlives the call that started it. The
-// threads take the elements a chunk at a time from a shared counter, so a
-// slow element does not hold up a whole share of the work.
+// Structured: a call returns once every element is done, so no task
+// outlives the call that started it. The threads are a pool, started on
+// first use and kept: starting threads for each call cost 100
+// microseconds a call. A call posts its job for the pool, works on it
+// itself, and waits only for the threads that joined in. The elements are
+// taken a chunk at a time from a shared counter, so a slow element does
+// not hold up a whole share of the work. Because the caller always works,
+// a task inside a task cannot wait for a thread that is not coming.
 
 static int64_t workers = 0;  // 0 until first asked
-// Threads started by calls still running. A call starts threads only
-// while fewer than workers - 1 run, so tasks inside tasks do not
-// multiply them: a call that finds none to spare does its work itself.
-static int64_t started = 0;
 
 int64_t vela_tasks_workers(void) {
     int64_t n = __atomic_load_n(&workers, __ATOMIC_RELAXED);
@@ -1090,15 +1090,39 @@ int64_t vela_tasks_workers(void) {
     return n;
 }
 
-typedef struct {
+typedef struct task_job {
     vela_array *xs;
     void *f;
     vela_task_call call;
     unsigned char *out;  // the result slots; NULL for tasks.each
     size_t out_size;
-    int64_t next;  // the first element no thread has taken; changed atomically
+    int64_t next;  // the first element not yet taken; changed atomically
     int64_t chunk;
+    int64_t helpers;  // pool threads working on it; changed atomically, under pool_lock
+    struct task_job *older;  // the next job waiting for help
 } task_job;
+
+static pthread_mutex_t pool_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t pool_work = PTHREAD_COND_INITIALIZER;  // a job was posted
+static pthread_cond_t pool_left = PTHREAD_COND_INITIALIZER;  // a thread left a job
+// Jobs that may still use help, newest first. Changed under pool_lock,
+// but read without it by threads watching for work.
+static task_job *open_jobs = NULL;
+static int64_t sleeping = 0;  // pool threads waiting on pool_work; under pool_lock
+static bool pool_started = false;
+
+static void set_open_jobs(task_job *j) {
+    __atomic_store_n(&open_jobs, j, __ATOMIC_RELEASE);
+}
+
+// A hint to the processor that this is a wait loop.
+static inline void cpu_relax(void) {
+#if defined(__x86_64__) || defined(__i386__)
+    __builtin_ia32_pause();
+#elif defined(__aarch64__)
+    __asm__ __volatile__("yield");
+#endif
+}
 
 static void task_work(task_job *j) {
     int64_t n = j->xs->len;
@@ -1113,45 +1137,95 @@ static void task_work(task_job *j) {
     }
 }
 
-static void *task_thread(void *job) {
-    task_work(job);
+// Takes `j` off the list of open jobs, if it is still there.
+static void close_job(task_job *j) {
+    if (open_jobs == j) {
+        set_open_jobs(j->older);
+        return;
+    }
+    for (task_job *p = open_jobs; p; p = p->older) {
+        if (p->older == j) {
+            p->older = j->older;
+            return;
+        }
+    }
+}
+
+static void *pool_thread(void *unused) {
+    (void)unused;
+    pthread_mutex_lock(&pool_lock);
+    for (;;) {
+        if (!open_jobs) {
+            // Watch for a while before sleeping: a program that runs tasks
+            // in a loop posts the next job within microseconds, and waking
+            // a sleeping thread costs more than that.
+            pthread_mutex_unlock(&pool_lock);
+            for (int k = 0; k < 20000 && !__atomic_load_n(&open_jobs, __ATOMIC_ACQUIRE); k++) cpu_relax();
+            pthread_mutex_lock(&pool_lock);
+            if (!open_jobs) {
+                sleeping++;
+                pthread_cond_wait(&pool_work, &pool_lock);
+                sleeping--;
+            }
+            continue;
+        }
+        task_job *j = open_jobs;  // the newest: a task's own tasks first
+        if (__atomic_load_n(&j->next, __ATOMIC_RELAXED) >= j->xs->len) {
+            close_job(j);  // every element is taken: nothing left to help with
+            continue;
+        }
+        __atomic_add_fetch(&j->helpers, 1, __ATOMIC_RELAXED);
+        pthread_mutex_unlock(&pool_lock);
+        task_work(j);
+        pthread_mutex_lock(&pool_lock);
+        if (__atomic_sub_fetch(&j->helpers, 1, __ATOMIC_RELEASE) == 0) pthread_cond_broadcast(&pool_left);
+    }
     return NULL;
 }
 
-// How many more threads this call may start, taken from the budget.
-static int64_t take_threads(int64_t want) {
-    int64_t limit = vela_tasks_workers() - 1;
-    int64_t got = 0;
-    while (got < want) {
-        int64_t now = __atomic_load_n(&started, __ATOMIC_RELAXED);
-        if (now >= limit) break;
-        if (__atomic_compare_exchange_n(&started, &now, now + 1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) got++;
+static void start_pool(void) {
+    int64_t n = vela_tasks_workers() - 1;
+    for (int64_t i = 0; i < n; i++) {
+        pthread_t t;
+        if (pthread_create(&t, NULL, pool_thread, NULL) != 0) break;  // fewer threads, still correct
+        pthread_detach(t);
     }
-    return got;
 }
 
 static void run_tasks(vela_array *xs, void *f, vela_env *env, vela_task_call call, unsigned char *out, size_t out_size) {
     int64_t n = xs->len;
-    int64_t extra = n > 1 ? take_threads(n - 1) : 0;
-    if (extra > 0) {
-        // From here other threads see the elements and the environment.
-        if (xs->elem->share) {
-            for (int64_t i = 0; i < n; i++) xs->elem->share(xs->data + xs->elem->size * (size_t)i);
-        }
-        vela_env_share(env);
+    int64_t threads = vela_tasks_workers();
+    int64_t chunk = n / (threads * 8);
+    task_job job = {xs, f, call, out, out_size, 0, chunk > 0 ? chunk : 1, 0, NULL};
+    if (n < 2 || threads < 2) {
+        task_work(&job);  // nothing to share
+        return;
     }
-    int64_t chunk = n / ((extra + 1) * 8);
-    task_job job = {xs, f, call, out, out_size, 0, chunk > 0 ? chunk : 1};
-    pthread_t *threads = vela_alloc(sizeof(pthread_t) * (size_t)(extra > 0 ? extra : 1));
-    int64_t running = 0;
-    for (; running < extra; running++) {
-        if (pthread_create(&threads[running], NULL, task_thread, &job) != 0) break;
+    // From here other threads see the elements and the environment.
+    if (xs->elem->share) {
+        for (int64_t i = 0; i < n; i++) xs->elem->share(xs->data + xs->elem->size * (size_t)i);
     }
-    if (running < extra) __atomic_fetch_sub(&started, extra - running, __ATOMIC_RELAXED);
+    vela_env_share(env);
+    pthread_mutex_lock(&pool_lock);
+    if (!pool_started) {
+        pool_started = true;
+        start_pool();
+    }
+    job.older = open_jobs;
+    set_open_jobs(&job);
+    // Threads watching for work see it; wake as many sleeping ones as can help.
+    for (int64_t i = 0; i < sleeping && i < n - 1; i++) pthread_cond_signal(&pool_work);
+    pthread_mutex_unlock(&pool_lock);
     task_work(&job);
-    for (int64_t i = 0; i < running; i++) pthread_join(threads[i], NULL);
-    __atomic_fetch_sub(&started, running, __ATOMIC_RELAXED);
-    free(threads);
+    // Every element is taken; wait for those still working on theirs,
+    // watching for a while first, as the pool threads do.
+    pthread_mutex_lock(&pool_lock);
+    close_job(&job);
+    pthread_mutex_unlock(&pool_lock);
+    for (int k = 0; k < 20000 && __atomic_load_n(&job.helpers, __ATOMIC_ACQUIRE) > 0; k++) cpu_relax();
+    pthread_mutex_lock(&pool_lock);
+    while (__atomic_load_n(&job.helpers, __ATOMIC_ACQUIRE) > 0) pthread_cond_wait(&pool_left, &pool_lock);
+    pthread_mutex_unlock(&pool_lock);
 }
 
 vela_array *vela_tasks_map(vela_array *xs, void *f, vela_env *env, vela_task_call call, const vela_type *result) {
