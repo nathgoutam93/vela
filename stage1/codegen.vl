@@ -194,6 +194,9 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
         }
         let mut g = new_gen(k, l, id, params, args, instance_names, name)
         let lines = function(mut g, id, name)
+        // Where the driver may cut the C into parts compiled in parallel:
+        // before each function, with the closures written for it.
+        push(mut bodies, part_mark())
         for line in g.extra {
             push(mut bodies, line)
         }
@@ -1416,6 +1419,13 @@ fn function_name(g: Gen, id: Int, e: ast.Expr) -> Str {
         push(mut targs, sub(g, t))
     }
     return g.instance_names[mono.key(id, targs)]
+}
+
+// The line between the parts of the C that can be compiled apart: what
+// comes before the first one (types, memory functions, prototypes) every
+// part needs; each part after it is a function and the closures it uses.
+pub fn part_mark() -> Str {
+    return "/* vela: part */"
 }
 
 // tasks.map(xs, f) or tasks.each(xs, f): the runtime runs the calls, through

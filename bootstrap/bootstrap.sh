@@ -8,8 +8,8 @@
 #
 # bootstrap/vela1.c is the seed: the C that Stage 1 (stage1/, the compiler
 # written in Vela) writes for itself. Generation 1 is built from it by the C
-# compiler; generation 2 from generation 1's C; generation 3 from
-# generation 2's. Generations 2 and 3 must write byte-identical C.
+# compiler; generation 2 by generation 1, from stage1/; generation 3 by
+# generation 2. Generations 2 and 3 must write byte-identical C.
 #
 # VELA_CC picks the C compiler (default cc).
 set -e
@@ -27,14 +27,15 @@ compile() {  # compile C_FILE EXE
 
 echo "generation 1: the seed, compiled by $cc"
 compile bootstrap/vela1.c "$build/vela-gen1"
-"$build/vela-gen1" c stage1/main.vl > "$build/gen1.c"
 
-echo "generation 2: built from generation 1's C"
-compile "$build/gen1.c" "$build/vela-gen2"
+# `vela build` compiles the C it writes in parts at the same time (M13);
+# the C is what `vela c` prints.
+echo "generation 2: built by generation 1"
+"$build/vela-gen1" build stage1/main.vl -o "$build/vela-gen2"
 "$build/vela-gen2" c stage1/main.vl > "$build/gen2.c"
 
-echo "generation 3: built from generation 2's C"
-compile "$build/gen2.c" "$build/vela-gen3"
+echo "generation 3: built by generation 2"
+"$build/vela-gen2" build stage1/main.vl -o "$build/vela-gen3"
 "$build/vela-gen3" c stage1/main.vl > "$build/gen3.c"
 
 if ! cmp -s "$build/gen2.c" "$build/gen3.c"; then
@@ -55,5 +56,5 @@ else
     echo "the seed is up to date"
 fi
 mv "$build/vela-gen3" "$build/vela"
-rm -f "$build/vela-gen1" "$build/vela-gen2" "$build/gen1.c" "$build/gen2.c" "$build/gen3.c"
+rm -f "$build/vela-gen1" "$build/vela-gen2" "$build/gen2.c" "$build/gen3.c"
 echo "built build/vela"

@@ -37,6 +37,7 @@ import os
 import parser
 import query
 import strings
+import tasks
 
 fn main() {
     let args = os.args()
@@ -233,15 +234,16 @@ fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str uses 
 }
 
 // C into a scratch directory, then the C compiler, optimizing at `opt`.
+//
+// The C compiler gets a large program in parts, compiled at the same time
+// as each other and the runtime, then linked: the code generator marks
+// where the C may be cut, and every part starts with what all of them
+// need (types, memory functions, prototypes). Building the compiler takes
+// a third of the time on four cores.
 fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
-        Err(e) => driver_error(e)
-    }
-    let c_file = modules.join(tmp, stem + ".c")
-    match files.write(c_file, c_source) {
-        Ok(_) => {}
         Err(e) => driver_error(e)
     }
     let mut cc = "cc"
@@ -256,27 +258,126 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
     }
     let runtime = modules.join(root, "runtime")
     // -pthread: the runtime runs tasks on threads.
-    let mut command = [cc, "-std=c11", opt, "-pthread"]
+    let mut base = [cc, "-std=c11", opt, "-pthread"]
     for f in flags {
-        push(mut command, f)
+        push(mut base, f)
     }
-    for word in ["-I", runtime, c_file, modules.join(runtime, "vela_rt.c"), "-o", exe] {
-        push(mut command, word)
-    }
-    let result = os.run(command)
-    // The scratch directory goes either way.
-    files.remove(c_file)
-    files.remove(tmp)
-    match result {
-        Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + e + "); install gcc or clang, or set VELA_CC")
-        Ok(code) => {
-            if code != 0 {
-                internal_error("the C compiler rejected the generated code\ncommand: " + join_words(command))
+    push(mut base, "-I")
+    push(mut base, runtime)
+    let mut commands: [[Str]] = []
+    let mut written: [Str] = []
+    let mut objects: [Str] = []
+    // About 400 KB of C per unit before another is worth starting.
+    let units = c_parts(c_source, tasks.workers(), 400000)
+    for i in 0..len(units) + 1 {
+        let mut source = modules.join(runtime, "vela_rt.c")
+        if i < len(units) {
+            source = modules.join(tmp, stem + "_" + strings.from_int(i) + ".c")
+            match files.write(source, units[i]) {
+                Ok(_) => push(mut written, source)
+                Err(e) => driver_error(e)
             }
         }
+        let object = modules.join(tmp, "part" + strings.from_int(i) + ".o")
+        push(mut objects, object)
+        let mut command = base
+        for word in ["-c", source, "-o", object] {
+            push(mut command, word)
+        }
+        push(mut commands, command)
+    }
+    let codes = tasks.map(commands, fn(command) {
+        match os.run(command) {
+            Ok(code) => return code
+            Err(_) => return -1
+        }
+    })
+    let mut failed: [Str] = []
+    for i in 0..len(codes) {
+        if codes[i] < 0 {
+            driver_error("C compiler '" + cc + "' could not be run; install gcc or clang, or set VELA_CC")
+        }
+        if codes[i] != 0 {
+            failed = commands[i]
+        }
+    }
+    let mut link = [cc, "-pthread"]
+    for f in flags {
+        push(mut link, f)
+    }
+    for o in objects {
+        push(mut link, o)
+    }
+    push(mut link, "-o")
+    push(mut link, exe)
+    let mut code = 0
+    if len(failed) == 0 {
+        match os.run(link) {
+            Ok(c) => code = c
+            Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + e + "); install gcc or clang, or set VELA_CC")
+        }
+        if code != 0 {
+            failed = link
+        }
+    }
+    // The scratch directory goes either way.
+    for f in written {
+        files.remove(f)
+    }
+    for o in objects {
+        files.remove(o)
+    }
+    files.remove(tmp)
+    if len(failed) > 0 {
+        internal_error("the C compiler rejected the generated code\ncommand: " + join_words(failed))
     }
 }
 
+// The C cut into at most `n` translation units at the code generator's
+// marks, each the shared beginning and a run of whole parts, of about the
+// same size, and one unit for every `unit_size` bytes at most: each unit
+// costs a run of the C compiler, so a small program stays in one.
+fn c_parts(c: Str, n: Int, unit_size: Int) -> [Str] {
+    let mark = codegen.part_mark()
+    let mut cuts: [Int] = []  // where each part starts
+    let mut i = 0
+    for i + len(mark) <= len(c) {
+        if c[i] == '/' && c[i..i + len(mark)] == mark {
+            push(mut cuts, i)
+            i = i + len(mark)
+        } else {
+            i = i + 1
+        }
+    }
+    if len(cuts) == 0 {
+        return [c]
+    }
+    let head = c[0..cuts[0]]
+    let body = len(c) - cuts[0]
+    let mut k = body / unit_size + 1
+    if k > n {
+        k = n
+    }
+    if k > len(cuts) {
+        k = len(cuts)
+    }
+    let mut units: [Str] = []
+    let mut start = cuts[0]
+    let mut next = 1
+    for u in 1..k {
+        // The first cut at or after this unit's share of the body.
+        let goal = cuts[0] + body * u / k
+        for next < len(cuts) && cuts[next] < goal {
+            next = next + 1
+        }
+        if next < len(cuts) && cuts[next] > start {
+            push(mut units, head + c[start..cuts[next]])
+            start = cuts[next]
+        }
+    }
+    push(mut units, head + c[start..len(c)])
+    return units
+}
 fn join_words(words: [Str]) -> Str {
     let mut b = strings.builder()
     for i in 0..len(words) {
@@ -531,4 +632,34 @@ fn contains(s: Str, word: Str) -> Bool {
         }
     }
     return false
+}
+
+test "the C is cut at the marks, into units of whole parts" {
+    let m = codegen.part_mark()
+    // Small: one unit, whatever the threads.
+    let small = "head\n" + m + "\nf\n" + m + "\ng\n"
+    let one = c_parts(small, 4, 1000)
+    assert(len(one) == 1 && one[0] == small)
+    assert(len(c_parts("no marks at all", 4, 1)) == 1)
+    // Large: as many units as threads, each the head and whole parts.
+    let mut b = strings.builder()
+    strings.add(mut b, "HEAD\n")
+    for i in 0..40 {
+        strings.add(mut b, m + "\n")
+        for _ in 0..10 {
+            strings.add(mut b, "int x" + strings.from_int(i) + ";\n")
+        }
+    }
+    let c = strings.build(b)
+    let units = c_parts(c, 4, 100)
+    assert(len(units) == 4)
+    let mut total = 0
+    for u in units {
+        assert(u[0..5] == "HEAD\n" && u[5..5 + len(m)] == m)
+        total = total + len(u) - 5
+    }
+    assert(total == len(c) - 5)
+    assert(len(c_parts(c, 1, 100)) == 1)
+    // Never more units than parts.
+    assert(len(c_parts(small, 8, 1)) == 2)
 }
