@@ -13,7 +13,6 @@
 // space goes between two tokens except after an opening bracket, before a
 // closing one, around `.` and `..`, before `,` `:` `?`, after a unary `-` or
 // `!`, and between a name and the `(` or `[` that follows it.
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import errors
 import lexer
 import parser

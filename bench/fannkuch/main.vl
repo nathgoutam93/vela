@@ -3,7 +3,6 @@
 // indexing.
 //
 //     vela run bench/fannkuch/main.vl N
-// stage 1 only
 import os
 import strings
 

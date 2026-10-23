@@ -18,7 +18,6 @@
 // functions and types, the modules it imports, the built-in functions and
 // types, and the keywords. Only names starting with what is typed already
 // are given.
-// stage 1 only (it says `uses`)
 import ast
 import checker
 import files

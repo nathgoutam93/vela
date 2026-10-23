@@ -1,7 +1,6 @@
 // Copy-on-write with the check made once per variable (M18): after any
 // copy, call, capture or new value, the next write checks again, so a copy
 // never sees a later write.
-// stage 1 only
 // out: 9 2 3 | 9 8 3
 // out: 1 2 3 | 7 2 3
 // out: 5 | 6

@@ -3,7 +3,6 @@
 // building and output.
 //
 //     vela run bench/fasta/main.vl N
-// stage 1 only
 import os
 import strings
 

@@ -1,5 +1,4 @@
 // Just enough CSV for orders.csv: fields split at commas, no quoting.
-// stage 1 only
 import lists
 import text
 

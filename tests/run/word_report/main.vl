@@ -3,7 +3,6 @@
 //     word_report INPUT REPORT
 //
 // It then reads the report back and prints it, so the test sees it.
-// stage 1 only (it says `uses`, which Stage 0 cannot read)
 // args: input.txt report.txt
 // out: wrote report.txt, 162 bytes
 // out: words: 39

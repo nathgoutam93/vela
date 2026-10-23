@@ -94,9 +94,9 @@ main:
     .asciz "value does not fit in a Byte"
     .p2align 3
 .Lc0:
-    .asciz "native_asm.vl:11:20"
+    .asciz "native_asm.vl:10:20"
 .Lc1:
-    .asciz "native_asm.vl:11:25"
+    .asciz "native_asm.vl:10:25"
 
     .section .data.rel.ro,"aw"
     .p2align 3

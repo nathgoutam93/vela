@@ -1,6 +1,5 @@
 // Contracts and fakes (M10b): requires and ensures checked at run time, and
 // `with` replacing files, args and stdout for the code a test calls.
-// stage 1 only
 // command: test
 // out: PASS  contracts_and_fakes.vl: test "contracts hold"
 // out: FAIL  contracts_and_fakes.vl: test "a broken ensures"
@@ -8,8 +7,8 @@
 // out: PASS  contracts_and_fakes.vl: test "fakes"
 // out: PASS  contracts_and_fakes.vl: test "fakes end with the block"
 // out: 5 tests: 3 passed, 2 failed
-// err: contracts_and_fakes.vl:35:20: panic: ensures of 'bad_half' failed: result >= 0 (left: -2, right: 0)
-// err: contracts_and_fakes.vl:29:16: panic: requires of 'half' failed: n >= 0 (left: -1, right: 0)
+// err: contracts_and_fakes.vl:34:20: panic: ensures of 'bad_half' failed: result >= 0 (left: -2, right: 0)
+// err: contracts_and_fakes.vl:28:16: panic: requires of 'half' failed: n >= 0 (left: -1, right: 0)
 // exit: 1
 import files
 import os

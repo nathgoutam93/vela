@@ -1,4 +1,3 @@
-// stage 1 only
 // os.read_line and os.read take stdin a line or a count at a time, and
 // os.write prints with no newline. Reading flushes stdout first, so the
 // prompt is out before the program waits.

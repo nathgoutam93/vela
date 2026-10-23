@@ -1,22 +1,21 @@
 // M15: function values with effects go only where a type allows them, and
 // `uses f` names a parameter whose effects each call takes on.
-// stage 1 only
-// err: effect_param_errors.vl:50:19: error: argument 1 of 'apply' must be fn(Str) -> Int, found fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
-// err: effect_param_errors.vl:51:29: error: 'g' is declared as fn(Str) -> Int, but its value is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
-// err: effect_param_errors.vl:52:24: error: field 'f' of 'Plain' is fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
-// err: effect_param_errors.vl:53:24: error: argument 2 of 'first' must be fn(Str) -> Int, found fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
-// err: effect_param_errors.vl:58:12: error: 'hand_out' returns fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
-// err: effect_param_errors.vl:63:12: error: 'undeclared' uses fs, through the function passed to 'apply_any', but does not say so; add `uses fs` after its signature
-// err: effect_param_errors.vl:71:29: error: `uses a` lets 'a' use anything, but its type says what it uses; write one or the other
-// err: effect_param_errors.vl:72:5: error: 'bounded' uses fs, through 'a', but does not say so; add `uses fs` after its signature
-// err: effect_param_errors.vl:82:34: error: unknown effect 'f' in a function type; its effects can be fs and os. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to
-// err: effect_param_errors.vl:82:47: error: `uses f` names a mut parameter; the function could put a function that uses anything in it
-// err: effect_param_errors.vl:82:47: error: `uses n` names parameter 'n', which is Int, not a function
-// err: effect_param_errors.vl:82:47: error: unknown effect 'bogus'; the effects are fs (the files module) and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), or the name of a parameter that is a function, for whatever that function uses
-// err: effect_param_errors.vl:85:19: warning: 'never' says `uses f` but never calls f, nor passes it on
-// err: effect_param_errors.vl:89:16: error: unknown effect 'net' in a function type; its effects can be fs and os. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to
-// err: effect_param_errors.vl:93:13: error: 'apply_any' uses whatever its parameter f uses, so it cannot be used as a value; call it from a closure instead
-// err: effect_param_errors.vl:97:24: error: the elements of an array must all be fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
+// err: effect_param_errors.vl:49:19: error: argument 1 of 'apply' must be fn(Str) -> Int, found fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
+// err: effect_param_errors.vl:50:29: error: 'g' is declared as fn(Str) -> Int, but its value is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
+// err: effect_param_errors.vl:51:24: error: field 'f' of 'Plain' is fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
+// err: effect_param_errors.vl:52:24: error: argument 2 of 'first' must be fn(Str) -> Int, found fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
+// err: effect_param_errors.vl:57:12: error: 'hand_out' returns fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
+// err: effect_param_errors.vl:62:12: error: 'undeclared' uses fs, through the function passed to 'apply_any', but does not say so; add `uses fs` after its signature
+// err: effect_param_errors.vl:70:29: error: `uses a` lets 'a' use anything, but its type says what it uses; write one or the other
+// err: effect_param_errors.vl:71:5: error: 'bounded' uses fs, through 'a', but does not say so; add `uses fs` after its signature
+// err: effect_param_errors.vl:81:34: error: unknown effect 'f' in a function type; its effects can be fs and os. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to
+// err: effect_param_errors.vl:81:47: error: `uses f` names a mut parameter; the function could put a function that uses anything in it
+// err: effect_param_errors.vl:81:47: error: `uses n` names parameter 'n', which is Int, not a function
+// err: effect_param_errors.vl:81:47: error: unknown effect 'bogus'; the effects are fs (the files module) and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), or the name of a parameter that is a function, for whatever that function uses
+// err: effect_param_errors.vl:84:19: warning: 'never' says `uses f` but never calls f, nor passes it on
+// err: effect_param_errors.vl:88:16: error: unknown effect 'net' in a function type; its effects can be fs and os. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to
+// err: effect_param_errors.vl:92:13: error: 'apply_any' uses whatever its parameter f uses, so it cannot be used as a value; call it from a closure instead
+// err: effect_param_errors.vl:96:24: error: the elements of an array must all be fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses`
 import files
 import lists
 import os

@@ -2,7 +2,6 @@
 // vela.mod) writes the amounts.
 //
 //     vela run examples/receipt/main.vl
-// stage 1 only
 import money
 import text
 

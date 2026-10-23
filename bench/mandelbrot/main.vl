@@ -3,7 +3,6 @@
 // the picture on every core).
 //
 //     vela run bench/mandelbrot/main.vl N
-// stage 1 only
 import os
 import strings
 

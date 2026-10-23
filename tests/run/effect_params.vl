@@ -2,7 +2,6 @@
 // function's `uses f` says it uses whatever the function passed as f uses:
 // lists.map with a function that reads files reads files, and with one
 // that does not, does not. A function value's type says what it uses.
-// stage 1 only
 // out: [3, 6, -1]
 // out: [1, 3]
 // out: 9

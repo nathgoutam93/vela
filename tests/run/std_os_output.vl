@@ -1,4 +1,3 @@
-// stage 1 only
 // os.output runs a program as os.run does and returns what it printed on
 // stdout; a program that fails, or cannot be started, is an Err.
 // out: [hello from sh]

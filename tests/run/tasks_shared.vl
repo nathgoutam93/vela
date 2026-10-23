@@ -1,4 +1,3 @@
-// stage 1 only
 // Many tasks taking and dropping references to the same values at once:
 // the one string, array and closure copy every element and every task
 // uses. Their counts are changed atomically once they are shared; run

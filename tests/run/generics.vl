@@ -1,7 +1,6 @@
 // User generics (M10a): generic functions with bounds, generic structs and
 // enums, inference from arguments and from the context, one C copy per
 // set of type arguments.
-// stage 1 only
 // out: 3
 // out: c
 // out: 10

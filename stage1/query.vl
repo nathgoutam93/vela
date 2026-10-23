@@ -21,7 +21,6 @@
 //
 // A question with no answer (no name at that position, or a file that
 // does not parse) prints {"error": "..."} and exits with 1.
-// stage 1 only (it says `uses`)
 import ast
 import checker
 import errors

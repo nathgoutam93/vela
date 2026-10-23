@@ -1,7 +1,6 @@
 // Function types with effects inside other types (M15): a generic
 // struct, an enum's payload, a map's values, an array. The code generators
 // see them without their effects, as the same C types as fn(Str) -> Int.
-// stage 1 only
 // out: true
 // out: 3
 // out: 4

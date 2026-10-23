@@ -2,7 +2,6 @@
 // GNU assembler in Intel syntax. n arrives in rdi and is kept in r10,
 // which calls do not keep: nothing needs n after the call. `n <= 0` and
 // the branch on it are one cmp and one jump; overflow jumps to a panic.
-// stage 1 only
 // command: asm
 fn count(n: Int) -> Int {
     if n <= 0 {

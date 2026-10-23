@@ -1,6 +1,5 @@
 // vela query symbols: a file's outline, with signatures, for an agent to
 // see what a module offers without reading all of it.
-// stage 1 only
 // command: query symbols FILE
 pub type Stack = struct {
     items: [Int]

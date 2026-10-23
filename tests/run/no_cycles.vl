@@ -1,4 +1,3 @@
-// stage 1 only
 // Vela values cannot refer to themselves: a value is changed in place only
 // when nothing else refers to it, so what is stored into it cannot refer
 // to it, and closures' copies never change. Here every way of trying to

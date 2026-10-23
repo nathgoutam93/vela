@@ -2,7 +2,6 @@
 // arithmetic on structs in an array. Prints the energy before and after.
 //
 //     vela run bench/nbody/main.vl N
-// stage 1 only
 import math
 import os
 import strings

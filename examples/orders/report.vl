@@ -1,5 +1,4 @@
 // The report: totals per customer, ranked, as aligned text.
-// stage 1 only
 import lists
 import maps
 import orders

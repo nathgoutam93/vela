@@ -1,6 +1,5 @@
 // Closures (M10c): function values that copy the variables they use, when
 // they are made. Parameter types can come from the context.
-// stage 1 only
 // out: bo ada cy
 // out: 15
 // out: [2, 4, 6]

@@ -1,6 +1,5 @@
 // A program that cannot read its input says why on stderr and exits with
 // a code of its own choosing.
-// stage 1 only (it says `uses`, which Stage 0 cannot read)
 // err: error: cannot read no_such_input.txt: No such file or directory
 // exit: 1
 import files

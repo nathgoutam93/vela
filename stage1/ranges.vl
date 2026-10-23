@@ -21,7 +21,6 @@
 // An operation needs no check when its whole range fits strictly inside
 // the Int range. When it does not, the check stays, and the range of what
 // it gives is still known: the checked result is within the Int range.
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import ast
 import checker
 import maps

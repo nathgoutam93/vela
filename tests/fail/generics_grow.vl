@@ -1,7 +1,6 @@
 // Generic functions that call each other with ever bigger types would need
 // copies without end; the code generator stops and says where it starts.
-// stage 1 only
-// err: generics_grow.vl:13:12: error: 'f' is called here with types that grow without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]])
+// err: generics_grow.vl:12:12: error: 'f' is called here with types that grow without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]])
 fn f[T](x: T, n: Int) -> Int {
     if n == 0 {
         return 0

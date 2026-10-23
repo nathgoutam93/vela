@@ -17,7 +17,6 @@
 //   straight to where that one goes.
 // - Dead code. An instruction with no effect whose result nobody reads
 //   goes, and so does code no jump can reach.
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import ir
 import maps
 

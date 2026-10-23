@@ -28,7 +28,6 @@
 // Exit codes as in Stage 0: 0 success, 1 the program has errors, 2 bad
 // command line, 70 internal compiler error.
 //
-// stage 1 only (it says `uses`)
 //
 // VELA_CC picks the C compiler (default `cc`); VELA_CFLAGS adds flags to its
 // command line, split at spaces. The native backend (M11, lower.vl and

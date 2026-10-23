@@ -19,7 +19,6 @@
 // Positions: LSP counts lines and characters from 0, and characters in
 // UTF-16 units unless the editor agrees to UTF-8 (bytes), which Neovim
 // and VS Code both offer; Vela counts both from 1, in bytes.
-// stage 1 only (it says `uses`)
 import ast
 import checker
 import complete

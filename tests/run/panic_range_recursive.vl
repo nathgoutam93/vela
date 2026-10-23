@@ -1,8 +1,7 @@
 // A parameter of a recursive function keeps growing from call to call; the
 // range analysis gives up on it, and the check stays (M18).
-// stage 1 only
 // out: 9223372036854775806
-// err: panic_range_recursive.vl:11:20: panic: integer overflow
+// err: panic_range_recursive.vl:10:20: panic: integer overflow
 // exit: 101
 fn climb(x: Int, steps: Int) -> Int {
     if steps == 0 {

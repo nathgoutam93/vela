@@ -22,7 +22,6 @@
 // argument has a kind saying how.
 //
 //     vela ir FILE    prints it
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import strings
 
 pub type Op = enum {

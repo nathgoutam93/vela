@@ -5,7 +5,6 @@
 // Each row is computed by its own call of `row`, and tasks.map runs the
 // calls on every core, returning the rows in order. The picture is the same
 // whatever the number of threads: VELA_THREADS=1 gives it on one.
-// stage 1 only
 import lists
 import os
 import strings

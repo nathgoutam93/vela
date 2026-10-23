@@ -1,4 +1,3 @@
-// stage 1 only
 // Effects in tasks: the function given straight to tasks.map or tasks.each
 // may read and write files and run programs, and the function around it
 // says so in its `uses`. A named function with effects may be given too.

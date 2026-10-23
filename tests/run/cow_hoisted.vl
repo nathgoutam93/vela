@@ -1,7 +1,6 @@
 // Copy-on-write checked once before a loop (M18), when nothing in the loop
 // can share what it writes; checked at each write when something can: a
 // copy, a call, iterating over it, capturing it, a new value.
-// stage 1 only
 // out: 9 9 9 | 1 2 3
 // out: 5 2 3 | 7 2 3 | 6 2 3
 // out: 1 2 3 | 0 0 0

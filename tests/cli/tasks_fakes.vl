@@ -1,7 +1,6 @@
 // Fakes seen from tasks (M13): what a test fakes with `with`, the tasks
 // that the code it calls starts see too, and use under one lock: files
 // read and written, printing, and stdin read a line at a time.
-// stage 1 only
 // command: test
 // out: PASS  tasks_fakes.vl: test "files"
 // out: PASS  tasks_fakes.vl: test "printing"

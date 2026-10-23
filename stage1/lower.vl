@@ -20,7 +20,6 @@
 //   argument points. The runtime is called with C's convention (CCall).
 // - The functions C generated from layout.vl: retain, release and share
 //   for each type, boxes, and the descriptors arrays and maps use.
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import ast
 import checker
 import codegen

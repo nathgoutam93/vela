@@ -1,6 +1,5 @@
 // Function values (M10b): named functions passed, stored, returned and
 // called; a generic function becomes a value by the type the context wants.
-// stage 1 only
 // out: 7
 // out: 12
 // out: 3

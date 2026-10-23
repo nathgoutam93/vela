@@ -1,5 +1,4 @@
 // The syntax tree of M10c's additions: closures, both forms, and Floats.
-// stage 1 only
 // dump: ast
 // out: (fn main ()
 // out:   (block

@@ -4,7 +4,6 @@
 //     use json https://github.com/nathgoutam93/vela//packages/json packages/json/v1.0.0
 //
 // and `import json` gets this file.
-// stage 1 only
 //
 //     match json.parse("{\"id\": 1, \"tags\": [\"a\"]}") {
 //         Ok(doc) => print(json.int_or(json.get(doc, "id"), 0))

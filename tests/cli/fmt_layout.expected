@@ -1,5 +1,4 @@
 // `vela fmt`: spacing and indentation, with every line break and comment kept.
-// stage 1 only
 // command: fmt
 import strings
 type Pair[A, B] = struct { first: A, second: B }

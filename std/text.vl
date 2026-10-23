@@ -1,5 +1,4 @@
 // Text: searching, splitting, trimming and parsing Strs. `import text`.
-// stage 1 only
 //
 // Positions are byte indexes, and ASCII is what case and space mean here,
 // as in the `bytes` module: a Str splits at bytes, never inside a UTF-8

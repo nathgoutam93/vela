@@ -1,5 +1,4 @@
 // Orders, their prices, and reading them from CSV. Money is in cents.
-// stage 1 only
 import csv
 import lists
 import maps

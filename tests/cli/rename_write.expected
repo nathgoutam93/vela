@@ -5,19 +5,19 @@
   "edits": [
     {
       "file": "rename_write.vl",
-      "line": 11,
+      "line": 10,
       "col": 4,
       "len": 5
     },
     {
       "file": "rename_write.vl",
-      "line": 7,
+      "line": 6,
       "col": 11,
       "len": 5
     },
     {
       "file": "rename_write.vl",
-      "line": 22,
+      "line": 21,
       "col": 12,
       "len": 5
     }

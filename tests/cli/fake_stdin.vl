@@ -1,7 +1,6 @@
 // `with stdin` (M12): the code a test calls reads the given text, a line or
 // a count of bytes at a time; an inner `with` has its own, and the outer
 // one goes on where it stopped.
-// stage 1 only
 // command: test
 // out: PASS  fake_stdin.vl: test "lines and bytes"
 // out: PASS  fake_stdin.vl: test "nested"

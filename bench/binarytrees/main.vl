@@ -2,7 +2,6 @@
 // binary-trees, one thread). Allocation, a recursive enum, reference counts.
 //
 //     vela run bench/binarytrees/main.vl N
-// stage 1 only
 import os
 import strings
 

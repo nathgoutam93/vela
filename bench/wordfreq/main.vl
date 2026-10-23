@@ -2,7 +2,6 @@
 // common. A realistic mix: reading a file, slicing strings, a map.
 //
 //     vela run bench/wordfreq/main.vl TEXT
-// stage 1 only
 import files
 import maps
 import os

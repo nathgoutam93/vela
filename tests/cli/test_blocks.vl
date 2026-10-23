@@ -1,6 +1,5 @@
 // `vela test`: each test runs in a process of its own, so one that panics
 // fails alone; a failed comparison shows both sides.
-// stage 1 only
 // command: test
 // out: PASS  test_blocks.vl: test "squares"
 // out: FAIL  test_blocks.vl: test "names"
@@ -8,8 +7,8 @@
 // out: PASS  test_blocks.vl: test "bools"
 // out: FAIL  test_blocks.vl: test "exits" (exit code 3)
 // out: 5 tests: 2 passed, 3 failed
-// err: test_blocks.vl:30:5: panic: assertion failed: greet("vela") == "hello, Vela" (left: "hello, vela", right: "hello, Vela")
-// err: test_blocks.vl:35:15: panic: index out of range
+// err: test_blocks.vl:29:5: panic: assertion failed: greet("vela") == "hello, Vela" (left: "hello, vela", right: "hello, Vela")
+// err: test_blocks.vl:34:15: panic: index out of range
 // exit: 1
 import os
 

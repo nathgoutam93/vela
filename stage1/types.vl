@@ -16,7 +16,6 @@
 // like Option, whose `origin` is the declaration and whose fields or
 // variants are the declaration's with the arguments put in. A type that
 // mentions a parameter anywhere is "open"; only closed types reach C.
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import maps
 import strings
 

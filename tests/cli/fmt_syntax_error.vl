@@ -1,7 +1,6 @@
 // `vela fmt` leaves a file that does not parse alone and reports why.
-// stage 1 only
 // command: fmt
-// err: fmt_syntax_error.vl:8:1: error: expected expression, found '}'
+// err: fmt_syntax_error.vl:7:1: error: expected expression, found '}'
 // exit: 1
 fn main() {
     let x =

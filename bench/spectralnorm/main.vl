@@ -2,7 +2,6 @@
 // method (the Benchmarks Game's spectral-norm). Floats, arrays and calls.
 //
 //     vela run bench/spectralnorm/main.vl N
-// stage 1 only
 import math
 import os
 import strings

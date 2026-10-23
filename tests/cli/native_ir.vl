@@ -2,7 +2,6 @@
 // %0, %1...; labels L0, L1...; `add.chk` adds and panics on overflow at
 // the position its C string names; a Str in memory is passed `as str` to
 // the C runtime.
-// stage 1 only
 // command: ir
 fn square(n: Int) -> Int {
     return n * n

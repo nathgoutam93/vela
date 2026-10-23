@@ -3,28 +3,28 @@
   "kind": "local",
   "def": {
     "file": "query_refs.vl",
-    "line": 6,
+    "line": 5,
     "col": 13
   },
   "refs": [
     {
       "file": "query_refs.vl",
-      "line": 6,
+      "line": 5,
       "col": 13
     },
     {
       "file": "query_refs.vl",
-      "line": 9,
+      "line": 8,
       "col": 13
     },
     {
       "file": "query_refs.vl",
-      "line": 9,
+      "line": 8,
       "col": 17
     },
     {
       "file": "query_refs.vl",
-      "line": 12,
+      "line": 11,
       "col": 12
     }
   ]

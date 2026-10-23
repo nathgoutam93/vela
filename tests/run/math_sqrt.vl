@@ -1,5 +1,4 @@
 // math.sqrt (M16): the square root of a Float; NaN for a negative one.
-// stage 1 only
 // out: 1.4142135623730951
 // out: true
 // out: 5

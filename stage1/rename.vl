@@ -13,7 +13,6 @@
 // A built-in name, a module (named by its file), a test (named by its
 // string), and anything declared in the standard library or in a package
 // fetched by `vela get` cannot be renamed. Comments are not changed.
-// stage 1 only (it says `uses`)
 import errors
 import files
 import index

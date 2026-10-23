@@ -1,6 +1,5 @@
 // files: reading, writing, reading back, and the errors: a missing file,
 // a directory where a file is expected. Writing replaces a file whole.
-// stage 1 only (it says `uses`, which Stage 0 cannot read)
 // out: 18 bytes, 2 lines
 // out: wrote 5
 // out: hello

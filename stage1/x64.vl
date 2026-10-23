@@ -22,7 +22,6 @@
 // The frame: rbp, the callee-saved registers used, then the IR's slots
 // and the spilled values, then the arguments of calls that go on the
 // stack, with rsp a multiple of 16 at every call.
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import ir
 import lists
 import maps

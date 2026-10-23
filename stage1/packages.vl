@@ -32,7 +32,6 @@
 // can do nothing when it is fetched or built: there are no build scripts,
 // and its functions say in their signatures whether they touch files or
 // run programs (`uses fs, os`).
-// stage 1 only (it says `uses`)
 import files
 import maps
 import modules

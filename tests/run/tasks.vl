@@ -1,4 +1,3 @@
-// stage 1 only
 // tasks.map and tasks.each (M13): results in the order of the elements,
 // whatever the threads did first; every kind of value crossing threads;
 // tasks inside tasks; and values that were shared still copied before a

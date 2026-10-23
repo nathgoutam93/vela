@@ -3,23 +3,23 @@
   "kind": "parameter",
   "def": {
     "file": "query_effect_param.vl",
-    "line": 5,
+    "line": 4,
     "col": 21
   },
   "refs": [
     {
       "file": "query_effect_param.vl",
-      "line": 5,
+      "line": 4,
       "col": 21
     },
     {
       "file": "query_effect_param.vl",
-      "line": 5,
+      "line": 4,
       "col": 52
     },
     {
       "file": "query_effect_param.vl",
-      "line": 8,
+      "line": 7,
       "col": 25
     }
   ]

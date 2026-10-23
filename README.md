@@ -7,7 +7,7 @@ milestone has a walkthrough in [`docs/`](docs/).
 ## Requirements
 
 - gcc or clang, on Linux or macOS. Set `VELA_CC=clang` to choose.
-- Python 3.10 or newer, only for the test scripts and the frozen Stage 0.
+- Python 3.10 or newer, only for the test scripts.
 
 ## Building
 
@@ -60,7 +60,6 @@ bootstrap/   the seed (Stage 1 compiled to C) and the bootstrap script
 examples/    larger programs: orders/ prices orders read from CSV;
              mandelbrot/ renders rows on every core; receipt/ uses a package
 editors/     Neovim and VS Code support for `vela lsp`
-stage0/      the first compiler, in Python: frozen at M9 as the readable reference
 runtime/     C runtime linked into every program
 std/         standard modules written in Vela
 packages/    packages kept in this repository: json/ (the compiler uses it too)
@@ -71,7 +70,6 @@ tests/cli/   commands such as test, fmt, query and check --json, and their outpu
 tests/lsp_client.py, tests/nvim_test.lua  the language server, driven by a script and by Neovim
 docs/        one walkthrough per milestone
 run_tests.py the golden-test runner
-compare_stages.py  checks that Stage 0 and Stage 1 agree on every file
 ```
 
 ## Status
@@ -82,9 +80,8 @@ checker that reports every error in one run, structs, enums, `match` and
 `Option`/`Result`, reference-counted strings, arrays and maps, programs of
 several files (`import`, `pub`), the `?` operator, a standard library for
 files, arguments, exit codes and string building, and Stage 1: the compiler
-rewritten in Vela, which writes the same C as Stage 0 for every program
-(`python3 compare_stages.py tokens ast check`). M9 reached the fixed point
-and retired Python from the build. M10a added generics
+rewritten in Vela. M9 reached the fixed point and retired Python from the
+build; the first compiler, Stage 0 in Python, was removed after M18. M10a added generics
 (`fn largest[T: Ord]`, `type Box[T]`), `test` blocks with `assert`, a
 formatter and JSON errors; M10b added function values (`fn(Int) -> Str`),
 effects (`uses fs, os`), fakes for tests (`with files = ...`), contracts
@@ -121,8 +118,7 @@ turn it off), so `vela run` of a small program takes 0.04 s. M18 brought
 benchmarks): overflow checks left out where the ranges of the values
 prove they cannot fail, copy-on-write checked once per variable or once
 before a loop, one allocation per array, a map write after a lookup that
-reuses it, and free lists for small objects. All of M10 to M18 is in
-Stage 1 only.
+reuses it, and free lists for small objects.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.

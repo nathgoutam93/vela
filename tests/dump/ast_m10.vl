@@ -1,5 +1,4 @@
 // The syntax tree of M10a's additions: type parameters with bounds, and tests.
-// stage 1 only
 // dump: ast
 // out: (struct Pair [A, B] (first A) (second B))
 // out: (enum Tree [T] (Leaf) (Node Tree[T] T Tree[T]))

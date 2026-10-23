@@ -1,6 +1,5 @@
 // Float (M10c): a C double. Literals, arithmetic, comparisons, conversions,
 // and printing as the shortest decimal that reads back exactly.
-// stage 1 only
 // out: 0.30000000000000004
 // out: 2.5
 // out: 3.0
@@ -19,7 +18,7 @@
 // out: 10.0
 // out: 2.0
 // out: [0.5, 1.5, 2.5]
-// err: floats.vl:66:11: panic: int() of inf, which is not a number in Int's range
+// err: floats.vl:65:11: panic: int() of inf, which is not a number in Int's range
 // exit: 101
 import lists
 import strings

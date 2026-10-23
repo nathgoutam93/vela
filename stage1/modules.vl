@@ -1,7 +1,6 @@
 // Programs made of several files: a port of stage0/modules.py, which
 // explains the rules. Modules are kept in one array and refer to each
 // other by index.
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import ast
 import errors
 import files

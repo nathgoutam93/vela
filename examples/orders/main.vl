@@ -5,7 +5,6 @@
 //
 //     vela run examples/orders/main.vl examples/orders/orders.csv
 //     vela test examples/orders/main.vl
-// stage 1 only
 import files
 import orders
 import os

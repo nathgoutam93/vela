@@ -4,7 +4,6 @@
 // functions. Since M10c the C is no longer Stage 0's line for line: share
 // functions for threads (M13) and names for packages' modules (M14) are
 // Stage 1's alone.
-// stage 1 only (it has tests, which Stage 0 cannot read)
 import maps
 import strings
 import types

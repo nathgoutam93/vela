@@ -1,8 +1,7 @@
 // A function used as a value can be called with anything, so its
 // parameters' ranges are not taken from its calls (M18).
-// stage 1 only
 // out: 2
-// err: panic_range_value.vl:8:14: panic: integer overflow
+// err: panic_range_value.vl:7:14: panic: integer overflow
 // exit: 101
 fn double(x: Int) -> Int {
     return x * 2

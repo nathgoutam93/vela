@@ -1,18 +1,17 @@
 // Mistakes with struct values and fields.
-// stage 1 only (its messages mention Float, which came in M10c)
-// err: struct_errors.vl:19:13: error: missing field 'y' in this 'Point' value
-// err: struct_errors.vl:19:27: error: 'Point' has no field 'z'
-// err: struct_errors.vl:20:27: error: field 'x' is given twice
-// err: struct_errors.vl:21:13: error: unknown type 'Nope'
-// err: struct_errors.vl:22:13: error: 'Kind' is an enum; build its values with Kind.Variant
-// err: struct_errors.vl:23:13: error: 'Point' has no field 'z'
-// err: struct_errors.vl:25:13: error: Int has no fields
-// err: struct_errors.vl:26:18: error: Kind has no fields; use match to look inside it
-// err: struct_errors.vl:27:5: error: cannot assign to a field of 'p', which was declared with 'let'; use 'let mut' to allow changes
-// err: struct_errors.vl:29:11: error: cannot assign Bool to 'm.x', which is Int
-// err: struct_errors.vl:30:13: error: Point values cannot be compared with '=='; use match, or compare their fields
-// err: struct_errors.vl:31:11: error: print takes an Int, Byte, Float, Bool or Str, not Point
-// err: struct_errors.vl:32:13: error: 'Point' is a type, not a value
+// err: struct_errors.vl:18:13: error: missing field 'y' in this 'Point' value
+// err: struct_errors.vl:18:27: error: 'Point' has no field 'z'
+// err: struct_errors.vl:19:27: error: field 'x' is given twice
+// err: struct_errors.vl:20:13: error: unknown type 'Nope'
+// err: struct_errors.vl:21:13: error: 'Kind' is an enum; build its values with Kind.Variant
+// err: struct_errors.vl:22:13: error: 'Point' has no field 'z'
+// err: struct_errors.vl:24:13: error: Int has no fields
+// err: struct_errors.vl:25:18: error: Kind has no fields; use match to look inside it
+// err: struct_errors.vl:26:5: error: cannot assign to a field of 'p', which was declared with 'let'; use 'let mut' to allow changes
+// err: struct_errors.vl:28:11: error: cannot assign Bool to 'm.x', which is Int
+// err: struct_errors.vl:29:13: error: Point values cannot be compared with '=='; use match, or compare their fields
+// err: struct_errors.vl:30:11: error: print takes an Int, Byte, Float, Bool or Str, not Point
+// err: struct_errors.vl:31:13: error: 'Point' is a type, not a value
 type Point = struct { x: Int, y: Int }
 type Kind = enum { A }
 fn main() {

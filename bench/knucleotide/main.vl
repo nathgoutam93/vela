@@ -4,7 +4,6 @@
 // input is fasta's output; the sequence is the one after ">THREE".
 //
 //     vela run bench/knucleotide/main.vl FASTA_OUTPUT
-// stage 1 only
 import files
 import maps
 import os

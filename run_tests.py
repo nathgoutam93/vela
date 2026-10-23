@@ -2,7 +2,6 @@
 """Run the Vela golden tests against a compiler.
 
     python3 run_tests.py                       every test, with build/vela (Stage 1)
-    python3 run_tests.py --stage0              every test, with the Python compiler
     python3 run_tests.py precedence overflow   only tests whose path contains a word
     python3 run_tests.py -v                    also list the tests that pass
     python3 run_tests.py --sanitize            build with AddressSanitizer, which
@@ -29,8 +28,6 @@ whose main file is main.vl. Comment lines at the very top of the .vl file
     // command: <words>  tests/cli only: the compiler's command line; FILE
     //                stands for the test's file (also inside a word, as in
     //                FILE:3:7), which goes last if FILE is not there
-    // stage 1 only   the test uses what Stage 0, frozen at M9, does not
-    //                have; --stage0 skips it
 
 The directory a test lives in decides what is checked:
 
@@ -100,7 +97,6 @@ SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all"
 TSAN_CFLAGS = " -g -fsanitize=thread"
 
 HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args|command|in):(.*)$")
-STAGE1_ONLY = "// stage 1 only"
 COMPILE_TIMEOUT = 60
 RUN_TIMEOUT = 10
 VELA_TEST_TIMEOUT = 600  # the compiler's own tests build the whole compiler, under --sanitize too
@@ -115,7 +111,6 @@ class Expectations:
     args: list[str] = field(default_factory=list)
     command: list[str] = field(default_factory=list)
     stdin: list[str] = field(default_factory=list)
-    stage1_only: bool = False
 
 
 def read_expectations(path: Path) -> Expectations:
@@ -124,9 +119,6 @@ def read_expectations(path: Path) -> Expectations:
     for line in text.splitlines():
         if not line.startswith("//"):
             break  # the header ends at the first line that is not a comment
-        if line.strip().startswith(STAGE1_ONLY):
-            expect.stage1_only = True
-            continue
         m = HEADER_LINE.match(line)
         if not m:
             continue  # an ordinary comment describing the test
@@ -348,7 +340,6 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Run the Vela golden tests.")
     ap.add_argument("filters", nargs="*", help="only run tests whose path contains one of these")
     ap.add_argument("--compiler", help="command that runs the compiler (default: build/vela)")
-    ap.add_argument("--stage0", action="store_true", help="test the Python compiler, stage0/")
     ap.add_argument("-v", "--verbose", action="store_true", help="list passing tests too")
     ap.add_argument("--sanitize", action="store_true",
                     help="build with AddressSanitizer and UBSan; leaks fail the test")
@@ -362,8 +353,6 @@ def main() -> int:
 
     if args.compiler:
         compiler = shlex.split(args.compiler)
-    elif args.stage0:
-        compiler = [sys.executable, str(ROOT / "stage0" / "main.py")]
     else:
         compiler = [str(ROOT / "build" / "vela")]
         if not Path(compiler[0]).exists():
@@ -387,9 +376,6 @@ def main() -> int:
         RUN_TIMEOUT *= 10
 
     tests = find_tests(args.filters)
-    if args.stage0:
-        tests = [t for t in tests
-                 if t.is_relative_to(TESTS) and t.suffix == ".vl" and not read_expectations(t).stage1_only and t.relative_to(TESTS).parts[0] != "cli"]
     if not tests:
         print("no tests found")
         return 1

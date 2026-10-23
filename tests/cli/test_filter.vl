@@ -1,6 +1,5 @@
 // `vela test FILE WORDS`: only the tests whose names contain a word run,
 // and a program with tests needs no main to test them.
-// stage 1 only
 // command: test FILE sum
 // out: PASS  test_filter.vl: test "sum of two"
 // out: PASS  test_filter.vl: test "sum of none"

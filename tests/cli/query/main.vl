@@ -1,8 +1,7 @@
 // vela query type: what a name is, with its declaration and its comment.
 // The position is in a module, shapes.vl, which is checked as part of
 // this program.
-// stage 1 only
-// command: query type FILE:12:32
+// command: query type FILE:11:32
 import shapes
 
 fn main() {

@@ -1,5 +1,4 @@
 // Generic functions on arrays. `import lists`.
-// stage 1 only
 //
 // Sorting is stable: values that compare equal keep their order. A sort by
 // some property of the elements takes a function that gives it:

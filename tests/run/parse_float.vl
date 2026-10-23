@@ -1,4 +1,3 @@
-// stage 1 only
 // strings.parse_float reads a decimal number, as Vela or JSON writes one,
 // to the nearest Float; anything else is None.
 // out: 0.1

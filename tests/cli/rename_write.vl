@@ -1,8 +1,7 @@
 // vela rename: the name renamed everywhere it is used, in every file of
 // the program, and the edits as JSON. Here the function `count` becomes
 // `positives`, its uses and test included; `count` in the comment stays.
-// stage 1 only
-// command: rename FILE:11:4 positives
+// command: rename FILE:10:4 positives
 fn main() {
     print(count([1, -2, 3]))
 }

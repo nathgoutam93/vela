@@ -4,13 +4,13 @@
     {
       "name": "Stack",
       "kind": "struct",
-      "line": 5,
+      "line": 4,
       "col": 10,
       "children": [
         {
           "name": "items",
           "kind": "field",
-          "line": 6,
+          "line": 5,
           "col": 5,
           "detail": "[Int]"
         }
@@ -19,20 +19,20 @@
     {
       "name": "Op",
       "kind": "enum",
-      "line": 9,
+      "line": 8,
       "col": 6,
       "children": [
         {
           "name": "Push",
           "kind": "variant",
-          "line": 10,
+          "line": 9,
           "col": 5,
           "detail": "Push(Int)"
         },
         {
           "name": "Pop",
           "kind": "variant",
-          "line": 11,
+          "line": 10,
           "col": 5,
           "detail": "Pop"
         }
@@ -41,21 +41,21 @@
     {
       "name": "apply",
       "kind": "function",
-      "line": 15,
+      "line": 14,
       "col": 8,
       "detail": "pub fn apply(s: Stack, op: Op) -> Stack"
     },
     {
       "name": "main",
       "kind": "function",
-      "line": 24,
+      "line": 23,
       "col": 4,
       "detail": "fn main()"
     },
     {
       "name": "test \"push\"",
       "kind": "test",
-      "line": 28,
+      "line": 27,
       "col": 1
     }
   ]
