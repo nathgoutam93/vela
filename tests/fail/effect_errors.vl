@@ -3,7 +3,7 @@
 // err: effect_errors.vl:22:18: error: 'read' uses fs, through files.read, but does not say so; add `uses fs` after its signature
 // err: effect_errors.vl:25:28: warning: 'first' says `uses fs` but uses nothing of it
 // err: effect_errors.vl:32:12: error: effect 'os' is listed twice
-// err: effect_errors.vl:32:12: error: unknown effect 'net'; the effects are fs (the files module) and os (os.args, os.exit, os.env, os.run, os.read_line and os.read)
+// err: effect_errors.vl:32:12: error: unknown effect 'net'; the effects are fs (the files module) and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read)
 // err: effect_errors.vl:37:5: error: 'caller' uses os, through 'leave', but does not say so; add `uses os` after its signature
 // err: effect_errors.vl:40:11: warning: 'tidy' says `uses os` but uses nothing of it
 // err: effect_errors.vl:45:14: error: a requires clause must be Bool, found Int

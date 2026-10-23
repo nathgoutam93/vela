@@ -274,6 +274,10 @@ bool vela_files_temp_dir(vela_str *out);
 // to its exit code, or 128 + the signal number if a signal ended it. False,
 // with a message in *err, if it could not be started at all. POSIX only.
 bool vela_os_run(vela_array *command, int64_t *code, vela_str *err);
+// os.output(command): runs it as os.run does, but with its stdout captured:
+// true, with the output in *out, if it exits with 0; false, with why not
+// in *out ("git exited with 128"), otherwise. Its stderr is the program's.
+bool vela_os_output(vela_array *command, vela_str *out);
 // os.env(name): true, with the value in *out, if the variable is set.
 bool vela_os_env(vela_str name, vela_str *out);
 // os.read_line(): true, with the next line of stdin in *out (without its

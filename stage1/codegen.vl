@@ -1816,7 +1816,7 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         return no_value()
     }
     if name == "files.read" || name == "files.write" || name == "files.remove" || name == "files.temp_dir" ||
-        name == "os.run" {
+        name == "os.run" || name == "os.output" {
         return file_call(mut g, e, name, args)
     }
     if name == "os.env" || name == "os.read_line" || name == "strings.parse_float" {
@@ -1929,6 +1929,8 @@ fn file_call(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         success = "0"
     } else if name == "files.temp_dir" {
         emit(mut g, "bool " + ok + " = vela_files_temp_dir(&" + text + ");")
+    } else if name == "os.output" {
+        emit(mut g, "bool " + ok + " = vela_os_output(" + cs[0] + ", &" + text + ");")
     } else {
         let code = new_temp(mut g)
         emit(mut g, "int64_t " + code + " = 0;")

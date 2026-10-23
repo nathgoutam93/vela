@@ -1,0 +1,36 @@
+// stage 1 only
+// os.output runs a program as os.run does and returns what it printed on
+// stdout; a program that fails, or cannot be started, is an Err.
+// out: [hello from sh]
+// out: lines: 3
+// out: sh exited with 3
+// out: cannot run no-such-program: No such file or directory
+// out: big: 100000
+import os
+import strings
+
+fn show(r: Result[Str, Str]) -> Str {
+    match r {
+        Ok(text) => return text
+        Err(e) => return e
+    }
+}
+
+fn main() {
+    match os.output(["sh", "-c", "echo hello from sh"]) {
+        Ok(text) => print("[" + text[0..len(text) - 1] + "]")
+        Err(e) => print(e)
+    }
+    let three = show(os.output(["sh", "-c", "printf 'a\\nb\\nc\\n'"]))
+    let mut n = 0
+    for c in three {
+        if c == '\n' {
+            n = n + 1
+        }
+    }
+    print("lines: " + strings.from_int(n))
+    print(show(os.output(["sh", "-c", "echo lost; exit 3"])))
+    print(show(os.output(["no-such-program"])))
+    // More than a pipe holds: the output is read while the program runs.
+    print("big: " + strings.from_int(len(show(os.output(["sh", "-c", "head -c 100000 /dev/zero"])))))
+}

@@ -870,7 +870,10 @@ static vela_str message(const char *a, vela_str b, const char *c) {
 
 static pthread_mutex_t fork_lock = PTHREAD_MUTEX_INITIALIZER;
 
-bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
+// Runs `command`, waits for it and sets *code. When `captured` is not NULL
+// the program's stdout goes into *captured instead of ours. False, with a
+// message in *err, if it could not be started at all.
+static bool run_program(vela_array *command, int64_t *code, vela_str *err, vela_str *captured) {
     if (command->len == 0) {
         *err = str_from("os.run needs a program to run", 29);
         return false;
@@ -893,25 +896,35 @@ bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
     // If exec fails, the child sends errno back through this pipe; a
     // successful exec closes it (close-on-exec), so reading gets nothing.
     int fds[2];
+    int out[2] = {-1, -1};  // the child's stdout, when captured
     int failed = 0;
     pid_t pid = -1;
-    // A task running os.run at the same time must not fork between pipe()
-    // and fcntl(): its child would keep our pipe open, and the read below
-    // would wait for that program to end.
+    // A task running a program at the same time must not fork between
+    // pipe() and fcntl(): its child would keep our pipes open, and the reads
+    // below would wait for that program to end.
     pthread_mutex_lock(&fork_lock);
-    if (pipe(fds) != 0) {
+    if (pipe(fds) != 0 || (captured && pipe(out) != 0)) {
         failed = errno;
         pthread_mutex_unlock(&fork_lock);
     } else {
+        fcntl(fds[0], F_SETFD, FD_CLOEXEC);
         fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+        if (captured) {
+            fcntl(out[0], F_SETFD, FD_CLOEXEC);
+            fcntl(out[1], F_SETFD, FD_CLOEXEC);
+        }
         pid = fork();
         if (pid != 0) pthread_mutex_unlock(&fork_lock);
         if (pid < 0) {
             failed = errno;
             close(fds[0]);
             close(fds[1]);
+            if (captured) {
+                close(out[0]);
+                close(out[1]);
+            }
         } else if (pid == 0) {
-            close(fds[0]);
+            if (captured) dup2(out[1], 1);  // dup2 clears close-on-exec on 1
             execvp(argv[0], argv);
             int e = errno;
             ssize_t written = write(fds[1], &e, sizeof e);
@@ -919,6 +932,26 @@ bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
             _exit(127);
         } else {
             close(fds[1]);
+            if (captured) {
+                // All of the output, then the exit status: a program that
+                // fills the pipe waits for us to read it.
+                close(out[1]);
+                size_t cap = 4096, len = 0;
+                char *buf = vela_alloc(cap);
+                for (;;) {
+                    if (len == cap) {
+                        cap *= 2;
+                        buf = vela_realloc(buf, cap);
+                    }
+                    ssize_t got = read(out[0], buf + len, cap - len);
+                    if (got < 0 && errno == EINTR) continue;
+                    if (got <= 0) break;
+                    len += (size_t)got;
+                }
+                close(out[0]);
+                *captured = str_from(buf, len);
+                free(buf);
+            }
             int e;
             ssize_t got;
             do {
@@ -930,6 +963,7 @@ bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
             }
             if (got == (ssize_t)sizeof e) {
                 failed = e;
+                if (captured) vela_str_release(*captured);
             } else if (WIFSIGNALED(status)) {
                 *code = 128 + WTERMSIG(status);  // as a shell reports it
             } else {
@@ -948,6 +982,26 @@ bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
         return false;
     }
     return true;
+}
+
+bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
+    return run_program(command, code, err, NULL);
+}
+
+bool vela_os_output(vela_array *command, vela_str *out) {
+    int64_t code = 0;
+    vela_str captured;
+    if (!run_program(command, &code, out, &captured)) return false;
+    if (code == 0) {
+        *out = captured;
+        return true;
+    }
+    vela_str_release(captured);
+    char buf[32];
+    snprintf(buf, sizeof buf, " exited with %" PRId64, code);
+    vela_str *words = (vela_str *)command->data;
+    *out = message("", words[0], buf);
+    return false;
 }
 
 // ---- stdin ----

@@ -19688,7 +19688,7 @@ vela_array * f_7modules_builtin_functions(vela_str v_name) {
         vela_array_push(_t7, &_t11);
         _t1 = _t7;
     } else if (vela_str_eq(v_name, VELA_STR("os", 2))) {
-        vela_array * _t12 = vela_array_new(&vela_type_str, 8);
+        vela_array * _t12 = vela_array_new(&vela_type_str, 9);
         vela_str _t13 = VELA_STR("args", 4);
         vela_array_push(_t12, &_t13);
         vela_str _t14 = VELA_STR("exit", 4);
@@ -19705,42 +19705,44 @@ vela_array * f_7modules_builtin_functions(vela_str v_name) {
         vela_array_push(_t12, &_t19);
         vela_str _t20 = VELA_STR("write", 5);
         vela_array_push(_t12, &_t20);
+        vela_str _t21 = VELA_STR("output", 6);
+        vela_array_push(_t12, &_t21);
         _t1 = _t12;
     } else if (vela_str_eq(v_name, VELA_STR("strings", 7))) {
-        vela_array * _t21 = vela_array_new(&vela_type_str, 8);
-        vela_str _t22 = VELA_STR("builder", 7);
-        vela_array_push(_t21, &_t22);
-        vela_str _t23 = VELA_STR("add", 3);
-        vela_array_push(_t21, &_t23);
-        vela_str _t24 = VELA_STR("add_byte", 8);
-        vela_array_push(_t21, &_t24);
-        vela_str _t25 = VELA_STR("add_int", 7);
-        vela_array_push(_t21, &_t25);
-        vela_str _t26 = VELA_STR("build", 5);
-        vela_array_push(_t21, &_t26);
-        vela_str _t27 = VELA_STR("from_int", 8);
-        vela_array_push(_t21, &_t27);
-        vela_str _t28 = VELA_STR("from_float", 10);
-        vela_array_push(_t21, &_t28);
-        vela_str _t29 = VELA_STR("parse_float", 11);
-        vela_array_push(_t21, &_t29);
-        _t1 = _t21;
+        vela_array * _t22 = vela_array_new(&vela_type_str, 8);
+        vela_str _t23 = VELA_STR("builder", 7);
+        vela_array_push(_t22, &_t23);
+        vela_str _t24 = VELA_STR("add", 3);
+        vela_array_push(_t22, &_t24);
+        vela_str _t25 = VELA_STR("add_byte", 8);
+        vela_array_push(_t22, &_t25);
+        vela_str _t26 = VELA_STR("add_int", 7);
+        vela_array_push(_t22, &_t26);
+        vela_str _t27 = VELA_STR("build", 5);
+        vela_array_push(_t22, &_t27);
+        vela_str _t28 = VELA_STR("from_int", 8);
+        vela_array_push(_t22, &_t28);
+        vela_str _t29 = VELA_STR("from_float", 10);
+        vela_array_push(_t22, &_t29);
+        vela_str _t30 = VELA_STR("parse_float", 11);
+        vela_array_push(_t22, &_t30);
+        _t1 = _t22;
     } else if (vela_str_eq(v_name, VELA_STR("tasks", 5))) {
-        vela_array * _t30 = vela_array_new(&vela_type_str, 3);
-        vela_str _t31 = VELA_STR("map", 3);
-        vela_array_push(_t30, &_t31);
-        vela_str _t32 = VELA_STR("each", 4);
-        vela_array_push(_t30, &_t32);
-        vela_str _t33 = VELA_STR("workers", 7);
-        vela_array_push(_t30, &_t33);
-        _t1 = _t30;
+        vela_array * _t31 = vela_array_new(&vela_type_str, 3);
+        vela_str _t32 = VELA_STR("map", 3);
+        vela_array_push(_t31, &_t32);
+        vela_str _t33 = VELA_STR("each", 4);
+        vela_array_push(_t31, &_t33);
+        vela_str _t34 = VELA_STR("workers", 7);
+        vela_array_push(_t31, &_t34);
+        _t1 = _t31;
     } else {
-        vela_array * _t34 = vela_array_new(&vela_type_str, 0);
-        _t1 = _t34;
+        vela_array * _t35 = vela_array_new(&vela_type_str, 0);
+        _t1 = _t35;
     }
-    vela_array * _t35 = _t1;
+    vela_array * _t36 = _t1;
     vela_str_release(v_name);
-    return _t35;
+    return _t36;
 }
 /* vela: part */
 
@@ -22027,7 +22029,7 @@ void f_7checker_signatures(t_7checker_Checker * v_c) {
                 // line 438
                 vela_str _t30 = vela_str_concat(VELA_STR("unknown effect '", 16), v_u);
                 vela_str _t31 = vela_str_concat(_t30, VELA_STR("'; the effects are fs (the files module) ", 41));
-                vela_str _t32 = vela_str_concat(_t31, VELA_STR("and os (os.args, os.exit, os.env, os.run, os.read_line and os.read)", 67));
+                vela_str _t32 = vela_str_concat(_t31, VELA_STR("and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read)", 78));
                 f_7checker_report(&(*v_c), v_f.m_effects_line, v_f.m_effects_col, _t32);
                 vela_str_release(_t31);
                 vela_str_release(_t30);
@@ -23321,16 +23323,21 @@ vela_str f_7checker_effect_of(vela_str v_name) {
         bool _t17 = vela_str_eq(v_name, VELA_STR("os.read", 7));
         _t16 = _t17;
     }
-    if (_t16) {
+    bool _t18 = _t16;
+    if (!_t18) {
+        bool _t19 = vela_str_eq(v_name, VELA_STR("os.output", 9));
+        _t18 = _t19;
+    }
+    if (_t18) {
         // line 761
-        vela_str _t18 = VELA_STR("os", 2);
+        vela_str _t20 = VELA_STR("os", 2);
         vela_str_release(v_name);
-        return _t18;
+        return _t20;
     }
     // line 763
-    vela_str _t19 = VELA_STR("", 0);
+    vela_str _t21 = VELA_STR("", 0);
     vela_str_release(v_name);
-    return _t19;
+    return _t21;
 }
 /* vela: part */
 
@@ -24070,7 +24077,7 @@ vela_str f_7checker_std_hint(t_7checker_Checker v_c, vela_str v_name) {
             vela_array_push(_t15, &_t19);
             _t9 = _t15;
         } else if (vela_str_eq(v_module, VELA_STR("os", 2))) {
-            vela_array * _t20 = vela_array_new(&vela_type_str, 8);
+            vela_array * _t20 = vela_array_new(&vela_type_str, 9);
             vela_str _t21 = VELA_STR("args", 4);
             vela_array_push(_t20, &_t21);
             vela_str _t22 = VELA_STR("exit", 4);
@@ -24087,103 +24094,105 @@ vela_str f_7checker_std_hint(t_7checker_Checker v_c, vela_str v_name) {
             vela_array_push(_t20, &_t27);
             vela_str _t28 = VELA_STR("write", 5);
             vela_array_push(_t20, &_t28);
+            vela_str _t29 = VELA_STR("output", 6);
+            vela_array_push(_t20, &_t29);
             _t9 = _t20;
         } else if (vela_str_eq(v_module, VELA_STR("tasks", 5))) {
-            vela_array * _t29 = vela_array_new(&vela_type_str, 3);
-            vela_str _t30 = VELA_STR("map", 3);
-            vela_array_push(_t29, &_t30);
-            vela_str _t31 = VELA_STR("each", 4);
-            vela_array_push(_t29, &_t31);
-            vela_str _t32 = VELA_STR("workers", 7);
-            vela_array_push(_t29, &_t32);
-            _t9 = _t29;
+            vela_array * _t30 = vela_array_new(&vela_type_str, 3);
+            vela_str _t31 = VELA_STR("map", 3);
+            vela_array_push(_t30, &_t31);
+            vela_str _t32 = VELA_STR("each", 4);
+            vela_array_push(_t30, &_t32);
+            vela_str _t33 = VELA_STR("workers", 7);
+            vela_array_push(_t30, &_t33);
+            _t9 = _t30;
         } else {
-            vela_array * _t33 = vela_array_new(&vela_type_str, 8);
-            vela_str _t34 = VELA_STR("builder", 7);
-            vela_array_push(_t33, &_t34);
-            vela_str _t35 = VELA_STR("add", 3);
-            vela_array_push(_t33, &_t35);
-            vela_str _t36 = VELA_STR("add_byte", 8);
-            vela_array_push(_t33, &_t36);
-            vela_str _t37 = VELA_STR("add_int", 7);
-            vela_array_push(_t33, &_t37);
-            vela_str _t38 = VELA_STR("build", 5);
-            vela_array_push(_t33, &_t38);
-            vela_str _t39 = VELA_STR("from_int", 8);
-            vela_array_push(_t33, &_t39);
-            vela_str _t40 = VELA_STR("from_float", 10);
-            vela_array_push(_t33, &_t40);
-            vela_str _t41 = VELA_STR("parse_float", 11);
-            vela_array_push(_t33, &_t41);
-            _t9 = _t33;
+            vela_array * _t34 = vela_array_new(&vela_type_str, 8);
+            vela_str _t35 = VELA_STR("builder", 7);
+            vela_array_push(_t34, &_t35);
+            vela_str _t36 = VELA_STR("add", 3);
+            vela_array_push(_t34, &_t36);
+            vela_str _t37 = VELA_STR("add_byte", 8);
+            vela_array_push(_t34, &_t37);
+            vela_str _t38 = VELA_STR("add_int", 7);
+            vela_array_push(_t34, &_t38);
+            vela_str _t39 = VELA_STR("build", 5);
+            vela_array_push(_t34, &_t39);
+            vela_str _t40 = VELA_STR("from_int", 8);
+            vela_array_push(_t34, &_t40);
+            vela_str _t41 = VELA_STR("from_float", 10);
+            vela_array_push(_t34, &_t41);
+            vela_str _t42 = VELA_STR("parse_float", 11);
+            vela_array_push(_t34, &_t42);
+            _t9 = _t34;
         }
         vela_array * v_fns = _t9;
         // line 967
-        vela_array * _t43 = v_fns;
-        vela_array_retain(_t43);
-        vela_array * _t42 = _t43;
-        for (int64_t _t44 = 0; _t44 < _t42->len; _t44++) {
-            vela_str v_f = ((vela_str *)_t42->data)[_t44];
+        vela_array * _t44 = v_fns;
+        vela_array_retain(_t44);
+        vela_array * _t43 = _t44;
+        for (int64_t _t45 = 0; _t45 < _t43->len; _t45++) {
+            vela_str v_f = ((vela_str *)_t43->data)[_t45];
             vela_str_retain(v_f);
             // line 968
-            bool _t45 = vela_str_eq(v_f, v_name);
-            if (_t45) {
+            bool _t46 = vela_str_eq(v_f, v_name);
+            if (_t46) {
                 // line 969
-                vela_str _t46 = vela_str_concat(VELA_STR("; it is ", 8), v_module);
-                vela_str _t47 = vela_str_concat(_t46, VELA_STR(".", 1));
-                vela_str _t48 = vela_str_concat(_t47, v_name);
-                vela_str v_hint = _t48;
+                vela_str _t47 = vela_str_concat(VELA_STR("; it is ", 8), v_module);
+                vela_str _t48 = vela_str_concat(_t47, VELA_STR(".", 1));
+                vela_str _t49 = vela_str_concat(_t48, v_name);
+                vela_str v_hint = _t49;
+                vela_str_release(_t48);
                 vela_str_release(_t47);
-                vela_str_release(_t46);
                 // line 970
-                t_7modules_Module _t49 = *(t_7modules_Module *)vela_array_at(v_c.m_modules, v_c.m_current, "stage1/checker.vl:970:38");
-                vela_str _t51 = v_module;
-                int64_t *_t50 = vela_map_find(_t49.m_imports, &_t51);
-                bool _t52 = _t50 != NULL;
-                if (_t52) {
+                t_7modules_Module _t50 = *(t_7modules_Module *)vela_array_at(v_c.m_modules, v_c.m_current, "stage1/checker.vl:970:38");
+                vela_str _t52 = v_module;
+                int64_t *_t51 = vela_map_find(_t50.m_imports, &_t52);
+                bool _t53 = _t51 != NULL;
+                if (_t53) {
                     // line 971
-                    vela_str _t53 = v_hint;
-                    vela_str_retain(_t53);
-                    vela_str _t54 = _t53;
+                    vela_str _t54 = v_hint;
+                    vela_str_retain(_t54);
+                    vela_str _t55 = _t54;
                     vela_str_release(v_hint);
                     vela_str_release(v_f);
-                    vela_array_release(_t42);
+                    vela_array_release(_t43);
                     vela_array_release(v_fns);
                     vela_str_release(v_module);
                     vela_array_release(_t1);
                     vela_str_release(v_name);
                     rc_release_t_7checker_Checker(v_c);
-                    return _t54;
+                    return _t55;
                 }
                 // line 973
-                vela_str _t55 = vela_str_concat(v_hint, VELA_STR(", after `import ", 16));
-                vela_str _t56 = vela_str_concat(_t55, v_module);
-                vela_str _t57 = vela_str_concat(_t56, VELA_STR("`", 1));
-                vela_str _t58 = _t57;
+                vela_str _t56 = vela_str_concat(v_hint, VELA_STR(", after `import ", 16));
+                vela_str _t57 = vela_str_concat(_t56, v_module);
+                vela_str _t58 = vela_str_concat(_t57, VELA_STR("`", 1));
+                vela_str _t59 = _t58;
+                vela_str_release(_t57);
                 vela_str_release(_t56);
-                vela_str_release(_t55);
                 vela_str_release(v_hint);
                 vela_str_release(v_f);
-                vela_array_release(_t42);
+                vela_array_release(_t43);
                 vela_array_release(v_fns);
                 vela_str_release(v_module);
                 vela_array_release(_t1);
                 vela_str_release(v_name);
                 rc_release_t_7checker_Checker(v_c);
-                return _t58;
+                return _t59;
             }
             vela_str_release(v_f);
         }
-        vela_array_release(_t42);
+        vela_array_release(_t43);
         vela_array_release(v_fns);
         vela_str_release(v_module);
     }
     vela_array_release(_t1);
     // line 977
-    vela_str _t59 = VELA_STR("", 0);
+    vela_str _t60 = VELA_STR("", 0);
     vela_str_release(v_name);
     rc_release_t_7checker_Checker(v_c);
-    return _t59;
+    return _t60;
 }
 /* vela: part */
 
@@ -34723,42 +34732,47 @@ bool f_7checker_has_signature(vela_str v_name) {
     }
     bool _t20 = _t18;
     if (!_t20) {
-        bool _t21 = vela_str_eq(v_name, VELA_STR("tasks.workers", 13));
+        bool _t21 = vela_str_eq(v_name, VELA_STR("os.output", 9));
         _t20 = _t21;
     }
     bool _t22 = _t20;
     if (!_t22) {
-        int64_t _t23 = v_name.len;
-        bool _t24 = _t23 > 8;
-        bool _t25 = _t24;
-        if (_t25) {
-            vela_str _t26 = vela_str_slice(v_name, 0, 8, "stage1/checker.vl:3377:30");
-            bool _t27 = vela_str_eq(_t26, VELA_STR("strings.", 8));
-            _t25 = _t27;
-            vela_str_release(_t26);
-        }
-        _t22 = _t25;
+        bool _t23 = vela_str_eq(v_name, VELA_STR("tasks.workers", 13));
+        _t22 = _t23;
     }
-    bool _t28 = _t22;
+    bool _t24 = _t22;
+    if (!_t24) {
+        int64_t _t25 = v_name.len;
+        bool _t26 = _t25 > 8;
+        bool _t27 = _t26;
+        if (_t27) {
+            vela_str _t28 = vela_str_slice(v_name, 0, 8, "stage1/checker.vl:3378:30");
+            bool _t29 = vela_str_eq(_t28, VELA_STR("strings.", 8));
+            _t27 = _t29;
+            vela_str_release(_t28);
+        }
+        _t24 = _t27;
+    }
+    bool _t30 = _t24;
     vela_str_release(v_name);
-    return _t28;
+    return _t30;
 }
 /* vela: part */
 
 vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
-    // line 3382
+    // line 3383
     int64_t _t1 = f_5types_STR();
     int64_t v_s = _t1;
-    // line 3383
+    // line 3384
     int64_t _t2 = f_5types_BUILDER();
     int64_t v_b = _t2;
-    // line 3384
+    // line 3385
     int64_t _t3 = f_5types_NOTHING();
     int64_t v_nothing = _t3;
-    // line 3385
+    // line 3386
     bool _t4 = vela_str_eq(v_name, VELA_STR("files.read", 10));
     if (_t4) {
-        // line 3386
+        // line 3387
         vela_array * _t5 = vela_array_new(&vela_type_int, 2);
         int64_t _t6 = v_s;
         vela_array_push(_t5, &_t6);
@@ -34769,10 +34783,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_str_release(v_name);
         return _t9;
     }
-    // line 3388
+    // line 3389
     bool _t10 = vela_str_eq(v_name, VELA_STR("files.write", 11));
     if (_t10) {
-        // line 3389
+        // line 3390
         vela_array * _t11 = vela_array_new(&vela_type_int, 3);
         int64_t _t12 = v_s;
         vela_array_push(_t11, &_t12);
@@ -34786,10 +34800,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_str_release(v_name);
         return _t17;
     }
-    // line 3391
+    // line 3392
     bool _t18 = vela_str_eq(v_name, VELA_STR("files.remove", 12));
     if (_t18) {
-        // line 3392
+        // line 3393
         vela_array * _t19 = vela_array_new(&vela_type_int, 2);
         int64_t _t20 = v_s;
         vela_array_push(_t19, &_t20);
@@ -34801,10 +34815,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_str_release(v_name);
         return _t24;
     }
-    // line 3394
+    // line 3395
     bool _t25 = vela_str_eq(v_name, VELA_STR("files.temp_dir", 14));
     if (_t25) {
-        // line 3395
+        // line 3396
         vela_array * _t26 = vela_array_new(&vela_type_int, 1);
         int64_t _t27 = f_5types_result(&(*v_c).m_table, v_s, v_s);
         int64_t _t28 = _t27;
@@ -34813,10 +34827,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_str_release(v_name);
         return _t29;
     }
-    // line 3397
+    // line 3398
     bool _t30 = vela_str_eq(v_name, VELA_STR("os.args", 7));
     if (_t30) {
-        // line 3398
+        // line 3399
         vela_array * _t31 = vela_array_new(&vela_type_int, 1);
         int64_t _t32 = f_5types_array(&(*v_c).m_table, v_s);
         int64_t _t33 = _t32;
@@ -34825,13 +34839,13 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_str_release(v_name);
         return _t34;
     }
-    // line 3400
+    // line 3401
     bool _t35 = vela_str_eq(v_name, VELA_STR("os.run", 6));
     if (_t35) {
-        // line 3401
+        // line 3402
         int64_t _t36 = f_5types_array(&(*v_c).m_table, v_s);
         int64_t v_command = _t36;
-        // line 3402
+        // line 3403
         vela_array * _t37 = vela_array_new(&vela_type_int, 2);
         int64_t _t38 = v_command;
         vela_array_push(_t37, &_t38);
@@ -34843,149 +34857,166 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_str_release(v_name);
         return _t42;
     }
-    // line 3404
-    bool _t43 = vela_str_eq(v_name, VELA_STR("os.env", 6));
+    // line 3405
+    bool _t43 = vela_str_eq(v_name, VELA_STR("os.output", 9));
     if (_t43) {
-        // line 3405
-        vela_array * _t44 = vela_array_new(&vela_type_int, 2);
-        int64_t _t45 = v_s;
-        vela_array_push(_t44, &_t45);
-        int64_t _t46 = f_5types_option(&(*v_c).m_table, v_s);
-        int64_t _t47 = _t46;
-        vela_array_push(_t44, &_t47);
-        vela_array * _t48 = _t44;
+        // line 3406
+        int64_t _t44 = f_5types_array(&(*v_c).m_table, v_s);
+        int64_t v_command_2 = _t44;
+        // line 3407
+        vela_array * _t45 = vela_array_new(&vela_type_int, 2);
+        int64_t _t46 = v_command_2;
+        vela_array_push(_t45, &_t46);
+        int64_t _t47 = f_5types_result(&(*v_c).m_table, v_s, v_s);
+        int64_t _t48 = _t47;
+        vela_array_push(_t45, &_t48);
+        vela_array * _t49 = _t45;
         vela_str_release(v_name);
-        return _t48;
+        return _t49;
     }
-    // line 3407
-    bool _t49 = vela_str_eq(v_name, VELA_STR("os.read_line", 12));
-    if (_t49) {
-        // line 3408
-        vela_array * _t50 = vela_array_new(&vela_type_int, 1);
-        int64_t _t51 = f_5types_option(&(*v_c).m_table, v_s);
-        int64_t _t52 = _t51;
-        vela_array_push(_t50, &_t52);
-        vela_array * _t53 = _t50;
+    // line 3409
+    bool _t50 = vela_str_eq(v_name, VELA_STR("os.env", 6));
+    if (_t50) {
+        // line 3410
+        vela_array * _t51 = vela_array_new(&vela_type_int, 2);
+        int64_t _t52 = v_s;
+        vela_array_push(_t51, &_t52);
+        int64_t _t53 = f_5types_option(&(*v_c).m_table, v_s);
+        int64_t _t54 = _t53;
+        vela_array_push(_t51, &_t54);
+        vela_array * _t55 = _t51;
         vela_str_release(v_name);
-        return _t53;
+        return _t55;
     }
-    // line 3410
-    bool _t54 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
-    if (_t54) {
-        // line 3411
-        vela_array * _t55 = vela_array_new(&vela_type_int, 2);
-        int64_t _t56 = v_s;
-        vela_array_push(_t55, &_t56);
-        int64_t _t57 = f_5types_FLOAT();
-        int64_t _t58 = f_5types_option(&(*v_c).m_table, _t57);
+    // line 3412
+    bool _t56 = vela_str_eq(v_name, VELA_STR("os.read_line", 12));
+    if (_t56) {
+        // line 3413
+        vela_array * _t57 = vela_array_new(&vela_type_int, 1);
+        int64_t _t58 = f_5types_option(&(*v_c).m_table, v_s);
         int64_t _t59 = _t58;
-        vela_array_push(_t55, &_t59);
-        vela_array * _t60 = _t55;
+        vela_array_push(_t57, &_t59);
+        vela_array * _t60 = _t57;
         vela_str_release(v_name);
         return _t60;
     }
-    // line 3413
-    vela_array * _t61;
-    if (vela_str_eq(v_name, VELA_STR("os.exit", 7))) {
+    // line 3415
+    bool _t61 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
+    if (_t61) {
+        // line 3416
         vela_array * _t62 = vela_array_new(&vela_type_int, 2);
-        int64_t _t63 = f_5types_INT();
-        int64_t _t64 = _t63;
-        vela_array_push(_t62, &_t64);
-        int64_t _t65 = v_nothing;
-        vela_array_push(_t62, &_t65);
-        _t61 = _t62;
-    } else if (vela_str_eq(v_name, VELA_STR("os.read", 7))) {
-        vela_array * _t66 = vela_array_new(&vela_type_int, 2);
-        int64_t _t67 = f_5types_INT();
-        int64_t _t68 = _t67;
-        vela_array_push(_t66, &_t68);
-        int64_t _t69 = v_s;
-        vela_array_push(_t66, &_t69);
-        _t61 = _t66;
-    } else if (vela_str_eq(v_name, VELA_STR("tasks.workers", 13))) {
-        vela_array * _t70 = vela_array_new(&vela_type_int, 1);
-        int64_t _t71 = f_5types_INT();
-        int64_t _t72 = _t71;
-        vela_array_push(_t70, &_t72);
-        _t61 = _t70;
-    } else if (vela_str_eq(v_name, VELA_STR("os.write", 8))) {
-        vela_array * _t73 = vela_array_new(&vela_type_int, 2);
-        int64_t _t74 = v_s;
-        vela_array_push(_t73, &_t74);
-        int64_t _t75 = v_nothing;
-        vela_array_push(_t73, &_t75);
-        _t61 = _t73;
-    } else if (vela_str_eq(v_name, VELA_STR("strings.builder", 15))) {
-        vela_array * _t76 = vela_array_new(&vela_type_int, 1);
-        int64_t _t77 = v_b;
-        vela_array_push(_t76, &_t77);
-        _t61 = _t76;
-    } else if (vela_str_eq(v_name, VELA_STR("strings.add", 11))) {
-        vela_array * _t78 = vela_array_new(&vela_type_int, 3);
-        int64_t _t79 = v_b;
-        vela_array_push(_t78, &_t79);
-        int64_t _t80 = v_s;
-        vela_array_push(_t78, &_t80);
-        int64_t _t81 = v_nothing;
-        vela_array_push(_t78, &_t81);
-        _t61 = _t78;
-    } else if (vela_str_eq(v_name, VELA_STR("strings.add_byte", 16))) {
-        vela_array * _t82 = vela_array_new(&vela_type_int, 3);
-        int64_t _t83 = v_b;
-        vela_array_push(_t82, &_t83);
-        int64_t _t84 = f_5types_BYTE();
-        int64_t _t85 = _t84;
-        vela_array_push(_t82, &_t85);
-        int64_t _t86 = v_nothing;
-        vela_array_push(_t82, &_t86);
-        _t61 = _t82;
-    } else if (vela_str_eq(v_name, VELA_STR("strings.add_int", 15))) {
-        vela_array * _t87 = vela_array_new(&vela_type_int, 3);
-        int64_t _t88 = v_b;
-        vela_array_push(_t87, &_t88);
-        int64_t _t89 = f_5types_INT();
-        int64_t _t90 = _t89;
-        vela_array_push(_t87, &_t90);
-        int64_t _t91 = v_nothing;
-        vela_array_push(_t87, &_t91);
-        _t61 = _t87;
-    } else if (vela_str_eq(v_name, VELA_STR("strings.build", 13))) {
-        vela_array * _t92 = vela_array_new(&vela_type_int, 2);
-        int64_t _t93 = v_b;
-        vela_array_push(_t92, &_t93);
-        int64_t _t94 = v_s;
-        vela_array_push(_t92, &_t94);
-        _t61 = _t92;
-    } else if (vela_str_eq(v_name, VELA_STR("strings.from_float", 18))) {
-        vela_array * _t95 = vela_array_new(&vela_type_int, 2);
-        int64_t _t96 = f_5types_FLOAT();
-        int64_t _t97 = _t96;
-        vela_array_push(_t95, &_t97);
-        int64_t _t98 = v_s;
-        vela_array_push(_t95, &_t98);
-        _t61 = _t95;
-    } else {
-        vela_array * _t99 = vela_array_new(&vela_type_int, 2);
-        int64_t _t100 = f_5types_INT();
-        int64_t _t101 = _t100;
-        vela_array_push(_t99, &_t101);
-        int64_t _t102 = v_s;
-        vela_array_push(_t99, &_t102);
-        _t61 = _t99;
+        int64_t _t63 = v_s;
+        vela_array_push(_t62, &_t63);
+        int64_t _t64 = f_5types_FLOAT();
+        int64_t _t65 = f_5types_option(&(*v_c).m_table, _t64);
+        int64_t _t66 = _t65;
+        vela_array_push(_t62, &_t66);
+        vela_array * _t67 = _t62;
+        vela_str_release(v_name);
+        return _t67;
     }
-    vela_array * _t103 = _t61;
+    // line 3418
+    vela_array * _t68;
+    if (vela_str_eq(v_name, VELA_STR("os.exit", 7))) {
+        vela_array * _t69 = vela_array_new(&vela_type_int, 2);
+        int64_t _t70 = f_5types_INT();
+        int64_t _t71 = _t70;
+        vela_array_push(_t69, &_t71);
+        int64_t _t72 = v_nothing;
+        vela_array_push(_t69, &_t72);
+        _t68 = _t69;
+    } else if (vela_str_eq(v_name, VELA_STR("os.read", 7))) {
+        vela_array * _t73 = vela_array_new(&vela_type_int, 2);
+        int64_t _t74 = f_5types_INT();
+        int64_t _t75 = _t74;
+        vela_array_push(_t73, &_t75);
+        int64_t _t76 = v_s;
+        vela_array_push(_t73, &_t76);
+        _t68 = _t73;
+    } else if (vela_str_eq(v_name, VELA_STR("tasks.workers", 13))) {
+        vela_array * _t77 = vela_array_new(&vela_type_int, 1);
+        int64_t _t78 = f_5types_INT();
+        int64_t _t79 = _t78;
+        vela_array_push(_t77, &_t79);
+        _t68 = _t77;
+    } else if (vela_str_eq(v_name, VELA_STR("os.write", 8))) {
+        vela_array * _t80 = vela_array_new(&vela_type_int, 2);
+        int64_t _t81 = v_s;
+        vela_array_push(_t80, &_t81);
+        int64_t _t82 = v_nothing;
+        vela_array_push(_t80, &_t82);
+        _t68 = _t80;
+    } else if (vela_str_eq(v_name, VELA_STR("strings.builder", 15))) {
+        vela_array * _t83 = vela_array_new(&vela_type_int, 1);
+        int64_t _t84 = v_b;
+        vela_array_push(_t83, &_t84);
+        _t68 = _t83;
+    } else if (vela_str_eq(v_name, VELA_STR("strings.add", 11))) {
+        vela_array * _t85 = vela_array_new(&vela_type_int, 3);
+        int64_t _t86 = v_b;
+        vela_array_push(_t85, &_t86);
+        int64_t _t87 = v_s;
+        vela_array_push(_t85, &_t87);
+        int64_t _t88 = v_nothing;
+        vela_array_push(_t85, &_t88);
+        _t68 = _t85;
+    } else if (vela_str_eq(v_name, VELA_STR("strings.add_byte", 16))) {
+        vela_array * _t89 = vela_array_new(&vela_type_int, 3);
+        int64_t _t90 = v_b;
+        vela_array_push(_t89, &_t90);
+        int64_t _t91 = f_5types_BYTE();
+        int64_t _t92 = _t91;
+        vela_array_push(_t89, &_t92);
+        int64_t _t93 = v_nothing;
+        vela_array_push(_t89, &_t93);
+        _t68 = _t89;
+    } else if (vela_str_eq(v_name, VELA_STR("strings.add_int", 15))) {
+        vela_array * _t94 = vela_array_new(&vela_type_int, 3);
+        int64_t _t95 = v_b;
+        vela_array_push(_t94, &_t95);
+        int64_t _t96 = f_5types_INT();
+        int64_t _t97 = _t96;
+        vela_array_push(_t94, &_t97);
+        int64_t _t98 = v_nothing;
+        vela_array_push(_t94, &_t98);
+        _t68 = _t94;
+    } else if (vela_str_eq(v_name, VELA_STR("strings.build", 13))) {
+        vela_array * _t99 = vela_array_new(&vela_type_int, 2);
+        int64_t _t100 = v_b;
+        vela_array_push(_t99, &_t100);
+        int64_t _t101 = v_s;
+        vela_array_push(_t99, &_t101);
+        _t68 = _t99;
+    } else if (vela_str_eq(v_name, VELA_STR("strings.from_float", 18))) {
+        vela_array * _t102 = vela_array_new(&vela_type_int, 2);
+        int64_t _t103 = f_5types_FLOAT();
+        int64_t _t104 = _t103;
+        vela_array_push(_t102, &_t104);
+        int64_t _t105 = v_s;
+        vela_array_push(_t102, &_t105);
+        _t68 = _t102;
+    } else {
+        vela_array * _t106 = vela_array_new(&vela_type_int, 2);
+        int64_t _t107 = f_5types_INT();
+        int64_t _t108 = _t107;
+        vela_array_push(_t106, &_t108);
+        int64_t _t109 = v_s;
+        vela_array_push(_t106, &_t109);
+        _t68 = _t106;
+    }
+    vela_array * _t110 = _t68;
     vela_str_release(v_name);
-    return _t103;
+    return _t110;
 }
 /* vela: part */
 
 int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args, vela_str v_written) {
-    // line 3431
+    // line 3436
     vela_str _t1 = v_name;
     vela_str_retain(_t1);
     bool _t2 = f_7checker_has_signature(_t1);
     if (_t2) {
-        // line 3432
+        // line 3437
         t_3ast_Expr _t3 = v_e;
         rc_retain_t_3ast_Expr(_t3);
         vela_str _t4 = v_name;
@@ -35002,9 +35033,9 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t8;
     }
-    // line 3434
+    // line 3439
     int64_t v_want = 2;
-    // line 3435
+    // line 3440
     bool _t9 = vela_str_eq(v_name, VELA_STR("print", 5));
     bool _t10 = _t9;
     if (!_t10) {
@@ -35042,10 +35073,10 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         _t22 = _t23;
     }
     if (_t22) {
-        // line 3437
+        // line 3442
         v_want = 1;
     }
-    // line 3439
+    // line 3444
     t_3ast_Expr _t24 = v_e;
     rc_retain_t_3ast_Expr(_t24);
     vela_str _t25 = v_written;
@@ -35054,21 +35085,21 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
     bool _t27 = f_7checker_arity(&(*v_c), _t24, _t25, v_want, _t26);
     bool _t28 = !_t27;
     if (_t28) {
-        // line 3440
+        // line 3445
         vela_array * _t30 = v_args;
         vela_array_retain(_t30);
         vela_array * _t29 = _t30;
         for (int64_t _t31 = 0; _t31 < _t29->len; _t31++) {
             t_3ast_Expr v_a = ((t_3ast_Expr *)_t29->data)[_t31];
             rc_retain_t_3ast_Expr(v_a);
-            // line 3441
+            // line 3446
             t_3ast_Expr _t32 = v_a;
             rc_retain_t_3ast_Expr(_t32);
             int64_t _t33 = f_7checker_infer(&(*v_c), _t32);
             rc_release_t_3ast_Expr(v_a);
         }
         vela_array_release(_t29);
-        // line 3443
+        // line 3448
         int64_t _t34;
         if (vela_str_eq(v_name, VELA_STR("print", 5))) {
             int64_t _t35 = f_5types_NOTHING();
@@ -35111,7 +35142,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t46;
     }
-    // line 3457
+    // line 3462
     bool _t47 = vela_str_eq(v_name, VELA_STR("print", 5));
     bool _t48 = _t47;
     if (!_t48) {
@@ -35119,12 +35150,12 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         _t48 = _t49;
     }
     if (_t48) {
-        // line 3458
-        t_3ast_Expr _t50 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3458:34");
+        // line 3463
+        t_3ast_Expr _t50 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3463:34");
         rc_retain_t_3ast_Expr(_t50);
         int64_t _t51 = f_7checker_value(&(*v_c), _t50);
         int64_t v_t = _t51;
-        // line 3459
+        // line 3464
         bool _t52 = f_7checker_is_printable(v_t);
         bool _t53 = !_t52;
         bool _t54 = _t53;
@@ -35134,8 +35165,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             _t54 = _t56;
         }
         if (_t54) {
-            // line 3460
-            t_3ast_Expr _t57 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3460:34");
+            // line 3465
+            t_3ast_Expr _t57 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3465:34");
             rc_retain_t_3ast_Expr(_t57);
             vela_str _t58 = vela_str_concat(v_written, VELA_STR(" takes an Int, Byte, Float, Bool or Str, not ", 45));
             t_7checker_Checker _t59 = (*v_c);
@@ -35146,7 +35177,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(_t60);
             vela_str_release(_t58);
         }
-        // line 3462
+        // line 3467
         int64_t _t62 = f_5types_NOTHING();
         int64_t _t63 = _t62;
         vela_str_release(v_written);
@@ -35155,16 +35186,16 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t63;
     }
-    // line 3464
+    // line 3469
     bool _t64 = vela_str_eq(v_name, VELA_STR("assert", 6));
     if (_t64) {
-        // line 3465
-        t_3ast_Expr _t65 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3465:31");
+        // line 3470
+        t_3ast_Expr _t65 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3470:31");
         rc_retain_t_3ast_Expr(_t65);
         int64_t _t66 = f_5types_BOOL();
         t_7checker_Msg _t67 = f_7checker_msg(VELA_STR("assert takes a Bool, found ", 27), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t65, _t66, _t67);
-        // line 3466
+        // line 3471
         int64_t _t68 = f_5types_NOTHING();
         int64_t _t69 = _t68;
         vela_str_release(v_written);
@@ -35173,15 +35204,15 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t69;
     }
-    // line 3468
+    // line 3473
     bool _t70 = vela_str_eq(v_name, VELA_STR("len", 3));
     if (_t70) {
-        // line 3469
-        t_3ast_Expr _t71 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3469:34");
+        // line 3474
+        t_3ast_Expr _t71 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3474:34");
         rc_retain_t_3ast_Expr(_t71);
         int64_t _t72 = f_7checker_value(&(*v_c), _t71);
         int64_t v_t_2 = _t72;
-        // line 3470
+        // line 3475
         int64_t _t73 = f_5types_STR();
         bool _t74 = v_t_2 == _t73;
         bool _t75 = _t74;
@@ -35206,8 +35237,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         }
         bool _t84 = !_t81;
         if (_t84) {
-            // line 3471
-            t_3ast_Expr _t85 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3471:34");
+            // line 3476
+            t_3ast_Expr _t85 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3476:34");
             rc_retain_t_3ast_Expr(_t85);
             t_7checker_Checker _t86 = (*v_c);
             rc_retain_t_7checker_Checker(_t86);
@@ -35216,7 +35247,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             f_7checker_report_at(&(*v_c), _t85, _t88);
             vela_str_release(_t87);
         }
-        // line 3473
+        // line 3478
         int64_t _t89 = f_5types_INT();
         int64_t _t90 = _t89;
         vela_str_release(v_written);
@@ -35225,33 +35256,33 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t90;
     }
-    // line 3475
+    // line 3480
     bool _t91 = vela_str_eq(v_name, VELA_STR("int", 3));
     if (_t91) {
-        // line 3477
+        // line 3482
         bool v_is_lit = false;
-        // line 3478
-        t_3ast_Expr _t92 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3478:19");
+        // line 3483
+        t_3ast_Expr _t92 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3483:19");
         if (_t92.m_kind->value.tag == t_3ast_ExprKind_IntLit) {
-            // line 3479
+            // line 3484
             v_is_lit = true;
         } else {
         }
-        // line 3482
+        // line 3487
         if (v_is_lit) {
-            // line 3483
-            t_3ast_Expr _t93 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3483:35");
+            // line 3488
+            t_3ast_Expr _t93 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3488:35");
             rc_retain_t_3ast_Expr(_t93);
             int64_t _t94 = f_5types_BYTE();
             t_7checker_Msg _t95 = f_7checker_msg(VELA_STR("int takes a Byte or a Float, found ", 35), VELA_STR("", 0));
             f_7checker_check_expr(&(*v_c), _t93, _t94, _t95);
         } else {
-            // line 3485
-            t_3ast_Expr _t96 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3485:38");
+            // line 3490
+            t_3ast_Expr _t96 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3490:38");
             rc_retain_t_3ast_Expr(_t96);
             int64_t _t97 = f_7checker_value(&(*v_c), _t96);
             int64_t v_t_3 = _t97;
-            // line 3486
+            // line 3491
             int64_t _t98 = f_5types_BYTE();
             bool _t99 = v_t_3 != _t98;
             bool _t100 = _t99;
@@ -35267,8 +35298,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
                 _t103 = _t105;
             }
             if (_t103) {
-                // line 3487
-                t_3ast_Expr _t106 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3487:38");
+                // line 3492
+                t_3ast_Expr _t106 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3492:38");
                 rc_retain_t_3ast_Expr(_t106);
                 t_7checker_Checker _t107 = (*v_c);
                 rc_retain_t_7checker_Checker(_t107);
@@ -35278,7 +35309,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
                 vela_str_release(_t108);
             }
         }
-        // line 3490
+        // line 3495
         int64_t _t110 = f_5types_INT();
         int64_t _t111 = _t110;
         vela_str_release(v_written);
@@ -35287,16 +35318,16 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t111;
     }
-    // line 3492
+    // line 3497
     bool _t112 = vela_str_eq(v_name, VELA_STR("float", 5));
     if (_t112) {
-        // line 3493
-        t_3ast_Expr _t113 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3493:31");
+        // line 3498
+        t_3ast_Expr _t113 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3498:31");
         rc_retain_t_3ast_Expr(_t113);
         int64_t _t114 = f_5types_INT();
         t_7checker_Msg _t115 = f_7checker_msg(VELA_STR("float takes an Int, found ", 26), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t113, _t114, _t115);
-        // line 3494
+        // line 3499
         int64_t _t116 = f_5types_FLOAT();
         int64_t _t117 = _t116;
         vela_str_release(v_written);
@@ -35305,16 +35336,16 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t117;
     }
-    // line 3496
+    // line 3501
     bool _t118 = vela_str_eq(v_name, VELA_STR("byte", 4));
     if (_t118) {
-        // line 3497
-        t_3ast_Expr _t119 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3497:31");
+        // line 3502
+        t_3ast_Expr _t119 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3502:31");
         rc_retain_t_3ast_Expr(_t119);
         int64_t _t120 = f_5types_INT();
         t_7checker_Msg _t121 = f_7checker_msg(VELA_STR("byte takes an Int, found ", 25), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t119, _t120, _t121);
-        // line 3498
+        // line 3503
         int64_t _t122 = f_5types_BYTE();
         int64_t _t123 = _t122;
         vela_str_release(v_written);
@@ -35323,29 +35354,29 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t123;
     }
-    // line 3500
+    // line 3505
     bool _t124 = vela_str_eq(v_name, VELA_STR("push", 4));
     if (_t124) {
-        // line 3501
-        t_3ast_Expr _t125 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3501:41");
+        // line 3506
+        t_3ast_Expr _t125 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3506:41");
         rc_retain_t_3ast_Expr(_t125);
         int64_t _t126 = f_5types_NOTHING();
         int64_t _t127 = f_7checker_mut_argument(&(*v_c), _t125, _t126, VELA_STR("argument 1 of 'push'", 20));
         int64_t v_t_4 = _t127;
-        // line 3502
+        // line 3507
         t_5types_Table _t128 = (*v_c).m_table;
         rc_retain_t_5types_Table(_t128);
         bool _t129 = f_5types_is_array(_t128, v_t_4);
         if (_t129) {
-            // line 3503
+            // line 3508
             t_5types_Table _t130 = (*v_c).m_table;
             rc_retain_t_5types_Table(_t130);
             t_5types_TypeInfo _t131 = f_5types_get(_t130, v_t_4);
-            int64_t _t132 = *(int64_t *)vela_array_at(_t131.m_args, 0, "stage1/checker.vl:3503:50");
+            int64_t _t132 = *(int64_t *)vela_array_at(_t131.m_args, 0, "stage1/checker.vl:3508:50");
             int64_t v_elem = _t132;
             rc_release_t_5types_TypeInfo(_t131);
-            // line 3504
-            t_3ast_Expr _t133 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/checker.vl:3504:35");
+            // line 3509
+            t_3ast_Expr _t133 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/checker.vl:3509:35");
             rc_retain_t_3ast_Expr(_t133);
             t_7checker_Checker _t134 = (*v_c);
             rc_retain_t_7checker_Checker(_t134);
@@ -35365,12 +35396,12 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(_t136);
             vela_str_release(_t135);
         } else {
-            // line 3506
+            // line 3511
             int64_t _t143 = f_5types_ERROR();
             bool _t144 = v_t_4 != _t143;
             if (_t144) {
-                // line 3507
-                t_3ast_Expr _t145 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3507:38");
+                // line 3512
+                t_3ast_Expr _t145 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3512:38");
                 rc_retain_t_3ast_Expr(_t145);
                 t_7checker_Checker _t146 = (*v_c);
                 rc_retain_t_7checker_Checker(_t146);
@@ -35379,12 +35410,12 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
                 f_7checker_report_at(&(*v_c), _t145, _t148);
                 vela_str_release(_t147);
             }
-            // line 3509
-            t_3ast_Expr _t149 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/checker.vl:3509:30");
+            // line 3514
+            t_3ast_Expr _t149 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/checker.vl:3514:30");
             rc_retain_t_3ast_Expr(_t149);
             int64_t _t150 = f_7checker_infer(&(*v_c), _t149);
         }
-        // line 3511
+        // line 3516
         int64_t _t151 = f_5types_NOTHING();
         int64_t _t152 = _t151;
         vela_str_release(v_written);
@@ -35393,14 +35424,14 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t152;
     }
-    // line 3514
+    // line 3519
     int64_t _t153 = f_5types_ERROR();
     int64_t v_t_5 = _t153;
-    // line 3515
+    // line 3520
     bool _t154 = vela_str_eq(v_name, VELA_STR("maps.remove", 11));
     if (_t154) {
-        // line 3516
-        t_3ast_Expr _t155 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3516:37");
+        // line 3521
+        t_3ast_Expr _t155 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3521:37");
         rc_retain_t_3ast_Expr(_t155);
         int64_t _t156 = f_5types_NOTHING();
         vela_str _t157 = vela_str_concat(VELA_STR("argument 1 of '", 15), v_written);
@@ -35409,24 +35440,24 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         v_t_5 = _t159;
         vela_str_release(_t157);
     } else {
-        // line 3518
-        t_3ast_Expr _t160 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3518:30");
+        // line 3523
+        t_3ast_Expr _t160 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3523:30");
         rc_retain_t_3ast_Expr(_t160);
         int64_t _t161 = f_7checker_value(&(*v_c), _t160);
         v_t_5 = _t161;
     }
-    // line 3520
+    // line 3525
     t_5types_Table _t162 = (*v_c).m_table;
     rc_retain_t_5types_Table(_t162);
     bool _t163 = f_5types_is_map(_t162, v_t_5);
     bool _t164 = !_t163;
     if (_t164) {
-        // line 3521
+        // line 3526
         int64_t _t165 = f_5types_ERROR();
         bool _t166 = v_t_5 != _t165;
         if (_t166) {
-            // line 3522
-            t_3ast_Expr _t167 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3522:34");
+            // line 3527
+            t_3ast_Expr _t167 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/checker.vl:3527:34");
             rc_retain_t_3ast_Expr(_t167);
             vela_str _t168 = vela_str_concat(v_written, VELA_STR(" needs a map, not ", 18));
             t_7checker_Checker _t169 = (*v_c);
@@ -35437,24 +35468,24 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(_t170);
             vela_str_release(_t168);
         }
-        // line 3524
+        // line 3529
         int64_t _t173 = v_args->len;
-        vela_array * _t174 = vela_array_slice(v_args, 1, _t173, "stage1/checker.vl:3524:22");
+        vela_array * _t174 = vela_array_slice(v_args, 1, _t173, "stage1/checker.vl:3529:22");
         vela_array * _t172 = _t174;
         for (int64_t _t175 = 0; _t175 < _t172->len; _t175++) {
             t_3ast_Expr v_a_2 = ((t_3ast_Expr *)_t172->data)[_t175];
             rc_retain_t_3ast_Expr(v_a_2);
-            // line 3525
+            // line 3530
             t_3ast_Expr _t176 = v_a_2;
             rc_retain_t_3ast_Expr(_t176);
             int64_t _t177 = f_7checker_infer(&(*v_c), _t176);
             rc_release_t_3ast_Expr(v_a_2);
         }
         vela_array_release(_t172);
-        // line 3527
+        // line 3532
         bool _t178 = vela_str_eq(v_name, VELA_STR("maps.has", 8));
         if (_t178) {
-            // line 3528
+            // line 3533
             int64_t _t179 = f_5types_BOOL();
             int64_t _t180 = _t179;
             vela_str_release(v_written);
@@ -35463,10 +35494,10 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             rc_release_t_3ast_Expr(v_e);
             return _t180;
         }
-        // line 3530
+        // line 3535
         bool _t181 = vela_str_eq(v_name, VELA_STR("maps.remove", 11));
         if (_t181) {
-            // line 3531
+            // line 3536
             int64_t _t182 = f_5types_NOTHING();
             int64_t _t183 = _t182;
             vela_str_release(v_written);
@@ -35475,7 +35506,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             rc_release_t_3ast_Expr(v_e);
             return _t183;
         }
-        // line 3533
+        // line 3538
         int64_t _t184 = f_5types_ERROR();
         int64_t _t185 = _t184;
         vela_str_release(v_written);
@@ -35484,17 +35515,17 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t185;
     }
-    // line 3535
+    // line 3540
     t_5types_Table _t186 = (*v_c).m_table;
     rc_retain_t_5types_Table(_t186);
     t_5types_TypeInfo _t187 = f_5types_get(_t186, v_t_5);
-    int64_t _t188 = *(int64_t *)vela_array_at(_t187.m_args, 0, "stage1/checker.vl:3535:41");
+    int64_t _t188 = *(int64_t *)vela_array_at(_t187.m_args, 0, "stage1/checker.vl:3540:41");
     int64_t v_key = _t188;
     rc_release_t_5types_TypeInfo(_t187);
-    // line 3536
+    // line 3541
     bool _t189 = vela_str_eq(v_name, VELA_STR("maps.keys", 9));
     if (_t189) {
-        // line 3537
+        // line 3542
         int64_t _t190 = f_5types_array(&(*v_c).m_table, v_key);
         int64_t _t191 = _t190;
         vela_str_release(v_written);
@@ -35503,8 +35534,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t191;
     }
-    // line 3539
-    t_3ast_Expr _t192 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/checker.vl:3539:27");
+    // line 3544
+    t_3ast_Expr _t192 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/checker.vl:3544:27");
     rc_retain_t_3ast_Expr(_t192);
     t_7checker_Checker _t193 = (*v_c);
     rc_retain_t_7checker_Checker(_t193);
@@ -35523,10 +35554,10 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
     vela_str_release(_t196);
     vela_str_release(_t195);
     vela_str_release(_t194);
-    // line 3540
+    // line 3545
     bool _t202 = vela_str_eq(v_name, VELA_STR("maps.has", 8));
     if (_t202) {
-        // line 3541
+        // line 3546
         int64_t _t203 = f_5types_BOOL();
         int64_t _t204 = _t203;
         vela_str_release(v_written);
@@ -35535,14 +35566,14 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t204;
     }
-    // line 3543
+    // line 3548
     bool _t205 = vela_str_eq(v_name, VELA_STR("maps.get", 8));
     if (_t205) {
-        // line 3544
+        // line 3549
         t_5types_Table _t206 = (*v_c).m_table;
         rc_retain_t_5types_Table(_t206);
         t_5types_TypeInfo _t207 = f_5types_get(_t206, v_t_5);
-        int64_t _t208 = *(int64_t *)vela_array_at(_t207.m_args, 1, "stage1/checker.vl:3544:68");
+        int64_t _t208 = *(int64_t *)vela_array_at(_t207.m_args, 1, "stage1/checker.vl:3549:68");
         int64_t _t209 = f_5types_option(&(*v_c).m_table, _t208);
         int64_t _t210 = _t209;
         rc_release_t_5types_TypeInfo(_t207);
@@ -35552,7 +35583,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         rc_release_t_3ast_Expr(v_e);
         return _t210;
     }
-    // line 3546
+    // line 3551
     int64_t _t211 = f_5types_NOTHING();
     int64_t _t212 = _t211;
     vela_str_release(v_written);
@@ -35564,7 +35595,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
 /* vela: part */
 
 bool f_7checker_changes_first(vela_str v_name) {
-    // line 3550
+    // line 3555
     bool _t1 = vela_str_eq(v_name, VELA_STR("strings.add", 11));
     bool _t2 = _t1;
     if (!_t2) {
@@ -35583,19 +35614,19 @@ bool f_7checker_changes_first(vela_str v_name) {
 /* vela: part */
 
 int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args, vela_str v_written) {
-    // line 3554
+    // line 3559
     vela_str _t1 = v_name;
     vela_str_retain(_t1);
     vela_array * _t2 = f_7checker_signature(&(*v_c), _t1);
     vela_array * v_sig = _t2;
-    // line 3555
+    // line 3560
     int64_t _t3 = v_sig->len;
-    int64_t _t4 = vela_sub(_t3, 1, "stage1/checker.vl:3555:22");
+    int64_t _t4 = vela_sub(_t3, 1, "stage1/checker.vl:3560:22");
     int64_t v_n = _t4;
-    // line 3556
-    int64_t _t5 = *(int64_t *)vela_array_at(v_sig, v_n, "stage1/checker.vl:3556:21");
+    // line 3561
+    int64_t _t5 = *(int64_t *)vela_array_at(v_sig, v_n, "stage1/checker.vl:3561:21");
     int64_t v_result = _t5;
-    // line 3557
+    // line 3562
     t_3ast_Expr _t6 = v_e;
     rc_retain_t_3ast_Expr(_t6);
     vela_str _t7 = v_written;
@@ -35604,21 +35635,21 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
     bool _t9 = f_7checker_arity(&(*v_c), _t6, _t7, v_n, _t8);
     bool _t10 = !_t9;
     if (_t10) {
-        // line 3558
+        // line 3563
         vela_array * _t12 = v_args;
         vela_array_retain(_t12);
         vela_array * _t11 = _t12;
         for (int64_t _t13 = 0; _t13 < _t11->len; _t13++) {
             t_3ast_Expr v_a = ((t_3ast_Expr *)_t11->data)[_t13];
             rc_retain_t_3ast_Expr(v_a);
-            // line 3559
+            // line 3564
             t_3ast_Expr _t14 = v_a;
             rc_retain_t_3ast_Expr(_t14);
             int64_t _t15 = f_7checker_infer(&(*v_c), _t14);
             rc_release_t_3ast_Expr(v_a);
         }
         vela_array_release(_t11);
-        // line 3561
+        // line 3566
         int64_t _t16 = v_result;
         vela_array_release(v_sig);
         vela_str_release(v_written);
@@ -35627,14 +35658,14 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
         rc_release_t_3ast_Expr(v_e);
         return _t16;
     }
-    // line 3563
+    // line 3568
     int64_t _t17 = v_n;
     for (int64_t _t18 = 0; _t18 < _t17; _t18++) {
         int64_t v_i = _t18;
-        // line 3564
-        int64_t _t19 = *(int64_t *)vela_array_at(v_sig, v_i, "stage1/checker.vl:3564:23");
+        // line 3569
+        int64_t _t19 = *(int64_t *)vela_array_at(v_sig, v_i, "stage1/checker.vl:3569:23");
         int64_t v_want = _t19;
-        // line 3565
+        // line 3570
         bool _t20 = v_i == 0;
         bool _t21 = _t20;
         if (_t21) {
@@ -35644,18 +35675,18 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
             _t21 = _t23;
         }
         if (_t21) {
-            // line 3566
-            t_3ast_Expr _t24 = *(t_3ast_Expr *)vela_array_at(v_args, v_i, "stage1/checker.vl:3566:37");
+            // line 3571
+            t_3ast_Expr _t24 = *(t_3ast_Expr *)vela_array_at(v_args, v_i, "stage1/checker.vl:3571:37");
             rc_retain_t_3ast_Expr(_t24);
             vela_str _t25 = vela_str_concat(VELA_STR("argument 1 of '", 15), v_written);
             vela_str _t26 = vela_str_concat(_t25, VELA_STR("'", 1));
             int64_t _t27 = f_7checker_mut_argument(&(*v_c), _t24, v_want, _t26);
             vela_str_release(_t25);
         } else {
-            // line 3568
-            t_3ast_Expr _t28 = *(t_3ast_Expr *)vela_array_at(v_args, v_i, "stage1/checker.vl:3568:35");
+            // line 3573
+            t_3ast_Expr _t28 = *(t_3ast_Expr *)vela_array_at(v_args, v_i, "stage1/checker.vl:3573:35");
             rc_retain_t_3ast_Expr(_t28);
-            int64_t _t29 = vela_add(v_i, 1, "stage1/checker.vl:3568:83");
+            int64_t _t29 = vela_add(v_i, 1, "stage1/checker.vl:3573:83");
             vela_str _t30 = vela_from_int(_t29);
             vela_str _t31 = vela_str_concat(VELA_STR("argument ", 9), _t30);
             vela_str _t32 = vela_str_concat(_t31, VELA_STR(" of '", 5));
@@ -35677,7 +35708,7 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
             vela_str_release(_t30);
         }
     }
-    // line 3572
+    // line 3577
     int64_t _t40 = v_result;
     vela_array_release(v_sig);
     vela_str_release(v_written);
@@ -35689,7 +35720,7 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
 /* vela: part */
 
 vela_str f_7checker_written(t_3ast_Expr v_callee) {
-    // line 3577
+    // line 3582
     vela_str _t1;
     if (v_callee.m_kind->value.tag == t_3ast_ExprKind_Field) {
         t_3ast_Expr v_obj = v_callee.m_kind->value.as.m_Field._0->value;
@@ -35723,28 +35754,28 @@ vela_str f_7checker_written(t_3ast_Expr v_callee) {
 /* vela: part */
 
 vela_str f_7checker_describe_target(t_3ast_Expr v_target) {
-    // line 3586
+    // line 3591
     vela_array * _t1 = vela_array_new(&vela_type_str, 0);
     vela_array * v_parts = _t1;
-    // line 3587
+    // line 3592
     t_3ast_Expr _t2 = v_target;
     rc_retain_t_3ast_Expr(_t2);
     t_3ast_Expr v_node = _t2;
-    // line 3588
+    // line 3593
     for (;;) {
-        // line 3589
+        // line 3594
         if (v_node.m_kind->value.tag == t_3ast_ExprKind_Field) {
             t_3ast_Expr v_obj = v_node.m_kind->value.as.m_Field._0->value;
             rc_retain_t_3ast_Expr(v_obj);
             vela_str v_name = v_node.m_kind->value.as.m_Field._1;
             vela_str_retain(v_name);
-            // line 3591
+            // line 3596
             vela_str _t3 = v_name;
             vela_str_retain(_t3);
             vela_array_unique(&v_parts);
             vela_str _t4 = _t3;
             vela_array_push(v_parts, &_t4);
-            // line 3592
+            // line 3597
             t_3ast_Expr _t5 = v_obj;
             rc_retain_t_3ast_Expr(_t5);
             rc_release_t_3ast_Expr(v_node);
@@ -35752,15 +35783,15 @@ vela_str f_7checker_describe_target(t_3ast_Expr v_target) {
             vela_str_release(v_name);
             rc_release_t_3ast_Expr(v_obj);
         } else {
-            // line 3594
+            // line 3599
             break;
         }
     }
-    // line 3597
+    // line 3602
     if (v_node.m_kind->value.tag == t_3ast_ExprKind_Name) {
         vela_str v_name_2 = v_node.m_kind->value.as.m_Name._0;
         vela_str_retain(v_name_2);
-        // line 3598
+        // line 3603
         vela_str _t6 = v_name_2;
         vela_str_retain(_t6);
         vela_array_unique(&v_parts);
@@ -35769,43 +35800,43 @@ vela_str f_7checker_describe_target(t_3ast_Expr v_target) {
         vela_str_release(v_name_2);
     } else {
     }
-    // line 3601
+    // line 3606
     vela_array * _t8 = vela_array_new(&vela_type_byte, 0);
     vela_array * v_b = _t8;
-    // line 3602
+    // line 3607
     vela_array_unique(&v_b);
     uint8_t _t9 = 39;
     vela_array_push(v_b, &_t9);
-    // line 3603
+    // line 3608
     int64_t _t10 = v_parts->len;
-    int64_t _t11 = vela_sub(_t10, 1, "stage1/checker.vl:3603:28");
+    int64_t _t11 = vela_sub(_t10, 1, "stage1/checker.vl:3608:28");
     int64_t v_i = _t11;
-    // line 3604
+    // line 3609
     for (;;) {
         bool _t12 = v_i >= 0;
         bool _t13 = _t12;
         if (!_t13) break;
-        // line 3605
-        vela_str _t14 = *(vela_str *)vela_array_at(v_parts, v_i, "stage1/checker.vl:3605:33");
+        // line 3610
+        vela_str _t14 = *(vela_str *)vela_array_at(v_parts, v_i, "stage1/checker.vl:3610:33");
         vela_array_unique(&v_b);
         vela_builder_add(v_b, _t14);
-        // line 3606
+        // line 3611
         bool _t15 = v_i > 0;
         if (_t15) {
-            // line 3607
+            // line 3612
             vela_array_unique(&v_b);
             uint8_t _t16 = 46;
             vela_array_push(v_b, &_t16);
         }
-        // line 3609
-        int64_t _t17 = vela_sub(v_i, 1, "stage1/checker.vl:3609:15");
+        // line 3614
+        int64_t _t17 = vela_sub(v_i, 1, "stage1/checker.vl:3614:15");
         v_i = _t17;
     }
-    // line 3611
+    // line 3616
     vela_array_unique(&v_b);
     uint8_t _t18 = 39;
     vela_array_push(v_b, &_t18);
-    // line 3612
+    // line 3617
     vela_str _t19 = vela_builder_build(v_b);
     vela_str _t20 = _t19;
     vela_array_release(v_b);
@@ -35817,17 +35848,17 @@ vela_str f_7checker_describe_target(t_3ast_Expr v_target) {
 /* vela: part */
 
 bool f_7checker_terminates_block(t_7checker_Checker v_c, t_3ast_Block v_b) {
-    // line 3618
+    // line 3623
     int64_t _t1 = v_b.m_stmts->len;
     int64_t v_n = _t1;
-    // line 3619
+    // line 3624
     bool _t2 = v_n > 0;
     bool _t3 = _t2;
     if (_t3) {
         t_7checker_Checker _t4 = v_c;
         rc_retain_t_7checker_Checker(_t4);
-        int64_t _t6 = vela_sub(v_n, 1, "stage1/checker.vl:3619:45");
-        t_3ast_Stmt _t5 = *(t_3ast_Stmt *)vela_array_at(v_b.m_stmts, _t6, "stage1/checker.vl:3619:42");
+        int64_t _t6 = vela_sub(v_n, 1, "stage1/checker.vl:3624:45");
+        t_3ast_Stmt _t5 = *(t_3ast_Stmt *)vela_array_at(v_b.m_stmts, _t6, "stage1/checker.vl:3624:42");
         rc_retain_t_3ast_Stmt(_t5);
         bool _t7 = f_7checker_terminates(_t4, _t5);
         _t3 = _t7;
@@ -35840,9 +35871,9 @@ bool f_7checker_terminates_block(t_7checker_Checker v_c, t_3ast_Block v_b) {
 /* vela: part */
 
 bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
-    // line 3623
+    // line 3628
     if (v_s.m_kind->value.tag == t_3ast_StmtKind_Return) {
-        // line 3624
+        // line 3629
         bool _t1 = true;
         rc_release_t_3ast_Stmt(v_s);
         rc_release_t_7checker_Checker(v_c);
@@ -35850,14 +35881,14 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_ExprStmt) {
         t_3ast_Expr v_e = v_s.m_kind->value.as.m_ExprStmt._0;
         rc_retain_t_3ast_Expr(v_e);
-        // line 3626
+        // line 3631
         if (v_e.m_kind->value.tag == t_3ast_ExprKind_Call) {
-            // line 3628
-            t_7checker_Ref _t2 = *(t_7checker_Ref *)vela_array_at(v_c.m_refs, v_e.m_id, "stage1/checker.vl:3628:33");
+            // line 3633
+            t_7checker_Ref _t2 = *(t_7checker_Ref *)vela_array_at(v_c.m_refs, v_e.m_id, "stage1/checker.vl:3633:33");
             if (_t2.tag == t_7checker_Ref_Builtin) {
                 vela_str v_name = _t2.as.m_Builtin._0;
                 vela_str_retain(v_name);
-                // line 3629
+                // line 3634
                 bool _t3 = vela_str_eq(v_name, VELA_STR("os.exit", 7));
                 bool _t4 = _t3;
                 vela_str_release(v_name);
@@ -35866,7 +35897,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
                 rc_release_t_7checker_Checker(v_c);
                 return _t4;
             } else {
-                // line 3630
+                // line 3635
                 bool _t5 = false;
                 rc_release_t_3ast_Expr(v_e);
                 rc_release_t_3ast_Stmt(v_s);
@@ -35874,7 +35905,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
                 return _t5;
             }
         } else {
-            // line 3633
+            // line 3638
             bool _t6 = false;
             rc_release_t_3ast_Expr(v_e);
             rc_release_t_3ast_Stmt(v_s);
@@ -35884,7 +35915,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_Block) {
         t_3ast_Block v_b = v_s.m_kind->value.as.m_Block._0;
         rc_retain_t_3ast_Block(v_b);
-        // line 3636
+        // line 3641
         t_7checker_Checker _t7 = v_c;
         rc_retain_t_7checker_Checker(_t7);
         t_3ast_Block _t8 = v_b;
@@ -35900,9 +35931,9 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
         rc_retain_t_3ast_Block(v_then);
         t_3ast_Else v_otherwise = v_s.m_kind->value.as.m_If._2->value;
         rc_retain_t_3ast_Else(v_otherwise);
-        // line 3638
+        // line 3643
         if (v_otherwise.tag == t_3ast_Else_NoElse) {
-            // line 3639
+            // line 3644
             bool _t11 = false;
             rc_release_t_3ast_Else(v_otherwise);
             rc_release_t_3ast_Block(v_then);
@@ -35912,7 +35943,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
         } else if (v_otherwise.tag == t_3ast_Else_ElseBlock) {
             t_3ast_Block v_b_2 = v_otherwise.as.m_ElseBlock._0;
             rc_retain_t_3ast_Block(v_b_2);
-            // line 3640
+            // line 3645
             t_7checker_Checker _t12 = v_c;
             rc_retain_t_7checker_Checker(_t12);
             t_3ast_Block _t13 = v_then;
@@ -35937,7 +35968,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
         } else {
             t_3ast_Stmt v_s2 = v_otherwise.as.m_ElseIf._0->value;
             rc_retain_t_3ast_Stmt(v_s2);
-            // line 3641
+            // line 3646
             t_7checker_Checker _t20 = v_c;
             rc_retain_t_7checker_Checker(_t20);
             t_3ast_Block _t21 = v_then;
@@ -35963,17 +35994,17 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_For) {
         Option_3ast_Expr v_cond = v_s.m_kind->value.as.m_For._0;
         rc_retain_Option_3ast_Expr(v_cond);
-        // line 3645
+        // line 3650
         if (v_cond.tag == Option_3ast_Expr_Some) {
-            // line 3646
+            // line 3651
             bool _t28 = false;
             rc_release_Option_3ast_Expr(v_cond);
             rc_release_t_3ast_Stmt(v_s);
             rc_release_t_7checker_Checker(v_c);
             return _t28;
         } else {
-            // line 3647
-            bool _t29 = *(bool *)vela_array_at(v_c.m_breaks, v_s.m_id, "stage1/checker.vl:3647:41");
+            // line 3652
+            bool _t29 = *(bool *)vela_array_at(v_c.m_breaks, v_s.m_id, "stage1/checker.vl:3652:41");
             bool _t30 = !_t29;
             bool _t31 = _t30;
             rc_release_Option_3ast_Expr(v_cond);
@@ -35984,29 +36015,29 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_MatchStmt) {
         vela_array * v_arms = v_s.m_kind->value.as.m_MatchStmt._1;
         vela_array_retain(v_arms);
-        // line 3652
+        // line 3657
         int64_t _t32 = v_arms->len;
         bool _t33 = _t32 == 0;
         if (_t33) {
-            // line 3653
+            // line 3658
             bool _t34 = false;
             vela_array_release(v_arms);
             rc_release_t_3ast_Stmt(v_s);
             rc_release_t_7checker_Checker(v_c);
             return _t34;
         }
-        // line 3655
+        // line 3660
         vela_array * _t36 = v_arms;
         vela_array_retain(_t36);
         vela_array * _t35 = _t36;
         for (int64_t _t37 = 0; _t37 < _t35->len; _t37++) {
             t_3ast_Arm v_a = ((t_3ast_Arm *)_t35->data)[_t37];
             rc_retain_t_3ast_Arm(v_a);
-            // line 3656
+            // line 3661
             if (v_a.m_body.tag == t_3ast_ArmBody_Do) {
                 t_3ast_Stmt v_body = v_a.m_body.as.m_Do._0;
                 rc_retain_t_3ast_Stmt(v_body);
-                // line 3658
+                // line 3663
                 t_7checker_Checker _t38 = v_c;
                 rc_retain_t_7checker_Checker(_t38);
                 t_3ast_Stmt _t39 = v_body;
@@ -36014,7 +36045,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
                 bool _t40 = f_7checker_terminates(_t38, _t39);
                 bool _t41 = !_t40;
                 if (_t41) {
-                    // line 3659
+                    // line 3664
                     bool _t42 = false;
                     rc_release_t_3ast_Stmt(v_body);
                     rc_release_t_3ast_Arm(v_a);
@@ -36026,7 +36057,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
                 }
                 rc_release_t_3ast_Stmt(v_body);
             } else {
-                // line 3662
+                // line 3667
                 bool _t43 = false;
                 rc_release_t_3ast_Arm(v_a);
                 vela_array_release(_t35);
@@ -36038,7 +36069,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
             rc_release_t_3ast_Arm(v_a);
         }
         vela_array_release(_t35);
-        // line 3665
+        // line 3670
         bool _t44 = true;
         vela_array_release(v_arms);
         rc_release_t_3ast_Stmt(v_s);
@@ -36047,7 +36078,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_With) {
         t_3ast_Block v_body_2 = v_s.m_kind->value.as.m_With._1;
         rc_retain_t_3ast_Block(v_body_2);
-        // line 3667
+        // line 3672
         t_7checker_Checker _t45 = v_c;
         rc_retain_t_7checker_Checker(_t45);
         t_3ast_Block _t46 = v_body_2;
@@ -36059,7 +36090,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
         rc_release_t_7checker_Checker(v_c);
         return _t48;
     } else {
-        // line 3668
+        // line 3673
         bool _t49 = false;
         rc_release_t_3ast_Stmt(v_s);
         rc_release_t_7checker_Checker(v_c);
@@ -47298,143 +47329,148 @@ t_7codegen_Value f_7codegen_builtin(t_7codegen_Gen * v_g, t_3ast_Expr v_e, vela_
         bool _t130 = vela_str_eq(v_name, VELA_STR("os.run", 6));
         _t129 = _t130;
     }
-    if (_t129) {
+    bool _t131 = _t129;
+    if (!_t131) {
+        bool _t132 = vela_str_eq(v_name, VELA_STR("os.output", 9));
+        _t131 = _t132;
+    }
+    if (_t131) {
         // line 1820
-        t_3ast_Expr _t131 = v_e;
-        rc_retain_t_3ast_Expr(_t131);
-        vela_str _t132 = v_name;
-        vela_str_retain(_t132);
-        vela_array * _t133 = v_args;
-        vela_array_retain(_t133);
-        t_7codegen_Value _t134 = f_7codegen_file_call(&(*v_g), _t131, _t132, _t133);
-        t_7codegen_Value _t135 = _t134;
+        t_3ast_Expr _t133 = v_e;
+        rc_retain_t_3ast_Expr(_t133);
+        vela_str _t134 = v_name;
+        vela_str_retain(_t134);
+        vela_array * _t135 = v_args;
+        vela_array_retain(_t135);
+        t_7codegen_Value _t136 = f_7codegen_file_call(&(*v_g), _t133, _t134, _t135);
+        t_7codegen_Value _t137 = _t136;
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t135;
+        return _t137;
     }
     // line 1822
-    bool _t136 = vela_str_eq(v_name, VELA_STR("os.env", 6));
-    bool _t137 = _t136;
-    if (!_t137) {
-        bool _t138 = vela_str_eq(v_name, VELA_STR("os.read_line", 12));
-        _t137 = _t138;
-    }
-    bool _t139 = _t137;
+    bool _t138 = vela_str_eq(v_name, VELA_STR("os.env", 6));
+    bool _t139 = _t138;
     if (!_t139) {
-        bool _t140 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
+        bool _t140 = vela_str_eq(v_name, VELA_STR("os.read_line", 12));
         _t139 = _t140;
     }
-    if (_t139) {
+    bool _t141 = _t139;
+    if (!_t141) {
+        bool _t142 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
+        _t141 = _t142;
+    }
+    if (_t141) {
         // line 1823
         vela_str v_call = VELA_STR("vela_os_read_line(", 18);
         // line 1824
-        bool _t141 = vela_str_eq(v_name, VELA_STR("os.env", 6));
-        if (_t141) {
+        bool _t143 = vela_str_eq(v_name, VELA_STR("os.env", 6));
+        if (_t143) {
             // line 1825
-            t_3ast_Expr _t142 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1825:53");
-            rc_retain_t_3ast_Expr(_t142);
-            t_7codegen_Value _t143 = f_7codegen_expr(&(*v_g), _t142);
-            vela_str _t144 = vela_str_concat(VELA_STR("vela_os_env(", 12), _t143.m_c);
-            vela_str _t145 = vela_str_concat(_t144, VELA_STR(", ", 2));
+            t_3ast_Expr _t144 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1825:53");
+            rc_retain_t_3ast_Expr(_t144);
+            t_7codegen_Value _t145 = f_7codegen_expr(&(*v_g), _t144);
+            vela_str _t146 = vela_str_concat(VELA_STR("vela_os_env(", 12), _t145.m_c);
+            vela_str _t147 = vela_str_concat(_t146, VELA_STR(", ", 2));
             vela_str_release(v_call);
-            v_call = _t145;
-            vela_str_release(_t144);
-            rc_release_t_7codegen_Value(_t143);
+            v_call = _t147;
+            vela_str_release(_t146);
+            rc_release_t_7codegen_Value(_t145);
         } else {
-            bool _t146 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
-            if (_t146) {
+            bool _t148 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
+            if (_t148) {
                 // line 1827
-                t_3ast_Expr _t147 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1827:58");
-                rc_retain_t_3ast_Expr(_t147);
-                t_7codegen_Value _t148 = f_7codegen_expr(&(*v_g), _t147);
-                vela_str _t149 = vela_str_concat(VELA_STR("vela_parse_float(", 17), _t148.m_c);
-                vela_str _t150 = vela_str_concat(_t149, VELA_STR(", ", 2));
+                t_3ast_Expr _t149 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1827:58");
+                rc_retain_t_3ast_Expr(_t149);
+                t_7codegen_Value _t150 = f_7codegen_expr(&(*v_g), _t149);
+                vela_str _t151 = vela_str_concat(VELA_STR("vela_parse_float(", 17), _t150.m_c);
+                vela_str _t152 = vela_str_concat(_t151, VELA_STR(", ", 2));
                 vela_str_release(v_call);
-                v_call = _t150;
-                vela_str_release(_t149);
-                rc_release_t_7codegen_Value(_t148);
+                v_call = _t152;
+                vela_str_release(_t151);
+                rc_release_t_7codegen_Value(_t150);
             }
         }
         // line 1829
-        vela_str _t151 = f_7codegen_new_temp(&(*v_g));
-        vela_str v_text = _t151;
+        vela_str _t153 = f_7codegen_new_temp(&(*v_g));
+        vela_str v_text = _t153;
         // line 1830
-        vela_str _t152 = f_7codegen_new_temp(&(*v_g));
-        vela_str v_ok = _t152;
+        vela_str _t154 = f_7codegen_new_temp(&(*v_g));
+        vela_str v_ok = _t154;
         // line 1831
-        bool _t153 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
-        if (_t153) {
+        bool _t155 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
+        if (_t155) {
             // line 1832
-            vela_str _t154 = vela_str_concat(VELA_STR("double ", 7), v_text);
-            vela_str _t155 = vela_str_concat(_t154, VELA_STR(" = 0;", 5));
-            f_7codegen_emit(&(*v_g), _t155);
-            vela_str_release(_t154);
-        } else {
-            // line 1834
-            vela_str _t156 = vela_str_concat(VELA_STR("vela_str ", 9), v_text);
-            vela_str _t157 = vela_str_concat(_t156, VELA_STR(" = VELA_STR(\"\", 0);", 19));
+            vela_str _t156 = vela_str_concat(VELA_STR("double ", 7), v_text);
+            vela_str _t157 = vela_str_concat(_t156, VELA_STR(" = 0;", 5));
             f_7codegen_emit(&(*v_g), _t157);
             vela_str_release(_t156);
+        } else {
+            // line 1834
+            vela_str _t158 = vela_str_concat(VELA_STR("vela_str ", 9), v_text);
+            vela_str _t159 = vela_str_concat(_t158, VELA_STR(" = VELA_STR(\"\", 0);", 19));
+            f_7codegen_emit(&(*v_g), _t159);
+            vela_str_release(_t158);
         }
         // line 1836
-        vela_str _t158 = vela_str_concat(VELA_STR("bool ", 5), v_ok);
-        vela_str _t159 = vela_str_concat(_t158, VELA_STR(" = ", 3));
-        vela_str _t160 = vela_str_concat(_t159, v_call);
-        vela_str _t161 = vela_str_concat(_t160, VELA_STR("&", 1));
-        vela_str _t162 = vela_str_concat(_t161, v_text);
-        vela_str _t163 = vela_str_concat(_t162, VELA_STR(");", 2));
-        f_7codegen_emit(&(*v_g), _t163);
+        vela_str _t160 = vela_str_concat(VELA_STR("bool ", 5), v_ok);
+        vela_str _t161 = vela_str_concat(_t160, VELA_STR(" = ", 3));
+        vela_str _t162 = vela_str_concat(_t161, v_call);
+        vela_str _t163 = vela_str_concat(_t162, VELA_STR("&", 1));
+        vela_str _t164 = vela_str_concat(_t163, v_text);
+        vela_str _t165 = vela_str_concat(_t164, VELA_STR(");", 2));
+        f_7codegen_emit(&(*v_g), _t165);
+        vela_str_release(_t164);
+        vela_str_release(_t163);
         vela_str_release(_t162);
         vela_str_release(_t161);
         vela_str_release(_t160);
-        vela_str_release(_t159);
-        vela_str_release(_t158);
         // line 1837
-        t_7codegen_Gen _t164 = (*v_g);
-        rc_retain_t_7codegen_Gen(_t164);
-        vela_str _t165 = f_7codegen_c_type(_t164, v_t);
-        vela_str v_opt = _t165;
+        t_7codegen_Gen _t166 = (*v_g);
+        rc_retain_t_7codegen_Gen(_t166);
+        vela_str _t167 = f_7codegen_c_type(_t166, v_t);
+        vela_str v_opt = _t167;
         // line 1838
-        vela_str _t166 = vela_str_concat(VELA_STR("(", 1), v_opt);
-        vela_str _t167 = vela_str_concat(_t166, VELA_STR("){ .tag = ", 10));
-        t_6layout_Layout _t168 = (*v_g).m_l;
-        rc_retain_t_6layout_Layout(_t168);
-        vela_str _t169 = f_6layout_tag(_t168, v_t, VELA_STR("Some", 4));
-        vela_str _t170 = vela_str_concat(_t167, _t169);
-        vela_str _t171 = vela_str_concat(_t170, VELA_STR(", .as.m_Some = { ._0 = ", 23));
-        vela_str _t172 = vela_str_concat(_t171, v_text);
-        vela_str _t173 = vela_str_concat(_t172, VELA_STR(" } }", 4));
-        vela_str v_some = _t173;
+        vela_str _t168 = vela_str_concat(VELA_STR("(", 1), v_opt);
+        vela_str _t169 = vela_str_concat(_t168, VELA_STR("){ .tag = ", 10));
+        t_6layout_Layout _t170 = (*v_g).m_l;
+        rc_retain_t_6layout_Layout(_t170);
+        vela_str _t171 = f_6layout_tag(_t170, v_t, VELA_STR("Some", 4));
+        vela_str _t172 = vela_str_concat(_t169, _t171);
+        vela_str _t173 = vela_str_concat(_t172, VELA_STR(", .as.m_Some = { ._0 = ", 23));
+        vela_str _t174 = vela_str_concat(_t173, v_text);
+        vela_str _t175 = vela_str_concat(_t174, VELA_STR(" } }", 4));
+        vela_str v_some = _t175;
+        vela_str_release(_t174);
+        vela_str_release(_t173);
         vela_str_release(_t172);
         vela_str_release(_t171);
-        vela_str_release(_t170);
         vela_str_release(_t169);
-        vela_str_release(_t167);
-        vela_str_release(_t166);
+        vela_str_release(_t168);
         // line 1839
-        vela_str _t174 = vela_str_concat(VELA_STR("(", 1), v_opt);
-        vela_str _t175 = vela_str_concat(_t174, VELA_STR("){ .tag = ", 10));
-        t_6layout_Layout _t176 = (*v_g).m_l;
-        rc_retain_t_6layout_Layout(_t176);
-        vela_str _t177 = f_6layout_tag(_t176, v_t, VELA_STR("None", 4));
-        vela_str _t178 = vela_str_concat(_t175, _t177);
-        vela_str _t179 = vela_str_concat(_t178, VELA_STR(" }", 2));
-        vela_str v_none = _t179;
-        vela_str_release(_t178);
-        vela_str_release(_t177);
-        vela_str_release(_t175);
-        vela_str_release(_t174);
-        // line 1840
-        vela_str _t180 = vela_str_concat(v_ok, VELA_STR(" \? ", 3));
-        vela_str _t181 = vela_str_concat(_t180, v_some);
-        vela_str _t182 = vela_str_concat(_t181, VELA_STR(" : ", 3));
-        vela_str _t183 = vela_str_concat(_t182, v_none);
-        t_7codegen_Value _t184 = f_7codegen_store(&(*v_g), v_t, _t183);
-        t_7codegen_Value _t185 = _t184;
-        vela_str_release(_t182);
-        vela_str_release(_t181);
+        vela_str _t176 = vela_str_concat(VELA_STR("(", 1), v_opt);
+        vela_str _t177 = vela_str_concat(_t176, VELA_STR("){ .tag = ", 10));
+        t_6layout_Layout _t178 = (*v_g).m_l;
+        rc_retain_t_6layout_Layout(_t178);
+        vela_str _t179 = f_6layout_tag(_t178, v_t, VELA_STR("None", 4));
+        vela_str _t180 = vela_str_concat(_t177, _t179);
+        vela_str _t181 = vela_str_concat(_t180, VELA_STR(" }", 2));
+        vela_str v_none = _t181;
         vela_str_release(_t180);
+        vela_str_release(_t179);
+        vela_str_release(_t177);
+        vela_str_release(_t176);
+        // line 1840
+        vela_str _t182 = vela_str_concat(v_ok, VELA_STR(" \? ", 3));
+        vela_str _t183 = vela_str_concat(_t182, v_some);
+        vela_str _t184 = vela_str_concat(_t183, VELA_STR(" : ", 3));
+        vela_str _t185 = vela_str_concat(_t184, v_none);
+        t_7codegen_Value _t186 = f_7codegen_store(&(*v_g), v_t, _t185);
+        t_7codegen_Value _t187 = _t186;
+        vela_str_release(_t184);
+        vela_str_release(_t183);
+        vela_str_release(_t182);
         vela_str_release(v_none);
         vela_str_release(v_some);
         vela_str_release(v_opt);
@@ -47444,202 +47480,202 @@ t_7codegen_Value f_7codegen_builtin(t_7codegen_Gen * v_g, t_3ast_Expr v_e, vela_
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t185;
+        return _t187;
     }
     // line 1842
-    bool _t186 = vela_str_eq(v_name, VELA_STR("len", 3));
-    if (_t186) {
+    bool _t188 = vela_str_eq(v_name, VELA_STR("len", 3));
+    if (_t188) {
         // line 1843
-        t_3ast_Expr _t187 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1843:35");
-        rc_retain_t_3ast_Expr(_t187);
-        t_7codegen_Value _t188 = f_7codegen_expr(&(*v_g), _t187);
-        t_7codegen_Value v_arg_2 = _t188;
+        t_3ast_Expr _t189 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1843:35");
+        rc_retain_t_3ast_Expr(_t189);
+        t_7codegen_Value _t190 = f_7codegen_expr(&(*v_g), _t189);
+        t_7codegen_Value v_arg_2 = _t190;
         // line 1844
-        vela_str _t189 = vela_str_concat(v_arg_2.m_c, VELA_STR("->len", 5));
-        vela_str v_length = _t189;
+        vela_str _t191 = vela_str_concat(v_arg_2.m_c, VELA_STR("->len", 5));
+        vela_str v_length = _t191;
         // line 1845
-        int64_t _t190 = f_5types_STR();
-        bool _t191 = v_arg_2.m_ty == _t190;
-        if (_t191) {
+        int64_t _t192 = f_5types_STR();
+        bool _t193 = v_arg_2.m_ty == _t192;
+        if (_t193) {
             // line 1846
-            vela_str _t192 = vela_str_concat(v_arg_2.m_c, VELA_STR(".len", 4));
+            vela_str _t194 = vela_str_concat(v_arg_2.m_c, VELA_STR(".len", 4));
             vela_str_release(v_length);
-            v_length = _t192;
+            v_length = _t194;
         }
         // line 1848
-        int64_t _t193 = f_5types_INT();
-        vela_str _t194 = v_length;
-        vela_str_retain(_t194);
-        vela_str _t195 = f_7codegen_scalar(&(*v_g), _t193, _t194);
-        int64_t _t196 = f_5types_INT();
-        t_7codegen_Value _t197 = f_7codegen_value(_t195, _t196);
-        t_7codegen_Value _t198 = _t197;
+        int64_t _t195 = f_5types_INT();
+        vela_str _t196 = v_length;
+        vela_str_retain(_t196);
+        vela_str _t197 = f_7codegen_scalar(&(*v_g), _t195, _t196);
+        int64_t _t198 = f_5types_INT();
+        t_7codegen_Value _t199 = f_7codegen_value(_t197, _t198);
+        t_7codegen_Value _t200 = _t199;
         vela_str_release(v_length);
         rc_release_t_7codegen_Value(v_arg_2);
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t198;
+        return _t200;
     }
     // line 1850
-    bool _t199 = vela_str_eq(v_name, VELA_STR("int", 3));
-    if (_t199) {
+    bool _t201 = vela_str_eq(v_name, VELA_STR("int", 3));
+    if (_t201) {
         // line 1851
-        t_3ast_Expr _t200 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1851:35");
-        rc_retain_t_3ast_Expr(_t200);
-        t_7codegen_Value _t201 = f_7codegen_expr(&(*v_g), _t200);
-        t_7codegen_Value v_arg_3 = _t201;
+        t_3ast_Expr _t202 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1851:35");
+        rc_retain_t_3ast_Expr(_t202);
+        t_7codegen_Value _t203 = f_7codegen_expr(&(*v_g), _t202);
+        t_7codegen_Value v_arg_3 = _t203;
         // line 1852
-        int64_t _t202 = f_5types_FLOAT();
-        bool _t203 = v_arg_3.m_ty == _t202;
-        if (_t203) {
+        int64_t _t204 = f_5types_FLOAT();
+        bool _t205 = v_arg_3.m_ty == _t204;
+        if (_t205) {
             // line 1853
-            int64_t _t204 = f_5types_INT();
-            vela_str _t205 = vela_str_concat(VELA_STR("vela_float_to_int(", 18), v_arg_3.m_c);
-            vela_str _t206 = vela_str_concat(_t205, VELA_STR(", ", 2));
-            t_7codegen_Gen _t207 = (*v_g);
-            rc_retain_t_7codegen_Gen(_t207);
-            t_3ast_Expr _t208 = v_e;
-            rc_retain_t_3ast_Expr(_t208);
-            vela_str _t209 = f_7codegen_loc_of(_t207, _t208);
-            vela_str _t210 = vela_str_concat(_t206, _t209);
-            vela_str _t211 = vela_str_concat(_t210, VELA_STR(")", 1));
-            vela_str _t212 = f_7codegen_scalar(&(*v_g), _t204, _t211);
-            int64_t _t213 = f_5types_INT();
-            t_7codegen_Value _t214 = f_7codegen_value(_t212, _t213);
-            t_7codegen_Value _t215 = _t214;
-            vela_str_release(_t210);
-            vela_str_release(_t209);
-            vela_str_release(_t206);
-            vela_str_release(_t205);
+            int64_t _t206 = f_5types_INT();
+            vela_str _t207 = vela_str_concat(VELA_STR("vela_float_to_int(", 18), v_arg_3.m_c);
+            vela_str _t208 = vela_str_concat(_t207, VELA_STR(", ", 2));
+            t_7codegen_Gen _t209 = (*v_g);
+            rc_retain_t_7codegen_Gen(_t209);
+            t_3ast_Expr _t210 = v_e;
+            rc_retain_t_3ast_Expr(_t210);
+            vela_str _t211 = f_7codegen_loc_of(_t209, _t210);
+            vela_str _t212 = vela_str_concat(_t208, _t211);
+            vela_str _t213 = vela_str_concat(_t212, VELA_STR(")", 1));
+            vela_str _t214 = f_7codegen_scalar(&(*v_g), _t206, _t213);
+            int64_t _t215 = f_5types_INT();
+            t_7codegen_Value _t216 = f_7codegen_value(_t214, _t215);
+            t_7codegen_Value _t217 = _t216;
+            vela_str_release(_t212);
+            vela_str_release(_t211);
+            vela_str_release(_t208);
+            vela_str_release(_t207);
             rc_release_t_7codegen_Value(v_arg_3);
             vela_array_release(v_args);
             vela_str_release(v_name);
             rc_release_t_3ast_Expr(v_e);
-            return _t215;
+            return _t217;
         }
         // line 1855
-        int64_t _t216 = f_5types_INT();
-        vela_str _t217 = vela_str_concat(VELA_STR("(int64_t)", 9), v_arg_3.m_c);
-        vela_str _t218 = f_7codegen_scalar(&(*v_g), _t216, _t217);
-        int64_t _t219 = f_5types_INT();
-        t_7codegen_Value _t220 = f_7codegen_value(_t218, _t219);
-        t_7codegen_Value _t221 = _t220;
+        int64_t _t218 = f_5types_INT();
+        vela_str _t219 = vela_str_concat(VELA_STR("(int64_t)", 9), v_arg_3.m_c);
+        vela_str _t220 = f_7codegen_scalar(&(*v_g), _t218, _t219);
+        int64_t _t221 = f_5types_INT();
+        t_7codegen_Value _t222 = f_7codegen_value(_t220, _t221);
+        t_7codegen_Value _t223 = _t222;
         rc_release_t_7codegen_Value(v_arg_3);
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t221;
+        return _t223;
     }
     // line 1857
-    bool _t222 = vela_str_eq(v_name, VELA_STR("float", 5));
-    if (_t222) {
+    bool _t224 = vela_str_eq(v_name, VELA_STR("float", 5));
+    if (_t224) {
         // line 1858
-        t_3ast_Expr _t223 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1858:33");
-        rc_retain_t_3ast_Expr(_t223);
-        t_7codegen_Value _t224 = f_7codegen_expr(&(*v_g), _t223);
-        vela_str _t225 = _t224.m_c;
-        vela_str_retain(_t225);
-        vela_str v_c = _t225;
-        rc_release_t_7codegen_Value(_t224);
+        t_3ast_Expr _t225 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1858:33");
+        rc_retain_t_3ast_Expr(_t225);
+        t_7codegen_Value _t226 = f_7codegen_expr(&(*v_g), _t225);
+        vela_str _t227 = _t226.m_c;
+        vela_str_retain(_t227);
+        vela_str v_c = _t227;
+        rc_release_t_7codegen_Value(_t226);
         // line 1859
-        int64_t _t226 = f_5types_FLOAT();
-        vela_str _t227 = vela_str_concat(VELA_STR("(double)", 8), v_c);
-        vela_str _t228 = f_7codegen_scalar(&(*v_g), _t226, _t227);
-        int64_t _t229 = f_5types_FLOAT();
-        t_7codegen_Value _t230 = f_7codegen_value(_t228, _t229);
-        t_7codegen_Value _t231 = _t230;
+        int64_t _t228 = f_5types_FLOAT();
+        vela_str _t229 = vela_str_concat(VELA_STR("(double)", 8), v_c);
+        vela_str _t230 = f_7codegen_scalar(&(*v_g), _t228, _t229);
+        int64_t _t231 = f_5types_FLOAT();
+        t_7codegen_Value _t232 = f_7codegen_value(_t230, _t231);
+        t_7codegen_Value _t233 = _t232;
         vela_str_release(v_c);
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t231;
+        return _t233;
     }
     // line 1861
-    bool _t232 = vela_str_eq(v_name, VELA_STR("byte", 4));
-    if (_t232) {
+    bool _t234 = vela_str_eq(v_name, VELA_STR("byte", 4));
+    if (_t234) {
         // line 1862
-        t_3ast_Expr _t233 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1862:33");
-        rc_retain_t_3ast_Expr(_t233);
-        t_7codegen_Value _t234 = f_7codegen_expr(&(*v_g), _t233);
-        vela_str _t235 = _t234.m_c;
-        vela_str_retain(_t235);
-        vela_str v_c_2 = _t235;
-        rc_release_t_7codegen_Value(_t234);
+        t_3ast_Expr _t235 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1862:33");
+        rc_retain_t_3ast_Expr(_t235);
+        t_7codegen_Value _t236 = f_7codegen_expr(&(*v_g), _t235);
+        vela_str _t237 = _t236.m_c;
+        vela_str_retain(_t237);
+        vela_str v_c_2 = _t237;
+        rc_release_t_7codegen_Value(_t236);
         // line 1863
-        int64_t _t236 = f_5types_BYTE();
-        vela_str _t237 = vela_str_concat(VELA_STR("vela_to_byte(", 13), v_c_2);
-        vela_str _t238 = vela_str_concat(_t237, VELA_STR(", ", 2));
-        t_7codegen_Gen _t239 = (*v_g);
-        rc_retain_t_7codegen_Gen(_t239);
-        t_3ast_Expr _t240 = v_e;
-        rc_retain_t_3ast_Expr(_t240);
-        vela_str _t241 = f_7codegen_loc_of(_t239, _t240);
-        vela_str _t242 = vela_str_concat(_t238, _t241);
-        vela_str _t243 = vela_str_concat(_t242, VELA_STR(")", 1));
-        vela_str _t244 = f_7codegen_scalar(&(*v_g), _t236, _t243);
-        int64_t _t245 = f_5types_BYTE();
-        t_7codegen_Value _t246 = f_7codegen_value(_t244, _t245);
-        t_7codegen_Value _t247 = _t246;
-        vela_str_release(_t242);
-        vela_str_release(_t241);
-        vela_str_release(_t238);
-        vela_str_release(_t237);
+        int64_t _t238 = f_5types_BYTE();
+        vela_str _t239 = vela_str_concat(VELA_STR("vela_to_byte(", 13), v_c_2);
+        vela_str _t240 = vela_str_concat(_t239, VELA_STR(", ", 2));
+        t_7codegen_Gen _t241 = (*v_g);
+        rc_retain_t_7codegen_Gen(_t241);
+        t_3ast_Expr _t242 = v_e;
+        rc_retain_t_3ast_Expr(_t242);
+        vela_str _t243 = f_7codegen_loc_of(_t241, _t242);
+        vela_str _t244 = vela_str_concat(_t240, _t243);
+        vela_str _t245 = vela_str_concat(_t244, VELA_STR(")", 1));
+        vela_str _t246 = f_7codegen_scalar(&(*v_g), _t238, _t245);
+        int64_t _t247 = f_5types_BYTE();
+        t_7codegen_Value _t248 = f_7codegen_value(_t246, _t247);
+        t_7codegen_Value _t249 = _t248;
+        vela_str_release(_t244);
+        vela_str_release(_t243);
+        vela_str_release(_t240);
+        vela_str_release(_t239);
         vela_str_release(v_c_2);
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t247;
+        return _t249;
     }
     // line 1865
-    bool _t248 = vela_str_eq(v_name, VELA_STR("push", 4));
-    if (_t248) {
+    bool _t250 = vela_str_eq(v_name, VELA_STR("push", 4));
+    if (_t250) {
         // line 1866
-        t_3ast_Expr _t249 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/codegen.vl:1866:48");
-        rc_retain_t_3ast_Expr(_t249);
-        t_7codegen_Value _t250 = f_7codegen_expr(&(*v_g), _t249);
-        vela_str _t251 = f_7codegen_consume(&(*v_g), _t250);
-        vela_str v_v_2 = _t251;
+        t_3ast_Expr _t251 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/codegen.vl:1866:48");
+        rc_retain_t_3ast_Expr(_t251);
+        t_7codegen_Value _t252 = f_7codegen_expr(&(*v_g), _t251);
+        vela_str _t253 = f_7codegen_consume(&(*v_g), _t252);
+        vela_str v_v_2 = _t253;
         // line 1867
-        t_3ast_Expr _t252 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1867:51");
-        rc_retain_t_3ast_Expr(_t252);
-        t_3ast_Expr _t253 = f_7codegen_mut_place(_t252);
-        vela_str _t254 = f_7codegen_writable(&(*v_g), _t253);
-        vela_str v_array = _t254;
+        t_3ast_Expr _t254 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1867:51");
+        rc_retain_t_3ast_Expr(_t254);
+        t_3ast_Expr _t255 = f_7codegen_mut_place(_t254);
+        vela_str _t256 = f_7codegen_writable(&(*v_g), _t255);
+        vela_str v_array = _t256;
         // line 1868
-        t_7codegen_Gen _t255 = (*v_g);
-        rc_retain_t_7codegen_Gen(_t255);
-        t_5types_Table _t256 = (*v_g).m_k.m_table;
-        rc_retain_t_5types_Table(_t256);
         t_7codegen_Gen _t257 = (*v_g);
         rc_retain_t_7codegen_Gen(_t257);
-        t_3ast_Expr _t258 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1868:61");
-        rc_retain_t_3ast_Expr(_t258);
-        int64_t _t259 = f_7codegen_ty(_t257, _t258);
-        t_5types_TypeInfo _t260 = f_5types_get(_t256, _t259);
-        int64_t _t261 = *(int64_t *)vela_array_at(_t260.m_args, 0, "stage1/codegen.vl:1868:71");
-        vela_str _t262 = f_7codegen_c_type(_t255, _t261);
-        vela_str v_elem = _t262;
-        rc_release_t_5types_TypeInfo(_t260);
+        t_5types_Table _t258 = (*v_g).m_k.m_table;
+        rc_retain_t_5types_Table(_t258);
+        t_7codegen_Gen _t259 = (*v_g);
+        rc_retain_t_7codegen_Gen(_t259);
+        t_3ast_Expr _t260 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1868:61");
+        rc_retain_t_3ast_Expr(_t260);
+        int64_t _t261 = f_7codegen_ty(_t259, _t260);
+        t_5types_TypeInfo _t262 = f_5types_get(_t258, _t261);
+        int64_t _t263 = *(int64_t *)vela_array_at(_t262.m_args, 0, "stage1/codegen.vl:1868:71");
+        vela_str _t264 = f_7codegen_c_type(_t257, _t263);
+        vela_str v_elem = _t264;
+        rc_release_t_5types_TypeInfo(_t262);
         // line 1869
-        vela_str _t263 = v_elem;
-        vela_str_retain(_t263);
-        vela_str _t264 = v_v_2;
-        vela_str_retain(_t264);
-        vela_str _t265 = f_7codegen_addr(&(*v_g), _t263, _t264);
-        vela_str v_a_2 = _t265;
+        vela_str _t265 = v_elem;
+        vela_str_retain(_t265);
+        vela_str _t266 = v_v_2;
+        vela_str_retain(_t266);
+        vela_str _t267 = f_7codegen_addr(&(*v_g), _t265, _t266);
+        vela_str v_a_2 = _t267;
         // line 1870
-        vela_str _t266 = vela_str_concat(VELA_STR("vela_array_push(", 16), v_array);
-        vela_str _t267 = vela_str_concat(_t266, VELA_STR(", ", 2));
-        vela_str _t268 = vela_str_concat(_t267, v_a_2);
-        vela_str _t269 = vela_str_concat(_t268, VELA_STR(");", 2));
-        f_7codegen_emit(&(*v_g), _t269);
+        vela_str _t268 = vela_str_concat(VELA_STR("vela_array_push(", 16), v_array);
+        vela_str _t269 = vela_str_concat(_t268, VELA_STR(", ", 2));
+        vela_str _t270 = vela_str_concat(_t269, v_a_2);
+        vela_str _t271 = vela_str_concat(_t270, VELA_STR(");", 2));
+        f_7codegen_emit(&(*v_g), _t271);
+        vela_str_release(_t270);
+        vela_str_release(_t269);
         vela_str_release(_t268);
-        vela_str_release(_t267);
-        vela_str_release(_t266);
         // line 1871
-        t_7codegen_Value _t270 = f_7codegen_no_value();
-        t_7codegen_Value _t271 = _t270;
+        t_7codegen_Value _t272 = f_7codegen_no_value();
+        t_7codegen_Value _t273 = _t272;
         vela_str_release(v_a_2);
         vela_str_release(v_elem);
         vela_str_release(v_array);
@@ -47647,62 +47683,62 @@ t_7codegen_Value f_7codegen_builtin(t_7codegen_Gen * v_g, t_3ast_Expr v_e, vela_
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t271;
+        return _t273;
     }
     // line 1873
-    t_7codegen_Gen _t272 = (*v_g);
-    rc_retain_t_7codegen_Gen(_t272);
-    t_3ast_Expr _t273 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1873:24");
-    rc_retain_t_3ast_Expr(_t273);
-    int64_t _t274 = f_7codegen_ty(_t272, _t273);
-    int64_t v_mt = _t274;
+    t_7codegen_Gen _t274 = (*v_g);
+    rc_retain_t_7codegen_Gen(_t274);
+    t_3ast_Expr _t275 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1873:24");
+    rc_retain_t_3ast_Expr(_t275);
+    int64_t _t276 = f_7codegen_ty(_t274, _t275);
+    int64_t v_mt = _t276;
     // line 1874
-    t_5types_Table _t275 = (*v_g).m_k.m_table;
-    rc_retain_t_5types_Table(_t275);
-    t_5types_TypeInfo _t276 = f_5types_get(_t275, v_mt);
-    t_5types_TypeInfo v_mti = _t276;
+    t_5types_Table _t277 = (*v_g).m_k.m_table;
+    rc_retain_t_5types_Table(_t277);
+    t_5types_TypeInfo _t278 = f_5types_get(_t277, v_mt);
+    t_5types_TypeInfo v_mti = _t278;
     // line 1875
-    t_7codegen_Gen _t277 = (*v_g);
-    rc_retain_t_7codegen_Gen(_t277);
-    int64_t _t278 = *(int64_t *)vela_array_at(v_mti.m_args, 0, "stage1/codegen.vl:1875:31");
-    vela_str _t279 = f_7codegen_c_type(_t277, _t278);
-    vela_str v_k = _t279;
+    t_7codegen_Gen _t279 = (*v_g);
+    rc_retain_t_7codegen_Gen(_t279);
+    int64_t _t280 = *(int64_t *)vela_array_at(v_mti.m_args, 0, "stage1/codegen.vl:1875:31");
+    vela_str _t281 = f_7codegen_c_type(_t279, _t280);
+    vela_str v_k = _t281;
     // line 1876
-    bool _t280 = vela_str_eq(v_name, VELA_STR("maps.remove", 11));
-    if (_t280) {
+    bool _t282 = vela_str_eq(v_name, VELA_STR("maps.remove", 11));
+    if (_t282) {
         // line 1877
-        t_3ast_Expr _t281 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/codegen.vl:1877:35");
-        rc_retain_t_3ast_Expr(_t281);
-        t_7codegen_Value _t282 = f_7codegen_expr(&(*v_g), _t281);
-        vela_str _t283 = _t282.m_c;
-        vela_str_retain(_t283);
-        vela_str v_key = _t283;
-        rc_release_t_7codegen_Value(_t282);
+        t_3ast_Expr _t283 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/codegen.vl:1877:35");
+        rc_retain_t_3ast_Expr(_t283);
+        t_7codegen_Value _t284 = f_7codegen_expr(&(*v_g), _t283);
+        vela_str _t285 = _t284.m_c;
+        vela_str_retain(_t285);
+        vela_str v_key = _t285;
+        rc_release_t_7codegen_Value(_t284);
         // line 1878
-        t_3ast_Expr _t284 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1878:47");
-        rc_retain_t_3ast_Expr(_t284);
-        t_3ast_Expr _t285 = f_7codegen_mut_place(_t284);
-        vela_str _t286 = f_7codegen_writable(&(*v_g), _t285);
-        vela_str v_m = _t286;
+        t_3ast_Expr _t286 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1878:47");
+        rc_retain_t_3ast_Expr(_t286);
+        t_3ast_Expr _t287 = f_7codegen_mut_place(_t286);
+        vela_str _t288 = f_7codegen_writable(&(*v_g), _t287);
+        vela_str v_m = _t288;
         // line 1879
-        vela_str _t287 = v_k;
-        vela_str_retain(_t287);
-        vela_str _t288 = v_key;
-        vela_str_retain(_t288);
-        vela_str _t289 = f_7codegen_addr(&(*v_g), _t287, _t288);
-        vela_str v_ka = _t289;
+        vela_str _t289 = v_k;
+        vela_str_retain(_t289);
+        vela_str _t290 = v_key;
+        vela_str_retain(_t290);
+        vela_str _t291 = f_7codegen_addr(&(*v_g), _t289, _t290);
+        vela_str v_ka = _t291;
         // line 1880
-        vela_str _t290 = vela_str_concat(VELA_STR("(void)vela_map_remove(", 22), v_m);
-        vela_str _t291 = vela_str_concat(_t290, VELA_STR(", ", 2));
-        vela_str _t292 = vela_str_concat(_t291, v_ka);
-        vela_str _t293 = vela_str_concat(_t292, VELA_STR(");", 2));
-        f_7codegen_emit(&(*v_g), _t293);
+        vela_str _t292 = vela_str_concat(VELA_STR("(void)vela_map_remove(", 22), v_m);
+        vela_str _t293 = vela_str_concat(_t292, VELA_STR(", ", 2));
+        vela_str _t294 = vela_str_concat(_t293, v_ka);
+        vela_str _t295 = vela_str_concat(_t294, VELA_STR(");", 2));
+        f_7codegen_emit(&(*v_g), _t295);
+        vela_str_release(_t294);
+        vela_str_release(_t293);
         vela_str_release(_t292);
-        vela_str_release(_t291);
-        vela_str_release(_t290);
         // line 1881
-        t_7codegen_Value _t294 = f_7codegen_no_value();
-        t_7codegen_Value _t295 = _t294;
+        t_7codegen_Value _t296 = f_7codegen_no_value();
+        t_7codegen_Value _t297 = _t296;
         vela_str_release(v_ka);
         vela_str_release(v_m);
         vela_str_release(v_key);
@@ -47711,82 +47747,82 @@ t_7codegen_Value f_7codegen_builtin(t_7codegen_Gen * v_g, t_3ast_Expr v_e, vela_
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t295;
+        return _t297;
     }
     // line 1883
-    t_3ast_Expr _t296 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1883:29");
-    rc_retain_t_3ast_Expr(_t296);
-    t_7codegen_Value _t297 = f_7codegen_expr(&(*v_g), _t296);
-    vela_str _t298 = _t297.m_c;
-    vela_str_retain(_t298);
-    vela_str v_m_2 = _t298;
-    rc_release_t_7codegen_Value(_t297);
+    t_3ast_Expr _t298 = *(t_3ast_Expr *)vela_array_at(v_args, 0, "stage1/codegen.vl:1883:29");
+    rc_retain_t_3ast_Expr(_t298);
+    t_7codegen_Value _t299 = f_7codegen_expr(&(*v_g), _t298);
+    vela_str _t300 = _t299.m_c;
+    vela_str_retain(_t300);
+    vela_str v_m_2 = _t300;
+    rc_release_t_7codegen_Value(_t299);
     // line 1884
-    bool _t299 = vela_str_eq(v_name, VELA_STR("maps.keys", 9));
-    if (_t299) {
+    bool _t301 = vela_str_eq(v_name, VELA_STR("maps.keys", 9));
+    if (_t301) {
         // line 1885
-        vela_str _t300 = vela_str_concat(VELA_STR("vela_map_keys(", 14), v_m_2);
-        vela_str _t301 = vela_str_concat(_t300, VELA_STR(")", 1));
-        t_7codegen_Value _t302 = f_7codegen_store(&(*v_g), v_t, _t301);
-        t_7codegen_Value _t303 = _t302;
-        vela_str_release(_t300);
+        vela_str _t302 = vela_str_concat(VELA_STR("vela_map_keys(", 14), v_m_2);
+        vela_str _t303 = vela_str_concat(_t302, VELA_STR(")", 1));
+        t_7codegen_Value _t304 = f_7codegen_store(&(*v_g), v_t, _t303);
+        t_7codegen_Value _t305 = _t304;
+        vela_str_release(_t302);
         vela_str_release(v_m_2);
         vela_str_release(v_k);
         rc_release_t_5types_TypeInfo(v_mti);
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t303;
+        return _t305;
     }
     // line 1887
-    t_3ast_Expr _t304 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/codegen.vl:1887:31");
-    rc_retain_t_3ast_Expr(_t304);
-    t_7codegen_Value _t305 = f_7codegen_expr(&(*v_g), _t304);
-    vela_str _t306 = _t305.m_c;
-    vela_str_retain(_t306);
-    vela_str v_key_2 = _t306;
-    rc_release_t_7codegen_Value(_t305);
+    t_3ast_Expr _t306 = *(t_3ast_Expr *)vela_array_at(v_args, 1, "stage1/codegen.vl:1887:31");
+    rc_retain_t_3ast_Expr(_t306);
+    t_7codegen_Value _t307 = f_7codegen_expr(&(*v_g), _t306);
+    vela_str _t308 = _t307.m_c;
+    vela_str_retain(_t308);
+    vela_str v_key_2 = _t308;
+    rc_release_t_7codegen_Value(_t307);
     // line 1888
-    vela_str _t307 = f_7codegen_new_temp(&(*v_g));
-    vela_str v_found = _t307;
+    vela_str _t309 = f_7codegen_new_temp(&(*v_g));
+    vela_str v_found = _t309;
     // line 1889
-    t_7codegen_Gen _t308 = (*v_g);
-    rc_retain_t_7codegen_Gen(_t308);
-    int64_t _t309 = *(int64_t *)vela_array_at(v_mti.m_args, 1, "stage1/codegen.vl:1889:32");
-    vela_str _t310 = f_7codegen_c_type(_t308, _t309);
-    vela_str v_vt = _t310;
+    t_7codegen_Gen _t310 = (*v_g);
+    rc_retain_t_7codegen_Gen(_t310);
+    int64_t _t311 = *(int64_t *)vela_array_at(v_mti.m_args, 1, "stage1/codegen.vl:1889:32");
+    vela_str _t312 = f_7codegen_c_type(_t310, _t311);
+    vela_str v_vt = _t312;
     // line 1890
-    vela_str _t311 = v_k;
-    vela_str_retain(_t311);
-    vela_str _t312 = v_key_2;
-    vela_str_retain(_t312);
-    vela_str _t313 = f_7codegen_addr(&(*v_g), _t311, _t312);
-    vela_str v_ka_2 = _t313;
+    vela_str _t313 = v_k;
+    vela_str_retain(_t313);
+    vela_str _t314 = v_key_2;
+    vela_str_retain(_t314);
+    vela_str _t315 = f_7codegen_addr(&(*v_g), _t313, _t314);
+    vela_str v_ka_2 = _t315;
     // line 1891
-    vela_str _t314 = vela_str_concat(v_vt, VELA_STR(" *", 2));
-    vela_str _t315 = vela_str_concat(_t314, v_found);
-    vela_str _t316 = vela_str_concat(_t315, VELA_STR(" = vela_map_find(", 17));
-    vela_str _t317 = vela_str_concat(_t316, v_m_2);
-    vela_str _t318 = vela_str_concat(_t317, VELA_STR(", ", 2));
-    vela_str _t319 = vela_str_concat(_t318, v_ka_2);
-    vela_str _t320 = vela_str_concat(_t319, VELA_STR(");", 2));
-    f_7codegen_emit(&(*v_g), _t320);
+    vela_str _t316 = vela_str_concat(v_vt, VELA_STR(" *", 2));
+    vela_str _t317 = vela_str_concat(_t316, v_found);
+    vela_str _t318 = vela_str_concat(_t317, VELA_STR(" = vela_map_find(", 17));
+    vela_str _t319 = vela_str_concat(_t318, v_m_2);
+    vela_str _t320 = vela_str_concat(_t319, VELA_STR(", ", 2));
+    vela_str _t321 = vela_str_concat(_t320, v_ka_2);
+    vela_str _t322 = vela_str_concat(_t321, VELA_STR(");", 2));
+    f_7codegen_emit(&(*v_g), _t322);
+    vela_str_release(_t321);
+    vela_str_release(_t320);
     vela_str_release(_t319);
     vela_str_release(_t318);
     vela_str_release(_t317);
     vela_str_release(_t316);
-    vela_str_release(_t315);
-    vela_str_release(_t314);
     // line 1892
-    bool _t321 = vela_str_eq(v_name, VELA_STR("maps.has", 8));
-    if (_t321) {
+    bool _t323 = vela_str_eq(v_name, VELA_STR("maps.has", 8));
+    if (_t323) {
         // line 1893
-        int64_t _t322 = f_5types_BOOL();
-        vela_str _t323 = vela_str_concat(v_found, VELA_STR(" != NULL", 8));
-        vela_str _t324 = f_7codegen_scalar(&(*v_g), _t322, _t323);
-        int64_t _t325 = f_5types_BOOL();
-        t_7codegen_Value _t326 = f_7codegen_value(_t324, _t325);
-        t_7codegen_Value _t327 = _t326;
+        int64_t _t324 = f_5types_BOOL();
+        vela_str _t325 = vela_str_concat(v_found, VELA_STR(" != NULL", 8));
+        vela_str _t326 = f_7codegen_scalar(&(*v_g), _t324, _t325);
+        int64_t _t327 = f_5types_BOOL();
+        t_7codegen_Value _t328 = f_7codegen_value(_t326, _t327);
+        t_7codegen_Value _t329 = _t328;
         vela_str_release(v_ka_2);
         vela_str_release(v_vt);
         vela_str_release(v_found);
@@ -47797,79 +47833,79 @@ t_7codegen_Value f_7codegen_builtin(t_7codegen_Gen * v_g, t_3ast_Expr v_e, vela_
         vela_array_release(v_args);
         vela_str_release(v_name);
         rc_release_t_3ast_Expr(v_e);
-        return _t327;
+        return _t329;
     }
     // line 1896
-    t_7codegen_Gen _t328 = (*v_g);
-    rc_retain_t_7codegen_Gen(_t328);
-    vela_str _t329 = f_7codegen_c_type(_t328, v_t);
-    vela_str v_opt_2 = _t329;
+    t_7codegen_Gen _t330 = (*v_g);
+    rc_retain_t_7codegen_Gen(_t330);
+    vela_str _t331 = f_7codegen_c_type(_t330, v_t);
+    vela_str v_opt_2 = _t331;
     // line 1897
-    vela_str _t330 = f_7codegen_new_temp(&(*v_g));
-    vela_str v_result = _t330;
+    vela_str _t332 = f_7codegen_new_temp(&(*v_g));
+    vela_str v_result = _t332;
     // line 1898
-    vela_str _t331 = vela_str_concat(v_opt_2, VELA_STR(" ", 1));
-    vela_str _t332 = vela_str_concat(_t331, v_result);
-    vela_str _t333 = vela_str_concat(_t332, VELA_STR(";", 1));
-    f_7codegen_emit(&(*v_g), _t333);
-    vela_str_release(_t332);
-    vela_str_release(_t331);
-    // line 1899
-    vela_str _t334 = vela_str_concat(VELA_STR("if (", 4), v_found);
-    vela_str _t335 = vela_str_concat(_t334, VELA_STR(") {", 3));
-    f_7codegen_open(&(*v_g), _t335);
+    vela_str _t333 = vela_str_concat(v_opt_2, VELA_STR(" ", 1));
+    vela_str _t334 = vela_str_concat(_t333, v_result);
+    vela_str _t335 = vela_str_concat(_t334, VELA_STR(";", 1));
+    f_7codegen_emit(&(*v_g), _t335);
     vela_str_release(_t334);
+    vela_str_release(_t333);
+    // line 1899
+    vela_str _t336 = vela_str_concat(VELA_STR("if (", 4), v_found);
+    vela_str _t337 = vela_str_concat(_t336, VELA_STR(") {", 3));
+    f_7codegen_open(&(*v_g), _t337);
+    vela_str_release(_t336);
     // line 1900
-    vela_str _t336 = vela_str_concat(v_result, VELA_STR(" = (", 4));
-    vela_str _t337 = vela_str_concat(_t336, v_opt_2);
-    vela_str _t338 = vela_str_concat(_t337, VELA_STR("){ .tag = ", 10));
-    t_6layout_Layout _t339 = (*v_g).m_l;
-    rc_retain_t_6layout_Layout(_t339);
-    vela_str _t340 = f_6layout_tag(_t339, v_t, VELA_STR("Some", 4));
-    vela_str _t341 = vela_str_concat(_t338, _t340);
-    vela_str _t342 = vela_str_concat(_t341, VELA_STR(", .as.m_Some = { ._0 = *", 24));
-    vela_str _t343 = vela_str_concat(_t342, v_found);
-    vela_str _t344 = vela_str_concat(_t343, VELA_STR(" } };", 5));
-    f_7codegen_emit(&(*v_g), _t344);
+    vela_str _t338 = vela_str_concat(v_result, VELA_STR(" = (", 4));
+    vela_str _t339 = vela_str_concat(_t338, v_opt_2);
+    vela_str _t340 = vela_str_concat(_t339, VELA_STR("){ .tag = ", 10));
+    t_6layout_Layout _t341 = (*v_g).m_l;
+    rc_retain_t_6layout_Layout(_t341);
+    vela_str _t342 = f_6layout_tag(_t341, v_t, VELA_STR("Some", 4));
+    vela_str _t343 = vela_str_concat(_t340, _t342);
+    vela_str _t344 = vela_str_concat(_t343, VELA_STR(", .as.m_Some = { ._0 = *", 24));
+    vela_str _t345 = vela_str_concat(_t344, v_found);
+    vela_str _t346 = vela_str_concat(_t345, VELA_STR(" } };", 5));
+    f_7codegen_emit(&(*v_g), _t346);
+    vela_str_release(_t345);
+    vela_str_release(_t344);
     vela_str_release(_t343);
     vela_str_release(_t342);
-    vela_str_release(_t341);
     vela_str_release(_t340);
+    vela_str_release(_t339);
     vela_str_release(_t338);
-    vela_str_release(_t337);
-    vela_str_release(_t336);
     // line 1901
-    int64_t _t345 = *(int64_t *)vela_array_at(v_mti.m_args, 1, "stage1/codegen.vl:1901:39");
-    vela_str _t346 = vela_str_concat(v_result, VELA_STR(".as.m_Some._0", 13));
-    vela_str _t347 = f_7codegen_retain(&(*v_g), _t345, _t346);
-    f_7codegen_emit(&(*v_g), _t347);
+    int64_t _t347 = *(int64_t *)vela_array_at(v_mti.m_args, 1, "stage1/codegen.vl:1901:39");
+    vela_str _t348 = vela_str_concat(v_result, VELA_STR(".as.m_Some._0", 13));
+    vela_str _t349 = f_7codegen_retain(&(*v_g), _t347, _t348);
+    f_7codegen_emit(&(*v_g), _t349);
     // line 1902
     f_7codegen_close(&(*v_g), VELA_STR("} else {", 8));
     // line 1903
-    int64_t _t348 = vela_add((*v_g).m_depth, 1, "stage1/codegen.vl:1903:23");
-    (*v_g).m_depth = _t348;
+    int64_t _t350 = vela_add((*v_g).m_depth, 1, "stage1/codegen.vl:1903:23");
+    (*v_g).m_depth = _t350;
     // line 1904
-    vela_str _t349 = vela_str_concat(v_result, VELA_STR(" = (", 4));
-    vela_str _t350 = vela_str_concat(_t349, v_opt_2);
-    vela_str _t351 = vela_str_concat(_t350, VELA_STR("){ .tag = ", 10));
-    t_6layout_Layout _t352 = (*v_g).m_l;
-    rc_retain_t_6layout_Layout(_t352);
-    vela_str _t353 = f_6layout_tag(_t352, v_t, VELA_STR("None", 4));
-    vela_str _t354 = vela_str_concat(_t351, _t353);
-    vela_str _t355 = vela_str_concat(_t354, VELA_STR(" };", 3));
-    f_7codegen_emit(&(*v_g), _t355);
-    vela_str_release(_t354);
+    vela_str _t351 = vela_str_concat(v_result, VELA_STR(" = (", 4));
+    vela_str _t352 = vela_str_concat(_t351, v_opt_2);
+    vela_str _t353 = vela_str_concat(_t352, VELA_STR("){ .tag = ", 10));
+    t_6layout_Layout _t354 = (*v_g).m_l;
+    rc_retain_t_6layout_Layout(_t354);
+    vela_str _t355 = f_6layout_tag(_t354, v_t, VELA_STR("None", 4));
+    vela_str _t356 = vela_str_concat(_t353, _t355);
+    vela_str _t357 = vela_str_concat(_t356, VELA_STR(" };", 3));
+    f_7codegen_emit(&(*v_g), _t357);
+    vela_str_release(_t356);
+    vela_str_release(_t355);
     vela_str_release(_t353);
+    vela_str_release(_t352);
     vela_str_release(_t351);
-    vela_str_release(_t350);
-    vela_str_release(_t349);
     // line 1905
     f_7codegen_close(&(*v_g), VELA_STR("}", 1));
     // line 1906
-    vela_str _t356 = v_result;
-    vela_str_retain(_t356);
-    t_7codegen_Value _t357 = f_7codegen_own(&(*v_g), _t356, v_t);
-    t_7codegen_Value _t358 = _t357;
+    vela_str _t358 = v_result;
+    vela_str_retain(_t358);
+    t_7codegen_Value _t359 = f_7codegen_own(&(*v_g), _t358, v_t);
+    t_7codegen_Value _t360 = _t359;
     vela_str_release(v_result);
     vela_str_release(v_opt_2);
     vela_str_release(v_ka_2);
@@ -47882,7 +47918,7 @@ t_7codegen_Value f_7codegen_builtin(t_7codegen_Gen * v_g, t_3ast_Expr v_e, vela_
     vela_array_release(v_args);
     vela_str_release(v_name);
     rc_release_t_3ast_Expr(v_e);
-    return _t358;
+    return _t360;
 }
 /* vela: part */
 
@@ -48009,91 +48045,109 @@ t_7codegen_Value f_7codegen_file_call(t_7codegen_Gen * v_g, t_3ast_Expr v_e, vel
                     vela_str_release(_t48);
                     vela_str_release(_t47);
                 } else {
-                    // line 1933
-                    vela_str _t51 = f_7codegen_new_temp(&(*v_g));
-                    vela_str v_code = _t51;
-                    // line 1934
-                    vela_str _t52 = vela_str_concat(VELA_STR("int64_t ", 8), v_code);
-                    vela_str _t53 = vela_str_concat(_t52, VELA_STR(" = 0;", 5));
-                    f_7codegen_emit(&(*v_g), _t53);
-                    vela_str_release(_t52);
-                    // line 1935
-                    vela_str _t54 = vela_str_concat(VELA_STR("bool ", 5), v_ok);
-                    vela_str _t55 = vela_str_concat(_t54, VELA_STR(" = vela_os_run(", 15));
-                    vela_str _t56 = *(vela_str *)vela_array_at(v_cs, 0, "stage1/codegen.vl:1935:58");
-                    vela_str _t57 = vela_str_concat(_t55, _t56);
-                    vela_str _t58 = vela_str_concat(_t57, VELA_STR(", &", 3));
-                    vela_str _t59 = vela_str_concat(_t58, v_code);
-                    vela_str _t60 = vela_str_concat(_t59, VELA_STR(", &", 3));
-                    vela_str _t61 = vela_str_concat(_t60, v_text);
-                    vela_str _t62 = vela_str_concat(_t61, VELA_STR(");", 2));
-                    f_7codegen_emit(&(*v_g), _t62);
-                    vela_str_release(_t61);
-                    vela_str_release(_t60);
-                    vela_str_release(_t59);
-                    vela_str_release(_t58);
-                    vela_str_release(_t57);
-                    vela_str_release(_t55);
-                    vela_str_release(_t54);
-                    // line 1936
-                    vela_str _t63 = v_code;
-                    vela_str_retain(_t63);
-                    vela_str_release(v_success);
-                    v_success = _t63;
-                    vela_str_release(v_code);
+                    bool _t51 = vela_str_eq(v_name, VELA_STR("os.output", 9));
+                    if (_t51) {
+                        // line 1933
+                        vela_str _t52 = vela_str_concat(VELA_STR("bool ", 5), v_ok);
+                        vela_str _t53 = vela_str_concat(_t52, VELA_STR(" = vela_os_output(", 18));
+                        vela_str _t54 = *(vela_str *)vela_array_at(v_cs, 0, "stage1/codegen.vl:1933:61");
+                        vela_str _t55 = vela_str_concat(_t53, _t54);
+                        vela_str _t56 = vela_str_concat(_t55, VELA_STR(", &", 3));
+                        vela_str _t57 = vela_str_concat(_t56, v_text);
+                        vela_str _t58 = vela_str_concat(_t57, VELA_STR(");", 2));
+                        f_7codegen_emit(&(*v_g), _t58);
+                        vela_str_release(_t57);
+                        vela_str_release(_t56);
+                        vela_str_release(_t55);
+                        vela_str_release(_t53);
+                        vela_str_release(_t52);
+                    } else {
+                        // line 1935
+                        vela_str _t59 = f_7codegen_new_temp(&(*v_g));
+                        vela_str v_code = _t59;
+                        // line 1936
+                        vela_str _t60 = vela_str_concat(VELA_STR("int64_t ", 8), v_code);
+                        vela_str _t61 = vela_str_concat(_t60, VELA_STR(" = 0;", 5));
+                        f_7codegen_emit(&(*v_g), _t61);
+                        vela_str_release(_t60);
+                        // line 1937
+                        vela_str _t62 = vela_str_concat(VELA_STR("bool ", 5), v_ok);
+                        vela_str _t63 = vela_str_concat(_t62, VELA_STR(" = vela_os_run(", 15));
+                        vela_str _t64 = *(vela_str *)vela_array_at(v_cs, 0, "stage1/codegen.vl:1937:58");
+                        vela_str _t65 = vela_str_concat(_t63, _t64);
+                        vela_str _t66 = vela_str_concat(_t65, VELA_STR(", &", 3));
+                        vela_str _t67 = vela_str_concat(_t66, v_code);
+                        vela_str _t68 = vela_str_concat(_t67, VELA_STR(", &", 3));
+                        vela_str _t69 = vela_str_concat(_t68, v_text);
+                        vela_str _t70 = vela_str_concat(_t69, VELA_STR(");", 2));
+                        f_7codegen_emit(&(*v_g), _t70);
+                        vela_str_release(_t69);
+                        vela_str_release(_t68);
+                        vela_str_release(_t67);
+                        vela_str_release(_t66);
+                        vela_str_release(_t65);
+                        vela_str_release(_t63);
+                        vela_str_release(_t62);
+                        // line 1938
+                        vela_str _t71 = v_code;
+                        vela_str_retain(_t71);
+                        vela_str_release(v_success);
+                        v_success = _t71;
+                        vela_str_release(v_code);
+                    }
                 }
             }
         }
     }
-    // line 1938
-    t_7codegen_Gen _t64 = (*v_g);
-    rc_retain_t_7codegen_Gen(_t64);
-    vela_str _t65 = f_7codegen_c_type(_t64, v_r);
-    vela_str v_rt = _t65;
-    // line 1939
-    vela_str _t66 = vela_str_concat(VELA_STR("(", 1), v_rt);
-    vela_str _t67 = vela_str_concat(_t66, VELA_STR("){ .tag = ", 10));
-    t_6layout_Layout _t68 = (*v_g).m_l;
-    rc_retain_t_6layout_Layout(_t68);
-    vela_str _t69 = f_6layout_tag(_t68, v_r, VELA_STR("Ok", 2));
-    vela_str _t70 = vela_str_concat(_t67, _t69);
-    vela_str _t71 = vela_str_concat(_t70, VELA_STR(", .as.m_Ok = { ._0 = ", 21));
-    vela_str _t72 = vela_str_concat(_t71, v_success);
-    vela_str _t73 = vela_str_concat(_t72, VELA_STR(" } }", 4));
-    vela_str v_ok_value = _t73;
-    vela_str_release(_t72);
-    vela_str_release(_t71);
-    vela_str_release(_t70);
-    vela_str_release(_t69);
-    vela_str_release(_t67);
-    vela_str_release(_t66);
     // line 1940
+    t_7codegen_Gen _t72 = (*v_g);
+    rc_retain_t_7codegen_Gen(_t72);
+    vela_str _t73 = f_7codegen_c_type(_t72, v_r);
+    vela_str v_rt = _t73;
+    // line 1941
     vela_str _t74 = vela_str_concat(VELA_STR("(", 1), v_rt);
     vela_str _t75 = vela_str_concat(_t74, VELA_STR("){ .tag = ", 10));
     t_6layout_Layout _t76 = (*v_g).m_l;
     rc_retain_t_6layout_Layout(_t76);
-    vela_str _t77 = f_6layout_tag(_t76, v_r, VELA_STR("Err", 3));
+    vela_str _t77 = f_6layout_tag(_t76, v_r, VELA_STR("Ok", 2));
     vela_str _t78 = vela_str_concat(_t75, _t77);
-    vela_str _t79 = vela_str_concat(_t78, VELA_STR(", .as.m_Err = { ._0 = ", 22));
-    vela_str _t80 = vela_str_concat(_t79, v_text);
+    vela_str _t79 = vela_str_concat(_t78, VELA_STR(", .as.m_Ok = { ._0 = ", 21));
+    vela_str _t80 = vela_str_concat(_t79, v_success);
     vela_str _t81 = vela_str_concat(_t80, VELA_STR(" } }", 4));
-    vela_str v_err_value = _t81;
+    vela_str v_ok_value = _t81;
     vela_str_release(_t80);
     vela_str_release(_t79);
     vela_str_release(_t78);
     vela_str_release(_t77);
     vela_str_release(_t75);
     vela_str_release(_t74);
-    // line 1941
-    vela_str _t82 = vela_str_concat(v_ok, VELA_STR(" \? ", 3));
-    vela_str _t83 = vela_str_concat(_t82, v_ok_value);
-    vela_str _t84 = vela_str_concat(_t83, VELA_STR(" : ", 3));
-    vela_str _t85 = vela_str_concat(_t84, v_err_value);
-    t_7codegen_Value _t86 = f_7codegen_store(&(*v_g), v_r, _t85);
-    t_7codegen_Value _t87 = _t86;
-    vela_str_release(_t84);
+    // line 1942
+    vela_str _t82 = vela_str_concat(VELA_STR("(", 1), v_rt);
+    vela_str _t83 = vela_str_concat(_t82, VELA_STR("){ .tag = ", 10));
+    t_6layout_Layout _t84 = (*v_g).m_l;
+    rc_retain_t_6layout_Layout(_t84);
+    vela_str _t85 = f_6layout_tag(_t84, v_r, VELA_STR("Err", 3));
+    vela_str _t86 = vela_str_concat(_t83, _t85);
+    vela_str _t87 = vela_str_concat(_t86, VELA_STR(", .as.m_Err = { ._0 = ", 22));
+    vela_str _t88 = vela_str_concat(_t87, v_text);
+    vela_str _t89 = vela_str_concat(_t88, VELA_STR(" } }", 4));
+    vela_str v_err_value = _t89;
+    vela_str_release(_t88);
+    vela_str_release(_t87);
+    vela_str_release(_t86);
+    vela_str_release(_t85);
     vela_str_release(_t83);
     vela_str_release(_t82);
+    // line 1943
+    vela_str _t90 = vela_str_concat(v_ok, VELA_STR(" \? ", 3));
+    vela_str _t91 = vela_str_concat(_t90, v_ok_value);
+    vela_str _t92 = vela_str_concat(_t91, VELA_STR(" : ", 3));
+    vela_str _t93 = vela_str_concat(_t92, v_err_value);
+    t_7codegen_Value _t94 = f_7codegen_store(&(*v_g), v_r, _t93);
+    t_7codegen_Value _t95 = _t94;
+    vela_str_release(_t92);
+    vela_str_release(_t91);
+    vela_str_release(_t90);
     vela_str_release(v_err_value);
     vela_str_release(v_ok_value);
     vela_str_release(v_rt);
@@ -48104,7 +48158,7 @@ t_7codegen_Value f_7codegen_file_call(t_7codegen_Gen * v_g, t_3ast_Expr v_e, vel
     vela_array_release(v_args);
     vela_str_release(v_name);
     rc_release_t_3ast_Expr(v_e);
-    return _t87;
+    return _t95;
 }
 /* vela: part */
 
@@ -50119,7 +50173,7 @@ int64_t f_5index_word_def(t_5index_Builder * v_b, vela_str v_name) {
         vela_str _t7 = vela_str_concat(VELA_STR("An effect: the function reads or changes files, with the files module (files.read, files.write, ", 96), VELA_STR("files.remove, files.temp_dir), or calls a function that does.", 61));
         _t6 = _t7;
     } else if (vela_str_eq(v_name, VELA_STR("os", 2))) {
-        vela_str _t8 = vela_str_concat(VELA_STR("An effect: the function uses the process's surroundings (os.args, os.exit, os.env, os.run, ", 91), VELA_STR("os.read_line, os.read), or calls a function that does.", 54));
+        vela_str _t8 = vela_str_concat(VELA_STR("An effect: the function uses the process's surroundings (os.args, os.exit, os.env, os.run, ", 91), VELA_STR("os.output, os.read_line, os.read), or calls a function that does.", 65));
         _t6 = _t8;
     } else if (vela_str_eq(v_name, VELA_STR("Eq", 2))) {
         _t6 = VELA_STR("A bound: values of the type can be compared with == and !=.", 59);

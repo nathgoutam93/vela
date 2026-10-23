@@ -252,7 +252,7 @@ fn word_def(b: mut Builder, name: Str) -> Int {
         "fs" => "An effect: the function reads or changes files, with the files module (files.read, files.write, " +
             "files.remove, files.temp_dir), or calls a function that does."
         "os" => "An effect: the function uses the process's surroundings (os.args, os.exit, os.env, os.run, " +
-            "os.read_line, os.read), or calls a function that does."
+            "os.output, os.read_line, os.read), or calls a function that does."
         "Eq" => "A bound: values of the type can be compared with == and !=."
         "Ord" => "A bound: values of the type can be compared with ==, !=, <, <=, > and >=."
         "Key" => "A bound: the type can be the key type of a Map."

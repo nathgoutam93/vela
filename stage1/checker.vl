@@ -436,7 +436,7 @@ fn signatures(c: mut Checker) {
             let u = f.effects[i]
             if u != "fs" && u != "os" {
                 report(mut c, f.effects_line, f.effects_col, "unknown effect '" + u + "'; the effects are fs (the files module) " +
-                    "and os (os.args, os.exit, os.env, os.run, os.read_line and os.read)")
+                    "and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read)")
             }
             for j in 0..i {
                 if f.effects[j] == u {
@@ -747,8 +747,8 @@ fn is_main(c: Checker, id: Int) -> Bool {
 // ---- Effects ----
 //
 // A function that touches the world says how: `uses fs` for the files
-// module, `uses os` for os.args, os.exit, os.env, os.run, os.read_line and
-// os.read. Printing is not an effect, and neither is os.write, which prints. A function must declare what it does itself and what the
+// module, `uses os` for os.args, os.exit, os.env, os.run, os.output,
+// os.read_line and os.read. Printing is not an effect, and neither is os.write, which prints. A function must declare what it does itself and what the
 // functions it calls declare; main and tests may do anything.
 
 // The effect of a built-in function, or "".
@@ -757,7 +757,7 @@ fn effect_of(name: Str) -> Str {
         return "fs"
     }
     if name == "os.args" || name == "os.exit" || name == "os.env" || name == "os.run" || name == "os.read_line" ||
-        name == "os.read" {
+        name == "os.read" || name == "os.output" {
         return "os"
     }
     return ""
@@ -960,7 +960,7 @@ fn std_hint(c: Checker, name: Str) -> Str {
         let fns = match module {
             "maps" => ["has", "get", "remove", "keys"]
             "files" => ["read", "write", "remove", "temp_dir"]
-            "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write"]
+            "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write", "output"]
             "tasks" => ["map", "each", "workers"]
             _ => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float", "parse_float"]
         }
@@ -3373,6 +3373,7 @@ fn is_printable(t: Int) -> Bool {
 fn has_signature(name: Str) -> Bool {
     return len(name) > 6 && name[0..6] == "files." || name == "os.args" || name == "os.exit" ||
         name == "os.run" || name == "os.env" || name == "os.read_line" || name == "os.read" || name == "os.write" ||
+        name == "os.output" ||
         name == "tasks.workers" ||
         len(name) > 8 && name[0..8] == "strings."
 }
@@ -3400,6 +3401,10 @@ fn signature(c: mut Checker, name: Str) -> [Int] {
     if name == "os.run" {
         let command = types.array(mut c.table, s)  // made before the Result, as in Stage 0
         return [command, types.result(mut c.table, types.INT(), s)]
+    }
+    if name == "os.output" {
+        let command = types.array(mut c.table, s)
+        return [command, types.result(mut c.table, s, s)]
     }
     if name == "os.env" {
         return [s, types.option(mut c.table, s)]
