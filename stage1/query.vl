@@ -5,6 +5,11 @@
 //     vela query def FILE:LINE:COL    where it is declared
 //     vela query refs FILE:LINE:COL   everywhere it is used, its declaration first
 //     vela query symbols FILE         the file's types, functions and tests
+//     vela query rename FILE:LINE:COL NEW
+//                                     what renaming the name there would change
+//                                     (rename.vl; `vela rename` changes it)
+//     vela query complete FILE:LINE:COL
+//                                     what may be written there (complete.vl)
 //
 // LINE and COL count from 1, in bytes, as the compiler's messages do, so a
 // position from an error message can be asked about as it is.
@@ -158,16 +163,17 @@ pub fn command(args: [Str], std_dir: Str) uses fs, os {
 }
 
 fn usage() uses os {
-    os.eprint("usage: vela query (type | def | refs) FILE:LINE:COL, or vela query symbols FILE")
+    os.eprint("usage: vela query (type | def | refs | complete) FILE:LINE:COL, vela query rename FILE:LINE:COL NEW, " +
+        "or vela query symbols FILE")
     os.exit(2)
 }
 
-fn fail(message: Str) uses os {
+pub fn fail(message: Str) uses os {
     print(json.show(json.object([json.member("error", json.string(message))])))
     os.exit(1)
 }
 
-fn load(path: Str, std_dir: Str) -> Analysis uses fs, os {
+pub fn load(path: Str, std_dir: Str) -> Analysis uses fs, os {
     match files.read(path) {
         Ok(_) => {}
         Err(e) => fail(e)
@@ -191,14 +197,14 @@ fn checked(a: Analysis) -> checker.Checked uses os {
     return checker.check_program(a.loaded, true)  // not reached
 }
 
-type Position = struct {
+pub type Position = struct {
     path: Str
     line: Int
     col: Int
 }
 
 // "main.vl:12:7"
-fn position(s: Str) -> Option[Position] {
+pub fn position(s: Str) -> Option[Position] {
     let mut colons: [Int] = []
     for i in 0..len(s) {
         if s[i] == ':' {

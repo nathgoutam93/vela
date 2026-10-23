@@ -1,0 +1,28 @@
+{
+  "name": "count",
+  "new_name": "positives",
+  "kind": "function",
+  "edits": [
+    {
+      "file": "rename_write.vl",
+      "line": 11,
+      "col": 4,
+      "len": 5
+    },
+    {
+      "file": "rename_write.vl",
+      "line": 7,
+      "col": 11,
+      "len": 5
+    },
+    {
+      "file": "rename_write.vl",
+      "line": 22,
+      "col": 12,
+      "len": 5
+    }
+  ],
+  "files": [
+    "rename_write.vl"
+  ]
+}

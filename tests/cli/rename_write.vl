@@ -1,0 +1,23 @@
+// vela rename: the name renamed everywhere it is used, in every file of
+// the program, and the edits as JSON. Here the function `count` becomes
+// `positives`, its uses and test included; `count` in the comment stays.
+// stage 1 only
+// command: rename FILE:11:4 positives
+fn main() {
+    print(count([1, -2, 3]))
+}
+
+// How many of xs are above 0; count them.
+fn count(xs: [Int]) -> Int {
+    let mut n = 0
+    for x in xs {
+        if x > 0 {
+            n = n + 1
+        }
+    }
+    return n
+}
+
+test "count" {
+    assert(count([0, 5]) == 1)
+}

@@ -165,6 +165,7 @@ def start(compiler: list[str], cwd: Path, utf8: bool) -> Client:
     for cap in ("hoverProvider", "definitionProvider", "referencesProvider", "documentSymbolProvider",
                 "documentFormattingProvider"):
         expect(cap, caps.get(cap), True)
+    expect("rename", caps.get("renameProvider"), {"prepareProvider": True})
     expect("sync", caps["textDocumentSync"]["change"], 1)
     c.notify("initialized", {})
     return c
@@ -251,8 +252,23 @@ def session(compiler: list[str], d: Path) -> None:
     c.notify("textDocument/didClose", {"textDocument": {"uri": odd_uri}})
     expect("cleared on close", c.diagnostics(odd_uri), [])
 
+    # Rename: what can be renamed, and every use of it, in both files.
+    p = c.result("textDocument/prepareRename", position(main_uri, 4, 13))
+    expect("prepareRename", p, {"range": {"start": {"line": 4, "character": 12}, "end": {"line": 4, "character": 17}},
+                                "placeholder": "total"})
+    reply = c.request("textDocument/prepareRename", position(main_uri, 8, 4))
+    expect("print cannot be renamed", reply.get("error", {}).get("message"), "'print' is built in; it cannot be renamed")
+    edit = c.result("textDocument/rename", {**position(main_uri, 6, 32), "newName": "size"})
+    expect("rename across files", edit, {"changes": {
+        shapes_uri: [{"range": {"start": {"line": 7, "character": 7}, "end": {"line": 7, "character": 11}}, "newText": "size"}],
+        main_uri: [{"range": {"start": {"line": 6, "character": 31}, "end": {"line": 6, "character": 35}}, "newText": "size"}],
+    }})
+    reply = c.request("textDocument/rename", {**position(main_uri, 4, 13), "newName": "all"})
+    expect("a rename that would be an error", reply.get("error", {}).get("message"),
+           f"renaming 'total' to 'all' would be an error: {main}:5:13: error: 'all' is already declared in this block, at 4:9")
+
     # A request it does not know gets an error, and the server goes on.
-    reply = c.request("textDocument/rename", {**position(main_uri, 4, 13), "newName": "sum"})
+    reply = c.request("textDocument/codeAction", {**position(main_uri, 4, 13), "context": {"diagnostics": []}})
     expect("unknown request", reply.get("error", {}).get("code"), -32601)
     expect("still answering", c.result("textDocument/hover", position(main_uri, 4, 13)) is not None, True)
 
@@ -274,6 +290,10 @@ def utf16_session(compiler: list[str], d: Path) -> None:
                                                 "end": {"line": 2, "character": 29}})
     refs = c.result("textDocument/references", {**position(u, 1, 9), "context": {"includeDeclaration": True}})
     expect("references", [r["range"]["start"] for r in refs], [{"line": 1, "character": 8}, {"line": 2, "character": 25}])
+    edit = c.result("textDocument/rename", {**position(u, 1, 9), "newName": "width"})
+    expect("rename, in UTF-16", [e["range"] for e in edit["changes"][u]], [
+        {"start": {"line": 1, "character": 8}, "end": {"line": 1, "character": 12}},
+        {"start": {"line": 2, "character": 25}, "end": {"line": 2, "character": 29}}])
     c.notify("textDocument/didChange", {"textDocument": {"uri": u, "version": 2},
                                         "contentChanges": [{"text": ACCENTS.replace("+ size", "+ sise")}]})
     ds = c.diagnostics(u)

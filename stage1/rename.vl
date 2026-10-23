@@ -1,0 +1,328 @@
+// Renaming a name everywhere it is used (M12b): `vela rename`, `vela query
+// rename` and the language server's rename.
+//
+// The index already knows every use of every declaration, so the edits are
+// those uses. What it cannot promise is that the new name means the same:
+// renaming a local `n` to `count` where a `count` is already in scope, or a
+// function to the name of another, changes what the program says. So the
+// edits are made to the program's text, the program is checked again, and
+// every name in it must still refer to the same declaration, the renamed
+// one by its new name, with no error the program did not have. Otherwise
+// nothing is renamed, and the answer says which name would change.
+//
+// A built-in name, a module (named by its file), a test (named by its
+// string), and anything declared in the standard library or in a package
+// fetched by `vela get` cannot be renamed. Comments are not changed.
+// stage 1 only (it says `uses`)
+import errors
+import files
+import index
+import json
+import lexer
+import maps
+import modules
+import packages
+import query
+import strings
+
+pub type Edit = struct {
+    file: Str  // as read
+    line: Int
+    col: Int
+    len: Int  // of the name replaced, in bytes
+}
+
+pub type Renamed = struct {
+    old: Str
+    kind: Str  // of what is renamed, as index.Def says
+    edits: [Edit]  // the declaration first
+    texts: Map[Str, Str]  // the new text of each file changed, by path as read
+}
+
+// Whether the name at the use can be renamed at all: "" if so, else why not.
+pub fn why_not(a: query.Analysis, ix: index.Index, u: index.Use) -> Str uses os {
+    let d = ix.defs[u.def]
+    if d.file == "" {
+        return "'" + d.name + "' is built in; it cannot be renamed"
+    }
+    if d.kind == "module" {
+        return "a module is named by its file: rename " + modules.stem(d.file) + ".vl, and the imports of it"
+    }
+    if d.kind == "test" {
+        return "a test is named by its string; edit that"
+    }
+    if d.kind == "result" {
+        return "'result' is what a function returns, in its `ensures`; it cannot be renamed"
+    }
+    for m in a.loaded.modules {
+        if m.file != d.file {
+            continue
+        }
+        if m.package == "std" {
+            return "'" + d.name + "' is declared in the standard library, " + m.path
+        }
+        let cache = modules.join(packages.home(), "pkg")
+        if m.package != "" && len(m.file) > len(cache) && m.file[0..len(cache) + 1] == cache + "/" {
+            return "'" + d.name + "' is declared in the package '" + m.package + "', fetched by `vela get`; change the " +
+                "package itself"
+        }
+        if d.name == "main" && d.kind == "function" && m.name == "" {
+            return "the program starts at main; it cannot be renamed"
+        }
+    }
+    return ""
+}
+
+// The renaming of the name at `file`:`line`:`col` (in bytes, from 1) to
+// `new_name`, checked; `a` is the program checked with the texts `open`.
+pub fn rename(a: query.Analysis, file: Str, line: Int, col: Int, new_name: Str, std_dir: Str, open: Map[Str, Str]) ->
+    Result[Renamed, Str] uses fs, os {
+    let mut ix = index.Index { defs: [], occurrences: [] }
+    match a.checked {
+        Some(k) => ix = index.build(k)
+        None => return Err("the program does not load, so nothing can be renamed: " + first_error(a))
+    }
+    let found = index.find(ix, file, line, col)
+    if found < 0 {
+        return Err("there is no name at " + file + ":" + strings.from_int(line) + ":" + strings.from_int(col))
+    }
+    let target = ix.occurrences[found].def
+    let d = ix.defs[target]
+    let why = why_not(a, ix, ix.occurrences[found])
+    if why != "" {
+        return Err(why)
+    }
+    if !is_plain_name(new_name) {
+        return Err("'" + new_name + "' is not a name: letters, digits and _, not starting with a digit, and not a keyword")
+    }
+    let mut edits: [Edit] = []
+    for r in index.references(ix, target) {
+        push(mut edits, Edit { file: r.file, line: r.line, col: r.col, len: r.len })
+    }
+    let mut out = Renamed { old: d.name, kind: d.kind, edits: edits, texts: [:] }
+    if new_name == d.name {
+        return Ok(out)
+    }
+    // The new texts.
+    let mut sources: Map[Str, Str] = [:]
+    for m in a.loaded.modules {
+        if !m.is_std {
+            sources[m.file] = m.source
+        }
+    }
+    for e in edits {
+        if !maps.has(out.texts, e.file) {
+            out.texts[e.file] = applied(sources[e.file], e.file, edits, new_name)
+        }
+    }
+    // Check the program again with them.
+    let mut texts = open
+    for f in maps.keys(out.texts) {
+        texts[f] = out.texts[f]
+    }
+    let root = a.loaded.modules[0].file
+    let mut root_text = sources[root]
+    match maps.get(out.texts, root) {
+        Some(t) => root_text = t
+        None => {}
+    }
+    let again = query.analyze(root, root_text, std_dir, texts)
+    let mut k2 = index.Index { defs: [], occurrences: [] }
+    match again.checked {
+        Some(k) => k2 = index.build(k)
+        None => return Err("renaming '" + d.name + "' to '" + new_name + "' would stop the program loading: " + first_error(again))
+    }
+    let before = error_count(a.errors)
+    if error_count(again.errors) > before {
+        return Err("renaming '" + d.name + "' to '" + new_name + "' would be an error: " + new_error(a.errors, again.errors))
+    }
+    // Every name must mean what it meant.
+    let mut by_place: Map[Str, Int] = [:]
+    for i in 0..len(k2.occurrences) {
+        let u = k2.occurrences[i]
+        by_place[place_key(u.file, u.line, u.col)] = i
+    }
+    for u in ix.occurrences {
+        let od = ix.defs[u.def]
+        let mut want = od.name
+        if u.def == target {
+            want = new_name
+        }
+        let at = place_key(u.file, u.line, moved(edits, u.file, u.line, u.col, len(new_name) - len(d.name)))
+        let mut same = false
+        match maps.get(by_place, at) {
+            Some(i) => {
+                let nd = k2.defs[k2.occurrences[i].def]
+                same = nd.name == want && nd.kind == od.kind && nd.file == od.file && nd.line == od.line &&
+                    nd.col == moved(edits, od.file, od.line, od.col, len(new_name) - len(d.name))
+            }
+            None => {}
+        }
+        if !same {
+            return Err("renaming '" + d.name + "' to '" + new_name + "' would change what '" + want + "' means at " + u.file +
+                ":" + strings.from_int(u.line) + ":" + strings.from_int(u.col) + "; choose another name")
+        }
+    }
+    return Ok(out)
+}
+
+fn is_plain_name(s: Str) -> Bool {
+    let toks = lexer.tokenize(s).tokens
+    if len(toks) == 0 || s == "_" {
+        return false
+    }
+    return match toks[0].kind {
+        lexer.Kind.Ident => toks[0].text == s
+        _ => false
+    }
+}
+
+fn place_key(file: Str, line: Int, col: Int) -> Str {
+    return file + ":" + strings.from_int(line) + ":" + strings.from_int(col)
+}
+
+// Where column `col` of a line is after the edits, each `delta` bytes longer.
+fn moved(edits: [Edit], file: Str, line: Int, col: Int, delta: Int) -> Int {
+    let mut out = col
+    for e in edits {
+        if e.file == file && e.line == line && e.col < col {
+            out = out + delta
+        }
+    }
+    return out
+}
+
+// `text` with the edits of `file` made.
+fn applied(text: Str, file: Str, edits: [Edit], new_name: Str) -> Str {
+    // Where each line starts.
+    let mut starts = [0]
+    for i in 0..len(text) {
+        if text[i] == '\n' {
+            push(mut starts, i + 1)
+        }
+    }
+    let mut offsets: [Int] = []
+    let mut lens: [Int] = []
+    for e in edits {
+        if e.file == file && e.line - 1 < len(starts) {
+            push(mut offsets, starts[e.line - 1] + e.col - 1)
+            push(mut lens, e.len)
+        }
+    }
+    // In order, so the text is copied once.
+    let mut i = 1
+    for i < len(offsets) {
+        let o = offsets[i]
+        let n = lens[i]
+        let mut j = i - 1
+        for j >= 0 && offsets[j] > o {
+            offsets[j + 1] = offsets[j]
+            lens[j + 1] = lens[j]
+            j = j - 1
+        }
+        offsets[j + 1] = o
+        lens[j + 1] = n
+        i = i + 1
+    }
+    let mut b = strings.builder()
+    let mut at = 0
+    for k in 0..len(offsets) {
+        strings.add(mut b, text[at..offsets[k]])
+        strings.add(mut b, new_name)
+        at = offsets[k] + lens[k]
+    }
+    strings.add(mut b, text[at..len(text)])
+    return strings.build(b)
+}
+
+fn error_count(es: [errors.CompileError]) -> Int {
+    let mut n = 0
+    for e in es {
+        if !e.warning {
+            n = n + 1
+        }
+    }
+    return n
+}
+
+// The first error of `after` that `before` does not have.
+fn new_error(before: [errors.CompileError], after: [errors.CompileError]) -> Str {
+    let mut had: Map[Str, Bool] = [:]
+    for e in before {
+        had[errors.render(e)] = true
+    }
+    for e in after {
+        if !e.warning && !maps.has(had, errors.render(e)) {
+            return errors.render(e)
+        }
+    }
+    return "?"
+}
+
+fn first_error(a: query.Analysis) -> Str {
+    for e in a.errors {
+        if !e.warning {
+            return errors.render(e)
+        }
+    }
+    return "?"
+}
+
+// ---- The commands ----
+
+// `vela query rename FILE:LINE:COL NEW` says what would change, as JSON;
+// `vela rename FILE:LINE:COL NEW` (`write`) changes it, and says the same.
+pub fn command(at: Str, new_name: Str, std_dir: Str, write: Bool) uses fs, os {
+    let mut path = ""
+    let mut line = 0
+    let mut col = 0
+    match query.position(at) {
+        Some(p) => {
+            path = p.path
+            line = p.line
+            col = p.col
+        }
+        None => query.fail("a position is FILE:LINE:COL, not '" + at + "'")
+    }
+    let a = query.load(path, std_dir)
+    match rename(a, path, line, col, new_name, std_dir, [:]) {
+        Ok(r) => {
+            if write {
+                for f in maps.keys(r.texts) {
+                    match files.write(f, r.texts[f]) {
+                        Ok(_) => {}
+                        Err(e) => query.fail(e)
+                    }
+                }
+            }
+            let mut edits: [json.Json] = []
+            for e in r.edits {
+                push(mut edits, json.object([
+                    json.member("file", json.string(e.file)), json.member("line", json.integer(e.line)),
+                    json.member("col", json.integer(e.col)), json.member("len", json.integer(e.len)),
+                ]))
+            }
+            let mut changed: [json.Json] = []
+            for f in maps.keys(r.texts) {
+                push(mut changed, json.string(f))
+            }
+            print(json.pretty(json.object([
+                json.member("name", json.string(r.old)), json.member("new_name", json.string(new_name)),
+                json.member("kind", json.string(r.kind)), json.member("edits", json.array(edits)),
+                json.member("files", json.array(changed)),
+            ])))
+        }
+        Err(e) => query.fail(e)
+    }
+}
+
+// ---- Tests ----
+
+test "edits" {
+    let edits = [Edit { file: "a.vl", line: 1, col: 5, len: 1 }, Edit { file: "a.vl", line: 2, col: 1, len: 1 },
+        Edit { file: "a.vl", line: 1, col: 1, len: 1 }]
+    assert(applied("n + n\nn\n", "a.vl", edits, "count") == "count + count\ncount\n")
+    assert(moved(edits, "a.vl", 1, 5, 4) == 9 && moved(edits, "a.vl", 1, 1, 4) == 1 && moved(edits, "b.vl", 1, 5, 4) == 5)
+    assert(is_plain_name("count") && is_plain_name("_n2") && !is_plain_name("2n") && !is_plain_name("let") &&
+        !is_plain_name("a b") && !is_plain_name("_") && !is_plain_name("true"))
+}

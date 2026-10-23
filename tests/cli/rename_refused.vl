@@ -1,0 +1,15 @@
+// vela query rename refuses a new name that would change what another name
+// means: the loop's `i` renamed to `n` would make `n + i` read `n + n`,
+// with no error to show it. Nothing is changed; exit code 1.
+// stage 1 only
+// command: query rename FILE:11:9 n
+// out: {"error":"renaming 'i' to 'n' would change what 'n' means at rename_refused.vl:12:21; choose another name"}
+// exit: 1
+fn main() {
+    let n = 2
+    let mut sum = 0
+    for i in 0..3 {
+        sum = sum + n + i
+    }
+    print(sum)
+}

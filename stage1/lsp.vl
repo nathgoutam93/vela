@@ -32,6 +32,7 @@ import modules
 import os
 import parser
 import query
+import rename
 import strings
 
 type Server = struct {
@@ -155,6 +156,10 @@ fn handle(s: mut Server, m: json.Json) uses fs, os {
         send(reply(id, document_symbols(s, params)))
     } else if method == "textDocument/formatting" {
         send(reply(id, formatting(s, params)))
+    } else if method == "textDocument/prepareRename" {
+        send(prepare_rename(mut s, id, params))
+    } else if method == "textDocument/rename" {
+        send(rename_request(mut s, id, params))
     } else if !json.is_null(id) {
         send(error_reply(id, -32601, "vela lsp does not do " + method))
     }
@@ -179,6 +184,7 @@ fn initialize(s: mut Server, params: json.Json) -> json.Json {
         json.member("hoverProvider", yes), json.member("definitionProvider", yes),
         json.member("referencesProvider", yes), json.member("documentSymbolProvider", yes),
         json.member("documentFormattingProvider", yes),
+        json.member("renameProvider", json.object([json.member("prepareProvider", yes)])),
     ])
     let info = json.object([json.member("name", json.string("vela")), json.member("version", json.string("0.12"))])
     return json.object([json.member("capabilities", capabilities), json.member("serverInfo", info)])
@@ -409,6 +415,68 @@ fn references(s: mut Server, params: json.Json) -> json.Json uses fs, os {
         None => {}
     }
     return json.array(out)
+}
+
+// The name's range, if it can be renamed; otherwise an error saying why,
+// which the editor shows.
+fn prepare_rename(s: mut Server, id: json.Json, params: json.Json) -> json.Json uses fs, os {
+    let path = uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), ""))
+    match at_position(mut s, params) {
+        Some(f) => {
+            let u = f.ix.occurrences[f.use]
+            let why = rename.why_not(s.analyses[path], f.ix, u)
+            if why != "" {
+                return error_reply(id, -32803, why)
+            }
+            return reply(id, json.object([
+                json.member("range", name_range(s, u.file, u.line, u.col, u.len)),
+                json.member("placeholder", json.string(f.ix.defs[u.def].name)),
+            ]))
+        }
+        None => return error_reply(id, -32803, "there is no name here to rename")
+    }
+}
+
+// Every use of the name, renamed, as one edit of the workspace; or an
+// error saying why not (see rename.vl).
+fn rename_request(s: mut Server, id: json.Json, params: json.Json) -> json.Json uses fs, os {
+    let path = uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), ""))
+    let pos = json.get(params, "position")
+    let line = json.int_or(json.get(pos, "line"), 0) + 1
+    let col = byte_col(s, path, line, json.int_or(json.get(pos, "character"), 0))
+    let new_name = json.str_or(json.get(params, "newName"), "")
+    match index_of(mut s, path) {
+        Some(_) => {}
+        None => return error_reply(id, -32803, "the program does not load yet; fix its syntax errors first")
+    }
+    match rename.rename(s.analyses[path], path, line, col, new_name, s.std_dir, s.open) {
+        Ok(r) => {
+            let mut by_file: Map[Str, [json.Json]] = [:]
+            let mut order: [Str] = []
+            for e in r.edits {
+                let edit = json.object([
+                    json.member("range", name_range(s, e.file, e.line, e.col, e.len)), json.member("newText", json.string(new_name)),
+                ])
+                match maps.get(by_file, e.file) {
+                    Some(list) => {
+                        let mut l = list
+                        push(mut l, edit)
+                        by_file[e.file] = l
+                    }
+                    None => {
+                        by_file[e.file] = [edit]
+                        push(mut order, e.file)
+                    }
+                }
+            }
+            let mut changes: [json.Member] = []
+            for f in order {
+                push(mut changes, json.member(path_uri(f), json.array(by_file[f])))
+            }
+            return reply(id, json.object([json.member("changes", json.object(changes))]))
+        }
+        Err(e) => return error_reply(id, -32803, e)
+    }
 }
 
 fn location(s: Server, file: Str, line: Int, col: Int, n: Int) -> json.Json {
