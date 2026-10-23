@@ -2883,7 +2883,7 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
         return no_value()
     }
     if name == "strings.builder" {
-        let b = ccall(mut g, "vela_array_new", [sym_addr(mut g, "vela_type_byte"), konst(mut g, 0)], [ir.KIND_INT(), ir.KIND_INT()],
+        let b = ccall(mut g, "vela_array_new", [sym_addr(mut g, "vela_type_byte"), konst(mut g, 64)], [ir.KIND_INT(), ir.KIND_INT()],
             ir.RET_INT(), -1)
         return own(mut g, reg_val(b, t))
     }

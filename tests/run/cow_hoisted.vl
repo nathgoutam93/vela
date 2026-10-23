@@ -1,0 +1,118 @@
+// Copy-on-write checked once before a loop (M18), when nothing in the loop
+// can share what it writes; checked at each write when something can: a
+// copy, a call, iterating over it, capturing it, a new value.
+// stage 1 only
+// out: 9 9 9 | 1 2 3
+// out: 5 2 3 | 7 2 3 | 6 2 3
+// out: 1 2 3 | 0 0 0
+// out: 1 2 3 | 7 7 7
+// out: 4 4 4 | 3 4 4
+// out: 10 11 12 | 99 11 12
+// out: a=2 | a=1
+// out: 3 2 1 | 1 2 3
+import maps
+import strings
+
+fn show(xs: [Int]) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(xs) {
+        if i > 0 {
+            strings.add(mut b, " ")
+        }
+        strings.add(mut b, strings.from_int(xs[i]))
+    }
+    return strings.build(b)
+}
+
+fn keep(xs: [Int], into: mut [[Int]]) {
+    push(mut into, xs)
+}
+
+fn main() {
+    // Shared before the loop: the check before it copies.
+    let mut a = [1, 2, 3]
+    let b = a
+    for i in 0..3 {
+        a[i] = 9
+    }
+    print(show(a) + " | " + show(b))
+
+    // A copy in the loop: each turn's first write checks again.
+    let mut c = [1, 2, 3]
+    let mut copies: [[Int]] = []
+    for i in 0..3 {
+        c[0] = 5 + i
+        push(mut copies, c)
+    }
+    print(show(copies[0]) + " | " + show(copies[2]) + " | " + show(copies[1]))
+
+    // Iterating over the array being written.
+    let mut d = [1, 2, 3]
+    let mut seen: [Int] = []
+    for x in d {
+        push(mut seen, x)
+        d[0] = 0
+        d[1] = 0
+        d[2] = 0
+    }
+    print(show(seen) + " | " + show(d))
+
+    // A call that keeps the array.
+    let mut e = [1, 2, 3]
+    let mut kept: [[Int]] = []
+    for i in 0..3 {
+        keep(e, mut kept)
+        e[i] = 7
+    }
+    print(show(kept[0]) + " | " + show(e))
+
+    // A closure capturing it.
+    let mut f = [3, 3, 3]
+    let mut fs: [fn() -> Int] = []
+    for i in 0..3 {
+        let snapshot = fn() => f[0]
+        push(mut fs, snapshot)
+        f[i] = 4
+    }
+    let mut got: [Int] = []
+    for snap in fs {
+        push(mut got, snap())
+    }
+    print(show(f) + " | " + show(got))
+
+    // A new value in the loop, shared with another variable.
+    let base = [10, 11, 12]
+    let mut h = [0, 0, 0]
+    let mut n = 0
+    for n < 2 {
+        if n == 0 {
+            h = base
+        } else {
+            h[0] = 99
+        }
+        n = n + 1
+    }
+    print(show(base) + " | " + show(h))
+
+    // A map shared before the loop.
+    let mut m: Map[Str, Int] = [:]
+    m["a"] = 1
+    let m0 = m
+    for i in 0..1 {
+        m["a"] = 2 + i
+    }
+    print("a=" + strings.from_int(m["a"]) + " | a=" + strings.from_int(m0["a"]))
+
+    // A nested loop inside a loop that copies: the inner loop's writes go
+    // to the copy made in this turn.
+    let mut p = [1, 2, 3]
+    let mut snaps: [[Int]] = []
+    for turn in 0..2 {
+        push(mut snaps, p)
+        for i in 0..3 {
+            p[i] = 3 - i
+        }
+    }
+    print(show(p) + " | " + show(snaps[0]))
+    assert(maps.has(m0, "a"))
+}

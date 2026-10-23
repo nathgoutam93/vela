@@ -116,8 +116,13 @@ runtime calls) and an evaluation of twenty tasks for AI agents. M16b
 fixed the largest causes (element access inline, one allocation per tree
 node, faster maps): Vela is now 1.68 times slower than C. It also caches
 the compiled runtime (in ~/.cache/vela, or VELA_CACHE; VELA_CACHE=off to
-turn it off), so `vela run` of a small program takes 0.04 s. All of M10
-to M16b is in Stage 1 only.
+turn it off), so `vela run` of a small program takes 0.04 s. M18 brought
+`vela build` within 1.2 of C (1.16, the geometric mean of the eight
+benchmarks): overflow checks left out where the ranges of the values
+prove they cannot fail, copy-on-write checked once per variable or once
+before a loop, one allocation per array, a map write after a lookup that
+reuses it, and free lists for small objects. All of M10 to M18 is in
+Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.

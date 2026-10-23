@@ -181,9 +181,70 @@ static inline uint8_t vela_byte_at(vela_str s, int64_t i, const char *loc) {
     if (__builtin_expect((uint64_t)i >= (uint64_t)s.len, 0)) vela_panic(loc, "index out of range");
     return s.data[i];
 }
+// vela_str_slice inline, for generated C (M18).
+static inline vela_str vela_slice(vela_str s, int64_t lo, int64_t hi, const char *loc) {
+    if (__builtin_expect(lo < 0 || hi > s.len || lo > hi, 0)) vela_panic(loc, "slice out of range");
+    vela_str_retain(s);  // the slice shares the bytes, so it shares the object
+    return (vela_str){s.obj, s.data + lo, hi - lo};
+}
 // Byte order: negative, zero or positive, as with memcmp. A Str that is a
 // prefix of another comes first.
 int vela_str_cmp(vela_str a, vela_str b);
+
+// ---- Boxes (M18) ----
+//
+// A box freed goes on a list of free boxes of its size, kept by the thread
+// that freed it, and the next box of that size comes off that list: a
+// program that makes and drops trees over and over stops calling malloc and
+// free. Sizes are rounded up to a multiple of 16, up to 128 bytes; each list
+// keeps at most 32 MB, and what does not fit goes back to free(). Under a
+// sanitizer every box is malloc'd and freed, so that it sees each one.
+#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+#define VELA_SANITIZED 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+#define VELA_SANITIZED 1
+#endif
+#endif
+
+#define VELA_POOL_CLASSES 8
+#define VELA_POOL_BYTES ((int64_t)32 << 20)
+
+typedef struct vela_pool {
+    void *free[VELA_POOL_CLASSES];
+    int64_t count[VELA_POOL_CLASSES];
+} vela_pool;
+
+extern _Thread_local vela_pool vela_pools;
+
+static inline void *vela_box_alloc(size_t size) {
+#ifndef VELA_SANITIZED
+    size_t c = (size - 1) / 16;
+    if (c < VELA_POOL_CLASSES) {
+        void *p = vela_pools.free[c];
+        if (p) {
+            vela_pools.free[c] = *(void **)p;
+            vela_pools.count[c]--;
+            return p;
+        }
+        return vela_alloc((c + 1) * 16);
+    }
+#endif
+    return vela_alloc(size);
+}
+
+static inline void vela_box_free(void *p, size_t size) {
+#ifndef VELA_SANITIZED
+    size_t c = (size - 1) / 16;
+    if (c < VELA_POOL_CLASSES && vela_pools.count[c] < VELA_POOL_BYTES / (int64_t)((c + 1) * 16)) {
+        *(void **)p = vela_pools.free[c];
+        vela_pools.free[c] = p;
+        vela_pools.count[c]++;
+        return;
+    }
+#endif
+    free(p);
+}
 
 // ---- Arrays ----
 typedef struct vela_array {
@@ -192,6 +253,7 @@ typedef struct vela_array {
     int64_t cap;
     const vela_type *elem;
     unsigned char *data;  // len elements of elem->size bytes
+    int64_t size;  // bytes allocated for this header, and the elements after it (M18)
 } vela_array;
 
 vela_array *vela_array_new(const vela_type *elem, int64_t cap);
@@ -272,6 +334,11 @@ void *vela_map_find(vela_map *m, const void *key);
 void *vela_map_at(vela_map *m, const void *key, const char *loc);
 // Takes over the references held by *key and *value.
 void vela_map_set(vela_map *m, const void *key, const void *value);
+// A lookup that also gives the key's hash, and a write after it that uses
+// what the lookup found (M18).
+void *vela_map_find_hashed(vela_map *m, const void *key, uint64_t *h);
+void vela_map_set_found(vela_map *m, const vela_map *looked_in, void *slot, uint64_t h, void *key,
+                        const void *value);
 bool vela_map_remove(vela_map *m, const void *key);
 vela_array *vela_map_keys(vela_map *m);
 

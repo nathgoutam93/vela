@@ -1,0 +1,21 @@
+// Overflow checks the range analysis must keep (M18): a parameter's range
+// comes from every call, and here one call passes the largest Int. The
+// small calls first, so the check is reached only at the end.
+// stage 1 only
+// out: 3
+// out: 101
+// err: panic_range_param.vl:10:14: panic: integer overflow
+// exit: 101
+fn next(x: Int) -> Int {
+    return x + 1
+}
+
+fn main() {
+    for i in 0..3 {
+        if i == 2 {
+            print(next(i))
+        }
+    }
+    print(next(100))
+    print(next(9223372036854775807))
+}

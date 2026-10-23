@@ -43,13 +43,31 @@ void vela_assert_failed_values(const char *loc, const char *what, const char *te
     _Exit(101);
 }
 
+// No string, array or map may hold more than VELA_MAX_LEN bytes or
+// elements (M18): the compiler relies on it to prove that arithmetic on
+// lengths and indexes cannot overflow (stage1/ranges.vl). No machine has
+// that much memory, so the check changes nothing a program can do.
+#define VELA_MAX_LEN ((int64_t)1 << 48)
+
+static void check_size(size_t size) {
+    if (size > (size_t)VELA_MAX_LEN) vela_panic("vela runtime", "out of memory");
+}
+
+static void check_count(int64_t n) {
+    if (n < 0 || n > VELA_MAX_LEN) vela_panic("vela runtime", "out of memory");
+}
+
+_Thread_local vela_pool vela_pools;
+
 void *vela_alloc(size_t size) {
+    check_size(size);
     void *p = malloc(size);
     if (p == NULL && size != 0) vela_panic("vela runtime", "out of memory");
     return p;
 }
 
 static void *vela_realloc(void *p, size_t size) {
+    check_size(size);
     p = realloc(p, size);
     if (p == NULL && size != 0) vela_panic("vela runtime", "out of memory");
     return p;
@@ -165,9 +183,7 @@ vela_str vela_str_concat(vela_str a, vela_str b) {
 }
 
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc) {
-    if (lo < 0 || hi > s.len || lo > hi) vela_panic(loc, "slice out of range");
-    vela_str_retain(s);  // the slice shares the bytes, so it shares the object
-    return (vela_str){s.obj, s.data + lo, hi - lo};
+    return vela_slice(s, lo, hi, loc);
 }
 
 uint8_t vela_str_at(vela_str s, int64_t i, const char *loc) {
@@ -175,7 +191,7 @@ uint8_t vela_str_at(vela_str s, int64_t i, const char *loc) {
     return s.data[i];
 }
 
-bool vela_str_eq(vela_str a, vela_str b) {
+static inline bool str_eq(vela_str a, vela_str b) {
     if (a.len != b.len) return false;
     uint64_t n = (uint64_t)a.len;
     // Short strings, the usual map keys, without a call (M16b): two loads
@@ -195,6 +211,10 @@ bool vela_str_eq(vela_str a, vela_str b) {
     return memcmp(a.data, b.data, (size_t)n) == 0;
 }
 
+bool vela_str_eq(vela_str a, vela_str b) {
+    return str_eq(a, b);
+}
+
 int vela_str_cmp(vela_str a, vela_str b) {
     int64_t n = a.len < b.len ? a.len : b.len;
     int c = n ? memcmp(a.data, b.data, (size_t)n) : 0;
@@ -204,21 +224,47 @@ int vela_str_cmp(vela_str a, vela_str b) {
 
 // ---- Arrays ----
 
+// An array starts as one allocation (M18): its elements right after it,
+// "inline", until it outgrows them and moves them to a buffer of their own.
+// A copy, a slice or a literal never grows, so it costs one malloc, not two.
+// The allocation comes from the free lists boxes use, so an array made and
+// dropped over and over, as a copy made to change, costs no malloc at all.
+static unsigned char *inline_data(vela_array *a) {
+    return (unsigned char *)(a + 1);
+}
+
 vela_array *vela_array_new(const vela_type *elem, int64_t cap) {
-    vela_array *a = vela_alloc(sizeof(vela_array));
+    check_count(cap);
+    check_size(elem->size * (size_t)cap);
+    size_t size = sizeof(vela_array) + elem->size * (size_t)cap;
+    vela_array *a = vela_box_alloc(size);
+    a->size = (int64_t)size;
     a->rc = 1;
     a->len = 0;
     a->cap = cap;
     a->elem = elem;
-    a->data = vela_alloc(elem->size * (size_t)cap);
+    a->data = inline_data(a);
     return a;
+}
+
+// Room for `bytes` bytes of elements, keeping the ones there.
+static void array_resize(vela_array *a, size_t bytes) {
+    if (a->data == inline_data(a)) {
+        unsigned char *data = vela_alloc(bytes);
+        if (a->len) memcpy(data, a->data, a->elem->size * (size_t)a->len);
+        a->data = data;
+    } else {
+        a->data = vela_realloc(a->data, bytes);
+    }
 }
 
 void vela_array_release(vela_array *a) {
     if (!vela_rc_dec(&a->rc)) return;
-    for (int64_t i = 0; i < a->len; i++) release_elem(a->elem, a->data + a->elem->size * (size_t)i);
-    free(a->data);
-    free(a);
+    if (a->elem->release) {
+        for (int64_t i = 0; i < a->len; i++) a->elem->release(a->data + a->elem->size * (size_t)i);
+    }
+    if (a->data != inline_data(a)) free(a->data);
+    vela_box_free(a, (size_t)a->size);
 }
 
 void vela_array_unique(vela_array **ap) {
@@ -227,7 +273,9 @@ void vela_array_unique(vela_array **ap) {
     vela_array *copy = vela_array_new(a->elem, a->len);
     if (a->len) memcpy(copy->data, a->data, a->elem->size * (size_t)a->len);
     copy->len = a->len;
-    for (int64_t i = 0; i < a->len; i++) retain_elem(a->elem, copy->data + a->elem->size * (size_t)i);
+    if (a->elem->retain) {
+        for (int64_t i = 0; i < a->len; i++) a->elem->retain(copy->data + a->elem->size * (size_t)i);
+    }
     // A shared array with no other reference is freed here.
     vela_array_release(a);
     *ap = copy;
@@ -246,7 +294,8 @@ void *vela_array_at(vela_array *a, int64_t i, const char *loc) {
 void vela_array_grow(vela_array *a) {
     // Doubling makes n pushes cost O(n) in total.
     a->cap = a->cap < 4 ? 4 : a->cap * 2;
-    a->data = vela_realloc(a->data, a->elem->size * (size_t)a->cap);
+    check_count(a->cap);
+    array_resize(a, a->elem->size * (size_t)a->cap);
 }
 
 void vela_array_push(vela_array *a, const void *elem) {
@@ -281,9 +330,35 @@ vela_array *vela_array_slice(vela_array *a, int64_t lo, int64_t hi, const char *
 #define MAP_EMPTY (-1)
 
 static void *map_key(vela_map *m, int64_t i) { return m->keys + m->key->size * (size_t)i; }
+
+// A key's hash and equality, with no call through its type for the usual
+// keys, Str and Int (M18).
+static inline uint64_t key_hash(const vela_map *m, const void *key) {
+    if (m->key == &vela_type_str) return hash_str(key);
+    if (m->key == &vela_type_int) return hash_int(key);
+    return m->key->hash(key);
+}
+
+static inline bool key_eq(const vela_map *m, const void *a, const void *b) {
+    if (m->key == &vela_type_str) return str_eq(*(const vela_str *)a, *(const vela_str *)b);
+    if (m->key == &vela_type_int) return *(const int64_t *)a == *(const int64_t *)b;
+    return m->key->eq(a, b);
+}
+
+// memcpy of an element, with the usual sizes known to the C compiler, so
+// it copies them inline instead of calling memcpy.
+static inline void copy_elem(void *to, const void *from, size_t size) {
+    switch (size) {
+    case 8: memcpy(to, from, 8); return;
+    case 16: memcpy(to, from, 16); return;
+    case 24: memcpy(to, from, 24); return;
+    default: memcpy(to, from, size);
+    }
+}
 static void *map_value(vela_map *m, int64_t i) { return m->values + m->value->size * (size_t)i; }
 
 static void map_reserve(vela_map *m, int64_t cap) {
+    check_count(cap);
     m->cap = cap;
     m->keys = vela_realloc(m->keys, m->key->size * (size_t)cap);
     m->values = vela_realloc(m->values, m->value->size * (size_t)cap);
@@ -367,12 +442,12 @@ static int64_t map_lookup_hashed(vela_map *m, const void *key, uint64_t h) {
     for (uint64_t s = h & mask;; s = (s + 1) & mask) {
         int64_t i = m->index[s];
         if (i == MAP_EMPTY) return -1;
-        if (m->hashes[i] == h && m->live[i] && m->key->eq(key, map_key(m, i))) return i;
+        if (m->hashes[i] == h && m->live[i] && key_eq(m, key, map_key(m, i))) return i;
     }
 }
 
 static int64_t map_lookup(vela_map *m, const void *key) {
-    return map_lookup_hashed(m, key, m->key->hash(key));
+    return map_lookup_hashed(m, key, key_hash(m, key));
 }
 
 void *vela_map_find(vela_map *m, const void *key) {
@@ -386,24 +461,24 @@ void *vela_map_at(vela_map *m, const void *key, const char *loc) {
     return v;
 }
 
-void vela_map_set(vela_map *m, const void *key, const void *value) {
-    uint64_t h = m->key->hash(key);
-    int64_t i = map_lookup_hashed(m, key, h);
-    if (i >= 0) {
-        // The key is already there: keep the old key, drop the new one.
-        release_elem(m->key, (void *)key);
-        release_elem(m->value, map_value(m, i));
-        memcpy(map_value(m, i), value, m->value->size);
-        return;
-    }
+// The key is already there, its value at `slot`: keep the old key, drop
+// the new one.
+static void map_replace(vela_map *m, void *slot, const void *key, const void *value) {
+    release_elem(m->key, (void *)key);
+    release_elem(m->value, slot);
+    copy_elem(slot, value, m->value->size);
+}
+
+// A key known not to be in the map, with hash h.
+static void map_insert(vela_map *m, const void *key, const void *value, uint64_t h) {
     if (m->count == m->cap) map_reserve(m, m->cap * 2);
     if ((m->count + 1) * 3 > m->index_cap * 2) {
         // Keep the table at most two thirds full, so walks stay short.
         map_rebuild_index(m, m->index_cap * 2);
     }
-    i = m->count++;
-    memcpy(map_key(m, i), key, m->key->size);
-    memcpy(map_value(m, i), value, m->value->size);
+    int64_t i = m->count++;
+    copy_elem(map_key(m, i), key, m->key->size);
+    copy_elem(map_value(m, i), value, m->value->size);
     m->live[i] = true;
     m->hashes[i] = h;
     m->len++;
@@ -411,6 +486,52 @@ void vela_map_set(vela_map *m, const void *key, const void *value) {
     uint64_t s = h & mask;
     while (m->index[s] != MAP_EMPTY) s = (s + 1) & mask;
     m->index[s] = i;
+}
+
+static void map_set_hashed(vela_map *m, const void *key, const void *value, uint64_t h) {
+    int64_t i = map_lookup_hashed(m, key, h);
+    if (i >= 0) {
+        map_replace(m, map_value(m, i), key, value);
+    } else {
+        map_insert(m, key, value, h);
+    }
+}
+
+void vela_map_set(vela_map *m, const void *key, const void *value) {
+    map_set_hashed(m, key, value, key_hash(m, key));
+}
+
+// `m[key] = v` right after a lookup of the same key in the same map (M18):
+//
+//     match maps.get(m, key) {
+//         Some(c) => m[key] = c + 1
+//         None => m[key] = 1
+//     }
+//
+// The lookup gave the key's hash and its value's slot, or NULL; the
+// compiler proved that nothing changed the map since, unless the write's
+// copy-on-write check copied it, so `m` is no longer `looked_in`. The key
+// is borrowed, and retained only when the map keeps it: a new value for a
+// key already there costs no reference count.
+void *vela_map_find_hashed(vela_map *m, const void *key, uint64_t *h) {
+    *h = key_hash(m, key);
+    int64_t i = map_lookup_hashed(m, key, *h);
+    return i < 0 ? NULL : map_value(m, i);
+}
+
+void vela_map_set_found(vela_map *m, const vela_map *looked_in, void *slot, uint64_t h, void *key,
+                        const void *value) {
+    if (m == looked_in && slot) {
+        release_elem(m->value, slot);
+        copy_elem(slot, value, m->value->size);
+        return;
+    }
+    retain_elem(m->key, key);
+    if (m != looked_in) {
+        map_set_hashed(m, key, value, h);
+    } else {
+        map_insert(m, key, value, h);
+    }
 }
 
 bool vela_map_remove(vela_map *m, const void *key) {
@@ -831,7 +952,8 @@ void vela_builder_add(vela_array *b, vela_str s) {
     if (need > b->cap) {
         int64_t cap = b->cap ? b->cap : 16;
         while (cap < need) cap *= 2;
-        b->data = vela_realloc(b->data, (size_t)cap);
+        check_count(cap);
+        array_resize(b, (size_t)cap);
         b->cap = cap;
     }
     memcpy(b->data + b->len, s.data, (size_t)s.len);

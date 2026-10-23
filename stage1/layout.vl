@@ -634,13 +634,13 @@ fn memory_functions(l: mut Layout) -> [Str] {
             push(mut out, line)
         }
         for line in [
-            "    " + b + " *b = vela_alloc(sizeof(" + b + "));",
+            "    " + b + " *b = vela_box_alloc(sizeof(" + b + "));",
             "    b->rc = 1;",
             "    b->value = value;",
             "    return b;",
             "}",
             "static inline VELA_UNUSED void " + b + "_release(" + b + " *b) {",
-            "    if (vela_rc_dec(&b->rc)) { " + drop + " free(b); }",
+            "    if (vela_rc_dec(&b->rc)) { " + drop + " vela_box_free(b, sizeof(" + b + ")); }",
             "}",
             "static inline VELA_UNUSED void " + b + "_share(" + b + " *b) {",
             "    if (vela_rc_share(&b->rc)) { " + mark + " }",

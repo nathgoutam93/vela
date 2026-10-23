@@ -1,0 +1,118 @@
+// A map write right after a lookup of the same key uses what the lookup
+// found (M18), unless something could have changed the map in between:
+// another write, a copy, a call, a new map, a loop's next turn.
+// stage 1 only
+// out: a=3 b=2 c=1
+// out: y=1 x=1
+// out: k=2 | k=1
+// out: one=uno! two=dos
+// out: p=1 q=1 r=1 s=1 t=1 u=1 v=1 w=1 x=1 y=1
+// out: n=2
+// out: m=99
+// out: z=1
+import maps
+import strings
+
+fn show(m: Map[Str, Int]) -> Str {
+    let mut b = strings.builder()
+    let keys = maps.keys(m)
+    for i in 0..len(keys) {
+        if i > 0 {
+            strings.add(mut b, " ")
+        }
+        strings.add(mut b, keys[i] + "=" + strings.from_int(m[keys[i]]))
+    }
+    return strings.build(b)
+}
+
+fn bump(m: mut Map[Str, Int], key: Str) {
+    m[key] = 1
+}
+
+fn main() {
+    // Counting: the write after either arm.
+    let mut counts: Map[Str, Int] = [:]
+    for w in ["a", "b", "a", "c", "b", "a"] {
+        match maps.get(counts, w) {
+            Some(c) => counts[w] = c + 1
+            None => counts[w] = 1
+        }
+    }
+    print(show(counts))
+
+    // Another write in between, which may grow the map and move every slot.
+    let mut m: Map[Str, Int] = [:]
+    let x = "x"
+    let found = maps.has(m, x)
+    m["y"] = 1
+    if !found {
+        m[x] = 1
+    }
+    print(show(m))
+
+    // A copy in between: the write copies the map, and the copy keeps 1.
+    let mut s: Map[Str, Int] = [:]
+    let k = "k"
+    s[k] = 1
+    match maps.get(s, k) {
+        Some(c) => {
+            let kept = s
+            s[k] = c + 1
+            print(show(s) + " | " + show(kept))
+        }
+        None => {}
+    }
+
+    // Str values: the old value is released when replaced.
+    let mut words: Map[Str, Str] = [:]
+    words["one"] = "uno"
+    words["two"] = "dos"
+    let one = "one"
+    match maps.get(words, one) {
+        Some(v) => words[one] = v + "!"
+        None => words[one] = "?"
+    }
+    print("one=" + words["one"] + " two=" + words["two"])
+
+    // Many new keys, each written after a lookup that missed: the table grows.
+    let mut grow: Map[Str, Int] = [:]
+    for key in ["p", "q", "r", "s", "t", "u", "v", "w", "x", "y"] {
+        if !maps.has(grow, key) {
+            grow[key] = 1
+        }
+    }
+    print(show(grow))
+
+    // A lookup before a loop: the first turn's write adds the key, so the
+    // next turn's must not add it again.
+    let mut n: Map[Str, Int] = [:]
+    let nk = "n"
+    let had_n = maps.has(n, nk)
+    for i in 0..3 {
+        if !had_n {
+            n[nk] = i
+        }
+    }
+    print(show(n))
+
+    // A call that adds the key in between.
+    let mut c: Map[Str, Int] = [:]
+    let mk = "m"
+    let had_m = maps.has(c, mk)
+    bump(mut c, mk)
+    if !had_m {
+        c[mk] = 99
+    }
+    print(show(c))
+
+    // A new map in between.
+    let mut r: Map[Str, Int] = [:]
+    let zk = "z"
+    r[zk] = 7
+    let had = maps.has(r, zk)
+    r = [:]
+    if had {
+        r[zk] = 1
+    }
+    print(show(r))
+}
