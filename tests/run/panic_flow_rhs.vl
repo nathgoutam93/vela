@@ -1,0 +1,13 @@
+// exit: 101
+// err: panic_flow_rhs.vl:11:11: panic: index out of range
+fn empty(xs: mut [Int]) -> Int {
+    xs = []
+    return 3
+}
+fn main() {
+    let mut xs = [1, 2]
+    let i = 0
+    if i < len(xs) {
+        xs[i] = empty(mut xs)
+    }
+}

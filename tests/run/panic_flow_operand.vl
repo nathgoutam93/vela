@@ -1,0 +1,10 @@
+// exit: 101
+// err: panic_flow_operand.vl:9:13: panic: integer overflow
+fn change(x: mut Int) -> Int {
+    x = 9223372036854775807
+    return 1
+}
+fn main() {
+    let mut x = 0
+    print(x + change(mut x) % 2)
+}

@@ -1,0 +1,11 @@
+// exit: 101
+// err: panic_flow_break.vl:10:13: panic: integer overflow
+fn main() {
+    let mut x = 0
+    for {
+        x = 9223372036854775807
+        break
+        x = 0
+    }
+    print(x + 1)
+}

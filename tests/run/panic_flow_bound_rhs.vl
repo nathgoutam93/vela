@@ -1,0 +1,13 @@
+// exit: 101
+// err: panic_flow_bound_rhs.vl:11:17: panic: index out of range
+fn shrink(xs: mut [Int]) -> Int {
+    xs = []
+    return 0
+}
+fn main() {
+    let mut xs = [1, 2]
+    let end = len(xs) + shrink(mut xs) * 0
+    for i in 0..end {
+        print(xs[i])
+    }
+}

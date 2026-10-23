@@ -1,0 +1,11 @@
+// exit: 101
+// err: panic_flow_mut_element.vl:4:11: panic: integer overflow
+fn bump(x: mut Int) {
+    x = x + 1
+}
+fn main() {
+    let mut n = 0
+    bump(mut n)
+    let mut xs = [9223372036854775807]
+    bump(mut xs[0])
+}

@@ -18,6 +18,7 @@ pub type Layout = struct {
     boxed: Map[Str, Bool]  // by "type slot index": slots stored in a box
     box_types: [Int]  // the types that live in boxes, in order
     managed_cache: Map[Int, Bool]
+    compact: Map[Int, Int]  // boxed enums whose empty variant can be NULL
     funcs: [Int]  // function types, which are C function pointer typedefs
 }
 
@@ -98,7 +99,7 @@ pub fn new_layout(table: types.Table, user_types: [Int], element_types: [Int]) -
     }
     let mut l = Layout {
         table: table, types: all, element_types: element_types, names: [:], used: [:], tags: [:], boxed: [:],
-        box_types: [], managed_cache: [:], funcs: [],
+        box_types: [], managed_cache: [:], compact: [:], funcs: [],
     }
     for t in all {
         let name = unique(mut l, base_name(l, t))
@@ -129,6 +130,28 @@ pub fn new_layout(table: types.Table, user_types: [Int], element_types: [Int]) -
             if is_boxed(l, t, s.name, s.index) && !contains_int(l.box_types, s.ty) {
                 push(mut l.box_types, s.ty)
             }
+        }
+    }
+    for t in l.box_types {
+        let vi = compact_shape(l, t)
+        if vi < 0 {
+            continue
+        }
+        // Struct fields can be passed by mutable address. Keep their boxed
+        // enum values addressable; compact payloads are reconstructed views.
+        let mut addressable = false
+        for outer in l.types {
+            let ti = types.get(l.table, outer)
+            if ti.tag == types.Tag.Struct {
+                for f in ti.fields {
+                    if f.ty == t && is_boxed(l, outer, f.name, 0) {
+                        addressable = true
+                    }
+                }
+            }
+        }
+        if !addressable {
+            l.compact[t] = vi
         }
     }
     return l
@@ -244,6 +267,36 @@ pub fn tag(l: Layout, enum: Int, variant: Str) -> Str {
 
 pub fn box_name(l: Layout, t: Int) -> Str {
     return "box_" + l.names[t]
+}
+
+// Exactly one empty and one carrying variant: the empty box is NULL;
+// allocated boxes need only the carrying variant's payload, without a tag.
+pub fn compact_variant(l: Layout, t: Int) -> Int {
+    return match maps.get(l.compact, t) {
+        Some(vi) => vi
+        None => -1
+    }
+}
+
+fn compact_shape(l: Layout, t: Int) -> Int {
+    let ti = types.get(l.table, t)
+    if ti.tag != types.Tag.Enum || len(ti.variants) != 2 {
+        return -1
+    }
+    if len(ti.variants[0].payload) == 0 && len(ti.variants[1].payload) > 0 {
+        return 1
+    }
+    if len(ti.variants[1].payload) == 0 && len(ti.variants[0].payload) > 0 {
+        return 0
+    }
+    return -1
+}
+
+pub fn box_value(l: Layout, t: Int, c: Str) -> Str {
+    if compact_variant(l, t) >= 0 {
+        return box_name(l, t) + "_get(" + c + ")"
+    }
+    return c + "->value"
 }
 
 // ---- Boxing ----
@@ -502,7 +555,28 @@ fn define(l: mut Layout, t: Int, done: mut Map[Int, Bool], out: mut [Str]) {
         push(mut out, "};")
     }
     if contains_int(l.box_types, t) {
-        push(mut out, "struct " + box_name(l, t) + " { int64_t rc; " + name + " value; };")
+        let vi = compact_variant(l, t)
+        if vi < 0 {
+            push(mut out, "struct " + box_name(l, t) + " { int64_t rc; " + name + " value; };")
+        } else {
+            let b = box_name(l, t)
+            let v = ti.variants[vi]
+            push(mut out, "struct " + b + " { int64_t rc;")
+            let mut fields = ""
+            for i in 0..len(v.payload) {
+                let m = "_" + strings.from_int(i)
+                push(mut out, "    " + member(l, t, v.name, i, v.payload[i], m) + ";")
+                if i > 0 {
+                    fields = fields + ", "
+                }
+                fields = fields + "." + m + " = b->" + m
+            }
+            push(mut out, "};")
+            push(mut out, "static inline VELA_UNUSED " + name + " " + b + "_get(" + b + " *b) {")
+            push(mut out, "    if (!b) return (" + name + "){.tag = " + tag(l, t, ti.variants[1 - vi].name) + "};")
+            push(mut out, "    return (" + name + "){.tag = " + tag(l, t, v.name) + ", .as.m_" + v.name + " = {" + fields + "}};")
+            push(mut out, "}")
+        }
     }
 }
 
@@ -519,6 +593,9 @@ fn member(l: Layout, t: Int, name: Str, index: Int, slot_type: Int, m: Str) -> S
 fn slot_ops(l: mut Layout, t: Int, name: Str, index: Int, slot_type: Int, c: Str, op: Str) -> [Str] {
     if is_boxed(l, t, name, index) {
         if op == "retain" {
+            if compact_variant(l, slot_type) >= 0 {
+                return ["if (" + c + ") vela_rc_inc(&" + c + "->rc);"]
+            }
             return ["vela_rc_inc(&" + c + "->rc);"]
         }
         return [box_name(l, slot_type) + "_" + op + "(" + c + ");"]
@@ -609,6 +686,12 @@ fn memory_functions(l: mut Layout) -> [Str] {
     for t in l.box_types {
         let b = box_name(l, t)
         let n = l.names[t]
+        if compact_variant(l, t) >= 0 {
+            for line in compact_helpers(mut l, t) {
+                push(mut out, line)
+            }
+            continue
+        }
         let keep = retain(mut l, t, "copy->value")
         let drop = release(mut l, t, "b->value")
         let mut mark = share(mut l, t, "b->value")
@@ -675,5 +758,66 @@ fn memory_functions(l: mut Layout) -> [Str] {
         push(mut out, "    return &t;")
         push(mut out, "}")
     }
+    return out
+}
+
+fn compact_helpers(l: mut Layout, t: Int) -> [Str] {
+    let b = box_name(l, t)
+    let n = l.names[t]
+    let vi = compact_variant(l, t)
+    let v = types.get(l.table, t).variants[vi]
+    let mut out = ["static inline VELA_UNUSED " + b + " *" + b + "_new(" + n + " value) {",
+        "    if (value.tag != " + tag(l, t, v.name) + ") return NULL;",
+        "    " + b + " *b = vela_box_alloc(sizeof(" + b + "));", "    b->rc = 1;"]
+    for i in 0..len(v.payload) {
+        let m = "_" + strings.from_int(i)
+        push(mut out, "    b->" + m + " = value.as.m_" + v.name + "." + m + ";")
+    }
+    push(mut out, "    return b;")
+    push(mut out, "}")
+    let mut tail = -1
+    for i in 0..len(v.payload) {
+        if v.payload[i] == t && is_boxed(l, t, v.name, i) {
+            tail = i
+        }
+    }
+    for op in ["release", "share"] {
+        push(mut out, "static inline VELA_UNUSED void " + b + "_" + op + "(" + b + " *b) {")
+        let mut check = "vela_rc_dec"
+        if op == "share" {
+            check = "vela_rc_share"
+        }
+        if tail >= 0 {
+            push(mut out, "    while (b) {")
+            push(mut out, "    if (!" + check + "(&b->rc)) return;")
+            push(mut out, "    " + b + " *next = b->_" + strings.from_int(tail) + ";")
+        } else {
+            push(mut out, "    if (!b || !" + check + "(&b->rc)) return;")
+        }
+        for i in 0..len(v.payload) {
+            if i == tail {
+                continue
+            }
+            for line in slot_ops(mut l, t, v.name, i, v.payload[i], "b->_" + strings.from_int(i), op) {
+                push(mut out, "    " + line)
+            }
+        }
+        if op == "release" {
+            push(mut out, "    vela_box_free(b, sizeof(" + b + "));")
+        }
+        if tail >= 0 {
+            push(mut out, "    b = next;")
+            push(mut out, "    }")
+        }
+        push(mut out, "}")
+    }
+    push(mut out, "static inline VELA_UNUSED void " + b + "_unique(" + b + " **b) {")
+    push(mut out, "    if (!*b || vela_rc_unique(&(*b)->rc)) return;")
+    push(mut out, "    " + n + " value = " + b + "_get(*b);")
+    push(mut out, "    " + retain(mut l, t, "value"))
+    push(mut out, "    " + b + " *copy = " + b + "_new(value);")
+    push(mut out, "    " + b + "_release(*b);")
+    push(mut out, "    *b = copy;")
+    push(mut out, "}")
     return out
 }

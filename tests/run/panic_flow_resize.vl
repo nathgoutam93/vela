@@ -1,0 +1,9 @@
+// exit: 101
+// err: panic_flow_resize.vl:7:17: panic: index out of range
+fn main() {
+    let mut xs = [1, 2]
+    for i in 0..len(xs) {
+        xs = []
+        print(xs[i])
+    }
+}

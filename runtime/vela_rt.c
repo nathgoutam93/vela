@@ -1,5 +1,8 @@
 // os.run needs POSIX (fork, exec, wait), which -std=c11 alone hides.
 #define _POSIX_C_SOURCE 200809L
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
+#endif
 
 #include "vela_rt.h"
 
@@ -328,6 +331,14 @@ vela_array *vela_array_slice(vela_array *a, int64_t lo, int64_t hi, const char *
 // not live, so the walk does not stop early; rebuilding the table drops them.
 
 #define MAP_EMPTY (-1)
+#define MAP_ENTRY_MASK UINT64_C(0x0000ffffffffffff)
+#define MAP_TAG_MASK UINT64_C(0x7fff000000000000)
+
+// Keep 15 high hash bits beside the entry number. A probe can reject a
+// collision before fetching that entry's full hash, liveness or string.
+static inline int64_t map_index_entry(int64_t i, uint64_t h) {
+    return (int64_t)((h & MAP_TAG_MASK) | (uint64_t)i);
+}
 
 static void *map_key(vela_map *m, int64_t i) { return m->keys + m->key->size * (size_t)i; }
 
@@ -386,7 +397,7 @@ static void map_rebuild_index(vela_map *m, int64_t index_cap) {
     for (int64_t i = 0; i < m->count; i++) {
         uint64_t s = m->hashes[i] & (uint64_t)(index_cap - 1);
         while (m->index[s] != MAP_EMPTY) s = (s + 1) & (uint64_t)(index_cap - 1);
-        m->index[s] = i;
+        m->index[s] = map_index_entry(i, m->hashes[i]);
     }
 }
 
@@ -440,8 +451,10 @@ void vela_map_share(vela_map *m) {
 static int64_t map_lookup_hashed(vela_map *m, const void *key, uint64_t h) {
     uint64_t mask = (uint64_t)(m->index_cap - 1);
     for (uint64_t s = h & mask;; s = (s + 1) & mask) {
-        int64_t i = m->index[s];
-        if (i == MAP_EMPTY) return -1;
+        int64_t entry = m->index[s];
+        if (entry == MAP_EMPTY) return -1;
+        if (((uint64_t)entry & MAP_TAG_MASK) != (h & MAP_TAG_MASK)) continue;
+        int64_t i = (int64_t)((uint64_t)entry & MAP_ENTRY_MASK);
         if (m->hashes[i] == h && m->live[i] && key_eq(m, key, map_key(m, i))) return i;
     }
 }
@@ -485,7 +498,7 @@ static void map_insert(vela_map *m, const void *key, const void *value, uint64_t
     uint64_t mask = (uint64_t)(m->index_cap - 1);
     uint64_t s = h & mask;
     while (m->index[s] != MAP_EMPTY) s = (s + 1) & mask;
-    m->index[s] = i;
+    m->index[s] = map_index_entry(i, h);
 }
 
 static void map_set_hashed(vela_map *m, const void *key, const void *value, uint64_t h) {
@@ -807,6 +820,10 @@ static int saved_argc;
 static char **saved_argv;
 
 void vela_init(int argc, char **argv) {
+    // Keep terminal output line buffered. Redirected output uses a larger
+    // stdio buffer; the existing read, panic and exit paths flush it.
+    static char output_buffer[65536];
+    if (!isatty(STDOUT_FILENO)) setvbuf(stdout, output_buffer, _IOFBF, sizeof output_buffer);
     saved_argc = argc;
     saved_argv = argv;
 }

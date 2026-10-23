@@ -202,6 +202,7 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
         push(mut out, prototype(k, l, c.fn_id, none, k.fns[c.fn_id].type_params, c.args, copy_names[i]) + ";")
     }
     let mut bodies: [Str] = []
+    let mut flow_envs: Map[Int, ranges.Env] = [:]
     let mut wrappers: Map[Str, Str] = [:]
     for i in 0..len(roots) + len(copies.instances) {
         let mut id = 0
@@ -218,7 +219,10 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
             args = c.args
             name = copy_names[i - len(roots)]
         }
-        let mut g = new_gen(k, l, id, params, args, instance_names, name, ranges.new_env(param_ranges))
+        if !maps.has(flow_envs, id) {
+            flow_envs[id] = ranges.function_env(k, param_ranges, id)
+        }
+        let mut g = new_gen(k, l, id, params, args, instance_names, name, flow_envs[id])
         let lines = function(mut g, id, name)
         // Where the driver may cut the C into parts compiled in parallel:
         // before each function, with the closures written for it.
@@ -1134,7 +1138,7 @@ fn assign(g: mut Gen, target: ast.Expr, v: ast.Expr) {
                 let index = expr(mut g, i).c
                 let elem = c_type(g, ty(g, target))
                 let slot = new_temp(mut g)
-                emit(mut g, elem + " *" + slot + " = " + element_address(elem, container, index, loc_of(g, target)) + ";")
+                emit(mut g, elem + " *" + slot + " = " + element_address(g, target, elem, container, index, loc_of(g, target)) + ";")
                 emit(mut g, release(mut g, ty(g, target), "*" + slot))
                 emit(mut g, "*" + slot + " = " + c + ";")
             }
@@ -1410,7 +1414,10 @@ fn hoist_unique(g: mut Gen, loop: ast.Stmt) {
 // The address of element `index` of the array `container`, checked to be
 // in bounds, as a pointer to `elem`, the element's C type. The check is
 // inline, in vela_rt.h, so the C compiler can see through it (M16b).
-fn element_address(elem: Str, container: Str, index: Str, loc: Str) -> Str {
+fn element_address(g: Gen, e: ast.Expr, elem: Str, container: Str, index: Str, loc: Str) -> Str {
+    if maps.has(g.env.safe, e.id) && g.env.safe[e.id] {
+        return "((" + elem + " *)" + container + "->data + " + index + ")"
+    }
     return "(" + elem + " *)vela_at(" + container + ", " + index + ", sizeof(" + elem + "), " + loc + ")"
 }
 
@@ -1426,7 +1433,7 @@ fn place(g: mut Gen, e: ast.Expr) -> Str {
                 return member
             }
             emit(mut g, layout.box_name(g.l, ty(g, e)) + "_unique(&" + member + ");")
-            return member + "->value"
+            return layout.box_value(g.l, ty(g, e), member)
         }
         ast.ExprKind.Index(obj, i) => {
             let container = writable(mut g, obj)
@@ -1438,7 +1445,7 @@ fn place(g: mut Gen, e: ast.Expr) -> Str {
                 return "(*(" + c_type(g, ty(g, e)) + " *)vela_map_at(" + container + ", " + ka + ", " + loc_of(g, e) + "))"
             }
             let index = expr(mut g, i).c
-            return "(*" + element_address(c_type(g, ty(g, e)), container, index, loc_of(g, e)) + ")"
+            return "(*" + element_address(g, e, c_type(g, ty(g, e)), container, index, loc_of(g, e)) + ")"
         }
         _ => return ""
     }
@@ -1572,7 +1579,7 @@ fn payload(g: Gen, path: Str, enum: Int, vi: Int, i: Int) -> Str {
     let name = types.get(g.k.table, enum).variants[vi].name
     let member = path + ".as.m_" + name + "._" + strings.from_int(i)
     if layout.is_boxed(g.l, enum, name, i) {
-        return member + "->value"
+        return layout.box_value(g.l, types.get(g.k.table, enum).variants[vi].payload[i], member)
     }
     return member
 }
@@ -1734,7 +1741,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             let c = expr(mut g, obj).c
             let mut member = c + ".m_" + name
             if layout.is_boxed(g.l, ty(g, obj), name, 0) {
-                member = member + "->value"
+                member = layout.box_value(g.l, ty(g, e), member)
             }
             return value(member, t)
         }
@@ -2067,6 +2074,9 @@ fn index(g: mut Gen, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Value {
     let t = ty(g, obj)
     if t == types.STR() {
         let ix = expr(mut g, i).c
+        if maps.has(g.env.safe, e.id) && g.env.safe[e.id] {
+            return value(scalar(mut g, types.BYTE(), o + ".data[" + ix + "]"), types.BYTE())
+        }
         return value(scalar(mut g, types.BYTE(), "vela_byte_at(" + o + ", " + ix + ", " + loc_of(g, e) + ")"), types.BYTE())
     }
     let elem = c_type(g, ty(g, e))
@@ -2078,7 +2088,7 @@ fn index(g: mut Gen, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Value {
         emit(mut g, elem + " " + temp + " = *(" + elem + " *)vela_map_at(" + o + ", " + ka + ", " + loc_of(g, e) + ");")
     } else {
         let ix = expr(mut g, i).c
-        emit(mut g, elem + " " + temp + " = *" + element_address(elem, o, ix, loc_of(g, e)) + ";")
+        emit(mut g, elem + " " + temp + " = *" + element_address(g, e, elem, o, ix, loc_of(g, e)) + ";")
     }
     return value(temp, ty(g, e))
 }

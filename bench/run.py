@@ -71,11 +71,13 @@ def run(cmd: list[str], env: dict[str, str] | None = None, cwd: Path | None = No
     return subprocess.run(cmd, env=env, cwd=cwd, stdout=stdout, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL)
 
 
-def build(lang: str, bench: Bench, out: Path, compiler: Path) -> tuple[Path, float]:
+def build(lang: str, bench: Bench, out: Path, compiler: Path, root: Path | None = None) -> tuple[Path, float]:
     """Build one version; returns the executable and how long building took."""
     src = BENCH / bench.name
     exe = out / f"{bench.name}-{lang}"
     env = dict(os.environ)
+    if root is not None:
+        env["VELA_ROOT"] = str(root)
     if lang == "c":
         cmd = ["gcc", "-O2", "-std=c11", str(src / "main.c"), "-lm", "-o", str(exe)]
     elif lang == "rust":
@@ -161,13 +163,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("only", nargs="*", help="only these benchmarks")
     ap.add_argument("--runs", type=int, default=5)
+    ap.add_argument("--languages", nargs="+", choices=LANGS, default=LANGS,
+                    help="versions to build (e.g. c vela for the release backend only)")
     ap.add_argument("--json", help="also write the results to this file")
     ap.add_argument("--quick", action="store_true", help="small sizes")
     ap.add_argument("--check", action="store_true", help="build and compare outputs only; no timing")
     ap.add_argument("--compiler", default=str(ROOT / "build" / "vela"))
     opts = ap.parse_args()
     compiler = Path(opts.compiler).resolve()
-    langs = [l for l in LANGS if l != "rust" or shutil.which("rustc")]
+    langs = [l for l in opts.languages if l != "rust" or shutil.which("rustc")]
     benches = [b for b in BENCHES if not opts.only or b.name in opts.only]
     results: dict[str, dict[str, dict[str, float]]] = {}
     problems = []

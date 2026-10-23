@@ -196,7 +196,7 @@ int vela_str_cmp(vela_str a, vela_str b);
 // A box freed goes on a list of free boxes of its size, kept by the thread
 // that freed it, and the next box of that size comes off that list: a
 // program that makes and drops trees over and over stops calling malloc and
-// free. Sizes are rounded up to a multiple of 16, up to 128 bytes; each list
+// free. Sizes are rounded up to a multiple of 8, up to 128 bytes; each list
 // keeps at most 32 MB, and what does not fit goes back to free(). Under a
 // sanitizer every box is malloc'd and freed, so that it sees each one.
 #if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
@@ -207,7 +207,7 @@ int vela_str_cmp(vela_str a, vela_str b);
 #endif
 #endif
 
-#define VELA_POOL_CLASSES 8
+#define VELA_POOL_CLASSES 16
 #define VELA_POOL_BYTES ((int64_t)32 << 20)
 
 typedef struct vela_pool {
@@ -219,7 +219,7 @@ extern _Thread_local vela_pool vela_pools;
 
 static inline void *vela_box_alloc(size_t size) {
 #ifndef VELA_SANITIZED
-    size_t c = (size - 1) / 16;
+    size_t c = (size - 1) / 8;
     if (c < VELA_POOL_CLASSES) {
         void *p = vela_pools.free[c];
         if (p) {
@@ -227,7 +227,7 @@ static inline void *vela_box_alloc(size_t size) {
             vela_pools.count[c]--;
             return p;
         }
-        return vela_alloc((c + 1) * 16);
+        return vela_alloc((c + 1) * 8);
     }
 #endif
     return vela_alloc(size);
@@ -235,8 +235,8 @@ static inline void *vela_box_alloc(size_t size) {
 
 static inline void vela_box_free(void *p, size_t size) {
 #ifndef VELA_SANITIZED
-    size_t c = (size - 1) / 16;
-    if (c < VELA_POOL_CLASSES && vela_pools.count[c] < VELA_POOL_BYTES / (int64_t)((c + 1) * 16)) {
+    size_t c = (size - 1) / 8;
+    if (c < VELA_POOL_CLASSES && vela_pools.count[c] < VELA_POOL_BYTES / (int64_t)((c + 1) * 8)) {
         *(void **)p = vela_pools.free[c];
         vela_pools.free[c] = p;
         vela_pools.count[c]++;
@@ -309,7 +309,7 @@ typedef struct vela_map {
     unsigned char *keys;
     unsigned char *values;
     bool *live;
-    int64_t *index;  // open-addressing table of entry numbers, -1 = empty
+    int64_t *index;  // open-addressing table: entry numbers plus hash bits, -1 = empty
     int64_t index_cap;  // a power of two
     uint64_t *hashes;  // each entry's key's hash (M16b), compared before the keys
 } vela_map;

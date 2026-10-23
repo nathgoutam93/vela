@@ -1,0 +1,67 @@
+// out: 7
+// out: 7
+// out: 3
+// out: empty
+// out: value
+// out: 0
+// out: 1
+import tasks
+
+type Tree = enum { Leaf, Node(Tree, Tree) }
+type List = enum { Cons(Str, List), Nil }
+type Other = enum { Empty, Missing, Pair(Other, Other) }
+
+fn tree(depth: Int) -> Tree {
+    if depth == 0 {
+        return Tree.Leaf
+    }
+    return Tree.Node(tree(depth - 1), tree(depth - 1))
+}
+fn size(t: Tree) -> Int {
+    return match t {
+        Tree.Leaf => 1
+        Tree.Node(a, b) => 1 + size(a) + size(b)
+    }
+}
+fn first(xs: List) -> Str {
+    return match xs {
+        List.Nil => "empty"
+        List.Cons(s, _) => s
+    }
+}
+type Link = enum { End, More(Holder) }
+type Holder = struct { link: Link }
+
+fn replace(link: mut Link) {
+    link = Link.End
+}
+
+fn linked(link: Link) -> Int {
+    return match link {
+        Link.End => 0
+        Link.More(_) => 1
+    }
+}
+
+fn main() {
+    let t = tree(2)
+    let copy = t
+    let xs = [t, copy]
+    for n in tasks.map(xs, size) {
+        print(n)
+    }
+    let other = Other.Pair(Other.Empty, Other.Missing)
+    match other {
+        Other.Pair(_, _) => print(3)
+        _ => print(0)
+    }
+    print(first(List.Nil))
+    let list = List.Cons("value", List.Nil)
+    let second = list
+    print(first(second))
+    let mut holder = Holder { link: Link.More(Holder { link: Link.End }) }
+    let old = holder
+    replace(mut holder.link)
+    print(linked(holder.link))
+    print(linked(old.link))
+}

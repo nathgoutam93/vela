@@ -1,0 +1,18 @@
+// exit: 101
+// err: panic_flow_mut_loop.vl:5:35: panic: integer overflow
+fn danger(n: Int) {
+    if n == 6 {
+        print(9223372036854775807 + n)
+    }
+}
+fn count(x: mut Int) {
+    x = 0
+    for x < 7 {
+        danger(x)
+        x = x + 1
+    }
+}
+fn main() {
+    let mut x = 0
+    count(mut x)
+}

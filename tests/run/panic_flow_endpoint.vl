@@ -1,0 +1,12 @@
+// exit: 101
+// err: panic_flow_endpoint.vl:9:21: panic: index out of range
+fn main() {
+    let xs = [1, 2]
+    let i = len(xs)
+    let j = 0
+    if j <= len(xs) {
+        if i != j {
+            print(xs[i])
+        }
+    }
+}

@@ -1,0 +1,40 @@
+// out: 45
+// out: 9
+// out: 54321
+// out: -9197
+import strings
+
+fn random(seed: mut Int) {
+    seed = (seed * 3877 + 29573) % 139968
+}
+
+fn main() {
+    let xs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    let mut sum = 0
+    let mut i = 0
+    for i < len(xs) {
+        sum = sum + xs[i]
+        i = i + 1
+    }
+    print(sum)
+    let mut j = len(xs) - 1
+    for j > 0 {
+        if j == 4 {
+            j = j - 1
+            continue
+        }
+        j = j - 1
+    }
+    print(xs[len(xs) - 1])
+    let text = "12345"
+    let mut out = strings.builder()
+    let mut pos = len(text)
+    for pos > 0 {
+        pos = pos - 1
+        strings.add_byte(mut out, text[pos])
+    }
+    print(strings.build(out))
+    let mut seed = -10
+    random(mut seed)
+    print(seed)
+}

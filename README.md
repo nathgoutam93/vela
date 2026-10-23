@@ -119,6 +119,9 @@ benchmarks): overflow checks left out where the ranges of the values
 prove they cannot fail, copy-on-write checked once per variable or once
 before a loop, one allocation per array, a map write after a lookup that
 reuses it, and free lists for small objects.
+The next performance round is implemented for review, but has not met all
+its acceptance limits; see [`docs/performance-next-round.md`](docs/performance-next-round.md)
+for changes, measurements and remaining work.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.
