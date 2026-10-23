@@ -603,14 +603,11 @@ fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
     push_frame(mut g, "function")
     let mut names: [Str] = []
     for i in 0..len(f.decl.params) {
-        // The caller passes each argument owned and the callee releases it,
-        // except a mut parameter, which stays the caller's.
-        let lid = f.param_locals[i]
-        push(mut names, c_name(mut g, lid))
-        let t = local_ty(g, lid)
-        if managed(mut g, t) && !f.decl.params[i].mutable {
-            push(mut g.frames[len(g.frames) - 1].items, Item { c: names[i], ty: t })
-        }
+        // Parameters are borrowed (M11b): the caller keeps its references,
+        // and the function retains only what it keeps, as consume does for
+        // any value it does not own. A function value's code, a closure's,
+        // takes its arguments owned instead (closure_value).
+        push(mut names, c_name(mut g, f.param_locals[i]))
     }
     for r in f.decl.requires {
         push_frame(mut g, "stmt")
@@ -1190,14 +1187,35 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
                 }
                 checker.Ref.Builtin(name) => return builtin(mut g, e, name, args)
                 checker.Ref.Function(id) => {
-                    // The other arguments first, left to right; then the
-                    // places of the mut ones, so nothing evaluated in between
-                    // can move them.
+                    // The function borrows its arguments (M11b): they stay
+                    // the caller's, temporaries released when the statement
+                    // ends. Unless an argument has a `mut` in it, which can
+                    // change a variable another argument was read from: then
+                    // each is a copy with a reference of its own, kept until
+                    // the statement ends. The other arguments first, left to
+                    // right; then the places of the mut ones, so nothing
+                    // evaluated in between can move them.
+                    let mut protect = false
+                    for a in args {
+                        if ast.has_mut(a) {
+                            protect = true
+                        }
+                    }
                     let mut cs: [Str] = []
+                    let mut kept: [Item] = []
                     for a in args {
                         match a.kind {
                             ast.ExprKind.MutArg(_) => push(mut cs, "")
-                            _ => push(mut cs, consume(mut g, expr(mut g, a)))
+                            _ => {
+                                if protect {
+                                    let v = expr(mut g, a)
+                                    let c = consume(mut g, v)
+                                    push(mut cs, c)
+                                    push(mut kept, Item { c: c, ty: v.ty })
+                                } else {
+                                    push(mut cs, expr(mut g, a).c)
+                                }
+                            }
                         }
                     }
                     for i in 0..len(args) {
@@ -1217,11 +1235,16 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
                     }
                     strings.add_byte(mut b, ')')
                     let call = strings.build(b)
+                    let mut result = no_value()
                     if t == types.NOTHING() {
                         emit(mut g, call + ";")
-                        return no_value()
+                    } else {
+                        result = store(mut g, t, call)
                     }
-                    return store(mut g, t, call)
+                    for item in kept {
+                        own(mut g, item.c, item.ty)  // released when the statement ends
+                    }
+                    return result
                 }
                 checker.Ref.Indirect => return indirect_call(mut g, e, args)
                 _ => return no_value()
@@ -1318,12 +1341,20 @@ fn function_value(g: mut Gen, id: Int, e: ast.Expr) -> Value {
             strings.add(mut args, "a" + strings.from_int(i))
         }
         let call = target + "(" + strings.build(args) + ");"
-        let mut ret = "return "
-        if ft.result == types.NOTHING() {
-            ret = ""
+        // A function value takes its arguments owned; the function borrows them.
+        let mut drops = strings.builder()
+        for i in 0..len(ft.args) {
+            let r = release(mut g, ft.args[i], "a" + strings.from_int(i))
+            if r != "" {
+                strings.add(mut drops, " " + r)
+            }
+        }
+        let mut body = call + strings.build(drops)
+        if ft.result != types.NOTHING() {
+            body = c_type(g, ft.result) + " r = " + call + strings.build(drops) + " return r;"
         }
         g.wrappers[wrapper] = "static VELA_UNUSED " + c_type(g, ft.result) + " " + wrapper + "(" + strings.build(params) +
-            ") { (void)env; " + ret + call + " }"
+            ") { (void)env; " + body + " }"
     }
     return store(mut g, t, "(" + c_type(g, t) + "){ .fn = " + wrapper + ", .env = NULL }")
 }

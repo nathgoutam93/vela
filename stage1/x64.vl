@@ -765,6 +765,8 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str]) -> [Str] {
     for s in o.stubs {
         push(mut o.lines, s)
     }
+    // Its size, so that profilers and debuggers can tell where it ends.
+    push(mut o.lines, "    .size " + f.name + ", . - " + f.name)
     for key in maps.keys(o.doubles) {
         doubles[key] = o.doubles[key]
     }
@@ -1277,7 +1279,7 @@ fn slot_offset(f: ir.Func, o: Out, slot: Int) -> Int {
 
 // size bytes from the address in register b to the one in register a.
 fn copy(o: mut Out, a: Int, b: Int, size: Int) {
-    if size > 64 {
+    if size > 256 {
         let d = src(mut o, a, "rdi")
         if d != "rdi" {
             emit(mut o, "mov rdi, " + d)

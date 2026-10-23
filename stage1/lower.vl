@@ -1326,12 +1326,10 @@ fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
         // The caller passes each argument owned and the callee releases it,
         // except a mut parameter, which stays the caller's.
         let lid = f.param_locals[i]
+        // Parameters are borrowed (M11b): the caller keeps its references,
+        // and the function retains only what it keeps (consume does).
         let t = local_ty(g, lid)
-        let mutable = f.decl.params[i].mutable
-        param_local(mut g, lid, t, mutable)
-        if managed(mut g, t) && !mutable {
-            push(mut g.fs.frames[0].items, Item { v: g.fs.locals[lid], ty: t, restore: "", saved: -1 })
-        }
+        param_local(mut g, lid, t, f.decl.params[i].mutable)
     }
     for r in f.decl.requires {
         push_frame(mut g, "stmt")
@@ -2172,14 +2170,33 @@ fn call_result(g: mut Low, t: Int, args: mut [Int]) -> Val {
     return temp_reg(mut g, t)
 }
 
+// A call of a Vela function, which borrows its arguments (M11b): the
+// caller keeps them, releasing temporaries when the statement ends, and
+// the callee retains only what it keeps. C's backend passes them owned;
+// borrowing saves a retain and a release per argument, as Lean 4's
+// borrowed parameters do. Unless some argument has a `mut` in it: that can
+// change a variable another argument was read from, so then each is a copy
+// with a reference of its own, kept until the statement ends.
 fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
+    let mut protect = false
+    for a in args {
+        if ast.has_mut(a) {
+            protect = true
+        }
+    }
     // The other arguments first, left to right; then the places of the mut
     // ones, so nothing evaluated in between can move them.
     let mut vals: [Val] = []
     for a in args {
         match a.kind {
             ast.ExprKind.MutArg(_) => push(mut vals, no_value())
-            _ => push(mut vals, consume(mut g, expr(mut g, a)))
+            _ => {
+                if protect {
+                    push(mut vals, consume(mut g, expr(mut g, a)))
+                } else {
+                    push(mut vals, expr(mut g, a))
+                }
+            }
         }
     }
     let mut regs: [Int] = []
@@ -2198,6 +2215,13 @@ fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
     }
     i.args = regs
     emit(mut g, i)
+    if protect {
+        for v in vals {
+            if v.reg >= 0 {
+                own(mut g, v)  // released when the statement ends
+            }
+        }
+    }
     if t == types.NOTHING() {
         return no_value()
     }
@@ -2264,18 +2288,29 @@ fn function_value(g: mut Low, id: Int, e: ast.Expr) -> Val {
         if sret >= 0 {
             push(mut regs, sret)
         }
+        let mut owned: [Val] = []
         for a in ft.args {
             let mut class = ir.INT()
             if !in_memory(g, a) {
                 class = class_of(a)
             }
-            push(mut regs, ir.param(mut g.fs.f, class))
+            let r = ir.param(mut g.fs.f, class)
+            push(mut regs, r)
+            if in_memory(g, a) {
+                push(mut owned, mem_val(r, 0, a))
+            } else {
+                push(mut owned, reg_val(r, a))
+            }
         }
         let mut r = -1
         if g.fs.f.result >= 0 {
             r = call(mut g, target, regs, g.fs.f.result)
         } else {
             call(mut g, target, regs, -1)
+        }
+        // A function value gets its arguments owned; the function borrows them.
+        for v in owned {
+            release(mut g, v.ty, v)
         }
         ret(mut g, r)
         finish(mut g)

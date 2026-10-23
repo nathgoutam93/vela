@@ -223,6 +223,66 @@ pub type Program = struct {
     tests: [TestDecl]
 }
 
+// Whether `e` has a `mut` argument in it, which may change variables.
+pub fn has_mut(e: Expr) -> Bool {
+    return match e.kind {
+        ExprKind.MutArg(_) => true
+        ExprKind.Unary(_, x) => has_mut(x)
+        ExprKind.Binary(_, a, b) => has_mut(a) || has_mut(b)
+        ExprKind.Call(f, args) => has_mut(f) || any_mut(args)
+        ExprKind.Field(x, _) => has_mut(x)
+        ExprKind.Index(a, b) => has_mut(a) || has_mut(b)
+        ExprKind.Try(x) => has_mut(x)
+        ExprKind.Slice(a, b, c) => has_mut(a) || has_mut(b) || has_mut(c)
+        ExprKind.ArrayLit(xs) => any_mut(xs)
+        ExprKind.MapLit(entries) => entries_mut(entries)
+        ExprKind.StructLit(_, _, fields) => fields_mut(fields)
+        ExprKind.Match(x, arms) => has_mut(x) || arms_mut(arms)
+        _ => false  // a closure's body does not run here
+    }
+}
+
+fn any_mut(es: [Expr]) -> Bool {
+    for e in es {
+        if has_mut(e) {
+            return true
+        }
+    }
+    return false
+}
+
+fn entries_mut(entries: [MapEntry]) -> Bool {
+    for en in entries {
+        if has_mut(en.key) || has_mut(en.value) {
+            return true
+        }
+    }
+    return false
+}
+
+fn fields_mut(fields: [FieldInit]) -> Bool {
+    for f in fields {
+        if has_mut(f.value) {
+            return true
+        }
+    }
+    return false
+}
+
+fn arms_mut(arms: [Arm]) -> Bool {
+    for a in arms {
+        match a.body {
+            ArmBody.Value(e) => {
+                if has_mut(e) {
+                    return true
+                }
+            }
+            ArmBody.Do(_) => return true
+        }
+    }
+    return false
+}
+
 // ---- `vela ast` ----
 //
 // An S-expression, rendered as in Stage 0: a list stays on one line unless

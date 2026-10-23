@@ -12,11 +12,9 @@ f_count:
     cmp r10, 0
     jg .L0_1
 .L0_0:
-    mov rbx, 0
-    mov rax, rbx
+    mov rax, 0
     jmp .LR0
 .L0_1:
-.L0_2:
     sub r10, 1
     jo .LP0_1
     mov rdi, r10
@@ -39,6 +37,7 @@ f_count:
     lea rdi, [rip + .Lc1]
     lea rsi, [rip + .Lmsg_overflow]
     call vela_panic@PLT
+    .size f_count, . - f_count
 
     .p2align 4
     .type f_main, @function
@@ -55,6 +54,7 @@ f_main:
     mov rsp, rbp
     pop rbp
     ret
+    .size f_main, . - f_main
 
     .p2align 4
     .globl main
@@ -69,7 +69,11 @@ main:
     mov rdi, r10
     mov rsi, rbx
     call vela_init@PLT
-    call f_main
+    mov rdi, 3
+    call f_count
+    mov r10, rax
+    mov rdi, r10
+    call vela_print_int@PLT
     mov rax, 0
     jmp .LR2
 .LR2:
@@ -77,6 +81,7 @@ main:
     pop rbx
     pop rbp
     ret
+    .size main, . - main
 
     .section .rodata
 .Lmsg_overflow:

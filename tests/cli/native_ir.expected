@@ -11,37 +11,28 @@
 
 fn f_square(%0)
     %1 = mul.chk .Lc0 %0, %0
-    %2 = move %1
-    ret %2
+    ret %1
 
 fn f_main()
     %0 = const #0
     %1 = move %0
     %2 = const #0
     %3 = const #4
-    %4 = move %3
     %5 = move %2
 L0:
-    branch.cmp ge %5, %4 L2
+    branch.cmp ge %5, %3 L2
     %6 = move %5
-    %7 = call f_square (%6)
-    %8 = add.chk .Lc1 %1, %7
+    %15 = mul.chk .Lc0 %6, %6
+    %8 = add.chk .Lc1 %1, %15
     %1 = move %8
-L1:
     %5 = addi %5 #1
     jump L0
 L2:
-    %9 = const #10
-    %10 = cmp %1, %9 #4
+    %10 = cmpi %1 #4 #10
     branch %10 L6 L4
 L6:
-    %11 = const #20
-    %12 = cmp %1, %11 #2
-    branch %12 L7 L8
-L7:
-    jump L3
-L8:
-    jump L4
+    %12 = cmpi %1 #2 #20
+    branch %12 L3 L4
 L3:
     %13 = sym .Ls3
     ccall vela_print_str (%13 as str) #0

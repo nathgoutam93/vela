@@ -1,0 +1,478 @@
+// Optimizing the IR (M11b), between lower.vl and x64.vl.
+//
+// - Inlining. A call to a small function becomes a copy of its body,
+//   with its registers, slots and labels renumbered: the function's
+//   parameters are set from the arguments, and each return sets the
+//   call's result and jumps to after the call. Small means at most
+//   inline_limit() instructions and not calling itself; the functions
+//   lowering writes for memory (rc_retain_T, box helpers) are mostly
+//   such, and so are accessors and the many one-line functions of a
+//   program. Two rounds, so that what an inlined body calls can be
+//   inlined too, each copying the bodies as the round before left them.
+// - Copy propagation. A register set once, by a move from another set
+//   once, is replaced by that other everywhere, and the move goes.
+// - Folding. A comparison of two constants is a constant, and a branch
+//   on a constant is a jump.
+// - Jump threading. A jump to a label followed only by a jump goes
+//   straight to where that one goes.
+// - Dead code. An instruction with no effect whose result nobody reads
+//   goes, and so does code no jump can reach.
+// stage 1 only (it has tests, which Stage 0 cannot read)
+import ir
+import maps
+
+fn inline_limit() -> Int {
+    return 12
+}
+
+pub fn optimize(p: ir.Program) -> ir.Program {
+    return optimize_with(p, inline_limit(), 2)
+}
+
+// With functions of at most `limit` instructions inlined, `rounds` times.
+pub fn optimize_with(p: ir.Program, limit: Int, rounds: Int) -> ir.Program {
+    let mut funcs = p.funcs
+    let mut index: Map[Str, Int] = [:]
+    for i in 0..len(funcs) {
+        index[funcs[i].name] = i
+    }
+    for _ in 0..rounds {
+        let before = funcs
+        let mut small: Map[Str, Bool] = [:]
+        for f in before {
+            if len(f.insts) <= limit && !calls(f, f.name) && !f.public {
+                small[f.name] = true
+            }
+        }
+        for i in 0..len(funcs) {
+            funcs[i] = simplify(inline_calls(funcs[i], before, index, small))
+        }
+    }
+    return ir.Program { funcs: funcs, data: p.data }
+}
+
+fn calls(f: ir.Func, name: Str) -> Bool {
+    for i in f.insts {
+        if i.op == ir.Op.Call && i.sym == name {
+            return true
+        }
+    }
+    return false
+}
+
+// ---- Inlining ----
+
+fn inline_calls(f: ir.Func, all: [ir.Func], index: Map[Str, Int], small: Map[Str, Bool]) -> ir.Func {
+    let mut out = f
+    out.insts = []
+    for i in f.insts {
+        if i.op != ir.Op.Call || i.sym == f.name || !maps.has(small, i.sym) {
+            push(mut out.insts, i)
+            continue
+        }
+        let g = all[index[i.sym]]
+        let regs = len(out.classes)
+        for c in g.classes {
+            push(mut out.classes, c)
+        }
+        let slots = len(out.slot_sizes)
+        for s in 0..len(g.slot_sizes) {
+            push(mut out.slot_sizes, g.slot_sizes[s])
+            push(mut out.slot_aligns, g.slot_aligns[s])
+        }
+        let labels = out.labels
+        out.labels = out.labels + g.labels + 1
+        let end = out.labels - 1
+        for k in 0..len(g.params) {
+            push(mut out.insts, ir.inst(ir.Op.Move, g.params[k] + regs, i.args[k], -1, 0))
+        }
+        for gi in g.insts {
+            if gi.op == ir.Op.Ret {
+                if i.dst >= 0 && gi.a >= 0 {
+                    push(mut out.insts, ir.inst(ir.Op.Move, i.dst, gi.a + regs, -1, 0))
+                }
+                push(mut out.insts, ir.inst(ir.Op.Jump, -1, -1, -1, end))
+                continue
+            }
+            push(mut out.insts, renumbered(gi, regs, slots, labels))
+        }
+        push(mut out.insts, ir.inst(ir.Op.Label, -1, -1, -1, end))
+    }
+    return out
+}
+
+fn renumbered(i: ir.Inst, regs: Int, slots: Int, labels: Int) -> ir.Inst {
+    let mut o = i
+    if o.dst >= 0 {
+        o.dst = o.dst + regs
+    }
+    if o.a >= 0 {
+        o.a = o.a + regs
+    }
+    if o.b >= 0 {
+        o.b = o.b + regs
+    }
+    if len(o.args) > 0 {
+        let mut args: [Int] = []
+        for a in o.args {
+            push(mut args, a + regs)
+        }
+        o.args = args
+    }
+    if o.op == ir.Op.Label || o.op == ir.Op.Jump || o.op == ir.Op.Branch || o.op == ir.Op.BranchCmp {
+        o.imm = o.imm + labels
+    }
+    if o.op == ir.Op.Branch {
+        o.imm2 = o.imm2 + labels
+    }
+    if o.op == ir.Op.SlotAddr {
+        o.imm = o.imm + slots
+    }
+    return o
+}
+
+// ---- Simplifying ----
+
+// Instructions with no effect but their result.
+fn pure(op: ir.Op) -> Bool {
+    return match op {
+        ir.Op.Const => true
+        ir.Op.FConst => true
+        ir.Op.Move => true
+        ir.Op.SlotAddr => true
+        ir.Op.SymAddr => true
+        ir.Op.Load => true
+        ir.Op.FLoad => true
+        ir.Op.Add => true
+        ir.Op.AddImm => true
+        ir.Op.Sub => true
+        ir.Op.Mul => true
+        ir.Op.MulImm => true
+        ir.Op.Cmp => true
+        ir.Op.CmpImm => true
+        ir.Op.FCmp => true
+        ir.Op.Not => true
+        ir.Op.FAdd => true
+        ir.Op.FSub => true
+        ir.Op.FMul => true
+        ir.Op.FDiv => true
+        ir.Op.FNeg => true
+        ir.Op.IntToFloat => true
+        ir.Op.Sext32 => true
+        _ => false
+    }
+}
+
+fn holds(cond: Int, a: Int, b: Int) -> Bool {
+    return match cond {
+        0 => a == b
+        1 => a != b
+        2 => a < b
+        3 => a <= b
+        4 => a > b
+        _ => a >= b
+    }
+}
+
+fn branch_holds(cond: Str, a: Int, b: Int) -> Bool {
+    return match cond {
+        "eq" => a == b
+        "ne" => a != b
+        "lt" => a < b
+        "le" => a <= b
+        "gt" => a > b
+        "ge" => a >= b
+        "ult" => a >= 0 && (b < 0 || a < b)  // unsigned: a negative number is big
+        _ => !(a >= 0 && (b < 0 || a < b))
+    }
+}
+
+fn simplify(f: ir.Func) -> ir.Func {
+    let mut out = f
+    for _ in 0..4 {
+        let before = len(out.insts)
+        out = propagate(out)
+        out = fold(out)
+        out = drop_dead(out)
+        out = thread_jumps(out)
+        out = drop_unreachable(out)
+        if len(out.insts) == before {
+            break
+        }
+    }
+    return out
+}
+
+// How many times each register is set: parameters count once.
+fn def_counts(f: ir.Func) -> [Int] {
+    let mut defs: [Int] = []
+    for _ in 0..len(f.classes) {
+        push(mut defs, 0)
+    }
+    for p in f.params {
+        defs[p] = defs[p] + 1
+    }
+    for i in f.insts {
+        if i.dst >= 0 {
+            defs[i.dst] = defs[i.dst] + 1
+        }
+    }
+    return defs
+}
+
+fn propagate(f: ir.Func) -> ir.Func {
+    let defs = def_counts(f)
+    let mut rep: [Int] = []
+    for r in 0..len(f.classes) {
+        push(mut rep, r)
+    }
+    let mut any = false
+    for i in f.insts {
+        if i.op == ir.Op.Move && defs[i.dst] == 1 && defs[i.a] == 1 && f.classes[i.dst] == f.classes[i.a] {
+            rep[i.dst] = i.a
+            any = true
+        }
+    }
+    if !any {
+        return f
+    }
+    // Chains: a move of a move.
+    for r in 0..len(rep) {
+        let mut x = rep[r]
+        for rep[x] != x {
+            x = rep[x]
+        }
+        rep[r] = x
+    }
+    let mut out = f
+    out.insts = []
+    for i in f.insts {
+        if i.op == ir.Op.Move && rep[i.dst] != i.dst {
+            continue
+        }
+        push(mut out.insts, renamed(i, rep))
+    }
+    return out
+}
+
+// `i` reading rep[r] for each register r it reads.
+fn renamed(i: ir.Inst, rep: [Int]) -> ir.Inst {
+    let mut o = i
+    let reads_a = i.a >= 0 && i.op != ir.Op.Label && i.op != ir.Op.Const && i.op != ir.Op.FConst && i.op != ir.Op.SlotAddr &&
+        i.op != ir.Op.SymAddr && i.op != ir.Op.Jump
+    if reads_a {
+        o.a = rep[i.a]
+    }
+    if i.b >= 0 {
+        o.b = rep[i.b]
+    }
+    if len(i.args) > 0 {
+        let mut args: [Int] = []
+        for a in i.args {
+            push(mut args, rep[a])
+        }
+        o.args = args
+    }
+    return o
+}
+
+fn fold(f: ir.Func) -> ir.Func {
+    let defs = def_counts(f)
+    let mut known: Map[Int, Int] = [:]  // registers set once to a constant
+    for i in f.insts {
+        if i.op == ir.Op.Const && defs[i.dst] == 1 {
+            known[i.dst] = i.imm
+        }
+    }
+    let mut out = f
+    out.insts = []
+    for i in f.insts {
+        let mut o = i
+        if i.op == ir.Op.Cmp && maps.has(known, i.a) && maps.has(known, i.b) {
+            o = ir.inst(ir.Op.Const, i.dst, -1, -1, bool_int(holds(i.imm, known[i.a], known[i.b])))
+        } else if i.op == ir.Op.CmpImm && maps.has(known, i.a) {
+            o = ir.inst(ir.Op.Const, i.dst, -1, -1, bool_int(holds(i.imm, known[i.a], i.imm2)))
+        } else if i.op == ir.Op.Cmp && maps.has(known, i.b) {
+            // Against a constant: the immediate form, which needs no register.
+            o = ir.inst(ir.Op.CmpImm, i.dst, i.a, -1, i.imm)
+            o.imm2 = known[i.b]
+        } else if i.op == ir.Op.Branch && maps.has(known, i.a) {
+            if known[i.a] != 0 {
+                o = ir.inst(ir.Op.Jump, -1, -1, -1, i.imm)
+            } else {
+                o = ir.inst(ir.Op.Jump, -1, -1, -1, i.imm2)
+            }
+        } else if i.op == ir.Op.BranchCmp && maps.has(known, i.a) && maps.has(known, i.b) {
+            if branch_holds(i.sym, known[i.a], known[i.b]) {
+                o = ir.inst(ir.Op.Jump, -1, -1, -1, i.imm)
+            } else {
+                continue
+            }
+        }
+        push(mut out.insts, o)
+    }
+    return out
+}
+
+fn bool_int(b: Bool) -> Int {
+    if b {
+        return 1
+    }
+    return 0
+}
+
+fn drop_dead(f: ir.Func) -> ir.Func {
+    let mut out = f
+    for _ in 0..4 {
+        let mut used: [Int] = []
+        for _ in 0..len(out.classes) {
+            push(mut used, 0)
+        }
+        for i in out.insts {
+            for r in ir.reads(i) {
+                used[r] = used[r] + 1
+            }
+        }
+        let mut kept: [ir.Inst] = []
+        let mut dropped = false
+        for i in out.insts {
+            if i.dst >= 0 && pure(i.op) && used[i.dst] == 0 {
+                dropped = true
+                continue
+            }
+            push(mut kept, i)
+        }
+        out.insts = kept
+        if !dropped {
+            break
+        }
+    }
+    return out
+}
+
+fn thread_jumps(f: ir.Func) -> ir.Func {
+    // Labels followed by a jump: where that jump goes.
+    let mut to: Map[Int, Int] = [:]
+    for k in 0..len(f.insts) - 1 {
+        if f.insts[k].op == ir.Op.Label && f.insts[k + 1].op == ir.Op.Jump && f.insts[k + 1].imm != f.insts[k].imm {
+            to[f.insts[k].imm] = f.insts[k + 1].imm
+        }
+    }
+    if len(maps.keys(to)) == 0 {
+        return f
+    }
+    let mut out = f
+    out.insts = []
+    for i in f.insts {
+        let mut o = i
+        if i.op == ir.Op.Jump || i.op == ir.Op.Branch || i.op == ir.Op.BranchCmp {
+            o.imm = final_label(to, i.imm)
+        }
+        if i.op == ir.Op.Branch {
+            o.imm2 = final_label(to, i.imm2)
+        }
+        push(mut out.insts, o)
+    }
+    return out
+}
+
+// Following jumps to jumps, a few at most (they may go round in a loop).
+fn final_label(to: Map[Int, Int], l: Int) -> Int {
+    let mut x = l
+    for _ in 0..8 {
+        match maps.get(to, x) {
+            Some(y) => x = y
+            None => return x
+        }
+    }
+    return x
+}
+
+// After a jump, a return or code that never returns, nothing runs until a
+// label something jumps to.
+fn drop_unreachable(f: ir.Func) -> ir.Func {
+    let mut target: Map[Int, Bool] = [:]
+    for i in f.insts {
+        if i.op == ir.Op.Jump || i.op == ir.Op.Branch || i.op == ir.Op.BranchCmp {
+            target[i.imm] = true
+        }
+        if i.op == ir.Op.Branch {
+            target[i.imm2] = true
+        }
+    }
+    let mut out = f
+    out.insts = []
+    let mut live = true
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        if i.op == ir.Op.Label {
+            if maps.has(target, i.imm) {
+                live = true
+            } else if !live {
+                continue
+            }
+            // A label nothing jumps to, reached by falling through, stays out.
+            if !maps.has(target, i.imm) {
+                continue
+            }
+        }
+        if !live {
+            continue
+        }
+        // A jump to the label right after it.
+        if i.op == ir.Op.Jump && k + 1 < len(f.insts) && f.insts[k + 1].op == ir.Op.Label && f.insts[k + 1].imm == i.imm {
+            continue
+        }
+        push(mut out.insts, i)
+        if ir.ends_block(i.op) {
+            live = false
+        }
+    }
+    return out
+}
+
+// ---- Tests ----
+
+fn small_program() -> ir.Program {
+    // id(x) = x; main calls it and compares the result with 3.
+    let mut id = ir.new_func("f_id", ir.INT())
+    let x = ir.param(mut id, ir.INT())
+    let y = ir.reg(mut id, ir.INT())
+    ir.add(mut id, ir.inst(ir.Op.Move, y, x, -1, 0))
+    ir.add(mut id, ir.inst(ir.Op.Ret, -1, y, -1, 0))
+    let mut m = ir.new_func("f_main", -1)
+    let three = ir.reg(mut m, ir.INT())
+    ir.add(mut m, ir.inst(ir.Op.Const, three, -1, -1, 3))
+    let r = ir.reg(mut m, ir.INT())
+    let mut c = ir.inst(ir.Op.Call, r, -1, -1, 0)
+    c.sym = "f_id"
+    c.args = [three]
+    ir.add(mut m, c)
+    let same = ir.reg(mut m, ir.INT())
+    ir.add(mut m, ir.inst(ir.Op.Cmp, same, r, three, 0))
+    let yes = ir.label(mut m)
+    let no = ir.label(mut m)
+    let mut b = ir.inst(ir.Op.Branch, -1, same, -1, yes)
+    b.imm2 = no
+    ir.add(mut m, b)
+    ir.add(mut m, ir.inst(ir.Op.Label, -1, -1, -1, yes))
+    ir.add(mut m, ir.inst(ir.Op.Ret, -1, -1, -1, 0))
+    ir.add(mut m, ir.inst(ir.Op.Label, -1, -1, -1, no))
+    ir.add(mut m, ir.inst(ir.Op.Unreachable, -1, -1, -1, 0))
+    return ir.Program { funcs: [id, m], data: [] }
+}
+
+test "inlining, then folding what it shows" {
+    let p = optimize(small_program())
+    let m = p.funcs[1]
+    // id(3) == 3 is known once id is inlined: what is left is the return.
+    for i in m.insts {
+        assert(i.op != ir.Op.Call && i.op != ir.Op.Cmp && i.op != ir.Op.Unreachable)
+    }
+    assert(m.insts[len(m.insts) - 1].op == ir.Op.Ret)
+}
+
+test "unsigned comparisons of constants" {
+    assert(branch_holds("ult", 1, 2) && !branch_holds("ult", -1, 2) && branch_holds("ult", 2, -1))
+    assert(branch_holds("uge", -1, 2) && !branch_holds("uge", 1, 2))
+}

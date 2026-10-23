@@ -341,8 +341,10 @@ def main() -> int:
     ap.add_argument("--sanitize", action="store_true",
                     help="build with AddressSanitizer and UBSan; leaks fail the test")
     ap.add_argument("--tsan", action="store_true", help="build with ThreadSanitizer; data races fail the test")
-    ap.add_argument("--native", action="store_true",
-                    help="compile programs with the native backend (VELA_BACKEND=native) instead of through C")
+    ap.add_argument("--backend", choices=["c", "native"],
+                    help="compile every program with this backend (VELA_BACKEND); by default `vela build` uses C "
+                         "and `vela run` and `vela test` the native backend")
+    ap.add_argument("--native", action="store_true", help="the same as --backend native")
     args = ap.parse_args()
     global RUN_TIMEOUT
 
@@ -363,7 +365,9 @@ def main() -> int:
         # AddressSanitizer makes an allocating program 3 to 15 times slower.
         RUN_TIMEOUT *= 3
     if args.native:
-        env["VELA_BACKEND"] = "native"
+        args.backend = "native"
+    if args.backend:
+        env["VELA_BACKEND"] = args.backend
     if args.tsan:
         env["VELA_CFLAGS"] += TSAN_CFLAGS
         env["TSAN_OPTIONS"] = "halt_on_error=1"

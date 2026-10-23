@@ -31,9 +31,11 @@
 // stage 1 only (it says `uses`)
 //
 // VELA_CC picks the C compiler (default `cc`); VELA_CFLAGS adds flags to its
-// command line, split at spaces. VELA_BACKEND=native compiles programs to
-// x86-64 assembly instead of C (M11, lower.vl and x64.vl); the C compiler
-// then assembles it and builds the runtime. The runtime and the standard modules are
+// command line, split at spaces. The native backend (M11, lower.vl and
+// x64.vl) compiles programs to x86-64 assembly instead of C, which the C
+// compiler then assembles beside the runtime: `vela run` and `vela test`
+// use it on x86-64 Linux, `vela build` uses C, and VELA_BACKEND=c or
+// VELA_BACKEND=native says which for all three (see native()). The runtime and the standard modules are
 // found in runtime/ and std/ next to the build/ directory this program is
 // in, or under VELA_ROOT if it is set.
 import ast
@@ -48,6 +50,7 @@ import lexer
 import lower
 import lsp
 import modules
+import opt
 import os
 import packages
 import parser
@@ -122,7 +125,7 @@ fn main() {
         } else if len(args) != 3 {
             usage()
         }
-        build(path, out, root)
+        build(path, out, root, false)
         return
     }
     if len(args) != 3 {
@@ -382,9 +385,9 @@ fn split_flags(flags: Str) -> [Str] {
     return out
 }
 
-// Compile a .vl file all the way to a native executable.
-fn build(path: Str, exe: Str, root: Str) uses fs, os {
-    if native() {
+// Compile a .vl file all the way to an executable; `quick` for `vela run`.
+fn build(path: Str, exe: Str, root: Str, quick: Bool) uses fs, os {
+    if native(quick) {
         let p = lowered(path, native_program(path, checked(path, root), false))
         assemble(x64.program(p), modules.stem(path), exe, root, "-O2")
         return
@@ -393,15 +396,50 @@ fn build(path: Str, exe: Str, root: Str) uses fs, os {
 }
 
 // VELA_BACKEND=native: assembly instead of C.
-fn native() -> Bool uses os {
+// VELA_BACKEND=c or VELA_BACKEND=native picks the backend. Otherwise `vela
+// build` uses C, whose code is faster, and `vela run` and `vela test` (the
+// `quick` ones) the native backend, which builds much faster (M11b): on
+// x86-64 Linux, the machine it writes code for, and C elsewhere.
+fn native(quick: Bool) -> Bool uses os {
     match os.env("VELA_BACKEND") {
         Some(b) => return b == "native"
-        None => return false
+        None => {}
+    }
+    if !quick {
+        return false
+    }
+    match os.output(["uname", "-sm"]) {
+        Ok(out) => return out == "Linux x86_64\n"
+        Err(_) => return false
     }
 }
 
-fn native_program(path: Str, k: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] {
-    return lower.lower(k, for_tests)
+// The IR, optimized (opt.vl) unless VELA_OPT=0.
+fn native_program(path: Str, k: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] uses os {
+    match lower.lower(k, for_tests) {
+        Ok(p) => {
+            match os.env("VELA_OPT") {
+                Some(v) => {
+                    if v == "0" {
+                        return Ok(p)
+                    }
+                }
+                None => {}
+            }
+            match os.env("VELA_INLINE") {
+                Some(v) => {
+                    let n = strings.parse_float(v)
+                    match n {
+                        Some(x) => return Ok(opt.optimize_with(p, int(x), 2))
+                        None => {}
+                    }
+                }
+                None => {}
+            }
+            return Ok(opt.optimize(p))
+        }
+        Err(e) => return Err(e)
+    }
 }
 
 // The IR, or stop with the errors that only making it found.
@@ -661,7 +699,7 @@ fn run(path: Str, args: [Str], root: Str) uses fs, os {
         Err(e) => driver_error(e)
     }
     let exe = modules.join(tmp, "program")
-    build(path, exe, root)
+    build(path, exe, root, true)
     let mut command = [exe]
     for a in args {
         push(mut command, a)
@@ -864,7 +902,7 @@ fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
     let exe = modules.join(tmp, "tests")
     // Tests are built often and run briefly, so the C compiler does not
     // optimize: building the compiler's own tests takes 3 s instead of 20.
-    if native() {
+    if native(true) {
         assemble(x64.program(lowered(path, native_program(path, k, true))), modules.stem(path) + "_tests", exe, root, "-O0")
     } else {
         compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root, "-O0")
