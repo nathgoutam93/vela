@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -94,15 +95,18 @@ static void retain_array(void *v) { vela_array_retain(*(vela_array **)v); }
 static void release_array(void *v) { vela_array_release(*(vela_array **)v); }
 static void retain_map(void *v) { vela_map_retain(*(vela_map **)v); }
 static void release_map(void *v) { vela_map_release(*(vela_map **)v); }
+static void share_str(void *v) { vela_str_share(*(vela_str *)v); }
+static void share_array(void *v) { vela_array_share(*(vela_array **)v); }
+static void share_map(void *v) { vela_map_share(*(vela_map **)v); }
 
-const vela_type vela_type_unit = {sizeof(vela_unit), NULL, NULL, hash_byte, eq_byte};
-const vela_type vela_type_int = {sizeof(int64_t), NULL, NULL, hash_int, eq_int};
-const vela_type vela_type_byte = {sizeof(uint8_t), NULL, NULL, hash_byte, eq_byte};
-const vela_type vela_type_float = {sizeof(double), NULL, NULL, NULL, NULL};
-const vela_type vela_type_bool = {sizeof(bool), NULL, NULL, hash_bool, eq_bool};
-const vela_type vela_type_str = {sizeof(vela_str), retain_str, release_str, hash_str, eq_str};
-const vela_type vela_type_array = {sizeof(vela_array *), retain_array, release_array, NULL, NULL};
-const vela_type vela_type_map = {sizeof(vela_map *), retain_map, release_map, NULL, NULL};
+const vela_type vela_type_unit = {sizeof(vela_unit), NULL, NULL, hash_byte, eq_byte, NULL};
+const vela_type vela_type_int = {sizeof(int64_t), NULL, NULL, hash_int, eq_int, NULL};
+const vela_type vela_type_byte = {sizeof(uint8_t), NULL, NULL, hash_byte, eq_byte, NULL};
+const vela_type vela_type_float = {sizeof(double), NULL, NULL, NULL, NULL, NULL};
+const vela_type vela_type_bool = {sizeof(bool), NULL, NULL, hash_bool, eq_bool, NULL};
+const vela_type vela_type_str = {sizeof(vela_str), retain_str, release_str, hash_str, eq_str, share_str};
+const vela_type vela_type_array = {sizeof(vela_array *), retain_array, release_array, NULL, NULL, share_array};
+const vela_type vela_type_map = {sizeof(vela_map *), retain_map, release_map, NULL, NULL, share_map};
 
 static void retain_elem(const vela_type *t, void *v) {
     if (t->retain) t->retain(v);
@@ -112,10 +116,14 @@ static void release_elem(const vela_type *t, void *v) {
     if (t->release) t->release(v);
 }
 
+static void share_elem(const vela_type *t, void *v) {
+    if (t->share) t->share(v);
+}
+
 // ---- Str ----
 
 void vela_str_release(vela_str s) {
-    if (s.obj && --s.obj->rc == 0) free(s.obj);
+    if (s.obj && vela_rc_dec(&s.obj->rc)) free(s.obj);
 }
 
 vela_str vela_str_concat(vela_str a, vela_str b) {
@@ -163,7 +171,7 @@ vela_array *vela_array_new(const vela_type *elem, int64_t cap) {
 }
 
 void vela_array_release(vela_array *a) {
-    if (--a->rc > 0) return;
+    if (!vela_rc_dec(&a->rc)) return;
     for (int64_t i = 0; i < a->len; i++) release_elem(a->elem, a->data + a->elem->size * (size_t)i);
     free(a->data);
     free(a);
@@ -171,13 +179,19 @@ void vela_array_release(vela_array *a) {
 
 void vela_array_unique(vela_array **ap) {
     vela_array *a = *ap;
-    if (a->rc == 1) return;  // nobody else can see it: change it in place
+    if (vela_rc_unique(&a->rc)) return;  // nobody else can see it: change it in place
     vela_array *copy = vela_array_new(a->elem, a->len);
     if (a->len) memcpy(copy->data, a->data, a->elem->size * (size_t)a->len);
     copy->len = a->len;
     for (int64_t i = 0; i < a->len; i++) retain_elem(a->elem, copy->data + a->elem->size * (size_t)i);
-    a->rc--;
+    // A shared array with no other reference is freed here.
+    vela_array_release(a);
     *ap = copy;
+}
+
+void vela_array_share(vela_array *a) {
+    if (!vela_rc_share(&a->rc) || !a->elem->share) return;
+    for (int64_t i = 0; i < a->len; i++) share_elem(a->elem, a->data + a->elem->size * (size_t)i);
 }
 
 void *vela_array_at(vela_array *a, int64_t i, const char *loc) {
@@ -262,7 +276,7 @@ vela_map *vela_map_new(const vela_type *key, const vela_type *value) {
 }
 
 void vela_map_release(vela_map *m) {
-    if (--m->rc > 0) return;
+    if (!vela_rc_dec(&m->rc)) return;
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
         release_elem(m->key, map_key(m, i));
@@ -277,7 +291,7 @@ void vela_map_release(vela_map *m) {
 
 void vela_map_unique(vela_map **mp) {
     vela_map *m = *mp;
-    if (m->rc == 1) return;
+    if (vela_rc_unique(&m->rc)) return;
     vela_map *copy = vela_map_new(m->key, m->value);
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
@@ -285,8 +299,17 @@ void vela_map_unique(vela_map **mp) {
         retain_elem(m->value, map_value(m, i));
         vela_map_set(copy, map_key(m, i), map_value(m, i));
     }
-    m->rc--;
+    vela_map_release(m);
     *mp = copy;
+}
+
+void vela_map_share(vela_map *m) {
+    if (!vela_rc_share(&m->rc)) return;
+    for (int64_t i = 0; i < m->count; i++) {
+        if (!m->live[i]) continue;
+        share_elem(m->key, map_key(m, i));
+        share_elem(m->value, map_value(m, i));
+    }
 }
 
 // The entry number holding `key`, or -1.
@@ -363,26 +386,42 @@ vela_array *vela_map_keys(vela_map *m) {
 // while one is set, the runtime uses it instead of the real thing. Each
 // setter takes the new value (owned) and returns the old one, which the
 // matching restore puts back when the block is left, however it is left.
+//
+// The code a test calls may run tasks, so the fakes are used under one
+// lock, and what they hold is marked shared: other threads take references
+// to it. A `with` itself never runs inside a task (the checker sees to
+// that), so the fakes are only set and put back while no task runs.
 
+static pthread_mutex_t fake_lock = PTHREAD_MUTEX_INITIALIZER;
 static vela_map *fake_files = NULL;    // path -> contents; "dir/" keys are directories
+// Whether files are faked. Tasks change fake_files (a write copies the
+// map), but not this, so it can be read without the lock.
+static bool files_faked = false;
 static vela_array *fake_args = NULL;
 static vela_map *fake_env = NULL;
 static vela_array **fake_stdout = NULL; // the test's strings.Builder
 static int64_t fake_temp_dirs = 0;
 
+static void lock_fakes(void) { pthread_mutex_lock(&fake_lock); }
+static void unlock_fakes(void) { pthread_mutex_unlock(&fake_lock); }
+
 vela_map *vela_fake_files(vela_map *m) {
     vela_map *old = fake_files;
+    vela_map_share(m);
     fake_files = m;
+    files_faked = true;
     return old;
 }
 
 void vela_fake_files_restore(vela_map *old) {
     vela_map_release(fake_files);
     fake_files = old;
+    files_faked = old != NULL;
 }
 
 vela_array *vela_fake_args(vela_array *a) {
     vela_array *old = fake_args;
+    vela_array_share(a);
     fake_args = a;
     return old;
 }
@@ -394,6 +433,7 @@ void vela_fake_args_restore(vela_array *old) {
 
 vela_map *vela_fake_env(vela_map *m) {
     vela_map *old = fake_env;
+    vela_map_share(m);
     fake_env = m;
     return old;
 }
@@ -424,6 +464,7 @@ static fake_input *fake_stdin = NULL;
 void *vela_fake_stdin(vela_str text) {
     fake_input *old = fake_stdin;
     fake_stdin = vela_alloc(sizeof(fake_input));
+    vela_str_share(text);
     fake_stdin->text = text;
     fake_stdin->pos = 0;
     return old;
@@ -438,13 +479,23 @@ void vela_fake_stdin_restore(void *old) {
 // Printing into the faked stdout: the builder may be shared, so it is made
 // unique first, as any change to a value is.
 static void captured(vela_str s) {
+    lock_fakes();
     vela_array_unique(fake_stdout);
     vela_builder_add(*fake_stdout, s);
     uint8_t nl = '\n';
     vela_array_push(*fake_stdout, &nl);
+    unlock_fakes();
 }
 
 static vela_str str_from(const char *data, size_t len);
+
+// A line and its newline, with nothing from another thread between them.
+static void print_line(FILE *f, const char *data, size_t len) {
+    flockfile(f);
+    if (len) fwrite(data, 1, len, f);
+    putc_unlocked('\n', f);
+    funlockfile(f);
+}
 
 // The shortest decimal that reads back as x, into buf; returns its length.
 static int float_text(double x, char *buf, size_t n) {
@@ -523,15 +574,13 @@ void vela_print_float(double x) {
         captured((vela_str){NULL, (const uint8_t *)buf, len});
         return;
     }
-    fwrite(buf, 1, (size_t)len, stdout);
-    putchar('\n');
+    print_line(stdout, buf, (size_t)len);
 }
 
 void vela_eprint_float(double x) {
     char buf[40];
     int len = float_text(x, buf, sizeof buf);
-    fwrite(buf, 1, (size_t)len, stderr);
-    fputc('\n', stderr);
+    print_line(stderr, buf, (size_t)len);
 }
 
 void vela_print_int(int64_t x) {
@@ -541,7 +590,9 @@ void vela_print_int(int64_t x) {
         captured((vela_str){NULL, (const uint8_t *)buf, len});
         return;
     }
-    printf("%" PRId64 "\n", x);
+    char buf[32];
+    int len = snprintf(buf, sizeof buf, "%" PRId64, x);
+    print_line(stdout, buf, (size_t)len);
 }
 
 void vela_print_bool(bool x) {
@@ -549,7 +600,7 @@ void vela_print_bool(bool x) {
         captured(x ? VELA_STR("true", 4) : VELA_STR("false", 5));
         return;
     }
-    puts(x ? "true" : "false");
+    print_line(stdout, x ? "true" : "false", x ? 4 : 5);
 }
 
 void vela_print_str(vela_str x) {
@@ -557,21 +608,21 @@ void vela_print_str(vela_str x) {
         captured(x);
         return;
     }
-    if (x.len) fwrite(x.data, 1, (size_t)x.len, stdout);
-    putchar('\n');
+    print_line(stdout, (const char *)x.data, (size_t)x.len);
 }
 
 void vela_eprint_int(int64_t x) {
-    fprintf(stderr, "%" PRId64 "\n", x);
+    char buf[32];
+    int len = snprintf(buf, sizeof buf, "%" PRId64, x);
+    print_line(stderr, buf, (size_t)len);
 }
 
 void vela_eprint_bool(bool x) {
-    fputs(x ? "true\n" : "false\n", stderr);
+    print_line(stderr, x ? "true" : "false", x ? 4 : 5);
 }
 
 void vela_eprint_str(vela_str x) {
-    if (x.len) fwrite(x.data, 1, (size_t)x.len, stderr);
-    fputc('\n', stderr);
+    print_line(stderr, (const char *)x.data, (size_t)x.len);
 }
 
 // ---- os ----
@@ -635,14 +686,18 @@ static char *c_path(vela_str path) {
 }
 
 bool vela_files_read(vela_str path, vela_str *out) {
-    if (fake_files) {
+    if (files_faked) {
+        lock_fakes();
         vela_str *found = vela_map_find(fake_files, &path);
+        if (found) {
+            *out = *found;
+            vela_str_retain(*out);
+        }
+        unlock_fakes();
         if (!found) {
             *out = file_error("cannot read", path, strerror(ENOENT));
             return false;
         }
-        *out = *found;
-        vela_str_retain(*out);
         return true;
     }
     char *p = c_path(path);
@@ -679,11 +734,15 @@ bool vela_files_read(vela_str path, vela_str *out) {
 }
 
 bool vela_files_write(vela_str path, vela_str data, vela_str *err) {
-    if (fake_files) {
-        vela_map_unique(&fake_files);
+    if (files_faked) {
         vela_str_retain(path);  // the map owns what it is given
         vela_str_retain(data);
+        vela_str_share(path);  // and other threads may read it
+        vela_str_share(data);
+        lock_fakes();
+        vela_map_unique(&fake_files);
         vela_map_set(fake_files, &path, &data);
+        unlock_fakes();
         return true;
     }
     char *p = c_path(path);
@@ -741,11 +800,12 @@ vela_str vela_from_int(int64_t n) {
 }
 
 bool vela_files_remove(vela_str path, vela_str *err) {
-    if (fake_files) {
-        vela_map_unique(&fake_files);
-        if (vela_map_remove(fake_files, &path)) return true;
+    if (files_faked) {
         vela_str dir = vela_str_concat(path, VELA_STR("/", 1));
-        bool removed = vela_map_remove(fake_files, &dir);
+        lock_fakes();
+        vela_map_unique(&fake_files);
+        bool removed = vela_map_remove(fake_files, &path) || vela_map_remove(fake_files, &dir);
+        unlock_fakes();
         vela_str_release(dir);
         if (removed) return true;
         *err = file_error("cannot remove", path, strerror(ENOENT));
@@ -766,14 +826,17 @@ bool vela_files_remove(vela_str path, vela_str *err) {
 }
 
 bool vela_files_temp_dir(vela_str *out) {
-    if (fake_files) {
+    if (files_faked) {
         char buf[48];
+        lock_fakes();
         int len = snprintf(buf, sizeof buf, "/fake-tmp/%" PRId64, ++fake_temp_dirs);
         *out = str_from(buf, (size_t)len);
         vela_str key = vela_str_concat(*out, VELA_STR("/", 1));
+        vela_str_share(key);
         vela_str empty = VELA_STR("", 0);
         vela_map_unique(&fake_files);
         vela_map_set(fake_files, &key, &empty);
+        unlock_fakes();
         return true;
     }
     const char *base = getenv("TMPDIR");
@@ -805,6 +868,8 @@ static vela_str message(const char *a, vela_str b, const char *c) {
     return s;
 }
 
+static pthread_mutex_t fork_lock = PTHREAD_MUTEX_INITIALIZER;
+
 bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
     if (command->len == 0) {
         *err = str_from("os.run needs a program to run", 29);
@@ -830,11 +895,17 @@ bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
     int fds[2];
     int failed = 0;
     pid_t pid = -1;
+    // A task running os.run at the same time must not fork between pipe()
+    // and fcntl(): its child would keep our pipe open, and the read below
+    // would wait for that program to end.
+    pthread_mutex_lock(&fork_lock);
     if (pipe(fds) != 0) {
         failed = errno;
+        pthread_mutex_unlock(&fork_lock);
     } else {
         fcntl(fds[1], F_SETFD, FD_CLOEXEC);
         pid = fork();
+        if (pid != 0) pthread_mutex_unlock(&fork_lock);
         if (pid < 0) {
             failed = errno;
             close(fds[0]);
@@ -907,19 +978,24 @@ static vela_str chomp(vela_str s) {
 
 bool vela_os_read_line(vela_str *out) {
     if (fake_stdin) {
+        lock_fakes();
         vela_str t = fake_stdin->text;
-        if (fake_stdin->pos == t.len) return false;
-        int64_t end = fake_stdin->pos;
-        while (end < t.len && t.data[end] != '\n') end++;
-        if (end < t.len) end++;  // the newline goes with its line
-        *out = chomp(fake_take(end - fake_stdin->pos));
-        return true;
+        bool more = fake_stdin->pos < t.len;
+        if (more) {
+            int64_t end = fake_stdin->pos;
+            while (end < t.len && t.data[end] != '\n') end++;
+            if (end < t.len) end++;  // the newline goes with its line
+            *out = chomp(fake_take(end - fake_stdin->pos));
+        }
+        unlock_fakes();
+        return more;
     }
     fflush(stdout);
     size_t cap = 128, len = 0;
     char *buf = vela_alloc(cap);
     int c;
-    while ((c = getchar()) != EOF) {
+    flockfile(stdin);  // a line is read whole, even with tasks reading too
+    while ((c = getc_unlocked(stdin)) != EOF) {
         if (len == cap) {
             cap *= 2;
             buf = vela_realloc(buf, cap);
@@ -927,6 +1003,7 @@ bool vela_os_read_line(vela_str *out) {
         buf[len++] = (char)c;
         if (c == '\n') break;
     }
+    funlockfile(stdin);
     if (len == 0) {
         free(buf);
         return false;
@@ -938,23 +1015,32 @@ bool vela_os_read_line(vela_str *out) {
 
 vela_str vela_os_read(int64_t n, const char *loc) {
     if (n < 0) vela_panic(loc, "os.read of a negative number of bytes");
-    if (fake_stdin) return fake_take(n);
+    if (fake_stdin) {
+        lock_fakes();
+        vela_str s = fake_take(n);
+        unlock_fakes();
+        return s;
+    }
     fflush(stdout);
     vela_strobj *obj = vela_alloc(sizeof(vela_strobj) + (size_t)n);
     obj->rc = 1;
     size_t got = 0;
+    flockfile(stdin);
     while (got < (size_t)n) {
         size_t k = fread(obj->bytes + got, 1, (size_t)n - got, stdin);
         if (k == 0) break;
         got += k;
     }
+    funlockfile(stdin);
     return (vela_str){obj, obj->bytes, (int64_t)got};
 }
 
 void vela_os_write(vela_str s) {
     if (fake_stdout) {
+        lock_fakes();
         vela_array_unique(fake_stdout);
         vela_builder_add(*fake_stdout, s);
+        unlock_fakes();
         return;
     }
     if (s.len) fwrite(s.data, 1, (size_t)s.len, stdout);
@@ -975,4 +1061,106 @@ bool vela_os_env(vela_str name, vela_str *out) {
     if (!v) return false;
     *out = str_from(v, strlen(v));
     return true;
+}
+
+// ---- tasks ----
+//
+// Structured: a call starts its threads, works alongside them, and returns
+// once all are done, so no thread outlives the call that started it. The
+// threads take the elements a chunk at a time from a shared counter, so a
+// slow element does not hold up a whole share of the work.
+
+static int64_t workers = 0;  // 0 until first asked
+// Threads started by calls still running. A call starts threads only
+// while fewer than workers - 1 run, so tasks inside tasks do not
+// multiply them: a call that finds none to spare does its work itself.
+static int64_t started = 0;
+
+int64_t vela_tasks_workers(void) {
+    int64_t n = __atomic_load_n(&workers, __ATOMIC_RELAXED);
+    if (n > 0) return n;
+    const char *e = getenv("VELA_THREADS");
+    n = e ? atoll(e) : 0;
+    if (n < 1) {
+        long cores = sysconf(_SC_NPROCESSORS_ONLN);
+        n = cores > 0 ? cores : 1;
+    }
+    if (n > 256) n = 256;
+    __atomic_store_n(&workers, n, __ATOMIC_RELAXED);
+    return n;
+}
+
+typedef struct {
+    vela_array *xs;
+    void *f;
+    vela_task_call call;
+    unsigned char *out;  // the result slots; NULL for tasks.each
+    size_t out_size;
+    int64_t next;  // the first element no thread has taken; changed atomically
+    int64_t chunk;
+} task_job;
+
+static void task_work(task_job *j) {
+    int64_t n = j->xs->len;
+    size_t size = j->xs->elem->size;
+    for (;;) {
+        int64_t i = __atomic_fetch_add(&j->next, j->chunk, __ATOMIC_RELAXED);
+        if (i >= n) return;
+        int64_t end = i + j->chunk < n ? i + j->chunk : n;
+        for (; i < end; i++) {
+            j->call(j->f, j->xs->data + size * (size_t)i, j->out ? j->out + j->out_size * (size_t)i : NULL);
+        }
+    }
+}
+
+static void *task_thread(void *job) {
+    task_work(job);
+    return NULL;
+}
+
+// How many more threads this call may start, taken from the budget.
+static int64_t take_threads(int64_t want) {
+    int64_t limit = vela_tasks_workers() - 1;
+    int64_t got = 0;
+    while (got < want) {
+        int64_t now = __atomic_load_n(&started, __ATOMIC_RELAXED);
+        if (now >= limit) break;
+        if (__atomic_compare_exchange_n(&started, &now, now + 1, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) got++;
+    }
+    return got;
+}
+
+static void run_tasks(vela_array *xs, void *f, vela_env *env, vela_task_call call, unsigned char *out, size_t out_size) {
+    int64_t n = xs->len;
+    int64_t extra = n > 1 ? take_threads(n - 1) : 0;
+    if (extra > 0) {
+        // From here other threads see the elements and the environment.
+        if (xs->elem->share) {
+            for (int64_t i = 0; i < n; i++) xs->elem->share(xs->data + xs->elem->size * (size_t)i);
+        }
+        vela_env_share(env);
+    }
+    int64_t chunk = n / ((extra + 1) * 8);
+    task_job job = {xs, f, call, out, out_size, 0, chunk > 0 ? chunk : 1};
+    pthread_t *threads = vela_alloc(sizeof(pthread_t) * (size_t)(extra > 0 ? extra : 1));
+    int64_t running = 0;
+    for (; running < extra; running++) {
+        if (pthread_create(&threads[running], NULL, task_thread, &job) != 0) break;
+    }
+    if (running < extra) __atomic_fetch_sub(&started, extra - running, __ATOMIC_RELAXED);
+    task_work(&job);
+    for (int64_t i = 0; i < running; i++) pthread_join(threads[i], NULL);
+    __atomic_fetch_sub(&started, running, __ATOMIC_RELAXED);
+    free(threads);
+}
+
+vela_array *vela_tasks_map(vela_array *xs, void *f, vela_env *env, vela_task_call call, const vela_type *result) {
+    vela_array *out = vela_array_new(result, xs->len);
+    run_tasks(xs, f, env, call, out->data, result->size);
+    out->len = xs->len;  // every slot is filled now
+    return out;
+}
+
+void vela_tasks_each(vela_array *xs, void *f, vela_env *env, vela_task_call call) {
+    run_tasks(xs, f, env, call, NULL, 0);
 }

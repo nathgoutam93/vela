@@ -1,0 +1,103 @@
+// The Mandelbrot set in text, one row per task.
+//
+//     vela run examples/mandelbrot/main.vl [WIDTH [HEIGHT [STEPS]]]
+//
+// Each row is computed by its own call of `row`, and tasks.map runs the
+// calls on every core, returning the rows in order. The picture is the same
+// whatever the number of threads: VELA_THREADS=1 gives it on one.
+// stage 1 only
+import lists
+import os
+import strings
+import tasks
+import text
+
+// How many steps the point (x, y) takes to leave the circle of radius 2,
+// up to `limit`.
+fn escape(x: Float, y: Float, limit: Int) -> Int {
+    let mut a = 0.0
+    let mut b = 0.0
+    let mut n = 0
+    for n < limit && a * a + b * b <= 4.0 {
+        let t = a * a - b * b + x
+        b = 2.0 * a * b + y
+        a = t
+        n = n + 1
+    }
+    return n
+}
+
+type View = struct {
+    width: Int
+    height: Int
+    steps: Int
+}
+
+// Row `y` of the picture: darker characters for points that stay longer,
+// and @ for those that never leave.
+fn row(v: View, y: Int) -> Str {
+    let shades = " .:-=+*#%@"
+    let mut b = strings.builder()
+    let im = 1.2 - 2.4 * float(y) / float(v.height - 1)
+    for i in 0..v.width {
+        let re = -2.1 + 3.0 * float(i) / float(v.width - 1)
+        let n = escape(re, im, v.steps)
+        if n == v.steps {
+            strings.add_byte(mut b, '@')
+        } else {
+            strings.add_byte(mut b, shades[n * 9 / (n + 8)])  // 0 to 8, rising fast, then slowly
+        }
+    }
+    return strings.build(b)
+}
+
+fn render(v: View) -> [Str] {
+    let mut ys: [Int] = []
+    for y in 0..v.height {
+        push(mut ys, y)
+    }
+    return tasks.map(ys, fn(y) => row(v, y))
+}
+
+fn number(s: Str, fallback: Int) -> Int {
+    match text.parse_int(s) {
+        Some(n) => return n
+        None => return fallback
+    }
+}
+
+fn main() {
+    let args = os.args()
+    let mut v = View { width: 78, height: 32, steps: 200 }
+    if len(args) > 1 {
+        v.width = number(args[1], v.width)
+    }
+    if len(args) > 2 {
+        v.height = number(args[2], v.height)
+    }
+    if len(args) > 3 {
+        v.steps = number(args[3], v.steps)
+    }
+    for line in render(v) {
+        print(line)
+    }
+}
+
+test "rows in parallel are the rows one by one" {
+    let v = View { width: 40, height: 12, steps: 60 }
+    let mut ys: [Int] = []
+    for y in 0..v.height {
+        push(mut ys, y)
+    }
+    let one_by_one = lists.map(ys, fn(y) => row(v, y))
+    let parallel = render(v)
+    assert(len(parallel) == v.height)
+    for y in 0..v.height {
+        assert(parallel[y] == one_by_one[y])
+    }
+}
+
+test "the middle of the set never escapes" {
+    assert(escape(0.0, 0.0, 500) == 500 && escape(-1.0, 0.0, 500) == 500)
+    assert(escape(1.0, 1.0, 500) < 5)
+}

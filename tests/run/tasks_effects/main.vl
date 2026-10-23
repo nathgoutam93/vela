@@ -1,0 +1,62 @@
+// stage 1 only
+// Effects in tasks: the function given straight to tasks.map or tasks.each
+// may read and write files and run programs, and the function around it
+// says so in its `uses`. A named function with effects may be given too.
+// out: read: one=3 two=6 three=10
+// out: written: 3 files, all as expected
+// out: exit codes: 0 3 7
+import files
+import os
+import strings
+import tasks
+
+fn size(name: Str) -> Int uses fs {
+    match files.read(name + ".txt") {
+        Ok(text) => return len(text)
+        Err(_) => return -1
+    }
+}
+
+fn read_all(names: [Str]) -> [Int] uses fs {
+    return tasks.map(names, size)
+}
+
+fn write_all(names: [Str]) uses fs {
+    tasks.each(names, fn(name) {
+        match files.write("out_" + name + ".txt", name + "!") {
+            Ok(_) => {}
+            Err(e) => print(e)
+        }
+    })
+}
+
+fn run_all(codes: [Int]) -> [Int] uses os {
+    return tasks.map(codes, fn(code) {
+        match os.run(["sh", "-c", "exit " + strings.from_int(code)]) {
+            Ok(c) => return c
+            Err(_) => return -1
+        }
+    })
+}
+
+fn main() {
+    let names = ["one", "two", "three"]
+    let sizes = read_all(names)
+    print("read: one=" + strings.from_int(sizes[0]) + " two=" + strings.from_int(sizes[1]) + " three=" +
+        strings.from_int(sizes[2]))
+    write_all(names)
+    let mut good = 0
+    for name in names {
+        match files.read("out_" + name + ".txt") {
+            Ok(text) => {
+                if text == name + "!" {
+                    good = good + 1
+                }
+            }
+            Err(e) => print(e)
+        }
+    }
+    print("written: " + strings.from_int(good) + " files, all as expected")
+    let codes = run_all([0, 3, 7])
+    print("exit codes: " + strings.from_int(codes[0]) + " " + strings.from_int(codes[1]) + " " + strings.from_int(codes[2]))
+}

@@ -9,7 +9,7 @@
 // err: effect_errors.vl:45:14: error: a requires clause must be Bool, found Int
 // err: effect_errors.vl:50:4: error: 'odd' has a parameter called 'result', which its ensures clauses cannot tell from the value it returns; rename the parameter
 // err: effect_errors.vl:56:13: error: undefined name 'result'
-// err: effect_errors.vl:60:13: error: 'first' uses fs, so it cannot be used as a value: function values have no effects
+// err: effect_errors.vl:60:13: error: 'first' uses fs, so it cannot be used as a value: function values have no effects, except one given straight to tasks.map or tasks.each
 // err: effect_errors.vl:61:5: error: 'with' only works in tests, where it fakes files, args, env, stdin or stdout for the code the test calls
 // err: effect_errors.vl:67:18: error: 'with files' needs a Map[Str, Str] from paths to contents, found [Str]
 // err: effect_errors.vl:67:31: error: 'with env' needs a Map[Str, Str] from names to values, found Int

@@ -28,6 +28,53 @@ void *vela_alloc(size_t size);
 
 // ---- Type descriptors ----
 //
+// ---- Reference counts, and threads ----
+//
+// Every heap object starts with its reference count, an int64_t. While
+// only one thread can reach an object the count is positive and changes
+// with plain increments. When tasks.map hands an object to other threads
+// it is first marked shared, for good: its count becomes negative, -n for
+// n references, and changes only atomically. One branch on the sign keeps
+// the common case as fast as before (atomic counts everywhere made the
+// compiler 1.74 times slower). Lean 4 counts references the same way.
+//
+// A shared object is never changed in place, even with one reference left:
+// copy-on-write copies it, and the copy belongs to one thread again. So a
+// shared object cannot come to hold one that is not shared.
+static inline void vela_rc_inc(int64_t *rc) {
+    int64_t n = __atomic_load_n(rc, __ATOMIC_RELAXED);
+    if (__builtin_expect(n > 0, 1)) {
+        *rc = n + 1;
+    } else {
+        __atomic_fetch_sub(rc, 1, __ATOMIC_RELAXED);
+    }
+}
+
+// Drops a reference; true when it was the last, and the object must go.
+static inline bool vela_rc_dec(int64_t *rc) {
+    int64_t n = __atomic_load_n(rc, __ATOMIC_RELAXED);
+    if (__builtin_expect(n > 0, 1)) {
+        *rc = n - 1;
+        return n == 1;
+    }
+    return __atomic_add_fetch(rc, 1, __ATOMIC_ACQ_REL) == 0;
+}
+
+// Whether the object may be changed in place: one reference, one thread.
+static inline bool vela_rc_unique(int64_t *rc) {
+    return __atomic_load_n(rc, __ATOMIC_RELAXED) == 1;
+}
+
+// Marks an object shared. True if it was not shared before, so that what
+// it holds must be marked too; an object already shared holds only shared
+// objects.
+static inline bool vela_rc_share(int64_t *rc) {
+    int64_t n = __atomic_load_n(rc, __ATOMIC_RELAXED);
+    if (n <= 0) return false;
+    *rc = -n;  // only this thread can see it yet
+    return true;
+}
+
 // Arrays and maps are written once in C for every element type. A
 // descriptor tells them what they need to know about the elements.
 typedef struct vela_type {
@@ -36,6 +83,7 @@ typedef struct vela_type {
     void (*release)(void *value);  // likewise
     uint64_t (*hash)(const void *value);  // only for map keys
     bool (*eq)(const void *a, const void *b);
+    void (*share)(void *value);    // marks what it holds shared; NULL like retain
 } vela_type;
 
 // Unit has one value, so it needs no bits; C has no empty types, so it is
@@ -81,21 +129,30 @@ _Noreturn void vela_assert_failed_values(const char *loc, const char *what, cons
 typedef struct vela_env {
     int64_t rc;
     void (*drop)(struct vela_env *e);
+    void (*share)(struct vela_env *e);  // marks the copies shared
 } vela_env;
 
 static inline void vela_env_retain(vela_env *e) {
-    if (e) e->rc++;
+    if (e) vela_rc_inc(&e->rc);
 }
 
 static inline void vela_env_release(vela_env *e) {
-    if (e && --e->rc == 0) e->drop(e);
+    if (e && vela_rc_dec(&e->rc)) e->drop(e);
+}
+
+static inline void vela_env_share(vela_env *e) {
+    if (e && vela_rc_share(&e->rc)) e->share(e);
 }
 
 // The Str for a C string literal of `n` bytes.
 #define VELA_STR(literal, n) ((vela_str){NULL, (const uint8_t *)(literal), (n)})
 
 static inline void vela_str_retain(vela_str s) {
-    if (s.obj) s.obj->rc++;
+    if (s.obj) vela_rc_inc(&s.obj->rc);
+}
+
+static inline void vela_str_share(vela_str s) {
+    if (s.obj) vela_rc_share(&s.obj->rc);
 }
 
 void vela_str_release(vela_str s);
@@ -119,8 +176,10 @@ typedef struct vela_array {
 vela_array *vela_array_new(const vela_type *elem, int64_t cap);
 
 static inline void vela_array_retain(vela_array *a) {
-    a->rc++;
+    vela_rc_inc(&a->rc);
 }
+
+void vela_array_share(vela_array *a);
 
 void vela_array_release(vela_array *a);
 void vela_array_unique(vela_array **a);
@@ -152,8 +211,10 @@ typedef struct vela_map {
 vela_map *vela_map_new(const vela_type *key, const vela_type *value);
 
 static inline void vela_map_retain(vela_map *m) {
-    m->rc++;
+    vela_rc_inc(&m->rc);
 }
+
+void vela_map_share(vela_map *m);
 
 void vela_map_release(vela_map *m);
 void vela_map_unique(vela_map **m);
@@ -223,6 +284,19 @@ bool vela_os_read_line(vela_str *out);
 vela_str vela_os_read(int64_t n, const char *loc);
 // os.write(s): s on stdout as it is, with no newline added.
 void vela_os_write(vela_str s);
+
+// ---- tasks ----
+//
+// tasks.map(xs, f) and tasks.each(xs, f): f on every element of xs, on as
+// many threads as tasks.workers() says, returning when every call is done.
+// `call` is written by the code generator for f's type: it calls the
+// function value at `f` on the element at `x`, and stores the result at
+// `out` (each has no result). `env` is f's environment, which is marked
+// shared with the elements before other threads see them.
+typedef void (*vela_task_call)(void *f, const void *x, void *out);
+int64_t vela_tasks_workers(void);
+vela_array *vela_tasks_map(vela_array *xs, void *f, vela_env *env, vela_task_call call, const vela_type *result);
+void vela_tasks_each(vela_array *xs, void *f, vela_env *env, vela_task_call call);
 
 // strings.Builder is an array of bytes (elem = &vela_type_byte); building
 // copies them into a new Str. The builder must already be unique.

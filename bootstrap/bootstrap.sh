@@ -22,7 +22,7 @@ build=build
 mkdir -p "$build"
 
 compile() {  # compile C_FILE EXE
-    $cc -std=c11 -O2 -I runtime "$1" runtime/vela_rt.c -o "$2"
+    $cc -std=c11 -O2 -pthread -I runtime "$1" runtime/vela_rt.c -o "$2"
 }
 
 echo "generation 1: the seed, compiled by $cc"

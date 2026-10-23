@@ -255,7 +255,8 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
         None => {}
     }
     let runtime = modules.join(root, "runtime")
-    let mut command = [cc, "-std=c11", opt]
+    // -pthread: the runtime runs tasks on threads.
+    let mut command = [cc, "-std=c11", opt, "-pthread"]
     for f in flags {
         push(mut command, f)
     }

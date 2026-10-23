@@ -1,0 +1,163 @@
+// stage 1 only
+// tasks.map and tasks.each (M13): results in the order of the elements,
+// whatever the threads did first; every kind of value crossing threads;
+// tasks inside tasks; and values that were shared still copied before a
+// change, so the program sees what it would see on one thread.
+// out: [] 0
+// out: [7]
+// out: 0 1 4 9 16 ... 9801 (100 squares)
+// out: hello, ada! hello, bo!
+// out: 2 levels: 0 10 20 30 / 3 13 23 33
+// out: generic: 1.5 2.5 | a!! b!!
+// out: tree sums: 6 10 0
+// out: maps: 2 3 2 true false
+// out: options: 2 none 6
+// out: funcs: 11 12
+// out: after: ada! bo / ada bo cy / 3 2 / x y
+// out: each saw 1000 of 1000
+// out: workers: true
+import lists
+import maps
+import strings
+import tasks
+
+type Person = struct {
+    name: Str
+    tags: [Str]
+}
+
+type Tree = enum {
+    Leaf(Int)
+    Node(Tree, Tree)
+}
+
+fn sum(t: Tree) -> Int {
+    return match t {
+        Tree.Leaf(n) => n
+        Tree.Node(l, r) => sum(l) + sum(r)
+    }
+}
+
+fn square(n: Int) -> Int {
+    return n * n
+}
+
+fn twice[T](xs: [T], f: fn(T) -> T) -> [T] {
+    return tasks.map(tasks.map(xs, f), f)
+}
+
+fn join(xs: [Str]) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(xs) {
+        if i > 0 {
+            strings.add(mut b, " ")
+        }
+        strings.add(mut b, xs[i])
+    }
+    return strings.build(b)
+}
+
+fn bool_text(b: Bool) -> Str {
+    if b {
+        return "true"
+    }
+    return "false"
+}
+
+fn ints(xs: [Int]) -> Str {
+    return join(lists.map(xs, fn(n) => strings.from_int(n)))
+}
+
+fn main() {
+    // Nothing, and one.
+    let none: [Int] = []
+    let empty = tasks.map(none, square)
+    print("[] " + strings.from_int(len(empty)))
+    print("[" + ints(tasks.map([7], fn(n) => n)) + "]")
+
+    let mut ns: [Int] = []
+    for i in 0..100 {
+        push(mut ns, i)
+    }
+    let sq = tasks.map(ns, square)
+    print(ints(sq[0..5]) + " ... " + strings.from_int(sq[99]) + " (" + strings.from_int(len(sq)) + " squares)")
+
+    // A closure's copies (greeting) and the elements (people) cross threads.
+    let greeting = "hello" + ", "
+    let people = [Person { name: "ada", tags: ["x"] }, Person { name: "bo", tags: [] }]
+    print(join(tasks.map(people, fn(p) => greeting + p.name + "!")))
+
+    // Tasks inside tasks.
+    let grid = tasks.map([0, 3], fn(start) => tasks.map([0, 10, 20, 30], fn(d) => start + d))
+    print("2 levels: " + ints(grid[0]) + " / " + ints(grid[1]))
+
+    // A generic function running tasks, for two types.
+    let halves = twice([0.5, 1.5], fn(x) => x + 0.5)
+    let shouts = twice(["a", "b"], fn(s) => s + "!")
+    print("generic: " + strings.from_float(halves[0]) + " " + strings.from_float(halves[1]) + " | " + join(shouts))
+
+    // Recursive enums, which live in boxes.
+    let trees = [Tree.Node(Tree.Leaf(1), Tree.Node(Tree.Leaf(2), Tree.Leaf(3))), Tree.Node(Tree.Leaf(4), Tree.Leaf(6)),
+        Tree.Leaf(0)]
+    print("tree sums: " + ints(tasks.map(trees, sum)))
+
+    // Maps, read in every task.
+    let ages = ["ada": 36, "bo": 4]
+    let counts = tasks.map([ages, ["x": 1, "y": 2, "z": 3]], fn(m) => len(maps.keys(m)))
+    let found = tasks.map(["ada", "cy"], fn(name) => maps.has(ages, name) && ages["ada"] == 36)
+    print("maps: " + ints(counts) + " " + strings.from_int(len(found)) + " " + bool_text(found[0]) + " " + bool_text(found[1]))
+
+    // Options and Results as results.
+    let opts = tasks.map([1, 0, 3], fn(n) {
+        if n == 0 {
+            let nothing: Option[Int] = None
+            return nothing
+        }
+        return Some(n * 2)
+    })
+    let mut shown: [Str] = []
+    for o in opts {
+        match o {
+            Some(n) => push(mut shown, strings.from_int(n))
+            None => push(mut shown, "none")
+        }
+    }
+    print("options: " + join(shown))
+
+    // Function values as elements.
+    let k = 10
+    let fs = [fn(n: Int) => n + k, fn(n: Int) => n * 2 + k]
+    print("funcs: " + ints(tasks.map(fs, fn(f) => f(1))))
+
+    // What was shared is copied before it changes: the original is as it was.
+    let mut names = ["ada", "bo"]
+    let mut first = names
+    let lens = tasks.map(names, fn(n) => len(n))
+    push(mut first, "cy")
+    names[0] = names[0] + "!"
+    let mut grown = people
+    grown[0].tags[0] = "y"
+    print("after: " + join(names) + " / " + join(first) + " / " + ints(lens) + " / " + people[0].tags[0] + " " +
+        grown[0].tags[0])
+
+    let mut thousand: [Int] = []
+    for i in 0..1000 {
+        push(mut thousand, i)
+    }
+    let seen = tasks.map(thousand, fn(i) => i == thousand[i])
+    let mut count = 0
+    for s in seen {
+        if s {
+            count = count + 1
+        }
+    }
+    tasks.each(thousand, fn(i) {
+        if thousand[i] != i {
+            print("wrong")
+        }
+    })
+    print("each saw " + strings.from_int(count) + " of " + strings.from_int(len(thousand)))
+    if tasks.workers() >= 1 {
+        print("workers: true")
+    }
+}

@@ -1,0 +1,45 @@
+// stage 1 only
+// Many tasks taking and dropping references to the same values at once:
+// the one string, array and closure copy every element and every task
+// uses. Their counts are changed atomically once they are shared; run
+// with `run_tests.py --tsan` a race here would be reported.
+// out: 50000 results
+// out: shared tag|cd|3
+// out: total length 750000
+// out: tag is still shared tag, words still 2
+import strings
+import tasks
+
+type Item = struct {
+    tag: Str
+    words: [Str]
+    n: Int
+}
+
+fn main() {
+    let tag = "shared " + "tag"  // made at run time, so it is counted
+    let words = ["a" + "b", "c" + "d"]
+    let mut items: [Item] = []
+    for i in 0..50000 {
+        push(mut items, Item { tag: tag, words: words, n: i })
+    }
+    let out = tasks.map(items, fn(it) {
+        // Each push takes a reference; each copy dropped gives one back.
+        let mut copies: [Str] = []
+        for _ in 0..3 {
+            push(mut copies, it.tag)
+            push(mut copies, words[it.n % 2])
+        }
+        let mine = it.words
+        return copies[0] + "|" + copies[3] + "|" + strings.from_int(len(copies) / 2 + len(mine) - 2)
+    })
+    print(strings.from_int(len(out)) + " results")
+    print(out[7])
+    let lengths = tasks.map(out, fn(s) => len(s))
+    let mut total = 0
+    for n in lengths {
+        total = total + n
+    }
+    print("total length " + strings.from_int(total))
+    print("tag is still " + tag + ", words still " + strings.from_int(len(words)))
+}

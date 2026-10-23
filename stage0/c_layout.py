@@ -352,7 +352,9 @@ class Layout:
                 funcs = "NULL, NULL"
             out += [
                 f"static inline VELA_UNUSED const vela_type *vt_{n}(void) {{",
-                f"    static const vela_type t = {{sizeof({n}), {funcs}, NULL, NULL}};",
+                # The last NULL is `share` (M13): Stage 0 programs never run
+                # tasks, so nothing is marked shared between threads.
+                f"    static const vela_type t = {{sizeof({n}), {funcs}, NULL, NULL, NULL}};",
                 "    return &t;",
                 "}",
             ]

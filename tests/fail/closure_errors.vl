@@ -2,11 +2,11 @@
 // stage 1 only
 // err: closure_errors.vl:16:9: error: cannot assign to 'total' inside a function value: it has its own copy of 'total', made when it was created, and changes to the copy would be lost
 // err: closure_errors.vl:18:16: error: cannot tell the type of parameter 'x'; write it, as in fn(x: Int) => ...
-// err: closure_errors.vl:19:36: error: a function value cannot use fs, through files.read: function values have no effects
+// err: closure_errors.vl:19:36: error: a function value cannot use fs, through files.read: function values have no effects, except one given straight to tasks.map or tasks.each
 // err: closure_errors.vl:24:5: error: missing return: this function value returns Int, but the end of its body can be reached
 // err: closure_errors.vl:25:40: error: this function value returns Str, but this is Int
 // err: closure_errors.vl:28:13: error: 'break' is only allowed inside a loop
-// err: closure_errors.vl:31:33: error: a function value cannot use fs, through files.read: function values have no effects
+// err: closure_errors.vl:31:33: error: a function value cannot use fs, through files.read: function values have no effects, except one given straight to tasks.map or tasks.each
 // err: closure_errors.vl:31:40: error: '?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... }
 import files
 

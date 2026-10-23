@@ -1,0 +1,91 @@
+// Fakes seen from tasks (M13): what a test fakes with `with`, the tasks
+// that the code it calls starts see too, and use under one lock: files
+// read and written, printing, and stdin read a line at a time.
+// stage 1 only
+// command: test
+// out: PASS  tasks_fakes.vl: test "files"
+// out: PASS  tasks_fakes.vl: test "printing"
+// out: PASS  tasks_fakes.vl: test "stdin"
+// out: 3 tests: 3 passed, 0 failed
+import files
+import lists
+import os
+import strings
+import tasks
+
+fn copy_all(names: [Str]) -> [Int] uses fs {
+    return tasks.map(names, fn(name) {
+        match files.read(name) {
+            Ok(text) => {
+                match files.write(name + ".copy", text + text) {
+                    Ok(_) => return len(text)
+                    Err(_) => return -2
+                }
+            }
+            Err(_) => return -1
+        }
+    })
+}
+
+test "files" {
+    let mut fake: Map[Str, Str] = [:]
+    let mut names: [Str] = []
+    for i in 0..50 {
+        let name = "f" + strings.from_int(i)
+        fake[name] = strings.from_int(i * i)
+        push(mut names, name)
+    }
+    with files = fake {
+        let sizes = copy_all(names)
+        assert(sizes[0] == 1 && sizes[7] == 2 && sizes[49] == 4)
+        for i in 0..50 {
+            match files.read(names[i] + ".copy") {
+                Ok(text) => assert(text == strings.from_int(i * i) + strings.from_int(i * i))
+                Err(_) => assert(false)
+            }
+        }
+    }
+}
+
+test "printing" {
+    let mut out = strings.builder()
+    with stdout = mut out {
+        tasks.each([1, 2, 3, 4, 5, 6, 7, 8], fn(n) {
+            print("line " + strings.from_int(n))
+        })
+    }
+    // Every line whole, in whatever order the tasks ran.
+    let lines = lists.sort(text_lines(strings.build(out)))
+    assert(len(lines) == 8 && lines[0] == "line 1" && lines[7] == "line 8")
+}
+
+fn read_one(n: Int) -> Str uses os {
+    match os.read_line() {
+        Some(line) => return line
+        None => return "none"
+    }
+}
+
+test "stdin" {
+    let mut input = strings.builder()
+    for i in 0..20 {
+        strings.add(mut input, "in " + strings.from_int(i) + "\n")
+    }
+    with stdin = strings.build(input) {
+        let got = lists.sort(tasks.map([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], read_one))
+        // Each line read once, by one task.
+        assert(len(got) == 20 && got[0] == "in 0" && got[19] == "in 9" && len(lists.unique(got)) == 20)
+    }
+}
+
+fn text_lines(s: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(s) {
+        if s[i] == '\n' {
+            push(mut out, s[start..i])
+            start = i + 1
+        }
+    }
+    return out
+}

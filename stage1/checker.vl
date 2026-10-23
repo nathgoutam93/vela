@@ -60,6 +60,10 @@ type ClosureCtx = struct {
     captures: [Int]
     result: Int  // -3 until a return says, when it was not written
     effect_reported: Bool
+    // Written as the function argument of tasks.map or tasks.each, which
+    // call it before they return: it cannot outlive the call, so what it
+    // uses is used by the function around it.
+    direct: Bool
 }
 
 pub type Checked = struct {
@@ -113,6 +117,7 @@ type Checker = struct {
     closures: Map[Int, ClosureInfo]
     in_closures: [ClosureCtx]  // the closures being checked, innermost last
     pending: [Int]  // type parameters of a generic call whose arguments are being checked, still unknown
+    direct: Int  // the node id of the function argument of tasks.map or tasks.each being checked, or -1
 }
 
 pub fn check(loaded: modules.Loaded) -> Checked {
@@ -136,7 +141,7 @@ pub fn check_program(loaded: modules.Loaded, for_tests: Bool) -> Checked {
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
         undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
-        in_closures: [], pending: [], defining: -1, expected: -2,
+        in_closures: [], pending: [], defining: -1, expected: -2, direct: -1,
     }
     c.warnings = loaded.warnings
     program(mut c, for_tests)
@@ -763,12 +768,17 @@ fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
     if effect != "fs" && effect != "os" {
         return  // none, or an unknown one, already reported where it is declared
     }
-    let n = len(c.in_closures)
+    // Through the closures it is in, innermost first: one given straight to
+    // tasks.map or tasks.each passes the effect on to the code around it.
+    let mut n = len(c.in_closures)
+    for n > 0 && c.in_closures[n - 1].direct {
+        n = n - 1
+    }
     if n > 0 {
         if !c.in_closures[n - 1].effect_reported {
             c.in_closures[n - 1].effect_reported = true
             report_at(mut c, e, "a function value cannot use " + effect + ", through " + through +
-                ": function values have no effects")
+                ": function values have no effects, except one given straight to tasks.map or tasks.each")
         }
         return
     }
@@ -792,7 +802,10 @@ fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
 // `with files = m, args = xs, env = m, stdin = s, stdout = mut out { ... }`: in a test,
 // the code the block runs sees these instead of the real ones.
 fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block) {
-    if !c.fns[c.current_fn].is_test {
+    if len(c.in_closures) > 0 {
+        report(mut c, s.line, s.col, "'with' cannot be used inside a function value; put the function value inside the " +
+            "'with' instead")
+    } else if !c.fns[c.current_fn].is_test {
         report(mut c, s.line, s.col, "'with' only works in tests, where it fakes files, args, env, stdin or stdout for the code " +
             "the test calls")
     }
@@ -943,11 +956,12 @@ fn private(c: mut Checker, line: Int, col: Int, module: Int, what: Str, name: St
 
 // `; it is maps.get` for a name that lives in a built-in module.
 fn std_hint(c: Checker, name: Str) -> Str {
-    for module in ["maps", "files", "os", "strings"] {
+    for module in ["maps", "files", "os", "strings", "tasks"] {
         let fns = match module {
             "maps" => ["has", "get", "remove", "keys"]
             "files" => ["read", "write", "remove", "temp_dir"]
             "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write"]
+            "tasks" => ["map", "each", "workers"]
             _ => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float", "parse_float"]
         }
         for f in fns {
@@ -2769,6 +2783,9 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
             }
             c.refs[e.id] = Ref.Builtin(name)
             use_effect(mut c, e, effect_of(name), name)
+            if name == "tasks.map" || name == "tasks.each" {
+                return tasks_call(mut c, e, name, args)
+            }
             return builtin(mut c, e, name, args, written(callee))
         }
         Ref.Variant(enum, vi) => {
@@ -3148,7 +3165,11 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
         Some(tn) => res = resolve_type(mut c, tn)
         None => {}
     }
-    push(mut c.in_closures, ClosureCtx { id: e.id, boundary: len(c.scopes), captures: [], result: res, effect_reported: false })
+    let direct = c.direct == e.id
+    c.direct = -1  // a closure inside this one is not the argument
+    push(mut c.in_closures, ClosureCtx {
+        id: e.id, boundary: len(c.scopes), captures: [], result: res, effect_reported: false, direct: direct,
+    })
     push_scope(mut c, scope)
     let saved_loops = c.loops
     c.loops = []  // break and continue cannot leave a function value
@@ -3196,6 +3217,75 @@ fn closure_return(c: mut Checker, s: ast.Stmt, v: Option[ast.Expr]) {
     }
 }
 
+// `tasks.map(xs, f)` and `tasks.each(xs, f)`: f on every element of xs, on
+// several threads. They are typed as generic functions would be,
+// `map[T, R](xs: [T], f: fn(T) -> R) -> [R]` and `each[T](xs: [T], f: fn(T))`:
+// xs first, which says what T is, then f, so that a closure gets its
+// parameter's type from xs and its result type from its body. The function
+// argument may use effects, which become the caller's: see ClosureCtx.direct.
+fn tasks_call(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr]) -> Int {
+    let is_map = name == "tasks.map"
+    let mut nothing = types.NOTHING()
+    if is_map {
+        nothing = types.ERROR()
+    }
+    if !arity(mut c, e, name, 2, len(args)) {
+        for a in args {
+            infer(mut c, a)
+        }
+        return nothing
+    }
+    let mut elem = types.ERROR()
+    let xs = value(mut c, args[0])
+    if types.is_array(c.table, xs) {
+        elem = types.get(c.table, xs).args[0]
+    } else if xs != types.ERROR() {
+        report_at(mut c, args[0], "argument 1 of '" + name + "' must be an array, found " + show(c, xs))
+    }
+    // The function, against fn(T) -> R where R is still to be found.
+    let mut result = types.NOTHING()
+    let saved_pending = c.pending
+    if is_map {
+        result = types.param(mut c.table, "R", [], e.line, e.col)
+        c.pending = [result]
+    }
+    let saved_direct = c.direct
+    c.direct = args[1].id
+    c.expected = types.func(mut c.table, [elem], result)
+    let f = value(mut c, args[1])
+    c.direct = saved_direct
+    c.pending = saved_pending
+    if f == types.ERROR() {
+        return nothing
+    }
+    let ft = types.get(c.table, f)
+    let mut takes_elem = types.is_func(c.table, f) && len(ft.args) == 1
+    if takes_elem && elem != types.ERROR() && ft.args[0] != types.ERROR() && ft.args[0] != elem {
+        takes_elem = false
+    }
+    if !takes_elem {
+        let mut what = "a function taking one value"
+        if elem != types.ERROR() {
+            what = "a function taking one " + show(c, elem)
+        }
+        report_at(mut c, args[1], "argument 2 of '" + name + "' must be " + what + ", found " + show(c, f))
+        return nothing
+    }
+    if !is_map {
+        if ft.result != types.NOTHING() {
+            report_at(mut c, args[1], "the function given to tasks.each returns " + show(c, ft.result) +
+                ", which would be lost; use tasks.map to collect the results")
+        }
+        return types.NOTHING()
+    }
+    if ft.result == types.NOTHING() {
+        report_at(mut c, args[1], "the function given to tasks.map returns nothing, so there are no results to collect; " +
+            "use tasks.each")
+        return types.ERROR()
+    }
+    return types.array(mut c.table, ft.result)
+}
+
 // A named function used as a value: `lists.map(xs, double)`. A generic one
 // takes its type arguments from the function type the context wants.
 fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> Int {
@@ -3207,9 +3297,14 @@ fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> I
         }
     }
     if len(f.decl.effects) > 0 {
-        report_at(mut c, e, "'" + name + "' uses " + f.decl.effects[0] + ", so it cannot be used as a value: function values " +
-            "have no effects")
-        return types.ERROR()
+        if c.direct != e.id {
+            report_at(mut c, e, "'" + name + "' uses " + f.decl.effects[0] + ", so it cannot be used as a value: function " +
+                "values have no effects, except one given straight to tasks.map or tasks.each")
+            return types.ERROR()
+        }
+        for u in f.decl.effects {
+            use_effect(mut c, e, u, "'" + name + "'")
+        }
     }
     c.refs[e.id] = Ref.Function(id)
     let tp = f.type_params
@@ -3278,6 +3373,7 @@ fn is_printable(t: Int) -> Bool {
 fn has_signature(name: Str) -> Bool {
     return len(name) > 6 && name[0..6] == "files." || name == "os.args" || name == "os.exit" ||
         name == "os.run" || name == "os.env" || name == "os.read_line" || name == "os.read" || name == "os.write" ||
+        name == "tasks.workers" ||
         len(name) > 8 && name[0..8] == "strings."
 }
 
@@ -3317,6 +3413,7 @@ fn signature(c: mut Checker, name: Str) -> [Int] {
     return match name {
         "os.exit" => [types.INT(), nothing]
         "os.read" => [types.INT(), s]
+        "tasks.workers" => [types.INT()]
         "os.write" => [s, nothing]
         "strings.builder" => [b]
         "strings.add" => [b, s, nothing]

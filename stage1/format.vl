@@ -131,6 +131,7 @@ fn before_operand(p: Piece) -> Bool {
     return match p.kind {
         lexer.Kind.Ident => false
         lexer.Kind.Int => false
+        lexer.Kind.Float => false
         lexer.Kind.Bool => false
         lexer.Kind.Str => false
         lexer.Kind.Byte => false
@@ -345,6 +346,8 @@ test "a unary minus after an operator or bracket" {
     assert(stmt("f(-1,[-2])") == "f(-1, [-2])")
     assert(stmt("return !ok") == "return !ok")
     assert(stmt("match x {-1=>{}}") == "match x { -1 => {} }")
+    // After a value, a minus is a subtraction: a Float is a value too.
+    assert(stmt("let y=1.2-2.4*x") == "let y = 1.2 - 2.4 * x")
 }
 
 test "indentation follows brackets and continuations" {

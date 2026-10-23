@@ -83,7 +83,7 @@ def run_c_compiler(c_file: Path, exe: Path) -> None:
     cc = os.environ.get("VELA_CC", "cc")
     extra = shlex.split(os.environ.get("VELA_CFLAGS", ""))
     command = [
-        cc, "-std=c11", "-O2", *extra,
+        cc, "-std=c11", "-O2", "-pthread", *extra,  # -pthread: the runtime has tasks (M13)
         "-I", str(RUNTIME_DIR),
         str(c_file), str(RUNTIME_DIR / "vela_rt.c"),
         "-o", str(exe),

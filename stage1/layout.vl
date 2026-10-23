@@ -342,6 +342,24 @@ pub fn release(l: mut Layout, t: Int, c: Str) -> Str {
     return "rc_release_" + l.names[t] + "(" + c + ");"
 }
 
+// A C statement marking what the value `c` of type `t` holds as shared
+// between threads, or "".
+pub fn share(l: mut Layout, t: Int, c: Str) -> Str {
+    if !managed(mut l, t) {
+        return ""
+    }
+    if t == types.STR() {
+        return "vela_str_share(" + c + ");"
+    }
+    if is_array_like(l.table, t) {
+        return "vela_array_share(" + c + ");"
+    }
+    if types.is_map(l.table, t) {
+        return "vela_map_share(" + c + ");"
+    }
+    return "rc_share_" + l.names[t] + "(" + c + ");"
+}
+
 // A C expression for the vela_type describing `t` to arrays and maps.
 pub fn descriptor(l: Layout, t: Int) -> Str {
     let d = runtime_descriptor(t)
@@ -464,19 +482,22 @@ fn member(l: Layout, t: Int, name: Str, index: Int, slot_type: Int, m: Str) -> S
     return c_type(l, slot_type) + " " + m
 }
 
-// Statements retaining (op "retain") or releasing one slot.
+// Statements retaining (op "retain"), releasing ("release") or sharing
+// ("share") one slot.
 fn slot_ops(l: mut Layout, t: Int, name: Str, index: Int, slot_type: Int, c: Str, op: Str) -> [Str] {
     if is_boxed(l, t, name, index) {
         if op == "retain" {
-            return [c + "->rc++;"]
+            return ["vela_rc_inc(&" + c + "->rc);"]
         }
-        return [box_name(l, slot_type) + "_release(" + c + ");"]
+        return [box_name(l, slot_type) + "_" + op + "(" + c + ");"]
     }
     let mut s = ""
     if op == "retain" {
         s = retain(mut l, slot_type, c)
-    } else {
+    } else if op == "release" {
         s = release(mut l, slot_type, c)
+    } else {
+        s = share(mut l, slot_type, c)
     }
     if s == "" {
         let none: [Str] = []
@@ -485,8 +506,8 @@ fn slot_ops(l: mut Layout, t: Int, name: Str, index: Int, slot_type: Int, c: Str
     return [s]
 }
 
-// rc_retain_T / rc_release_T for every managed struct and enum, box
-// helpers for every boxed type, and descriptors for element types.
+// rc_retain_T / rc_release_T / rc_share_T for every managed struct and
+// enum, box helpers for every boxed type, and descriptors for element types.
 fn memory_functions(l: mut Layout) -> [Str] {
     let mut managed_types: [Int] = []
     for t in l.types {
@@ -500,20 +521,23 @@ fn memory_functions(l: mut Layout) -> [Str] {
         let n = l.names[t]
         push(mut out, "static inline VELA_UNUSED void rc_retain_" + n + "(" + n + " v) { vela_env_retain(v.env); }")
         push(mut out, "static inline VELA_UNUSED void rc_release_" + n + "(" + n + " v) { vela_env_release(v.env); }")
+        push(mut out, "static inline VELA_UNUSED void rc_share_" + n + "(" + n + " v) { vela_env_share(v.env); }")
     }
     for t in managed_types {
         let n = l.names[t]
         push(mut out, "static inline VELA_UNUSED void rc_retain_" + n + "(" + n + " v);")
         push(mut out, "static inline VELA_UNUSED void rc_release_" + n + "(" + n + " v);")
+        push(mut out, "static inline VELA_UNUSED void rc_share_" + n + "(" + n + " v);")
     }
     for t in l.box_types {
         let b = box_name(l, t)
         push(mut out, "static inline VELA_UNUSED void " + b + "_release(" + b + " *b);")
+        push(mut out, "static inline VELA_UNUSED void " + b + "_share(" + b + " *b);")
     }
     for t in managed_types {
         let n = l.names[t]
         let ti = types.get(l.table, t)
-        for op in ["retain", "release"] {
+        for op in ["retain", "release", "share"] {
             push(mut out, "static inline VELA_UNUSED void rc_" + op + "_" + n + "(" + n + " v) {")
             if ti.tag == types.Tag.Struct {
                 for f in ti.fields {
@@ -555,6 +579,10 @@ fn memory_functions(l: mut Layout) -> [Str] {
         let n = l.names[t]
         let keep = retain(mut l, t, "copy->value")
         let drop = release(mut l, t, "b->value")
+        let mut mark = share(mut l, t, "b->value")
+        if mark == "" {
+            mark = "(void)0;"
+        }
         for line in [
             "static inline VELA_UNUSED " + b + " *" + b + "_new(" + n + " value) {",
             "    " + b + " *b = vela_alloc(sizeof(" + b + "));",
@@ -563,14 +591,17 @@ fn memory_functions(l: mut Layout) -> [Str] {
             "    return b;",
             "}",
             "static inline VELA_UNUSED void " + b + "_release(" + b + " *b) {",
-            "    if (--b->rc == 0) { " + drop + " free(b); }",
+            "    if (vela_rc_dec(&b->rc)) { " + drop + " free(b); }",
+            "}",
+            "static inline VELA_UNUSED void " + b + "_share(" + b + " *b) {",
+            "    if (vela_rc_share(&b->rc)) { " + mark + " }",
             "}",
             "// Copy-on-write: a box about to change gets a copy if anything else shares it.",
             "static inline VELA_UNUSED void " + b + "_unique(" + b + " **b) {",
-            "    if ((*b)->rc == 1) return;",
+            "    if (vela_rc_unique(&(*b)->rc)) return;",
             "    " + b + " *copy = " + b + "_new((*b)->value);",
             "    " + keep,
-            "    (*b)->rc--;",
+            "    " + b + "_release(*b);",
             "    *b = copy;",
             "}",
         ] {
@@ -583,13 +614,16 @@ fn memory_functions(l: mut Layout) -> [Str] {
         }
         let n = l.names[t]
         let mut funcs = "NULL, NULL"
+        let mut mark = "NULL"
         if managed(mut l, t) {
             push(mut out, "static inline VELA_UNUSED void vt_retain_" + n + "(void *p) { rc_retain_" + n + "(*(" + n + " *)p); }")
             push(mut out, "static inline VELA_UNUSED void vt_release_" + n + "(void *p) { rc_release_" + n + "(*(" + n + " *)p); }")
+            push(mut out, "static inline VELA_UNUSED void vt_share_" + n + "(void *p) { rc_share_" + n + "(*(" + n + " *)p); }")
             funcs = "vt_retain_" + n + ", vt_release_" + n
+            mark = "vt_share_" + n
         }
         push(mut out, "static inline VELA_UNUSED const vela_type *vt_" + n + "(void) {")
-        push(mut out, "    static const vela_type t = {sizeof(" + n + "), " + funcs + ", NULL, NULL};")
+        push(mut out, "    static const vela_type t = {sizeof(" + n + "), " + funcs + ", NULL, NULL, " + mark + "};")
         push(mut out, "    return &t;")
         push(mut out, "}")
     }

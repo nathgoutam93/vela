@@ -1,0 +1,76 @@
+// stage 1 only
+// err: tasks_errors.vl:31:38: error: 'sizes' uses fs, through 'size', but does not say so; add `uses fs` after its signature
+// err: tasks_errors.vl:35:29: error: 'sizes_named' uses fs, through 'size', but does not say so; add `uses fs` after its signature
+// err: tasks_errors.vl:40:32: warning: 'kept' says `uses fs` but uses nothing of it
+// err: tasks_errors.vl:41:27: error: a function value cannot use fs, through 'size': function values have no effects, except one given straight to tasks.map or tasks.each
+// err: tasks_errors.vl:42:13: error: 'size' uses fs, so it cannot be used as a value: function values have no effects, except one given straight to tasks.map or tasks.each
+// err: tasks_errors.vl:47:34: warning: 'nested' says `uses fs` but uses nothing of it
+// err: tasks_errors.vl:49:29: error: a function value cannot use fs, through 'size': function values have no effects, except one given straight to tasks.map or tasks.each
+// err: tasks_errors.vl:55:31: error: the function given to tasks.map returns nothing, so there are no results to collect; use tasks.each
+// err: tasks_errors.vl:58:23: error: argument 1 of 'tasks.map' must be an array, found Int
+// err: tasks_errors.vl:59:28: error: argument 2 of 'tasks.map' must be a function taking one Int, found fn(Str) -> Str
+// err: tasks_errors.vl:60:11: error: tasks.each expects 2 arguments, got 1
+// err: tasks_errors.vl:61:23: error: cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`
+// err: tasks_errors.vl:61:30: error: cannot tell the type of parameter 'x'; write it, as in fn(x: Int) => ...
+// err: tasks_errors.vl:62:19: error: tasks.each(...) does not produce a value
+// err: tasks_errors.vl:62:40: error: this function value does not return a value, so 'return' cannot have one
+// err: tasks_errors.vl:63:24: error: 'n' is declared as Str, but its value is Int
+// err: tasks_errors.vl:68:9: error: 'with' cannot be used inside a function value; put the function value inside the 'with' instead
+import files
+import tasks
+
+fn size(path: Str) -> Int uses fs {
+    match files.read(path) {
+        Ok(t) => return len(t)
+        Err(_) => return 0
+    }
+}
+
+// The effects of the function given to tasks.map are the caller's.
+fn sizes(paths: [Str]) -> [Int] {
+    return tasks.map(paths, fn(p) => size(p))
+}
+
+fn sizes_named(paths: [Str]) -> [Int] {
+    return tasks.map(paths, size)
+}
+
+// Only a function given straight to tasks.map: one kept in a variable
+// could be called anywhere, later.
+fn kept(paths: [Str]) -> [Int] uses fs {
+    let f = fn(p: Str) => size(p)
+    let g = size
+    return tasks.map(paths, f)
+}
+
+// A closure inside the one given straight to tasks.map is a value again.
+fn nested(paths: [Str]) -> [Int] uses fs {
+    return tasks.map(paths, fn(p) {
+        let later = fn() => size(p)
+        return 0
+    })
+}
+
+fn mistakes() {
+    let a = tasks.map([1, 2], fn(n) {
+        print(n)
+    })
+    let b = tasks.map(3, fn(n: Int) => n)
+    let c = tasks.map([1], fn(s: Str) => s)
+    tasks.each([1, 2])
+    let d = tasks.map([], fn(x) => x)
+    let e = tasks.each(["x"], fn(s) => len(s))
+    let n: Str = tasks.workers()
+}
+
+test "no with inside tasks" {
+    tasks.each([1], fn(n) {
+        with args = ["x"] {
+            print(n)
+        }
+    })
+}
+
+fn main() {
+    mistakes()
+}

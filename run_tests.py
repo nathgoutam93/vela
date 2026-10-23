@@ -7,6 +7,8 @@
     python3 run_tests.py -v                    also list the tests that pass
     python3 run_tests.py --sanitize            build with AddressSanitizer, which
                                                also fails a test that leaks memory
+    python3 run_tests.py --tsan                build with ThreadSanitizer, which
+                                               fails a test with a data race
     python3 run_tests.py --compiler "./vela1"  any other compiler
 
 build/vela is made from the seed by `sh bootstrap/bootstrap.sh`.
@@ -87,6 +89,8 @@ STRICT_CFLAGS = (
 # --sanitize: catch memory errors (use after free, out of bounds), undefined
 # behaviour, and, when the program exits, any memory it never freed.
 SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all"
+# --tsan: catch data races between threads (it cannot be combined with ASan).
+TSAN_CFLAGS = " -g -fsanitize=thread"
 
 HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args|command|in):(.*)$")
 STAGE1_ONLY = "// stage 1 only"
@@ -324,6 +328,7 @@ def main() -> int:
     ap.add_argument("-v", "--verbose", action="store_true", help="list passing tests too")
     ap.add_argument("--sanitize", action="store_true",
                     help="build with AddressSanitizer and UBSan; leaks fail the test")
+    ap.add_argument("--tsan", action="store_true", help="build with ThreadSanitizer; data races fail the test")
     args = ap.parse_args()
 
     if args.compiler:
@@ -340,6 +345,12 @@ def main() -> int:
     if args.sanitize:
         env["VELA_CFLAGS"] += SANITIZE_CFLAGS
         env["ASAN_OPTIONS"] = "detect_leaks=1"
+    if args.tsan:
+        env["VELA_CFLAGS"] += TSAN_CFLAGS
+        env["TSAN_OPTIONS"] = "halt_on_error=1"
+        # ThreadSanitizer makes a program 5 to 15 times slower.
+        global RUN_TIMEOUT
+        RUN_TIMEOUT *= 10
 
     tests = find_tests(args.filters)
     if args.stage0:
