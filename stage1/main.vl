@@ -395,7 +395,6 @@ fn build(path: Str, exe: Str, root: Str, quick: Bool) uses fs, os {
     compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root, "-O2")
 }
 
-// VELA_BACKEND=native: assembly instead of C.
 // VELA_BACKEND=c or VELA_BACKEND=native picks the backend. Otherwise `vela
 // build` uses C, whose code is faster, and `vela run` and `vela test` (the
 // `quick` ones) the native backend, which builds much faster (M11b): on

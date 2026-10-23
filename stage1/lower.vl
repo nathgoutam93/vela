@@ -129,7 +129,7 @@ fn new_fn(name: Str, result: Int) -> Fn {
 // The IR of a program, or of `vela test`'s program (`for_tests`), or the
 // errors only making the generic copies finds.
 pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] {
-    let mut k = checked
+    let mut k = checker.erased(checked)
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
         if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test {

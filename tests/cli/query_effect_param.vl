@@ -1,0 +1,15 @@
+// vela query refs on the `f` of `uses f` (M15): it is a use of the
+// parameter f, so refs, hover and rename treat it like the others.
+// stage 1 only
+// command: query refs FILE:5:52
+fn apply(xs: [Int], f: fn(Int) -> Int) -> Int uses f {
+    let mut total = 0
+    for x in xs {
+        total = total + f(x)
+    }
+    return total
+}
+
+fn main() {
+    print(apply([1, 2], fn(x: Int) => x * 2))
+}

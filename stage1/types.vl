@@ -58,6 +58,10 @@ pub type TypeInfo = struct {
     open: Bool  // mentions a type parameter
     filled: Bool  // a generic declaration: its fields or variants are known; an instance: they are put in
     result: Int  // a function type's result type; NOTHING() when it returns nothing
+    // A function type's effects (M15), sorted: "fs", "os", or "@f" for
+    // whatever the parameter f of the function being checked uses.
+    effects: [Str]
+    plain: Int  // for a function type with effects, the same type without them; -1 otherwise
 }
 
 pub type Table = struct {
@@ -108,7 +112,7 @@ pub fn NOTHING() -> Int {
 fn info(tag: Tag, name: Str) -> TypeInfo {
     return TypeInfo {
         tag: tag, name: name, module: "", public: true, line: 0, col: 0, args: [], fields: [], variants: [],
-        params: [], bounds: [], origin: -1, open: false, filled: false, result: -1,
+        params: [], bounds: [], origin: -1, open: false, filled: false, result: -1, effects: [], plain: -1,
     }
 }
 
@@ -219,6 +223,39 @@ pub fn map(table: mut Table, k: Int, v: Int) -> Int {
 // `fn(params) -> result`, interned; `result` is NOTHING() for a function
 // that returns nothing.
 pub fn func(table: mut Table, params: [Int], result: Int) -> Int {
+    return func_with(mut table, params, result, [])
+}
+
+fn func_key(params: [Int], result: Int, effects: [Str]) -> Str {
+    let mut k = key("fn " + strings.from_int(result), params)
+    if len(effects) > 0 {
+        k = k + " uses"
+        for e in effects {
+            k = k + " " + e
+        }
+    }
+    return k
+}
+
+// `fn(params) -> result uses effects` (M15): `effects` sorted, without
+// repeats. Effects are the checker's alone: the same type without them,
+// `plain`, is what the code generators lay out.
+pub fn func_with(table: mut Table, params: [Int], result: Int, effects: [Str]) -> Int {
+    if len(effects) > 0 {
+        let k = func_key(params, result, effects)
+        match maps.get(table.index, k) {
+            Some(t) => return t
+            None => {}
+        }
+        let base = func(mut table, params, result)
+        let mut t = table.types[base]
+        t.effects = effects
+        t.plain = base
+        push(mut table.types, t)
+        let id = len(table.types) - 1
+        table.index[k] = id
+        return id
+    }
     for p in params {
         if p == ERROR() {
             return ERROR()
@@ -227,7 +264,7 @@ pub fn func(table: mut Table, params: [Int], result: Int) -> Int {
     if result == ERROR() {
         return ERROR()
     }
-    let k = key("fn " + strings.from_int(result), params)
+    let k = func_key(params, result, [])
     match maps.get(table.index, k) {
         Some(t) => return t
         None => {}
@@ -244,6 +281,71 @@ pub fn func(table: mut Table, params: [Int], result: Int) -> Int {
 
 pub fn is_func(table: Table, t: Int) -> Bool {
     return t >= 0 && table.types[t].tag == Tag.Func
+}
+
+// The effects of a function type; none for any other type.
+pub fn effects_of(table: Table, t: Int) -> [Str] {
+    if t < 0 {
+        return []
+    }
+    return table.types[t].effects
+}
+
+// A function type without its effects; any other type as it is.
+pub fn plain(table: Table, t: Int) -> Int {
+    if t >= 0 && table.types[t].plain >= 0 {
+        return table.types[t].plain
+    }
+    return t
+}
+
+// The effect that stands for what the parameter `name` uses.
+pub fn effect_var(name: Str) -> Str {
+    return "@" + name
+}
+
+pub fn is_effect_var(e: Str) -> Bool {
+    return len(e) > 0 && e[0] == '@'
+}
+
+// The effects of both, sorted, without repeats.
+pub fn union_effects(a: [Str], b: [Str]) -> [Str] {
+    let mut out = a
+    for e in b {
+        let mut have = false
+        for x in out {
+            if x == e {
+                have = true
+            }
+        }
+        if !have {
+            // Insertion in order.
+            let mut i = len(out)
+            push(mut out, e)
+            for i > 0 && out[i - 1] > e {
+                out[i] = out[i - 1]
+                i = i - 1
+            }
+            out[i] = e
+        }
+    }
+    return out
+}
+
+// Whether every effect of `a` is one of `b`'s.
+pub fn effects_within(a: [Str], b: [Str]) -> Bool {
+    for e in a {
+        let mut found = false
+        for x in b {
+            if x == e {
+                found = true
+            }
+        }
+        if !found {
+            return false
+        }
+    }
+    return true
 }
 
 pub fn option(table: mut Table, t: Int) -> Int {
@@ -457,7 +559,7 @@ pub fn find_subst(table: Table, t: Int, params: [Int], args: [Int]) -> Int {
     }
     if ti.tag == Tag.Func {
         let r = find_subst(table, ti.result, params, args)
-        return table.index[key("fn " + strings.from_int(r), new_args)]
+        return table.index[func_key(new_args, r, ti.effects)]
     }
     if ti.origin >= 0 {
         return table.index[key("inst " + strings.from_int(ti.origin), new_args)]
@@ -491,12 +593,123 @@ pub fn subst(table: mut Table, t: Int, params: [Int], args: [Int]) -> Int {
     }
     if ti.tag == Tag.Func {
         let r = subst(mut table, ti.result, params, args)
-        return func(mut table, new_args, r)
+        return func_with(mut table, new_args, r, ti.effects)
     }
     if ti.origin >= 0 {
         return instantiate(mut table, ti.origin, new_args)
     }
     return instance(mut table, ti.name, new_args)
+}
+
+// ---- Erasure (M15) ----
+//
+// Effects are the checker's alone. Before code is made, every type gets a
+// form without them, interned like any other: fn() uses fs becomes fn(),
+// [fn() uses fs] becomes [fn()], and a struct's fields and an enum's
+// payloads are rewritten the same way. Each type erased to another has
+// that one as its `plain`, and the lists of instances, arrays and maps the
+// code generators define keep only the erased types.
+
+// Erase every type in the table; returns the erased form of each type
+// there was before, by number.
+pub fn erase_all(table: mut Table) -> [Int] {
+    let n = len(table.types)
+    let mut memo: Map[Int, Int] = [:]
+    for t in 0..n {
+        erase(mut table, mut memo, t)
+    }
+    // The fields and payloads, of the types made on the way too.
+    let mut t = 0
+    for t < len(table.types) {
+        let ti = table.types[t]
+        if ti.tag == Tag.Struct || ti.tag == Tag.Enum {
+            let mut fields: [FieldInfo] = []
+            for f in ti.fields {
+                push(mut fields, FieldInfo { name: f.name, ty: erase(mut table, mut memo, f.ty) })
+            }
+            let mut variants: [Variant] = []
+            for v in ti.variants {
+                let mut payload: [Int] = []
+                for x in v.payload {
+                    push(mut payload, erase(mut table, mut memo, x))
+                }
+                push(mut variants, Variant { name: v.name, payload: payload })
+            }
+            table.types[t].fields = fields
+            table.types[t].variants = variants
+        }
+        t = t + 1
+    }
+    let mut instances: [Int] = []
+    for i in table.instances {
+        if table.types[i].plain < 0 {
+            push(mut instances, i)
+        }
+    }
+    table.instances = instances
+    let mut arrays: [Int] = []
+    for e in table.arrays {
+        if e < 0 || table.types[e].plain < 0 {
+            push(mut arrays, e)
+        }
+    }
+    table.arrays = arrays
+    let mut kv: [Int] = []
+    for i in 0..len(table.maps) / 2 {
+        let k = table.maps[2 * i]
+        let v = table.maps[2 * i + 1]
+        if table.types[k].plain < 0 && (v < 0 || table.types[v].plain < 0) {
+            push(mut kv, k)
+            push(mut kv, v)
+        }
+    }
+    table.maps = kv
+    let mut out: [Int] = []
+    for i in 0..n {
+        push(mut out, memo[i])
+    }
+    return out
+}
+
+fn erase(table: mut Table, memo: mut Map[Int, Int], t: Int) -> Int {
+    if t < 0 {
+        return t
+    }
+    match maps.get(memo, t) {
+        Some(e) => return e
+        None => {}
+    }
+    let ti = table.types[t]
+    let mut e = t
+    if ti.tag == Tag.Func || len(ti.args) > 0 {
+        let mut args: [Int] = []
+        let mut changed = len(ti.effects) > 0
+        for a in ti.args {
+            let x = erase(mut table, mut memo, a)
+            changed = changed || x != a
+            push(mut args, x)
+        }
+        let r = erase(mut table, mut memo, ti.result)
+        changed = changed || r != ti.result
+        if changed {
+            if ti.tag == Tag.Func {
+                e = func(mut table, args, r)
+            } else if ti.tag == Tag.Array {
+                e = array(mut table, args[0])
+            } else if ti.tag == Tag.Map {
+                e = map(mut table, args[0], args[1])
+            } else if ti.origin >= 0 {
+                e = instantiate(mut table, ti.origin, args)
+            } else {
+                e = instance(mut table, ti.name, args)
+            }
+        }
+    }
+    memo[t] = e
+    if e != t {
+        table.types[t].plain = e
+    }
+    return e
 }
 
 // The index of the variant called `name`, or -1.
@@ -561,6 +774,19 @@ fn show_func(table: Table, ti: TypeInfo, viewpoint: Str) -> Str {
     if ti.result >= 0 {
         strings.add(mut b, " -> " + show(table, ti.result, viewpoint))
     }
+    for i in 0..len(ti.effects) {
+        if i == 0 {
+            strings.add(mut b, " uses ")
+        } else {
+            strings.add(mut b, ", ")
+        }
+        let e = ti.effects[i]
+        if is_effect_var(e) {
+            strings.add(mut b, e[1..len(e)])
+        } else {
+            strings.add(mut b, e)
+        }
+    }
     return strings.build(b)
 }
 
@@ -603,6 +829,18 @@ test "substitution makes closed types" {
     assert(ints == option(mut t, array(mut t, INT())))
     assert(show(t, ints, "") == "Option[[Int]]")
     assert(find_subst(t, opt, [p], [INT()]) == ints)
+}
+
+test "function types with effects" {
+    let mut t = new_table()
+    let plain_fn = func(mut t, [STR()], INT())
+    let reads = func_with(mut t, [STR()], INT(), ["fs"])
+    assert(reads != plain_fn && plain(t, reads) == plain_fn && plain(t, plain_fn) == plain_fn)
+    assert(func_with(mut t, [STR()], INT(), ["fs"]) == reads)
+    let poly = func_with(mut t, [], NOTHING(), ["@f", "fs"])
+    assert(show(t, poly, "") == "fn() uses f, fs")
+    let both = union_effects(["os"], ["fs", "os"])
+    assert(len(both) == 2 && both[0] == "fs" && effects_within(["fs"], both) && !effects_within(["fs"], ["os"]))
 }
 
 test "instances of a generic type are interned and filled" {

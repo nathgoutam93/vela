@@ -324,7 +324,7 @@ fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
     let mut result: Option[ast.TypeName] = None
     if peek(p, 0).kind == lexer.Kind.Arrow {
         advance(mut p)
-        result = Some(type_name(mut p)?)
+        result = Some(type_name_in(mut p, false)?)
     }
     // `uses fs, os`, then `requires ...` and `ensures ...`, each of which
     // may start a new line.
@@ -470,6 +470,19 @@ fn variant_decl(p: mut Parser) -> Result[ast.VariantDecl, errors.CompileError] {
 }
 
 fn type_name(p: mut Parser) -> Result[ast.TypeName, errors.CompileError] {
+    return type_name_in(mut p, true)
+}
+
+// A type; `uses` after a function type belongs to the type unless
+// `with_uses` is false, as in a declaration's result type, where `uses`
+// belongs to the declaration: `fn make() -> (fn() uses fs)` says otherwise.
+fn type_name_in(p: mut Parser, with_uses: Bool) -> Result[ast.TypeName, errors.CompileError] {
+    if peek(p, 0).kind == lexer.Kind.LParen {
+        advance(mut p)
+        let inner = type_name(mut p)?
+        expect(mut p, lexer.Kind.RParen, "after a type in parentheses")?
+        return Ok(inner)
+    }
     if peek(p, 0).kind == lexer.Kind.Fn {
         // `fn(Int, Str) -> Bool`: the parameter types, then the result type
         // if there is one ("fn->" says there is, and it comes last).
@@ -487,16 +500,28 @@ fn type_name(p: mut Parser) -> Result[ast.TypeName, errors.CompileError] {
         let mut name = "fn"
         if peek(p, 0).kind == lexer.Kind.Arrow {
             advance(mut p)
-            push(mut args, type_name(mut p)?)
+            push(mut args, type_name_in(mut p, with_uses)?)
             name = "fn->"
         }
-        return Ok(ast.TypeName { name: name, args: args, line: open.line, col: open.col, module: "" })
+        let mut effects: [Str] = []
+        if with_uses && peek(p, 0).kind == lexer.Kind.Uses {
+            advance(mut p)
+            for {
+                let effect = expect_name(mut p, "for an effect after 'uses' (fs, os or a parameter's name)")?
+                push(mut effects, effect.text)
+                if !more_effects(p) {
+                    break
+                }
+                advance(mut p)
+            }
+        }
+        return Ok(ast.TypeName { name: name, args: args, line: open.line, col: open.col, module: "", effects: effects })
     }
     if peek(p, 0).kind == lexer.Kind.LBracket {
         let open = advance(mut p)
         let elem = type_name(mut p)?
         expect(mut p, lexer.Kind.RBracket, "after the element type of an array type")?
-        return Ok(ast.TypeName { name: "[]", args: [elem], line: open.line, col: open.col, module: "" })
+        return Ok(ast.TypeName { name: "[]", args: [elem], line: open.line, col: open.col, module: "", effects: [] })
     }
     let start = expect_name(mut p, "for a type")?
     let mut tok = start
@@ -518,7 +543,24 @@ fn type_name(p: mut Parser) -> Result[ast.TypeName, errors.CompileError] {
         }
         expect(mut p, lexer.Kind.RBracket, "after the type arguments of '" + tok.text + "'")?
     }
-    return Ok(ast.TypeName { name: tok.text, args: args, line: start.line, col: start.col, module: module })
+    return Ok(ast.TypeName { name: tok.text, args: args, line: start.line, col: start.col, module: module, effects: [] })
+}
+
+// Whether the comma ahead goes on with a function type's effects: `uses fs,
+// os` in a list of parameters or types, where a comma could also start the
+// next one. An effect is a name in lower case on its own; a parameter
+// (`g: ...`), a module's type (`json.Value`), a generic one (`Box[T]`) and a
+// type in upper case are not.
+fn more_effects(p: Parser) -> Bool {
+    if peek(p, 0).kind != lexer.Kind.Comma {
+        return false
+    }
+    let name = peek(p, 1)
+    if name.kind != lexer.Kind.Ident || len(name.text) == 0 || name.text[0] < 'a' || name.text[0] > 'z' {
+        return false
+    }
+    let after = peek(p, 2).kind
+    return after != lexer.Kind.Colon && after != lexer.Kind.Dot && after != lexer.Kind.LBracket
 }
 
 // ---- Statements ----

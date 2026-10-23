@@ -100,7 +100,7 @@ pub fn test_ids(k: checker.Checked) -> [Int] {
 
 // The C, or the errors only making the generic copies finds.
 fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.CompileError]] {
-    let mut k = checked
+    let mut k = checker.erased(checked)
     // The functions that are not generic are all written; generic ones only
     // as the copies they are called as. Tests only for `vela test`.
     let mut roots: [Int] = []

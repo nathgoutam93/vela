@@ -1,0 +1,113 @@
+// Effects in function types and effect-polymorphic parameters (M15). A
+// function's `uses f` says it uses whatever the function passed as f uses:
+// lists.map with a function that reads files reads files, and with one
+// that does not, does not. A function value's type says what it uses.
+// stage 1 only
+// out: [3, 6, -1]
+// out: [1, 3]
+// out: 9
+// out: true
+// out: logged hello
+// out: 3
+// out: [3, 6]
+// out: 12
+// out: 7
+import files
+import lists
+import strings
+import tasks
+
+fn size(path: Str) -> Int uses fs {
+    match files.read(path) {
+        Ok(text) => return len(text)
+        Err(_) => return -1
+    }
+}
+
+fn sizes(paths: [Str]) -> [Int] uses fs {
+    return lists.map(paths, size)
+}
+
+// No `uses`: what is passed uses nothing.
+fn lengths(words: [Str]) -> [Int] {
+    return lists.map(words, fn(w) => len(w))
+}
+
+// Polymorphic itself: passing f on to lists.fold uses what f uses.
+fn total(xs: [Int], f: fn(Int) -> Int) -> Int uses f {
+    return lists.fold(xs, 0, fn(acc: Int, x: Int) => acc + f(x))
+}
+
+// A field whose type allows fs: any function that uses fs, or nothing, fits.
+type Logger = struct {
+    name: Str
+    write: fn(Str) uses fs
+}
+
+fn log(l: Logger, line: Str) uses fs {
+    l.write(l.name + " " + line)
+}
+
+fn pick(fs_ok: Bool) -> Option[fn(Str) -> Int uses fs] {
+    if fs_ok {
+        return Some(size)
+    }
+    return None
+}
+
+// A declaration's result type ends before `uses`; parentheses put it inside.
+fn reader() -> (fn(Str) -> Int uses fs) {
+    return size
+}
+
+fn show(xs: [Int]) {
+    let mut b = strings.builder()
+    strings.add(mut b, "[")
+    for i in 0..len(xs) {
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, strings.from_int(xs[i]))
+    }
+    strings.add(mut b, "]")
+    print(strings.build(b))
+}
+
+fn put(path: Str, text: Str) uses fs {
+    match files.write(path, text) {
+        Ok(_) => {}
+        Err(e) => print(e)
+    }
+}
+
+fn main() {
+    put("a.txt", "abc")
+    put("b.txt", "abcdef")
+    show(sizes(["a.txt", "b.txt", "missing"]))
+    show(lengths(["a", "bcd"]))
+    print(total([1, 2, 3], fn(x: Int) => x + 1))
+    print(total([1], fn(x: Int) -> Int {
+        return size("a.txt")
+    }) == 3)
+    let l = Logger { name: "logged", write: fn(s: Str) {
+        put("log.txt", s)
+    } }
+    log(l, "hello")
+    match files.read("log.txt") {
+        Ok(text) => print(text)
+        Err(e) => print(e)
+    }
+    let quiet = Logger { name: "q", write: fn(s: Str) {
+        print(len(s))
+    } }
+    log(quiet, "a")
+    match pick(true) {
+        Some(f) => show(tasks.map(["a.txt", "b.txt"], f))
+        None => {}
+    }
+    let r = reader()
+    print(r("a.txt") + r("b.txt") + 3)
+    let n = 3
+    let add = fn(x: Int) => x + n
+    print(add(4))
+}

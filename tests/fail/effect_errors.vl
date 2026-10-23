@@ -1,20 +1,19 @@
 // Mistakes with effects, contracts and fakes.
 // stage 1 only
-// err: effect_errors.vl:22:18: error: 'read' uses fs, through files.read, but does not say so; add `uses fs` after its signature
-// err: effect_errors.vl:25:28: warning: 'first' says `uses fs` but uses nothing of it
-// err: effect_errors.vl:32:12: error: effect 'os' is listed twice
-// err: effect_errors.vl:32:12: error: unknown effect 'net'; the effects are fs (the files module) and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read)
-// err: effect_errors.vl:37:5: error: 'caller' uses os, through 'leave', but does not say so; add `uses os` after its signature
-// err: effect_errors.vl:40:11: warning: 'tidy' says `uses os` but uses nothing of it
-// err: effect_errors.vl:45:14: error: a requires clause must be Bool, found Int
-// err: effect_errors.vl:50:4: error: 'odd' has a parameter called 'result', which its ensures clauses cannot tell from the value it returns; rename the parameter
-// err: effect_errors.vl:56:13: error: undefined name 'result'
-// err: effect_errors.vl:60:13: error: 'first' uses fs, so it cannot be used as a value: function values have no effects, except one given straight to tasks.map or tasks.each
-// err: effect_errors.vl:61:5: error: 'with' only works in tests, where it fakes files, args, env, stdin or stdout for the code the test calls
-// err: effect_errors.vl:67:18: error: 'with files' needs a Map[Str, Str] from paths to contents, found [Str]
-// err: effect_errors.vl:67:31: error: 'with env' needs a Map[Str, Str] from names to values, found Int
-// err: effect_errors.vl:67:43: error: 'with stdout' collects what is printed into a strings.Builder variable, written `stdout = mut out`
-// err: effect_errors.vl:67:46: error: 'with' cannot fake 'net'; it fakes files, args, env, stdin and stdout
+// err: effect_errors.vl:21:18: error: 'read' uses fs, through files.read, but does not say so; add `uses fs` after its signature
+// err: effect_errors.vl:24:28: warning: 'first' says `uses fs` but uses nothing of it
+// err: effect_errors.vl:31:12: error: effect 'os' is listed twice
+// err: effect_errors.vl:31:12: error: unknown effect 'net'; the effects are fs (the files module) and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), or the name of a parameter that is a function, for whatever that function uses
+// err: effect_errors.vl:36:5: error: 'caller' uses os, through 'leave', but does not say so; add `uses os` after its signature
+// err: effect_errors.vl:39:11: warning: 'tidy' says `uses os` but uses nothing of it
+// err: effect_errors.vl:44:14: error: a requires clause must be Bool, found Int
+// err: effect_errors.vl:49:4: error: 'odd' has a parameter called 'result', which its ensures clauses cannot tell from the value it returns; rename the parameter
+// err: effect_errors.vl:55:13: error: undefined name 'result'
+// err: effect_errors.vl:60:5: error: 'with' only works in tests, where it fakes files, args, env, stdin or stdout for the code the test calls
+// err: effect_errors.vl:66:18: error: 'with files' needs a Map[Str, Str] from paths to contents, found [Str]
+// err: effect_errors.vl:66:31: error: 'with env' needs a Map[Str, Str] from names to values, found Int
+// err: effect_errors.vl:66:43: error: 'with stdout' collects what is printed into a strings.Builder variable, written `stdout = mut out`
+// err: effect_errors.vl:66:46: error: 'with' cannot fake 'net'; it fakes files, args, env, stdin and stdout
 import files
 import os
 

@@ -116,7 +116,7 @@ pub fn new_layout(table: types.Table, user_types: [Int], element_types: [Int]) -
     }
     for t in 0..len(table.types) {
         let ti = types.get(table, t)
-        if ti.tag == types.Tag.Func && !ti.open {
+        if ti.tag == types.Tag.Func && !ti.open && ti.plain < 0 {  // not one erased to another (M15)
             push(mut l.funcs, t)
         }
     }

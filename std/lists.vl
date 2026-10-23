@@ -170,7 +170,7 @@ pub fn sort[T: Ord](xs: [T]) -> [T] {
 }
 
 // `xs` sorted by what `key` gives for each.
-pub fn sort_by[T, K: Ord](xs: [T], key: fn(T) -> K) -> [T] {
+pub fn sort_by[T, K: Ord](xs: [T], key: fn(T) -> K) -> [T] uses key {
     return in_order(xs, map(xs, key))
 }
 
@@ -185,7 +185,7 @@ pub fn in_order[T, K: Ord](xs: [T], keys: [K]) -> [T] {
 }
 
 // What `f` gives for each element.
-pub fn map[T, U](xs: [T], f: fn(T) -> U) -> [U] {
+pub fn map[T, U](xs: [T], f: fn(T) -> U) -> [U] uses f {
     let mut out: [U] = []
     for x in xs {
         push(mut out, f(x))
@@ -194,7 +194,7 @@ pub fn map[T, U](xs: [T], f: fn(T) -> U) -> [U] {
 }
 
 // The elements `keep` says yes to, in order.
-pub fn filter[T](xs: [T], keep: fn(T) -> Bool) -> [T] {
+pub fn filter[T](xs: [T], keep: fn(T) -> Bool) -> [T] uses keep {
     let mut out: [T] = []
     for x in xs {
         if keep(x) {
@@ -204,7 +204,7 @@ pub fn filter[T](xs: [T], keep: fn(T) -> Bool) -> [T] {
     return out
 }
 
-pub fn any[T](xs: [T], holds: fn(T) -> Bool) -> Bool {
+pub fn any[T](xs: [T], holds: fn(T) -> Bool) -> Bool uses holds {
     for x in xs {
         if holds(x) {
             return true
@@ -213,7 +213,7 @@ pub fn any[T](xs: [T], holds: fn(T) -> Bool) -> Bool {
     return false
 }
 
-pub fn all[T](xs: [T], holds: fn(T) -> Bool) -> Bool {
+pub fn all[T](xs: [T], holds: fn(T) -> Bool) -> Bool uses holds {
     for x in xs {
         if !holds(x) {
             return false
@@ -223,7 +223,7 @@ pub fn all[T](xs: [T], holds: fn(T) -> Bool) -> Bool {
 }
 
 // `f(... f(f(start, xs[0]), xs[1]) ..., xs[n - 1])`.
-pub fn fold[T, A](xs: [T], start: A, f: fn(A, T) -> A) -> A {
+pub fn fold[T, A](xs: [T], start: A, f: fn(A, T) -> A) -> A uses f {
     let mut acc = start
     for x in xs {
         acc = f(acc, x)

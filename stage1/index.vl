@@ -694,11 +694,22 @@ fn function(b: mut Builder, id: Int) {
     }
     scope_params(mut b, d.type_params)
     // `uses fs, os`: the effects are the names after `uses` and each comma.
+    // `uses f` names a parameter (M15), and is a use of it.
     for i in 0..len(d.effects) {
         match token_after(b, d.effects_line, d.effects_col, 1 + 2 * i) {
             Some(tok) => {
                 if tok.text == d.effects[i] {
-                    add_use(mut b, tok.line, tok.col, tok.text, word_def(mut b, tok.text), "")
+                    let mut param = -1
+                    for j in 0..len(d.params) {
+                        if d.params[j].name == tok.text && j < len(f.param_locals) {
+                            param = f.param_locals[j]
+                        }
+                    }
+                    if param >= 0 {
+                        add_use(mut b, tok.line, tok.col, tok.text, local_def(mut b, param), show(b, b.k.locals[param].ty))
+                    } else {
+                        add_use(mut b, tok.line, tok.col, tok.text, word_def(mut b, tok.text), "")
+                    }
                 }
             }
             None => {}

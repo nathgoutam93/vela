@@ -1,0 +1,26 @@
+{
+  "name": "f",
+  "kind": "parameter",
+  "def": {
+    "file": "query_effect_param.vl",
+    "line": 5,
+    "col": 21
+  },
+  "refs": [
+    {
+      "file": "query_effect_param.vl",
+      "line": 5,
+      "col": 21
+    },
+    {
+      "file": "query_effect_param.vl",
+      "line": 5,
+      "col": 52
+    },
+    {
+      "file": "query_effect_param.vl",
+      "line": 8,
+      "col": 25
+    }
+  ]
+}

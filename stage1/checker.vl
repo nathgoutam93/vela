@@ -59,11 +59,8 @@ type ClosureCtx = struct {
     boundary: Int  // its own scopes start here in c.scopes
     captures: [Int]
     result: Int  // -3 until a return says, when it was not written
-    effect_reported: Bool
-    // Written as the function argument of tasks.map or tasks.each, which
-    // call it before they return: it cannot outlive the call, so what it
-    // uses is used by the function around it.
-    direct: Bool
+    // What its body uses (M15), which its type says: whoever calls it uses it.
+    effects: [Str]
 }
 
 pub type Checked = struct {
@@ -128,7 +125,6 @@ type Checker = struct {
     closures: Map[Int, ClosureInfo]
     in_closures: [ClosureCtx]  // the closures being checked, innermost last
     pending: [Int]  // type parameters of a generic call whose arguments are being checked, still unknown
-    direct: Int  // the node id of the function argument of tasks.map or tasks.each being checked, or -1
     completion: Completion
 }
 
@@ -159,7 +155,7 @@ pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> C
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
         undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
-        in_closures: [], pending: [], defining: -1, expected: -2, direct: -1,
+        in_closures: [], pending: [], defining: -1, expected: -2,
         completion: Completion { name: name, module: -1, visible: [], type_params: [], object: [] },
     }
     c.warnings = loaded.warnings
@@ -454,9 +450,28 @@ fn signatures(c: mut Checker) {
         c.type_scope = [:]
         for i in 0..len(f.effects) {
             let u = f.effects[i]
-            if u != "fs" && u != "os" {
+            let pi = param_named(f, u)
+            if u == "fs" || u == "os" {
+            } else if pi < 0 {
                 report(mut c, f.effects_line, f.effects_col, "unknown effect '" + u + "'; the effects are fs (the files module) " +
-                    "and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read)")
+                    "and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), or the name of a " +
+                        "parameter that is a function, for whatever that function uses")
+            } else if !types.is_func(c.table, params[pi]) {
+                if params[pi] != types.ERROR() {
+                    report(mut c, f.effects_line, f.effects_col, "`uses " + u + "` names parameter '" + u + "', which is " +
+                        show(c, params[pi]) + ", not a function")
+                }
+            } else if f.params[pi].mutable {
+                report(mut c, f.effects_line, f.effects_col, "`uses " + u + "` names a mut parameter; the function could " +
+                    "put a function that uses anything in it")
+            } else if len(types.effects_of(c.table, params[pi])) > 0 {
+                report(mut c, f.effects_line, f.effects_col, "`uses " + u + "` lets '" + u + "' use anything, but its " +
+                    "type says what it uses; write one or the other")
+            } else {
+                // Polymorphic in what f uses: `@f` stands for the effects of
+                // the function each call passes, which the caller uses.
+                let ft = types.get(c.table, params[pi])
+                params[pi] = types.func_with(mut c.table, ft.args, ft.result, [types.effect_var(u)])
             }
             for j in 0..i {
                 if f.effects[j] == u {
@@ -512,6 +527,16 @@ fn signatures(c: mut Checker) {
     }
 }
 
+// The index of the parameter called `name`, or -1.
+fn param_named(f: ast.FnDecl, name: Str) -> Int {
+    for i in 0..len(f.params) {
+        if f.params[i].name == name {
+            return i
+        }
+    }
+    return -1
+}
+
 // The type a TypeName in the source stands for (ERROR if unknown).
 fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
     if t.module == "" {
@@ -532,7 +557,16 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
                 push(mut params, a)
             }
         }
-        return types.func(mut c.table, params, result)
+        let mut effects: [Str] = []
+        for u in t.effects {
+            if u == "fs" || u == "os" {
+                effects = types.union_effects(effects, [u])
+            } else {
+                report(mut c, t.line, t.col, "unknown effect '" + u + "' in a function type; its effects can be fs and os. " +
+                    "For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to")
+            }
+        }
+        return types.func_with(mut c.table, params, result, effects)
     }
     if t.module == "" {
         match maps.get(c.type_scope, t.name) {
@@ -744,10 +778,19 @@ fn function(c: mut Checker, id: Int) {
     c.type_scope = [:]
     for u in f.effects {
         let known = u == "fs" || u == "os"
+        let mut message = ""
         if known && !maps.has(c.effects_used, u) && !c.fns[id].is_test && !is_main(c, id) {
+            message = "'" + f.name + "' says `uses " + u + "` but uses nothing of it"
+        }
+        let pi = param_named(f, u)
+        let var = types.effect_var(u)
+        if !known && pi >= 0 && types.effects_within([var], types.effects_of(c.table, c.fns[id].params[pi])) &&
+            !maps.has(c.effects_used, var) {
+            message = "'" + f.name + "' says `uses " + u + "` but never calls " + u + ", nor passes it on"
+        }
+        if message != "" {
             let w = errors.CompileError {
-                path: c.modules[c.current].path, line: f.effects_line, col: f.effects_col,
-                message: "'" + f.name + "' says `uses " + u + "` but uses nothing of it", warning: true,
+                path: c.modules[c.current].path, line: f.effects_line, col: f.effects_col, message: message, warning: true,
             }
             errors.add(mut c.warnings, w)
         }
@@ -786,23 +829,17 @@ fn effect_of(name: Str) -> Str {
     return ""
 }
 
-// The function being checked uses `effect`, through the call at `e` to `through`.
+// The function being checked uses `effect`, through the call at `e` to
+// `through`. Inside a closure the closure uses it instead: its type says
+// so, and code that calls it uses it then (M15).
 fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
-    if effect != "fs" && effect != "os" {
+    let var = types.is_effect_var(effect)
+    if effect != "fs" && effect != "os" && !var {
         return  // none, or an unknown one, already reported where it is declared
     }
-    // Through the closures it is in, innermost first: one given straight to
-    // tasks.map or tasks.each passes the effect on to the code around it.
-    let mut n = len(c.in_closures)
-    for n > 0 && c.in_closures[n - 1].direct {
-        n = n - 1
-    }
+    let n = len(c.in_closures)
     if n > 0 {
-        if !c.in_closures[n - 1].effect_reported {
-            c.in_closures[n - 1].effect_reported = true
-            report_at(mut c, e, "a function value cannot use " + effect + ", through " + through +
-                ": function values have no effects, except one given straight to tasks.map or tasks.each")
-        }
+        c.in_closures[n - 1].effects = types.union_effects(c.in_closures[n - 1].effects, [effect])
         return
     }
     c.effects_used[effect] = true
@@ -810,14 +847,76 @@ fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
     if f.is_test || is_main(c, c.current_fn) || maps.has(c.effects_reported, effect) {
         return
     }
+    let mut name = effect
+    if var {
+        name = effect[1..len(effect)]
+    }
     for u in f.decl.effects {
-        if u == effect {
+        if u == name {
             return
         }
     }
     c.effects_reported[effect] = true
+    if var {
+        report_at(mut c, e, "'" + f.decl.name + "' uses whatever its parameter " + name + " uses, through " + through +
+            ", but does not say so; add `uses " + name + "` after its signature")
+        return
+    }
     report_at(mut c, e, "'" + f.decl.name + "' uses " + effect + ", through " + through + ", but does not say so; add `uses " +
         effect + "` after its signature")
+}
+
+// Whether a value of type `found` can go where `want` is wanted: the same
+// type, or a function type that uses no more than `want` says. A type with
+// an effect variable (`uses f`) takes a function that uses anything: each
+// call says what (M15).
+fn fits(c: Checker, found: Int, want: Int) -> Bool {
+    if found == want {
+        return true
+    }
+    if found < 0 || want < 0 || !types.is_func(c.table, found) || !types.is_func(c.table, want) ||
+        types.plain(c.table, found) != types.plain(c.table, want) {
+        return false
+    }
+    let w = types.effects_of(c.table, want)
+    for u in w {
+        if types.is_effect_var(u) {
+            return true
+        }
+    }
+    return types.effects_within(types.effects_of(c.table, found), w)
+}
+
+// After "must be X, found Y" where Y uses more than X allows.
+fn effect_hint(c: Checker, found: Int, want: Int) -> Str {
+    if found < 0 || want < 0 || !types.is_func(c.table, found) || !types.is_func(c.table, want) ||
+        types.plain(c.table, found) != types.plain(c.table, want) {
+        return ""
+    }
+    return "; a function that uses fs or os goes only where its type says so, or to a parameter its function " +
+        "names in `uses`"
+}
+
+// The function being checked uses what a call to a function of type `t`
+// uses.
+fn use_effects_of(c: mut Checker, e: ast.Expr, t: Int, through: Str) {
+    for u in types.effects_of(c.table, t) {
+        use_effect(mut c, e, u, through)
+    }
+}
+
+// A call to `f` uses what f says it uses, with `uses p` standing for what
+// the function passed as p uses.
+fn use_call_effects(c: mut Checker, e: ast.Expr, f: FnInfo, args: [ast.Expr], name: Str) {
+    for u in f.decl.effects {
+        let pi = param_named(f.decl, u)
+        if u == "fs" || u == "os" {
+            use_effect(mut c, e, u, "'" + name + "'")
+        } else if pi >= 0 && pi < len(args) && pi < len(f.params) &&
+            types.effects_within([types.effect_var(u)], types.effects_of(c.table, f.params[pi])) {
+            use_effects_of(mut c, e, c.ty[args[pi].id], "the function passed to '" + name + "'")
+        }
+    }
 }
 
 // ---- With ----
@@ -1797,8 +1896,8 @@ fn check_expr(c: mut Checker, e: ast.Expr, want: Int, m: Msg) {
     }
     c.expected = want  // for a generic call or value whose type arguments only the context can tell
     let found = value(mut c, e)
-    if found != want && found != types.ERROR() && want != types.ERROR() {
-        report_at(mut c, e, say(m, show(c, found)))
+    if !fits(c, found, want) && found != types.ERROR() && want != types.ERROR() {
+        report_at(mut c, e, say(m, show(c, found)) + effect_hint(c, found, want))
     }
 }
 
@@ -2430,14 +2529,14 @@ fn unify(c: Checker, pattern: Int, actual: Int, params: [Int], bound: mut [Int])
     }
     let i = param_index(params, pattern)
     if i >= 0 {
-        if bound[i] < 0 {
-            bound[i] = actual
+        if bound[i] < 0 || fits(c, bound[i], actual) {
+            bound[i] = actual  // the same, or a function type that allows more
             return true
         }
-        return bound[i] == actual
+        return fits(c, actual, bound[i])
     }
     if !mentions(c, pattern, params) {
-        return pattern == actual
+        return fits(c, actual, pattern)
     }
     let p = types.get(c.table, pattern)
     let a = types.get(c.table, actual)
@@ -2546,6 +2645,13 @@ fn infer_args(c: mut Checker, params: [Int], wants: [Int], args: [ast.Expr], mut
             c.pending = saved
             if !unify(c, want, t, params, mut bound) {
                 report_at(mut c, value_e, labels[i] + " must be " + show(c, want) + ", found " + show(c, t))
+            } else {
+                // Unifying passes over effects; they must fit too.
+                let full = partial(mut c, wants[i], params, bound)
+                if !mentions(c, full, params) && !fits(c, t, full) && t != types.ERROR() {
+                    report_at(mut c, value_e, labels[i] + " must be " + show(c, full) + ", found " + show(c, t) +
+                        effect_hint(c, t, full))
+                }
             }
         }
     }
@@ -2847,11 +2953,10 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
             let f = c.fns[id]
             c.refs[e.id] = Ref.Function(id)
             let name = written(callee)
-            for u in f.decl.effects {
-                use_effect(mut c, e, u, "'" + name + "'")
-            }
             if len(f.type_params) > 0 {
-                return generic_call(mut c, e, id, name, args, expected)
+                let t = generic_call(mut c, e, id, name, args, expected)
+                use_call_effects(mut c, e, f, args, name)
+                return t
             }
             arity(mut c, e, name, len(f.params), len(args))
             for i in 0..len(args) {
@@ -2876,15 +2981,16 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
                 }
             }
             exclusive(mut c, args)
+            use_call_effects(mut c, e, f, args, name)
             // Even after an argument error, the call has the declared result type.
             return f.result
         }
         Ref.Local(id) => {
             set_ty(mut c, callee, c.locals[id].ty)
             c.refs[callee.id] = Ref.Local(id)
-            return indirect_call(mut c, e, c.locals[id].ty, args)
+            return indirect_call(mut c, e, c.locals[id].ty, args, "'" + c.locals[id].name + "'")
         }
-        Ref.Indirect => return indirect_call(mut c, e, c.ty[callee.id], args)
+        Ref.Indirect => return indirect_call(mut c, e, c.ty[callee.id], args, "a function value")
     }
 }
 
@@ -3214,11 +3320,7 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
         Some(tn) => res = resolve_type(mut c, tn)
         None => {}
     }
-    let direct = c.direct == e.id
-    c.direct = -1  // a closure inside this one is not the argument
-    push(mut c.in_closures, ClosureCtx {
-        id: e.id, boundary: len(c.scopes), captures: [], result: res, effect_reported: false, direct: direct,
-    })
+    push(mut c.in_closures, ClosureCtx { id: e.id, boundary: len(c.scopes), captures: [], result: res, effects: [] })
     push_scope(mut c, scope)
     let saved_loops = c.loops
     c.loops = []  // break and continue cannot leave a function value
@@ -3238,7 +3340,7 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
             ", but the end of its body can be reached")
     }
     c.closures[e.id] = ClosureInfo { params: locals, captures: ctx.captures, result: final }
-    return types.func(mut c.table, param_types, final)
+    return types.func_with(mut c.table, param_types, final, ctx.effects)
 }
 
 // `return` inside a closure: against its result type, or deciding it.
@@ -3270,8 +3372,8 @@ fn closure_return(c: mut Checker, s: ast.Stmt, v: Option[ast.Expr]) {
 // several threads. They are typed as generic functions would be,
 // `map[T, R](xs: [T], f: fn(T) -> R) -> [R]` and `each[T](xs: [T], f: fn(T))`:
 // xs first, which says what T is, then f, so that a closure gets its
-// parameter's type from xs and its result type from its body. The function
-// argument may use effects, which become the caller's: see ClosureCtx.direct.
+// parameter's type from xs and its result type from its body. What the
+// function argument uses, the caller uses.
 fn tasks_call(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr]) -> Int {
     let is_map = name == "tasks.map"
     let mut nothing = types.NOTHING()
@@ -3298,15 +3400,13 @@ fn tasks_call(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr]) -> Int {
         result = types.param(mut c.table, "R", [], e.line, e.col)
         c.pending = [result]
     }
-    let saved_direct = c.direct
-    c.direct = args[1].id
     c.expected = types.func(mut c.table, [elem], result)
     let f = value(mut c, args[1])
-    c.direct = saved_direct
     c.pending = saved_pending
     if f == types.ERROR() {
         return nothing
     }
+    use_effects_of(mut c, e, f, "the function given to " + name)
     let ft = types.get(c.table, f)
     let mut takes_elem = types.is_func(c.table, f) && len(ft.args) == 1
     if takes_elem && elem != types.ERROR() && ft.args[0] != types.ERROR() && ft.args[0] != elem {
@@ -3345,14 +3445,15 @@ fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> I
             return types.ERROR()
         }
     }
-    if len(f.decl.effects) > 0 {
-        if c.direct != e.id {
-            report_at(mut c, e, "'" + name + "' uses " + f.decl.effects[0] + ", so it cannot be used as a value: function " +
-                "values have no effects, except one given straight to tasks.map or tasks.each")
+    // Its type says what it uses (M15).
+    let mut effects: [Str] = []
+    for u in f.decl.effects {
+        if u == "fs" || u == "os" {
+            effects = types.union_effects(effects, [u])
+        } else if param_named(f.decl, u) >= 0 {
+            report_at(mut c, e, "'" + name + "' uses whatever its parameter " + u + " uses, so it cannot be used as a " +
+                "value; call it from a closure instead")
             return types.ERROR()
-        }
-        for u in f.decl.effects {
-            use_effect(mut c, e, u, "'" + name + "'")
         }
     }
     c.refs[e.id] = Ref.Function(id)
@@ -3378,13 +3479,14 @@ fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> I
         push(mut params, partial(mut c, p, tp, bound))
     }
     let result = partial(mut c, f.result, tp, bound)
-    return types.func(mut c.table, params, result)
+    return types.func_with(mut c.table, params, result, effects)
 }
 
 // A call through a function value of type `t`.
-fn indirect_call(c: mut Checker, e: ast.Expr, t: Int, args: [ast.Expr]) -> Int {
+fn indirect_call(c: mut Checker, e: ast.Expr, t: Int, args: [ast.Expr], through: Str) -> Int {
     let ft = types.get(c.table, t)
     c.refs[e.id] = Ref.Indirect
+    use_effects_of(mut c, e, t, through)
     arity(mut c, e, "this function", len(ft.args), len(args))
     for i in 0..len(args) {
         let arg = args[i]
@@ -3721,4 +3823,59 @@ fn terminates(c: Checker, s: ast.Stmt) -> Bool {
         ast.StmtKind.With(_, body) => return terminates_block(c, body)
         _ => return false
     }
+}
+
+// ---- Erasure (M15) ----
+
+// The program as the code generators see it: every type without its
+// effects (types.erase_all), which only the checker needs.
+pub fn erased(k: Checked) -> Checked {
+    let mut any = false
+    for ti in k.table.types {
+        if len(ti.effects) > 0 {
+            any = true
+            break
+        }
+    }
+    if !any {
+        return k
+    }
+    let mut out = k
+    let er = types.erase_all(mut out.table)
+    for i in 0..len(out.ty) {
+        out.ty[i] = erase_id(er, out.ty[i])
+    }
+    for i in 0..len(out.fns) {
+        for j in 0..len(out.fns[i].params) {
+            out.fns[i].params[j] = erase_id(er, out.fns[i].params[j])
+        }
+        out.fns[i].result = erase_id(er, out.fns[i].result)
+    }
+    for i in 0..len(out.locals) {
+        out.locals[i].ty = erase_id(er, out.locals[i].ty)
+    }
+    for i in 0..len(out.targs) {
+        for j in 0..len(out.targs[i]) {
+            out.targs[i][j] = erase_id(er, out.targs[i][j])
+        }
+    }
+    for i in 0..len(out.refs) {
+        match out.refs[i] {
+            Ref.Variant(t, vi) => out.refs[i] = Ref.Variant(erase_id(er, t), vi)
+            _ => {}
+        }
+    }
+    for id in maps.keys(out.closures) {
+        let mut info = out.closures[id]
+        info.result = erase_id(er, info.result)
+        out.closures[id] = info
+    }
+    return out
+}
+
+fn erase_id(er: [Int], t: Int) -> Int {
+    if t >= 0 && t < len(er) {
+        return er[t]
+    }
+    return t
 }

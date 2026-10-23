@@ -18,6 +18,9 @@ pub type TypeName = struct {
     line: Int
     col: Int
     module: Str  // `lexer` in `lexer.Token`, or ""
+    // A function type's effects as written after `uses`: `fs`, `os`, or the
+    // name of a function-typed parameter (M15).
+    effects: [Str]
 }
 
 pub type Expr = struct {
@@ -355,6 +358,14 @@ pub fn type_text(t: TypeName) -> Str {
         strings.add_byte(mut b, ')')
         if t.name == "fn->" {
             strings.add(mut b, " -> " + type_text(t.args[n]))
+        }
+        for i in 0..len(t.effects) {
+            if i == 0 {
+                strings.add(mut b, " uses ")
+            } else {
+                strings.add(mut b, ", ")
+            }
+            strings.add(mut b, t.effects[i])
         }
         return strings.build(b)
     }

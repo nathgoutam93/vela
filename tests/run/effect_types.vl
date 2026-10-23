@@ -1,0 +1,66 @@
+// Function types with effects inside other types (M15): a generic
+// struct, an enum's payload, a map's values, an array. The code generators
+// see them without their effects, as the same C types as fn(Str) -> Int.
+// stage 1 only
+// out: true
+// out: 3
+// out: 4
+// out: false
+// out: true
+// out: true
+// out: 2
+import files
+import maps
+
+type Box[T] = struct {
+    v: T
+    n: Int
+}
+
+type Handler = enum {
+    Quiet
+    Loud(fn(Str) -> Int uses fs)
+}
+
+fn size(p: Str) -> Int uses fs {
+    match files.read(p) {
+        Ok(t) => return len(t)
+        Err(_) => return -1
+    }
+}
+
+fn pure_len(p: Str) -> Int {
+    return len(p)
+}
+
+fn run(h: Handler, p: Str) -> Int uses fs {
+    return match h {
+        Handler.Quiet => 0
+        Handler.Loud(f) => f(p)
+    }
+}
+
+fn main() {
+    match files.write("data.txt", "some data") {
+        Ok(_) => {}
+        Err(e) => print(e)
+    }
+    let b = Box { v: size, n: 1 }
+    print(b.v("data.txt") > 0)
+    let plain = Box { v: pure_len, n: 2 }
+    print(plain.v("abc"))
+    let mut table: Map[Str, fn(Str) -> Int uses fs] = [:]
+    table["size"] = size
+    table["len"] = pure_len
+    match maps.get(table, "len") {
+        Some(f) => print(f("abcd"))
+        None => {}
+    }
+    let hs = [Handler.Quiet, Handler.Loud(size), Handler.Loud(pure_len)]
+    for h in hs {
+        print(run(h, "data.txt") > 0)
+    }
+    let mut all: [fn(Str) -> Int uses fs] = [size]
+    push(mut all, pure_len)
+    print(len(all))
+}
