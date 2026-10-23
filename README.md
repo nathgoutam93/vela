@@ -29,8 +29,10 @@ build/vela c hello.vl         # show the generated C
 build/vela check hello.vl     # report errors only (--json for tools)
 build/vela tokens hello.vl    # show the tokens
 build/vela ast hello.vl       # show the syntax tree
-build/vela query type hello.vl:12:7   # what the name there is, in JSON (also def, refs, symbols)
+build/vela query type hello.vl:12:7   # what the name there is, in JSON (also def, refs, symbols, complete)
+build/vela rename hello.vl:12:7 count # rename it everywhere, if that changes nothing else
 build/vela lsp                # a language server on stdin and stdout, for editors
+build/vela new hello          # a program to start from, in hello/ (--package for a package)
 build/vela get                # fetch the packages vela.mod names; write vela.lock
 python3 run_tests.py          # run the test suite with build/vela
 ```
@@ -54,6 +56,7 @@ editors/     Neovim and VS Code support for `vela lsp`
 stage0/      the first compiler, in Python: frozen at M9 as the readable reference
 runtime/     C runtime linked into every program
 std/         standard modules written in Vela
+packages/    packages kept in this repository: json/ (the compiler uses it too)
 tests/run/   programs and their expected output
 tests/fail/  programs and the exact errors they must produce
 tests/dump/  expected token and syntax-tree dumps
@@ -80,13 +83,16 @@ formatter and JSON errors; M10b added function values (`fn(Int) -> Str`),
 effects (`uses fs, os`), fakes for tests (`with files = ...`), contracts
 (`requires`, `ensures`) and warnings; M10c added closures
 (`fn(x) => x * k`), `Float`, and `std/text.vl`. M12 added a language
-server (`vela lsp`) and `vela query` for agents, with `std/json.vl` and
+server (`vela lsp`) and `vela query` for agents, with a JSON module and
 reading from stdin. M13 added structured concurrency: `tasks.map(xs, f)`
 runs f on every core and returns the results in order, safely, since
 values are copies; the compiler uses it to compile its C in parallel.
 M14 added packages: git repositories or directories named in `vela.mod`,
 fetched by `vela get` and pinned in `vela.lock`; builds never use the
-network. All of M10 and M12 to M14 is in Stage 1 only.
+network. M12b added completion and rename to the language server and
+`vela query`, `vela rename`, and `vela new`; json became a package, in
+`packages/json`, which programs get with `vela get`. All of M10 and M12 to
+M14 is in Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.
