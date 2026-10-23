@@ -616,8 +616,24 @@ fn memory_functions(l: mut Layout) -> [Str] {
         if mark == "" {
             mark = "(void)0;"
         }
+        // A variant without values needs no box of its own: they all share
+        // one that is never freed (a count of 0; see vela_rt.h).
+        let mut fixed: [Str] = []
+        let ti = types.get(l.table, t)
+        if ti.tag == types.Tag.Enum {
+            for v in ti.variants {
+                if len(v.payload) == 0 {
+                    let tg = tag(l, t, v.name)
+                    push(mut fixed, "    if (value.tag == " + tg + ") { static " + b + " one = {0, {.tag = " + tg +
+                        "}}; return &one; }")
+                }
+            }
+        }
+        push(mut out, "static inline VELA_UNUSED " + b + " *" + b + "_new(" + n + " value) {")
+        for line in fixed {
+            push(mut out, line)
+        }
         for line in [
-            "static inline VELA_UNUSED " + b + " *" + b + "_new(" + n + " value) {",
             "    " + b + " *b = vela_alloc(sizeof(" + b + "));",
             "    b->rc = 1;",
             "    b->value = value;",

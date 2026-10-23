@@ -112,8 +112,12 @@ function that reads files reads files, and with one that does not, does
 not. M16 measured the baseline for the goal of an agent-first language
 with systems-language performance: eight benchmarks against C and Rust
 (Vela is 2.95 times slower than C, mostly from array access through
-runtime calls) and an evaluation of twenty tasks for AI agents. All of M10
-to M16 is in Stage 1 only.
+runtime calls) and an evaluation of twenty tasks for AI agents. M16b
+fixed the largest causes (element access inline, one allocation per tree
+node, faster maps): Vela is now 1.68 times slower than C. It also caches
+the compiled runtime (in ~/.cache/vela, or VELA_CACHE; VELA_CACHE=off to
+turn it off), so `vela run` of a small program takes 0.04 s. All of M10
+to M16b is in Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.

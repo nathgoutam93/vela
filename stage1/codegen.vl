@@ -899,10 +899,13 @@ fn assign(g: mut Gen, target: ast.Expr, v: ast.Expr) {
                 let va = addr(mut g, vt, c)
                 emit(mut g, "vela_map_set(" + container + ", " + ka + ", " + va + ");")
             } else {
+                // The old element goes, the new one takes its place.
                 let index = expr(mut g, i).c
                 let elem = c_type(g, ty(g, target))
-                let va = addr(mut g, elem, c)
-                emit(mut g, "vela_array_set(" + container + ", " + index + ", " + va + ", " + loc_of(g, target) + ");")
+                let slot = new_temp(mut g)
+                emit(mut g, elem + " *" + slot + " = " + element_address(elem, container, index, loc_of(g, target)) + ";")
+                emit(mut g, release(mut g, ty(g, target), "*" + slot))
+                emit(mut g, "*" + slot + " = " + c + ";")
             }
         }
         _ => {}
@@ -916,8 +919,19 @@ fn writable(g: mut Gen, e: ast.Expr) -> Str {
     if types.is_map(g.k.table, ty(g, e)) {
         kind = "map"
     }
-    emit(mut g, "vela_" + kind + "_unique(&" + p + ");")
+    if kind == "array" {
+        emit(mut g, "vela_unique(&" + p + ");")
+    } else {
+        emit(mut g, "vela_unique_map(&" + p + ");")
+    }
     return p
+}
+
+// The address of element `index` of the array `container`, checked to be
+// in bounds, as a pointer to `elem`, the element's C type. The check is
+// inline, in vela_rt.h, so the C compiler can see through it (M16b).
+fn element_address(elem: Str, container: Str, index: Str, loc: Str) -> Str {
+    return "(" + elem + " *)vela_at(" + container + ", " + index + ", sizeof(" + elem + "), " + loc + ")"
 }
 
 // A C lvalue for a variable, or a path inside one, about to be written
@@ -944,7 +958,7 @@ fn place(g: mut Gen, e: ast.Expr) -> Str {
                 return "(*(" + c_type(g, ty(g, e)) + " *)vela_map_at(" + container + ", " + ka + ", " + loc_of(g, e) + "))"
             }
             let index = expr(mut g, i).c
-            return "(*(" + c_type(g, ty(g, e)) + " *)vela_array_at(" + container + ", " + index + ", " + loc_of(g, e) + "))"
+            return "(*" + element_address(c_type(g, ty(g, e)), container, index, loc_of(g, e)) + ")"
         }
         _ => return ""
     }
@@ -952,11 +966,30 @@ fn place(g: mut Gen, e: ast.Expr) -> Str {
 
 // ---- Match ----
 
+// Whether `e` is a variable that cannot change while it is in scope: a
+// parameter that is not mut, a `let` without mut, a loop variable or a
+// match binding. What is bound from it in a match can borrow from it.
+fn unchanging(g: Gen, e: ast.Expr) -> Bool {
+    match e.kind {
+        ast.ExprKind.Name(_) => {
+            match g.k.refs[e.id] {
+                checker.Ref.Local(id) => {
+                    let kind = g.k.locals[id].kind
+                    return kind == "parameter" || kind == "let" || kind == "loop variable" || kind == "match binding"
+                }
+                _ => return false
+            }
+        }
+        _ => return false
+    }
+}
+
 // An if / else-if chain, one test per arm, in order; the last arm is a
 // plain `else`, since the checker proved the arms exhaustive.
 fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
     let v = expr(mut g, scrutinee).c
     let t = ty(g, scrutinee)
+    let borrowed = unchanging(g, scrutinee)
     let mut all_end = true  // every arm returns, breaks or continues
     for i in 0..len(arms) {
         let a = arms[i]
@@ -989,9 +1022,16 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
         }
         push_frame(mut g, "arm")
         for bound in bindings(g, a.pattern, v, t) {
-            // A binding is a copy of part of the value: it gets a reference of its own.
-            let name = declare(mut g, bound.local, bound.path)
-            emit(mut g, retain(mut g, local_ty(g, bound.local), name))
+            if borrowed {
+                // Borrowed from a variable nothing can change (M16b), as a
+                // parameter is: whatever keeps it retains it then.
+                let name = local(mut g, bound.local)
+                emit(mut g, c_type(g, local_ty(g, bound.local)) + " " + name + " = " + bound.path + ";")
+            } else {
+                // A binding is a copy of part of the value: it gets a reference of its own.
+                let name = declare(mut g, bound.local, bound.path)
+                emit(mut g, retain(mut g, local_ty(g, bound.local), name))
+            }
         }
         match code {
             ArmCode.Statements => {
@@ -1284,7 +1324,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             for x in elems {
                 let c = consume(mut g, expr(mut g, x))
                 let a = addr(mut g, elem, c)
-                emit(mut g, "vela_array_push(" + array.c + ", " + a + ");")
+                emit(mut g, "vela_push(" + array.c + ", " + a + ", sizeof(" + elem + "));")
             }
             return array
         }
@@ -1588,7 +1628,7 @@ fn index(g: mut Gen, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Value {
     let t = ty(g, obj)
     if t == types.STR() {
         let ix = expr(mut g, i).c
-        return value(scalar(mut g, types.BYTE(), "vela_str_at(" + o + ", " + ix + ", " + loc_of(g, e) + ")"), types.BYTE())
+        return value(scalar(mut g, types.BYTE(), "vela_byte_at(" + o + ", " + ix + ", " + loc_of(g, e) + ")"), types.BYTE())
     }
     let elem = c_type(g, ty(g, e))
     let temp = new_temp(mut g)
@@ -1599,7 +1639,7 @@ fn index(g: mut Gen, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Value {
         emit(mut g, elem + " " + temp + " = *(" + elem + " *)vela_map_at(" + o + ", " + ka + ", " + loc_of(g, e) + ");")
     } else {
         let ix = expr(mut g, i).c
-        emit(mut g, elem + " " + temp + " = *(" + elem + " *)vela_array_at(" + o + ", " + ix + ", " + loc_of(g, e) + ");")
+        emit(mut g, elem + " " + temp + " = *" + element_address(elem, o, ix, loc_of(g, e)) + ";")
     }
     return value(temp, ty(g, e))
 }
@@ -1844,7 +1884,7 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         let b = writable(mut g, mut_place(args[0]))
         if name == "strings.add_byte" {
             let a = addr(mut g, "uint8_t", v)
-            emit(mut g, "vela_array_push(" + b + ", " + a + ");")
+            emit(mut g, "vela_push(" + b + ", " + a + ", 1);")
         } else {
             emit(mut g, "vela_builder_" + name[8..len(name)] + "(" + b + ", " + v + ");")
         }
@@ -1902,7 +1942,7 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         let array = writable(mut g, mut_place(args[0]))
         let elem = c_type(g, types.get(g.k.table, ty(g, args[0])).args[0])
         let a = addr(mut g, elem, v)
-        emit(mut g, "vela_array_push(" + array + ", " + a + ");")
+        emit(mut g, "vela_push(" + array + ", " + a + ", sizeof(" + elem + "));")
         return no_value()
     }
     let mt = ty(g, args[0])

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Where a Vela benchmark's time goes (M16): instructions by kind of work.
 
-    python3 bench/profile.py [NAME...] [--backend c|native] [--json FILE]
+    python3 bench/profile.py [NAME...] [--backend c|native] [--json FILE] [--compiler PATH]
 
 Runs each benchmark's Vela version, built through C (the release
 backend), under valgrind's callgrind at a small size, and adds up the
@@ -93,11 +93,12 @@ def main() -> int:
     ap.add_argument("only", nargs="*")
     ap.add_argument("--backend", choices=["c", "native"], default="c")
     ap.add_argument("--json")
+    ap.add_argument("--compiler", default=str(ROOT / "build" / "vela"))
     opts = ap.parse_args()
     if not shutil.which("valgrind"):
         print("bench/profile.py needs valgrind")
         return 1
-    vela = ROOT / "build" / "vela"
+    vela = Path(opts.compiler).resolve()
     columns = [k for k, _ in KINDS] + ["program", "other runtime"]
     print("| Benchmark | Instructions | " + " | ".join(columns) + " |")
     print("|" + " --- |" * (len(columns) + 2))

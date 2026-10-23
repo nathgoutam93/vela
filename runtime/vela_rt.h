@@ -14,6 +14,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 // Generated helper functions (retain, release, descriptors) are only used by
 // some programs. This keeps clang from warning about the others.
@@ -41,11 +42,24 @@ void *vela_alloc(size_t size);
 // A shared object is never changed in place, even with one reference left:
 // copy-on-write copies it, and the copy belongs to one thread again. So a
 // shared object cannot come to hold one that is not shared.
+//
+// A count of 0 marks an object that is never freed (M16b): the one box the
+// generated code keeps for each variant that carries no values, such as a
+// tree's Leaf, which every leaf then points to instead of a box of its own.
+// Nothing counts its references, it is never unique (so a write copies it
+// first), and it counts as shared (so sharing it does nothing). Only the
+// branches already taken for shared objects look for it.
+// gcc cannot tell that such an object never reaches free(): its count
+// never drops to zero. Its warning would be noise in every build.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
+#endif
+
 static inline void vela_rc_inc(int64_t *rc) {
     int64_t n = __atomic_load_n(rc, __ATOMIC_RELAXED);
     if (__builtin_expect(n > 0, 1)) {
         *rc = n + 1;
-    } else {
+    } else if (n < 0) {
         __atomic_fetch_sub(rc, 1, __ATOMIC_RELAXED);
     }
 }
@@ -57,6 +71,7 @@ static inline bool vela_rc_dec(int64_t *rc) {
         *rc = n - 1;
         return n == 1;
     }
+    if (n == 0) return false;  // never freed
     return __atomic_add_fetch(rc, 1, __ATOMIC_ACQ_REL) == 0;
 }
 
@@ -160,6 +175,12 @@ vela_str vela_str_concat(vela_str a, vela_str b);
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc);
 uint8_t vela_str_at(vela_str s, int64_t i, const char *loc);
 bool vela_str_eq(vela_str a, vela_str b);
+
+// s[i] for generated C, inline (M16b).
+static inline uint8_t vela_byte_at(vela_str s, int64_t i, const char *loc) {
+    if (__builtin_expect((uint64_t)i >= (uint64_t)s.len, 0)) vela_panic(loc, "index out of range");
+    return s.data[i];
+}
 // Byte order: negative, zero or positive, as with memcmp. A Str that is a
 // prefix of another comes first.
 int vela_str_cmp(vela_str a, vela_str b);
@@ -189,6 +210,28 @@ void *vela_array_at(vela_array *a, int64_t i, const char *loc);
 void vela_array_push(vela_array *a, const void *elem);
 void vela_array_set(vela_array *a, int64_t i, const void *elem, const char *loc);
 vela_array *vela_array_slice(vela_array *a, int64_t lo, int64_t hi, const char *loc);
+// Room for one more element: what vela_array_push does when it is full.
+void vela_array_grow(vela_array *a);
+
+// Inline fast paths for generated C (M16b). The functions above are what
+// the native backend calls; generated C uses these, which the C compiler
+// can see through: it keeps values in registers, merges checks and moves
+// them out of loops. Each calls the runtime only on its slow path. `size`
+// is the element's size, a constant where they are used.
+static inline void *vela_at(vela_array *a, int64_t i, size_t size, const char *loc) {
+    if (__builtin_expect((uint64_t)i >= (uint64_t)a->len, 0)) vela_panic(loc, "index out of range");
+    return a->data + size * (size_t)i;
+}
+
+static inline void vela_unique(vela_array **ap) {
+    if (__builtin_expect(!vela_rc_unique(&(*ap)->rc), 0)) vela_array_unique(ap);
+}
+
+static inline void vela_push(vela_array *a, const void *elem, size_t size) {
+    if (__builtin_expect(a->len == a->cap, 0)) vela_array_grow(a);
+    memcpy(a->data + size * (size_t)a->len, elem, size);
+    a->len++;
+}
 
 // ---- Maps ----
 //
@@ -206,6 +249,7 @@ typedef struct vela_map {
     bool *live;
     int64_t *index;  // open-addressing table of entry numbers, -1 = empty
     int64_t index_cap;  // a power of two
+    uint64_t *hashes;  // each entry's key's hash (M16b), compared before the keys
 } vela_map;
 
 vela_map *vela_map_new(const vela_type *key, const vela_type *value);
@@ -218,6 +262,10 @@ void vela_map_share(vela_map *m);
 
 void vela_map_release(vela_map *m);
 void vela_map_unique(vela_map **m);
+// vela_map_unique's check inline, for generated C (M16b).
+static inline void vela_unique_map(vela_map **mp) {
+    if (__builtin_expect(!vela_rc_unique(&(*mp)->rc), 0)) vela_map_unique(mp);
+}
 // A pointer to the value for key, or NULL if there is none.
 void *vela_map_find(vela_map *m, const void *key);
 // Like find, but panics when the key is missing.

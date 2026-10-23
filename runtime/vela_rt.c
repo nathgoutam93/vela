@@ -55,6 +55,19 @@ static void *vela_realloc(void *p, size_t size) {
     return p;
 }
 
+// Unaligned loads of a string's bytes.
+static uint64_t load_u64(const uint8_t *p) {
+    uint64_t w;
+    memcpy(&w, p, 8);
+    return w;
+}
+
+static uint64_t load_u32(const uint8_t *p) {
+    uint32_t w;
+    memcpy(&w, p, 4);
+    return w;
+}
+
 // ---- Descriptors for the built-in types ----
 
 static uint64_t hash_u64(uint64_t x) {
@@ -75,13 +88,28 @@ static uint64_t hash_bool(const void *v) { return hash_u64(*(const bool *)v); }
 static bool eq_bool(const void *a, const void *b) { return *(const bool *)a == *(const bool *)b; }
 
 static uint64_t hash_str(const void *v) {
-    // FNV-1a over the bytes: the same string hashes the same everywhere.
+    // Word at a time (M16b), and the last bytes in at most two loads that
+    // may overlap, as wyhash reads them. A map's order is the order of
+    // insertion, so the hash decides only where an entry's number goes in
+    // the index, never what a program prints.
     const vela_str *s = v;
-    uint64_t h = 0xcbf29ce484222325ULL;
-    for (int64_t i = 0; i < s->len; i++) {
-        h ^= s->data[i];
-        h *= 0x100000001b3ULL;
+    const uint8_t *p = s->data;
+    uint64_t n = (uint64_t)s->len;
+    uint64_t h = 0x9e3779b97f4a7c15ULL ^ (n * 0xff51afd7ed558ccdULL);
+    if (n >= 8) {
+        uint64_t i = 0;
+        for (; i + 8 < n; i += 8) {
+            h = (h ^ load_u64(p + i)) * 0xc4ceb9fe1a85ec53ULL;
+            h ^= h >> 29;
+        }
+        h ^= load_u64(p + n - 8);
+    } else if (n >= 4) {
+        h ^= load_u32(p) << 32 | load_u32(p + n - 4);
+    } else if (n > 0) {
+        h ^= (uint64_t)p[0] << 16 | (uint64_t)p[n / 2] << 8 | (uint64_t)p[n - 1];
     }
+    h *= 0xbf58476d1ce4e5b9ULL;
+    h ^= h >> 31;
     return h;
 }
 
@@ -148,7 +176,23 @@ uint8_t vela_str_at(vela_str s, int64_t i, const char *loc) {
 }
 
 bool vela_str_eq(vela_str a, vela_str b) {
-    return a.len == b.len && (a.len == 0 || memcmp(a.data, b.data, (size_t)a.len) == 0);
+    if (a.len != b.len) return false;
+    uint64_t n = (uint64_t)a.len;
+    // Short strings, the usual map keys, without a call (M16b): two loads
+    // that may overlap cover any length from 4 to 16.
+    if (n >= 8 && n <= 16) {
+        return load_u64(a.data) == load_u64(b.data) && load_u64(a.data + n - 8) == load_u64(b.data + n - 8);
+    }
+    if (n >= 4 && n < 8) {
+        return load_u32(a.data) == load_u32(b.data) && load_u32(a.data + n - 4) == load_u32(b.data + n - 4);
+    }
+    if (n < 4) {
+        for (uint64_t i = 0; i < n; i++) {
+            if (a.data[i] != b.data[i]) return false;
+        }
+        return true;
+    }
+    return memcmp(a.data, b.data, (size_t)n) == 0;
 }
 
 int vela_str_cmp(vela_str a, vela_str b) {
@@ -199,12 +243,14 @@ void *vela_array_at(vela_array *a, int64_t i, const char *loc) {
     return a->data + a->elem->size * (size_t)i;
 }
 
+void vela_array_grow(vela_array *a) {
+    // Doubling makes n pushes cost O(n) in total.
+    a->cap = a->cap < 4 ? 4 : a->cap * 2;
+    a->data = vela_realloc(a->data, a->elem->size * (size_t)a->cap);
+}
+
 void vela_array_push(vela_array *a, const void *elem) {
-    if (a->len == a->cap) {
-        // Doubling makes n pushes cost O(n) in total.
-        a->cap = a->cap < 4 ? 4 : a->cap * 2;
-        a->data = vela_realloc(a->data, a->elem->size * (size_t)a->cap);
-    }
+    if (a->len == a->cap) vela_array_grow(a);
     memcpy(a->data + a->elem->size * (size_t)a->len, elem, a->elem->size);
     a->len++;
 }
@@ -242,6 +288,7 @@ static void map_reserve(vela_map *m, int64_t cap) {
     m->keys = vela_realloc(m->keys, m->key->size * (size_t)cap);
     m->values = vela_realloc(m->values, m->value->size * (size_t)cap);
     m->live = vela_realloc(m->live, sizeof(bool) * (size_t)cap);
+    m->hashes = vela_realloc(m->hashes, sizeof(uint64_t) * (size_t)cap);
 }
 
 static void map_rebuild_index(vela_map *m, int64_t index_cap) {
@@ -252,6 +299,7 @@ static void map_rebuild_index(vela_map *m, int64_t index_cap) {
         if (i != j) {
             memcpy(map_key(m, j), map_key(m, i), m->key->size);
             memcpy(map_value(m, j), map_value(m, i), m->value->size);
+            m->hashes[j] = m->hashes[i];
         }
         m->live[j++] = true;
     }
@@ -261,7 +309,7 @@ static void map_rebuild_index(vela_map *m, int64_t index_cap) {
     m->index = vela_alloc(sizeof(int64_t) * (size_t)index_cap);
     for (int64_t s = 0; s < index_cap; s++) m->index[s] = MAP_EMPTY;
     for (int64_t i = 0; i < m->count; i++) {
-        uint64_t s = m->key->hash(map_key(m, i)) & (uint64_t)(index_cap - 1);
+        uint64_t s = m->hashes[i] & (uint64_t)(index_cap - 1);
         while (m->index[s] != MAP_EMPTY) s = (s + 1) & (uint64_t)(index_cap - 1);
         m->index[s] = i;
     }
@@ -269,7 +317,7 @@ static void map_rebuild_index(vela_map *m, int64_t index_cap) {
 
 vela_map *vela_map_new(const vela_type *key, const vela_type *value) {
     vela_map *m = vela_alloc(sizeof(vela_map));
-    *m = (vela_map){1, 0, 0, 0, key, value, NULL, NULL, NULL, NULL, 0};
+    *m = (vela_map){1, 0, 0, 0, key, value, NULL, NULL, NULL, NULL, 0, NULL};
     map_reserve(m, 4);
     map_rebuild_index(m, 8);
     return m;
@@ -286,6 +334,7 @@ void vela_map_release(vela_map *m) {
     free(m->values);
     free(m->live);
     free(m->index);
+    free(m->hashes);
     free(m);
 }
 
@@ -313,13 +362,17 @@ void vela_map_share(vela_map *m) {
 }
 
 // The entry number holding `key`, or -1.
-static int64_t map_lookup(vela_map *m, const void *key) {
+static int64_t map_lookup_hashed(vela_map *m, const void *key, uint64_t h) {
     uint64_t mask = (uint64_t)(m->index_cap - 1);
-    for (uint64_t s = m->key->hash(key) & mask;; s = (s + 1) & mask) {
+    for (uint64_t s = h & mask;; s = (s + 1) & mask) {
         int64_t i = m->index[s];
         if (i == MAP_EMPTY) return -1;
-        if (m->live[i] && m->key->eq(key, map_key(m, i))) return i;
+        if (m->hashes[i] == h && m->live[i] && m->key->eq(key, map_key(m, i))) return i;
     }
+}
+
+static int64_t map_lookup(vela_map *m, const void *key) {
+    return map_lookup_hashed(m, key, m->key->hash(key));
 }
 
 void *vela_map_find(vela_map *m, const void *key) {
@@ -334,7 +387,8 @@ void *vela_map_at(vela_map *m, const void *key, const char *loc) {
 }
 
 void vela_map_set(vela_map *m, const void *key, const void *value) {
-    int64_t i = map_lookup(m, key);
+    uint64_t h = m->key->hash(key);
+    int64_t i = map_lookup_hashed(m, key, h);
     if (i >= 0) {
         // The key is already there: keep the old key, drop the new one.
         release_elem(m->key, (void *)key);
@@ -351,9 +405,10 @@ void vela_map_set(vela_map *m, const void *key, const void *value) {
     memcpy(map_key(m, i), key, m->key->size);
     memcpy(map_value(m, i), value, m->value->size);
     m->live[i] = true;
+    m->hashes[i] = h;
     m->len++;
     uint64_t mask = (uint64_t)(m->index_cap - 1);
-    uint64_t s = m->key->hash(key) & mask;
+    uint64_t s = h & mask;
     while (m->index[s] != MAP_EMPTY) s = (s + 1) & mask;
     m->index[s] = i;
 }
@@ -1130,8 +1185,22 @@ bool vela_os_env(vela_str name, vela_str *out) {
 
 static int64_t workers = 0;  // 0 until first asked
 
+// math.sqrt for the native backend, with the machine's own instruction,
+// so that the runtime needs no libm: programs that Stage 0 compiles are
+// linked without -lm. IEEE square roots are correctly rounded, so this is
+// the same value sqrt() gives; a negative number gives a NaN.
 double vela_math_sqrt(double x) {
+#if defined(__x86_64__)
+    double r;
+    __asm__("sqrtsd %1, %0" : "=x"(r) : "x"(x));
+    return r;
+#elif defined(__aarch64__)
+    double r;
+    __asm__("fsqrt %d0, %d1" : "=w"(r) : "w"(x));
+    return r;
+#else
     return sqrt(x);
+#endif
 }
 
 int64_t vela_tasks_workers(void) {

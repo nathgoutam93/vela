@@ -475,7 +475,7 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
         Err(e) => driver_error(e)
     }
     let program_o = modules.join(tmp, "program.o")
-    let runtime_o = modules.join(tmp, "runtime.o")
+    let mut runtime_o = modules.join(tmp, "runtime.o")
     let mut rt = [cc, "-std=c11", opt, "-pthread"]
     for f in flags {
         push(mut rt, f)
@@ -483,7 +483,13 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
     for word in ["-I", runtime, "-c", modules.join(runtime, "vela_rt.c"), "-o", runtime_o] {
         push(mut rt, word)
     }
-    let commands = [[cc, "-c", source, "-o", program_o], rt]
+    // The runtime from the cache when it is there (M16b).
+    let cached = cached_runtime(root, cc, opt, flags)
+    let have = cached != "" && exists(cached)
+    let mut commands = [[cc, "-c", source, "-o", program_o], rt]
+    if have {
+        commands = [[cc, "-c", source, "-o", program_o]]
+    }
     let codes = tasks.map(commands, fn(command) {
         match os.run(command) {
             Ok(code) => return code
@@ -498,6 +504,12 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
         if codes[i] != 0 {
             failed = commands[i]
         }
+    }
+    if len(failed) == 0 && cached != "" && !have {
+        keep_runtime(runtime_o, cached, tmp)
+    }
+    if have {
+        runtime_o = cached
     }
     if len(failed) == 0 {
         let mut link = [cc, "-pthread"]
@@ -517,7 +529,9 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
         }
     }
     for f in [source, program_o, runtime_o] {
-        files.remove(f)
+        if f != cached {
+            files.remove(f)
+        }
     }
     files.remove(tmp)
     if len(failed) > 0 {
@@ -568,9 +582,16 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
     let mut commands: [[Str]] = []
     let mut written: [Str] = []
     let mut objects: [Str] = []
+    // The runtime once per set of flags, from the cache when it is there.
+    let cached = cached_runtime(root, cc, opt, flags)
+    let have = cached != "" && exists(cached)
     // About 400 KB of C per unit before another is worth starting.
     let units = c_parts(c_source, tasks.workers(), 400000)
     for i in 0..len(units) + 1 {
+        if i == len(units) && have {
+            push(mut objects, cached)
+            continue
+        }
         let mut source = modules.join(runtime, "vela_rt.c")
         if i < len(units) {
             source = modules.join(tmp, stem + "_" + strings.from_int(i) + ".c")
@@ -622,16 +643,122 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
             failed = link
         }
     }
+    if len(failed) == 0 && cached != "" && !have {
+        keep_runtime(objects[len(objects) - 1], cached, tmp)
+    }
     // The scratch directory goes either way.
     for f in written {
         files.remove(f)
     }
     for o in objects {
-        files.remove(o)
+        if o != cached {
+            files.remove(o)
+        }
     }
     files.remove(tmp)
     if len(failed) > 0 {
         internal_error("the C compiler rejected the generated code\ncommand: " + join_words(failed))
+    }
+}
+
+// ---- The runtime's cache (M16b) ----
+//
+// Every build used to compile the C runtime, vela_rt.c, with the program:
+// 0.55 of the 0.6 seconds `vela run` took for a program that prints one
+// line. Now it is compiled once for each C compiler, optimization level,
+// set of VELA_CFLAGS and version of the runtime, and kept in the cache
+// directory: VELA_CACHE, else $XDG_CACHE_HOME/vela, else ~/.cache/vela.
+// VELA_CACHE=off turns it off. Nothing else is cached: the program is
+// compiled every time.
+
+fn cache_dir() -> Str uses os {
+    match os.env("VELA_CACHE") {
+        Some(d) => {
+            if d == "off" || d == "0" {
+                return ""
+            }
+            if d != "" {
+                return d
+            }
+        }
+        None => {}
+    }
+    match os.env("XDG_CACHE_HOME") {
+        Some(d) => {
+            if d != "" {
+                return modules.join(d, "vela")
+            }
+        }
+        None => {}
+    }
+    match os.env("HOME") {
+        Some(h) => {
+            if h != "" {
+                return modules.join(modules.join(h, ".cache"), "vela")
+            }
+        }
+        None => {}
+    }
+    return ""
+}
+
+// A polynomial hash of the bytes, below `modulus` (under 2^31, so no step
+// can overflow).
+fn text_hash(text: Str, base: Int, modulus: Int) -> Int {
+    let mut h = len(text) % modulus
+    for c in text {
+        h = (h * base + int(c) + 1) % modulus
+    }
+    return h
+}
+
+// Where the runtime compiled with these flags is kept, named by a hash of
+// the flags and of the runtime's source; "" when there is no cache.
+fn cached_runtime(root: Str, cc: Str, opt: Str, flags: [Str]) -> Str uses fs, os {
+    let dir = cache_dir()
+    if dir == "" {
+        return ""
+    }
+    let mut b = strings.builder()
+    strings.add(mut b, cc + "\n" + opt + "\n" + join_words(flags) + "\n")
+    for name in ["vela_rt.c", "vela_rt.h"] {
+        match files.read(modules.join(modules.join(root, "runtime"), name)) {
+            Ok(t) => strings.add(mut b, t)
+            Err(_) => return ""
+        }
+    }
+    let text = strings.build(b)
+    let key = strings.from_int(text_hash(text, 257, 2147483647)) + "-" + strings.from_int(text_hash(text, 65599, 2147483629))
+    return modules.join(dir, "runtime-" + key + ".o")
+}
+
+fn exists(path: Str) -> Bool uses os {
+    match os.run(["test", "-f", path]) {
+        Ok(code) => return code == 0
+        Err(_) => return false
+    }
+}
+
+// Put the runtime just compiled, `object`, in the cache at `path`: copied
+// beside it, then renamed, so that a build running at the same time never
+// sees half of it. A cache that cannot be written is not an error.
+fn keep_runtime(object: Str, path: Str, tmp: Str) uses os {
+    let partial = path + "." + modules.stem(tmp) + ".part"
+    match os.run(["mkdir", "-p", modules.dirname(path)]) {
+        Ok(code) => {
+            if code != 0 {
+                return
+            }
+        }
+        Err(_) => return
+    }
+    match os.run(["cp", object, partial]) {
+        Ok(code) => {
+            if code == 0 {
+                os.run(["mv", "-f", partial, path])
+            }
+        }
+        Err(_) => {}
     }
 }
 

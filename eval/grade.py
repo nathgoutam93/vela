@@ -35,6 +35,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -62,11 +63,17 @@ class Grader:
         self.checks.append({"name": name, "ok": ok, "detail": detail[-2000:]})
 
     def run(self, cmd: list[str], cwd: Path, stdin: str = "") -> subprocess.CompletedProcess | None:
+        # In a process group of its own, so that on a timeout what it
+        # started dies with it: `vela test` runs the test program as a child.
+        proc = subprocess.Popen(cmd, cwd=cwd, env=self.env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, start_new_session=True)
         try:
-            return subprocess.run(cmd, cwd=cwd, env=self.env, input=stdin, capture_output=True, text=True,
-                                  timeout=self.limit)
+            out, err = proc.communicate(stdin, timeout=self.limit)
         except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.communicate()
             return None
+        return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
 
     def vl_files(self, base: Path) -> list[Path]:
         return sorted(p for p in base.rglob("*.vl") if "_vela" not in p.parts and "_grade" not in p.parts)

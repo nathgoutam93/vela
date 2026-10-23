@@ -1,0 +1,91 @@
+{
+  "nbody": {
+    "program": 132790659,
+    "other runtime": 208055,
+    "allocation": 6526,
+    "strings": 1088,
+    "output": 2787,
+    "copying": 1392,
+    "ref counting": 485,
+    "push": 188,
+    "maps": 135
+  },
+  "spectralnorm": {
+    "program": 126288185,
+    "other runtime": 208303,
+    "ref counting": 7599,
+    "allocation": 10375,
+    "strings": 847,
+    "copying": 1153,
+    "output": 1824,
+    "maps": 135,
+    "push": 116
+  },
+  "fannkuch": {
+    "program": 20151491,
+    "copy-on-write": 4677120,
+    "allocation": 10490109,
+    "ref counting": 3830687,
+    "copying": 485092,
+    "other runtime": 610927,
+    "strings": 914,
+    "output": 2395,
+    "maps": 135,
+    "push": 44
+  },
+  "binarytrees": {
+    "allocation": 126526790,
+    "program": 68382572,
+    "ref counting": 17670357,
+    "other runtime": 2885825,
+    "output": 9617,
+    "strings": 2926,
+    "copying": 2764,
+    "maps": 135,
+    "push": 44
+  },
+  "mandelbrot": {
+    "program": 38832697,
+    "other runtime": 207380,
+    "allocation": 3658,
+    "strings": 654,
+    "copying": 998,
+    "output": 1427,
+    "maps": 135,
+    "ref counting": 69,
+    "push": 44
+  },
+  "fasta": {
+    "program": 58507069,
+    "ref counting": 7583916,
+    "allocation": 22618069,
+    "other runtime": 3373826,
+    "output": 3038970,
+    "strings": 650678,
+    "copying": 483165,
+    "maps": 135,
+    "push": 44
+  },
+  "knucleotide": {
+    "maps": 156090287,
+    "program": 64615204,
+    "strings": 52452115,
+    "copying": 24661631,
+    "ref counting": 21834274,
+    "other runtime": 2020658,
+    "allocation": 148913,
+    "output": 16701,
+    "push": 484
+  },
+  "wordfreq": {
+    "program": 34480331,
+    "maps": 44992804,
+    "strings": 17072875,
+    "copying": 3470121,
+    "ref counting": 5339972,
+    "other runtime": 642384,
+    "push": 175934,
+    "allocation": 38802,
+    "output": 9397
+  }
+}
