@@ -26,6 +26,8 @@ build/vela build hello.vl     # produce ./hello
 build/vela test hello.vl      # run its `test` blocks (and those of what it imports)
 build/vela fmt -w hello.vl    # format it in place (-l lists unformatted files)
 build/vela c hello.vl         # show the generated C
+build/vela asm hello.vl       # show the x86-64 assembly of the native backend (ir: its IR)
+VELA_BACKEND=native build/vela run hello.vl   # compile through the native backend instead of C
 build/vela check hello.vl     # report errors only (--json for tools)
 build/vela tokens hello.vl    # show the tokens
 build/vela ast hello.vl       # show the syntax tree
@@ -34,10 +36,13 @@ build/vela rename hello.vl:12:7 count # rename it everywhere, if that changes no
 build/vela lsp                # a language server on stdin and stdout, for editors
 build/vela new hello          # a program to start from, in hello/ (--package for a package)
 build/vela get                # fetch the packages vela.mod names; write vela.lock
-python3 run_tests.py          # run the test suite with build/vela
+python3 run_tests.py          # run the test suite with build/vela (--native: through the native backend)
 ```
 
 For Neovim and VS Code, see [`editors/`](editors/README.md).
+
+`sh bootstrap/bootstrap.sh --native` also builds the compiler through its
+native backend, twice, and checks that both write the same assembly.
 
 After changing `stage1/`, run `sh bootstrap/bootstrap.sh --update`: the
 seed compiles the new source, the new compiler compiles itself twice more,
@@ -91,8 +96,11 @@ M14 added packages: git repositories or directories named in `vela.mod`,
 fetched by `vela get` and pinned in `vela.lock`; builds never use the
 network. M12b added completion and rename to the language server and
 `vela query`, `vela rename`, and `vela new`; json became a package, in
-`packages/json`, which programs get with `vela get`. All of M10 and M12 to
-M14 is in Stage 1 only.
+`packages/json`, which programs get with `vela get`. M11 added a native
+backend: the compiler lowers a program to an IR of its own, allocates
+registers by linear scan and writes x86-64 assembly, linked with the C
+runtime; the compiler builds itself that way too (`VELA_BACKEND=native`).
+All of M10 to M14 is in Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.

@@ -51,7 +51,8 @@ Besides these, the compiler (stage1/main.vl), every examples/*/main.vl and
 every std/*.vl and packages/*/*.vl with tests in it must pass `vela test`, and the language
 server must pass tests/lsp_client.py, a scripted editor, and, if Neovim is
 installed, tests/nvim_test.lua, which drives it from Neovim; packages must
-pass tests/pkg_test.py, with git repositories it makes (Stage 1 only).
+pass tests/pkg_test.py, with git repositories it makes, and the native backend
+tests/native_test.py (both Stage 1 only).
 
 The compiler runs inside the test's directory and is given the bare file
 name, so messages read `name.vl:3:7: ...` wherever the repo is checked out.
@@ -76,6 +77,7 @@ ROOT = Path(__file__).resolve().parent
 TESTS = ROOT / "tests"
 LSP_CLIENT = TESTS / "lsp_client.py"
 PKG_TEST = TESTS / "pkg_test.py"
+NATIVE_TEST = TESTS / "native_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -159,6 +161,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(LSP_CLIENT, compiler, env)
     if path == PKG_TEST:
         return run_script(PKG_TEST, compiler, env)
+    if path == NATIVE_TEST:
+        return run_script(NATIVE_TEST, compiler, env)
     if path == NVIM_TEST:
         return run_nvim_test(compiler, env)
     if not path.is_relative_to(TESTS):
@@ -314,6 +318,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests += [p for p in sorted((ROOT / "packages").glob("*/*.vl")) if 'test "' in p.read_text()]
     tests.append(LSP_CLIENT)
     tests.append(PKG_TEST)
+    tests.append(NATIVE_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

@@ -1,0 +1,19 @@
+// vela ir: the native backend's IR for a program (M11). Registers are
+// %0, %1...; labels L0, L1...; `add.chk` adds and panics on overflow at
+// the position its C string names; a Str in memory is passed `as str` to
+// the C runtime.
+// stage 1 only
+// command: ir
+fn square(n: Int) -> Int {
+    return n * n
+}
+
+fn main() {
+    let mut total = 0
+    for i in 0..4 {
+        total = total + square(i)
+    }
+    if total > 10 && total < 20 {
+        print("fourteen")
+    }
+}

@@ -5,6 +5,7 @@
 #
 #     sh bootstrap/bootstrap.sh            build build/vela and check
 #     sh bootstrap/bootstrap.sh --update   also refresh the seed after a change to stage1/
+#     sh bootstrap/bootstrap.sh --native   also check the native backend's fixed point (M11)
 #
 # bootstrap/vela1.c is the seed: the C that Stage 1 (stage1/, the compiler
 # written in Vela) writes for itself. Generation 1 is built from it by the C
@@ -13,6 +14,15 @@
 #
 # VELA_CC picks the C compiler (default cc).
 set -e
+update=false
+native=false
+for arg in "$@"; do
+    case "$arg" in
+        --update) update=true ;;
+        --native) native=true ;;
+        *) echo "usage: sh bootstrap/bootstrap.sh [--update] [--native]" >&2; exit 2 ;;
+    esac
+done
 # Everything runs from the repository root with relative paths: the C
 # records source positions (for panics) as "stage1/lexer.vl:12:5", so an
 # absolute path would make the output depend on where the repository is.
@@ -45,7 +55,7 @@ fi
 echo "fixed point: generations 2 and 3 write identical C ($(wc -l < "$build/gen3.c") lines)"
 
 if ! cmp -s bootstrap/vela1.c "$build/gen3.c"; then
-    if [ "$1" = "--update" ]; then
+    if $update; then
         cp "$build/gen3.c" bootstrap/vela1.c
         echo "the seed is updated"
     else
@@ -58,3 +68,22 @@ fi
 mv "$build/vela-gen3" "$build/vela"
 rm -f "$build/vela-gen1" "$build/vela-gen2" "$build/gen2.c" "$build/gen3.c"
 echo "built build/vela"
+
+# The native backend: the compiler compiled to x86-64 assembly by build/vela,
+# then by itself; both must write the same assembly for the compiler.
+if $native; then
+    echo "native 1: built by build/vela with VELA_BACKEND=native"
+    VELA_BACKEND=native "$build/vela" build stage1/main.vl -o "$build/vela-native1"
+    "$build/vela-native1" asm stage1/main.vl > "$build/native1.s"
+    echo "native 2: built by native 1"
+    VELA_BACKEND=native "$build/vela-native1" build stage1/main.vl -o "$build/vela-native2"
+    "$build/vela-native2" asm stage1/main.vl > "$build/native2.s"
+    if ! cmp -s "$build/native1.s" "$build/native2.s"; then
+        echo "NOT a native fixed point: see build/native1.s, build/native2.s" >&2
+        exit 1
+    fi
+    echo "native fixed point: natives 1 and 2 write identical assembly ($(wc -l < "$build/native2.s") lines)"
+    mv "$build/vela-native2" "$build/vela-native"
+    rm -f "$build/vela-native1" "$build/native1.s" "$build/native2.s"
+    echo "built build/vela-native"
+fi

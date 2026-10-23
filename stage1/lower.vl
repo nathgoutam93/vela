@@ -1454,13 +1454,19 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
             push_loop(mut g, exit, head)
             match cond {
                 Some(e) => {
-                    // The condition's statements run on every iteration.
+                    // The condition's statements run on every iteration,
+                    // and what they made is released either way it goes.
                     push_frame(mut g, "stmt")
-                    let c = fresh(mut g, reg_val(scalar(mut g, expr(mut g, e)), types.BOOL()))
-                    pop_frame(mut g)
-                    let go = label(mut g)
-                    branch(mut g, c.reg, go, exit)
-                    place_label(mut g, go)
+                    let yes = label(mut g)
+                    let no = label(mut g)
+                    branch_on(mut g, e, yes, no)
+                    let frame = g.fs.frames[len(g.fs.frames) - 1]
+                    g.fs.frames = g.fs.frames[0..len(g.fs.frames) - 1]
+                    place_label(mut g, no)
+                    release_frame(mut g, frame)
+                    jump(mut g, exit)
+                    place_label(mut g, yes)
+                    release_frame(mut g, frame)
                 }
                 None => {}
             }
@@ -1572,11 +1578,10 @@ fn with_code(g: mut Low, items: [ast.WithItem], body: ast.Block) {
 }
 
 fn if_stmt(g: mut Low, cond: ast.Expr, then: ast.Block, otherwise: ast.Else) {
-    let c = scalar(mut g, expr(mut g, cond))
     let yes = label(mut g)
     let no = label(mut g)
     let end = label(mut g)
-    branch(mut g, c, yes, no)
+    branch_on(mut g, cond, yes, no)
     place_label(mut g, yes)
     block(mut g, then, "block")
     let then_ends = g.fs.dead
@@ -2540,6 +2545,46 @@ fn struct_value(g: mut Low, t: Int, fields: [ast.FieldInit]) -> Val {
         }
     }
     return own(mut g, v)
+}
+
+// Go to `yes` if the Bool `e` is true, else to `no`: `&&`, `||` and `!` as
+// jumps, with no Bool made for them.
+fn branch_on(g: mut Low, e: ast.Expr, yes: Int, no: Int) {
+    match e.kind {
+        ast.ExprKind.Binary(op, l, r) => {
+            if op == "&&" || op == "||" {
+                let mid = label(mut g)
+                if op == "&&" {
+                    branch_on(mut g, l, mid, no)
+                } else {
+                    branch_on(mut g, l, yes, mid)
+                }
+                place_label(mut g, mid)
+                // The right side's values are released before it jumps.
+                push_frame(mut g, "branch")
+                let a = label(mut g)
+                let b = label(mut g)
+                branch_on(mut g, r, a, b)
+                let frame = g.fs.frames[len(g.fs.frames) - 1]
+                g.fs.frames = g.fs.frames[0..len(g.fs.frames) - 1]
+                place_label(mut g, a)
+                release_frame(mut g, frame)
+                jump(mut g, yes)
+                place_label(mut g, b)
+                release_frame(mut g, frame)
+                jump(mut g, no)
+                return
+            }
+        }
+        ast.ExprKind.Unary(op, x) => {
+            if op == "!" {
+                branch_on(mut g, x, no, yes)
+                return
+            }
+        }
+        _ => {}
+    }
+    branch(mut g, scalar(mut g, expr(mut g, e)), yes, no)
 }
 
 fn binary(g: mut Low, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Val {

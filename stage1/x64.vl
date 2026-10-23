@@ -102,6 +102,7 @@ type Intervals = struct {
     end: [Int]
     defs: [Int]
     def_at: [Int]  // the instruction setting it, when there is one
+    first_def: [Int]  // the position it is first set at
     calls: [Int]  // calls[p]: how many calls are at positions before p
 }
 
@@ -222,7 +223,7 @@ fn intervals(f: ir.Func) -> Intervals {
             }
         }
     }
-    return Intervals { start: start, end: end, defs: defs, def_at: def_at, calls: calls }
+    return Intervals { start: start, end: end, defs: defs, def_at: def_at, first_def: first_def, calls: calls }
 }
 
 // Whether a call is strictly inside the interval of v.
@@ -236,6 +237,38 @@ fn crosses(iv: Intervals, v: Int) -> Bool {
 }
 
 // ---- Allocation ----
+
+// Whether an instruction may give its result the register of its operand a.
+fn shares_operand(op: ir.Op) -> Bool {
+    return match op {
+        ir.Op.Move => true
+        ir.Op.Load => true
+        ir.Op.FLoad => true
+        ir.Op.Add => true
+        ir.Op.AddImm => true
+        ir.Op.Sub => true
+        ir.Op.Mul => true
+        ir.Op.MulImm => true
+        ir.Op.AddChk => true
+        ir.Op.SubChk => true
+        ir.Op.MulChk => true
+        ir.Op.DivChk => true
+        ir.Op.RemChk => true
+        ir.Op.NegChk => true
+        ir.Op.ByteChk => true
+        ir.Op.ToByte => true
+        ir.Op.Cmp => true
+        ir.Op.CmpImm => true
+        ir.Op.Not => true
+        ir.Op.FAdd => true
+        ir.Op.FSub => true
+        ir.Op.FMul => true
+        ir.Op.FDiv => true
+        ir.Op.FNeg => true
+        ir.Op.Sext32 => true
+        _ => false
+    }
+}
 
 fn is_callee_saved(r: Str) -> Bool {
     return r == "rbx" || r == "r12" || r == "r13" || r == "r14" || r == "r15"
@@ -301,7 +334,29 @@ fn allocate(f: ir.Func) -> [Loc] {
         active = still
         let cross = crosses(iv, v)
         let mut got = ""
-        if f.classes[v] == ir.FLOAT() {
+        // The register of the operand the instruction setting v reads,
+        // when the operand's interval ends there: no move is needed.
+        let fd = iv.first_def[v]
+        if fd == iv.start[v] && fd >= 1 && !(f.classes[v] == ir.FLOAT() && cross) {
+            let d = f.insts[fd - 1]
+            if d.dst == v && d.a >= 0 && shares_operand(d.op) {
+                let a = d.a
+                if locs[a].kind == 0 && iv.end[a] == fd && f.classes[a] == f.classes[v] &&
+                    (!cross || is_callee_saved(locs[a].reg)) {
+                    got = locs[a].reg
+                    let mut kept: [Int] = []
+                    for x in active {
+                        if x != a {
+                            push(mut kept, x)
+                        }
+                    }
+                    active = kept
+                }
+            }
+        }
+        if got != "" {
+            // taken over from the operand
+        } else if f.classes[v] == ir.FLOAT() {
             if !cross && len(free_float) > 0 {
                 got = free_float[len(free_float) - 1]
                 free_float = free_float[0..len(free_float) - 1]
@@ -664,12 +719,35 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str]) -> [Str] {
             stack = stack + 8
         }
     }
-    for k in 0..len(f.insts) {
+    let mut reads: [Int] = []
+    for _ in 0..len(f.classes) {
+        push(mut reads, 0)
+    }
+    for i in f.insts {
+        for r in ir.reads(i) {
+            reads[r] = reads[r] + 1
+        }
+    }
+    let mut k = 0
+    for k < len(f.insts) {
+        let i = f.insts[k]
+        // A comparison only a branch right after it reads: one cmp and jump.
+        if k + 1 < len(f.insts) && fusable(i) && f.insts[k + 1].op == ir.Op.Branch && f.insts[k + 1].a == i.dst &&
+            reads[i.dst] == 1 {
+            let mut next = -1
+            if k + 2 < len(f.insts) && f.insts[k + 2].op == ir.Op.Label {
+                next = f.insts[k + 2].imm
+            }
+            fused(mut o, i, f.insts[k + 1], next)
+            k = k + 2
+            continue
+        }
         let mut next = -1
         if k + 1 < len(f.insts) && f.insts[k + 1].op == ir.Op.Label {
             next = f.insts[k + 1].imm
         }
-        instruction(mut o, f, f.insts[k], next)
+        instruction(mut o, f, i, next)
+        k = k + 1
     }
     push(mut o.lines, ".LR" + num(fid) + ":")
     if len(saved) > 0 {
@@ -762,8 +840,12 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
     }
     if op == ir.Op.FConst {
         let l = double_label(mut o, i.sym)
-        emit(mut o, "movsd xmm15, qword ptr [rip + " + l + "]")
-        fset(mut o, i.dst, "xmm15")
+        let mut d = "xmm15"
+        if o.locs[i.dst].kind == 0 {
+            d = o.locs[i.dst].reg
+        }
+        emit(mut o, "movsd " + d + ", qword ptr [rip + " + l + "]")
+        fset(mut o, i.dst, d)
         return
     }
     if op == ir.Op.Move {
@@ -784,14 +866,18 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
     }
     if op == ir.Op.Load {
         let m = mem(mut o, i.a, i.imm, i.imm2, "r11")
-        if i.imm2 == 1 {
-            emit(mut o, "movzx eax, " + m)
-        } else if i.imm2 == 4 {
-            emit(mut o, "movsxd rax, " + m)
-        } else {
-            emit(mut o, "mov rax, " + m)
+        let mut d = "rax"
+        if o.locs[i.dst].kind == 0 {
+            d = o.locs[i.dst].reg
         }
-        set(mut o, i.dst, "rax")
+        if i.imm2 == 1 {
+            emit(mut o, "movzx " + low32(d) + ", " + m)
+        } else if i.imm2 == 4 {
+            emit(mut o, "movsxd " + d + ", " + m)
+        } else {
+            emit(mut o, "mov " + d + ", " + m)
+        }
+        set(mut o, i.dst, d)
         return
     }
     if op == ir.Op.Store {
@@ -820,7 +906,16 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         return
     }
     if op == ir.Op.Add || op == ir.Op.Sub || op == ir.Op.Mul || op == ir.Op.AddChk || op == ir.Op.SubChk || op == ir.Op.MulChk {
-        emit(mut o, "mov rax, " + src(mut o, i.a, "rax"))
+        // In the result's own register when it has one that b is not in.
+        let mut d = "rax"
+        let l = o.locs[i.dst]
+        if l.kind == 0 && !(o.locs[i.b].kind == 0 && o.locs[i.b].reg == l.reg && i.b != i.a) {
+            d = l.reg
+        }
+        let a = src(mut o, i.a, d)
+        if a != d {
+            emit(mut o, "mov " + d + ", " + a)
+        }
         let b = src(mut o, i.b, "r11")
         let name = match op {
             ir.Op.Add => "add"
@@ -829,11 +924,11 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
             ir.Op.SubChk => "sub"
             _ => "imul"
         }
-        emit(mut o, name + " rax, " + b)
+        emit(mut o, name + " " + d + ", " + b)
         if op == ir.Op.AddChk || op == ir.Op.SubChk || op == ir.Op.MulChk {
             emit(mut o, "jo " + panic_stub(mut o, i.sym, ".Lmsg_overflow"))
         }
-        set(mut o, i.dst, "rax")
+        set(mut o, i.dst, d)
         return
     }
     if op == ir.Op.AddImm || op == ir.Op.MulImm {
@@ -972,9 +1067,21 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
             ir.Op.FMul => "mulsd"
             _ => "divsd"
         }
-        emit(mut o, "movsd xmm15, " + fsrc(o, i.a))
-        emit(mut o, name + " xmm15, " + fsrc(o, i.b))
-        fset(mut o, i.dst, "xmm15")
+        let mut d = "xmm15"
+        let l = o.locs[i.dst]
+        if l.kind == 0 && !(o.locs[i.b].kind == 0 && o.locs[i.b].reg == l.reg && i.b != i.a) {
+            d = l.reg
+        }
+        let la = o.locs[i.a]
+        if la.kind == 0 {
+            if la.reg != d {
+                emit(mut o, "movapd " + d + ", " + la.reg)
+            }
+        } else {
+            emit(mut o, "movsd " + d + ", " + fsrc(o, i.a))
+        }
+        emit(mut o, name + " " + d + ", " + fsrc(o, i.b))
+        fset(mut o, i.dst, d)
         return
     }
     if op == ir.Op.FNeg {
@@ -1093,6 +1200,70 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
     if op == ir.Op.Unreachable {
         emit(mut o, "ud2")
         return
+    }
+}
+
+fn fusable(i: ir.Inst) -> Bool {
+    if i.op == ir.Op.Cmp || i.op == ir.Op.CmpImm {
+        return true
+    }
+    // For Floats only the comparisons whose jump is false for NaN.
+    return i.op == ir.Op.FCmp && i.imm >= 2
+}
+
+fn negated(cc: Str) -> Str {
+    return match cc {
+        "e" => "ne"
+        "ne" => "e"
+        "l" => "ge"
+        "ge" => "l"
+        "le" => "g"
+        "g" => "le"
+        "a" => "be"
+        "ae" => "b"
+        "be" => "a"
+        _ => "ae"
+    }
+}
+
+// The comparison c and the branch b on it, as a compare and a jump.
+fn fused(o: mut Out, c: ir.Inst, b: ir.Inst, next: Int) {
+    let mut cc = ""
+    if c.op == ir.Op.FCmp {
+        if c.imm >= 4 {
+            emit(mut o, "ucomisd " + fin_reg(mut o, c.a, "xmm15") + ", " + fsrc(o, c.b))
+        } else {
+            emit(mut o, "ucomisd " + fin_reg(mut o, c.b, "xmm15") + ", " + fsrc(o, c.a))
+        }
+        if c.imm == 2 || c.imm == 4 {
+            cc = "a"
+        } else {
+            cc = "ae"
+        }
+    } else {
+        let a = in_reg(mut o, c.a, "rax")
+        if c.op == ir.Op.Cmp {
+            let lb = o.locs[c.b]
+            if lb.kind == 2 && fits32(lb.off) {
+                emit(mut o, "cmp " + a + ", " + num(lb.off))
+            } else {
+                emit(mut o, "cmp " + a + ", " + src(mut o, c.b, "r11"))
+            }
+        } else if fits32(c.imm2) {
+            emit(mut o, "cmp " + a + ", " + num(c.imm2))
+        } else {
+            emit(mut o, "movabs r11, " + num(c.imm2))
+            emit(mut o, "cmp " + a + ", r11")
+        }
+        cc = cond_suffix(c.imm)
+    }
+    if b.imm2 == next {
+        emit(mut o, "j" + cc + " " + ir_label(o, b.imm))
+    } else if b.imm == next {
+        emit(mut o, "j" + negated(cc) + " " + ir_label(o, b.imm2))
+    } else {
+        emit(mut o, "j" + cc + " " + ir_label(o, b.imm))
+        emit(mut o, "jmp " + ir_label(o, b.imm2))
     }
 }
 

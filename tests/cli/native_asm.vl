@@ -1,0 +1,16 @@
+// vela asm: the x86-64 assembly the native backend writes (M11), for the
+// GNU assembler in Intel syntax. n arrives in rdi and is kept in r10,
+// which calls do not keep: nothing needs n after the call. `n <= 0` and
+// the branch on it are one cmp and one jump; overflow jumps to a panic.
+// stage 1 only
+// command: asm
+fn count(n: Int) -> Int {
+    if n <= 0 {
+        return 0
+    }
+    return count(n - 1) + 1
+}
+
+fn main() {
+    print(count(3))
+}

@@ -1,0 +1,99 @@
+    .intel_syntax noprefix
+    .text
+
+    .p2align 4
+    .type f_count, @function
+f_count:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    sub rsp, 8
+    mov r10, rdi
+    cmp r10, 0
+    jg .L0_1
+.L0_0:
+    mov rbx, 0
+    mov rax, rbx
+    jmp .LR0
+.L0_1:
+.L0_2:
+    sub r10, 1
+    jo .LP0_1
+    mov rdi, r10
+    call f_count
+    mov rbx, rax
+    add rbx, 1
+    jo .LP0_2
+    mov rax, rbx
+    jmp .LR0
+.LR0:
+    lea rsp, [rbp - 8]
+    pop rbx
+    pop rbp
+    ret
+.LP0_1:
+    lea rdi, [rip + .Lc0]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
+.LP0_2:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
+
+    .p2align 4
+    .type f_main, @function
+f_main:
+    push rbp
+    mov rbp, rsp
+    mov rdi, 3
+    call f_count
+    mov r10, rax
+    mov rdi, r10
+    call vela_print_int@PLT
+    jmp .LR1
+.LR1:
+    mov rsp, rbp
+    pop rbp
+    ret
+
+    .p2align 4
+    .globl main
+    .type main, @function
+main:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    sub rsp, 8
+    mov r10, rdi
+    mov rbx, rsi
+    mov rdi, r10
+    mov rsi, rbx
+    call vela_init@PLT
+    call f_main
+    mov rax, 0
+    jmp .LR2
+.LR2:
+    lea rsp, [rbp - 8]
+    pop rbx
+    pop rbp
+    ret
+
+    .section .rodata
+.Lmsg_overflow:
+    .asciz "integer overflow"
+.Lmsg_div0:
+    .asciz "division by zero"
+.Lmsg_byte:
+    .asciz "byte overflow"
+.Lmsg_tobyte:
+    .asciz "value does not fit in a Byte"
+    .p2align 3
+.Lc0:
+    .asciz "native_asm.vl:11:20"
+.Lc1:
+    .asciz "native_asm.vl:11:25"
+
+    .section .data.rel.ro,"aw"
+    .p2align 3
+
+    .section .note.GNU-stack,"",@progbits
