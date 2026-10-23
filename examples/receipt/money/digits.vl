@@ -1,0 +1,26 @@
+// Digits for money.show: a module of the money package's own, which a
+// program using the package does not see (it is money.digits to the
+// compiler, so a program's own digits.vl would be another module).
+import strings
+
+// 1234567 as "1,234,567".
+pub fn grouped(n: Int) -> Str {
+    let s = strings.from_int(n)
+    let mut b = strings.builder()
+    for i in 0..len(s) {
+        if i > 0 && (len(s) - i) % 3 == 0 {
+            strings.add_byte(mut b, ',')
+        }
+        strings.add_byte(mut b, s[i])
+    }
+    return strings.build(b)
+}
+
+// 0 to 99 as two digits: 5 is "05".
+pub fn two(n: Int) -> Str
+    requires n >= 0 && n < 100 {
+    if n < 10 {
+        return "0" + strings.from_int(n)
+    }
+    return strings.from_int(n)
+}

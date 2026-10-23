@@ -1,0 +1,750 @@
+// Packages (M14): modules from other people, in git repositories or in
+// directories, named in a vela.mod next to the program's main file:
+//
+//     // vela.mod
+//     package orders                                       // optional for a program
+//     use text https://github.com/someone/vela-text v1.2.0 // git: a URL and a tag, branch or commit
+//     use shapes ../shapes                                 // a directory on this machine
+//
+// A package is a directory with a vela.mod naming it (`package text`) and
+// a text.vl, its main module, which is what `import text` gets. Its other
+// files are its own modules, and it may use packages of its own.
+//
+// `vela get` fetches what vela.mod says and writes vela.lock, the exact
+// commit of every git package, those the packages use too:
+//
+//     text https://github.com/someone/vela-text v1.2.0 3f2a9c1e...
+//
+// Building reads only vela.mod, vela.lock and the fetched files: it never
+// uses the network, and builds the same everywhere vela.lock is. Fetched
+// packages are kept in $VELA_HOME/pkg/NAME@COMMIT ($HOME/.vela by
+// default); git's own hashes check that the files are those of the commit.
+//
+// When two packages use different versions of a third, the one vela.mod
+// names wins if it names one; otherwise both must agree, or both be
+// version tags (v1.2.3), and the higher is taken, as Go does. A package
+// can do nothing when it is fetched or built: there are no build scripts,
+// and its functions say in their signatures whether they touch files or
+// run programs (`uses fs, os`).
+// stage 1 only (it says `uses`)
+import files
+import maps
+import modules
+import os
+import strings
+
+pub type Dep = struct {
+    name: Str
+    source: Str  // a git URL, or a directory
+    ref: Str  // a tag, branch or commit; "" for a directory
+    line: Int  // in vela.mod
+}
+
+pub type Manifest = struct {
+    package: Str  // its own name, or ""
+    deps: [Dep]
+}
+
+pub type Locked = struct {
+    name: Str
+    source: Str
+    ref: Str
+    commit: Str
+}
+
+fn is_dir_source(d: Dep) -> Bool {
+    return d.ref == ""
+}
+
+// ---- vela.mod and vela.lock ----
+
+fn words(line: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = -1
+    for i in 0..len(line) + 1 {
+        let space = i == len(line) || line[i] == ' ' || line[i] == '\t' || line[i] == '\r'
+        if space && start >= 0 {
+            push(mut out, line[start..i])
+            start = -1
+        } else if !space && start < 0 {
+            start = i
+        }
+    }
+    return out
+}
+
+// A line without its `// comment`: a `//` at the start of the line or
+// after a space, so that https://... is not one.
+fn uncommented(line: Str) -> Str {
+    for i in 0..len(line) - 1 {
+        if line[i] == '/' && line[i + 1] == '/' && (i == 0 || line[i - 1] == ' ' || line[i - 1] == '\t') {
+            return line[0..i]
+        }
+    }
+    return line
+}
+
+fn lines(text: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(text) + 1 {
+        if i == len(text) || text[i] == '\n' {
+            push(mut out, text[start..i])
+            start = i + 1
+        }
+    }
+    return out
+}
+
+fn is_name(s: Str) -> Bool {
+    if len(s) == 0 || s[0] >= '0' && s[0] <= '9' {
+        return false
+    }
+    for c in s {
+        if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_') {
+            return false
+        }
+    }
+    return true
+}
+
+// Why `name` cannot name a package, or "".
+fn bad_name(name: Str) -> Str {
+    if !is_name(name) {
+        return "'" + name + "' is not a name: letters, digits and _, not starting with a digit"
+    }
+    if modules.is_builtin_module(name) || name == "std" {
+        return "'" + name + "' is the name of a built-in module"
+    }
+    return ""
+}
+
+// vela.mod's text; `file` names it in messages, as "dir/vela.mod".
+pub fn parse_manifest(text: Str, file: Str) -> Result[Manifest, Str] {
+    let mut m = Manifest { package: "", deps: [] }
+    let ls = lines(text)
+    for i in 0..len(ls) {
+        let w = words(uncommented(ls[i]))
+        let at = file + ":" + strings.from_int(i + 1) + ": "
+        if len(w) == 0 {
+            continue
+        }
+        if w[0] == "package" {
+            if len(w) != 2 {
+                return Err(at + "write `package NAME`")
+            }
+            let why = bad_name(w[1])
+            if why != "" {
+                return Err(at + why)
+            }
+            m.package = w[1]
+        } else if w[0] == "use" {
+            if len(w) != 3 && len(w) != 4 {
+                return Err(at + "write `use NAME URL REF` for a git repository, or `use NAME DIRECTORY`")
+            }
+            let why = bad_name(w[1])
+            if why != "" {
+                return Err(at + why)
+            }
+            for d in m.deps {
+                if d.name == w[1] {
+                    return Err(at + "'" + w[1] + "' is already used, on line " + strings.from_int(d.line))
+                }
+            }
+            let mut ref = ""
+            if len(w) == 4 {
+                ref = w[3]
+            }
+            push(mut m.deps, Dep { name: w[1], source: w[2], ref: ref, line: i + 1 })
+        } else {
+            return Err(at + "a line is `package NAME` or `use NAME SOURCE [REF]`, not '" + w[0] + "'")
+        }
+    }
+    return Ok(m)
+}
+
+pub fn parse_lock(text: Str, file: Str) -> Result[Map[Str, Locked], Str] {
+    let mut out: Map[Str, Locked] = [:]
+    let ls = lines(text)
+    for i in 0..len(ls) {
+        let w = words(uncommented(ls[i]))
+        if len(w) == 0 {
+            continue
+        }
+        if len(w) != 4 || !is_commit(w[3]) {
+            return Err(file + ":" + strings.from_int(i + 1) + ": a line is `NAME URL REF COMMIT`; run `vela get` to " +
+                "write it again")
+        }
+        out[w[0]] = Locked { name: w[0], source: w[1], ref: w[2], commit: w[3] }
+    }
+    return Ok(out)
+}
+
+pub fn lock_text(locked: [Locked]) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, "// Written by `vela get`: the exact commit of every git package the program uses.\n")
+    strings.add(mut b, "// Keep it with the program, so that it builds the same everywhere.\n")
+    for l in sorted_locks(locked) {
+        strings.add(mut b, l.name + " " + l.source + " " + l.ref + " " + l.commit + "\n")
+    }
+    return strings.build(b)
+}
+
+fn sorted_locks(xs: [Locked]) -> [Locked] {
+    let mut out = xs
+    let mut i = 1
+    for i < len(out) {
+        let x = out[i]
+        let mut j = i - 1
+        for j >= 0 && x.name < out[j].name {
+            out[j + 1] = out[j]
+            j = j - 1
+        }
+        out[j + 1] = x
+        i = i + 1
+    }
+    return out
+}
+
+fn is_commit(s: Str) -> Bool {
+    if len(s) != 40 {
+        return false
+    }
+    for c in s {
+        if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+            return false
+        }
+    }
+    return true
+}
+
+// "v1.2.3" or "1.2.3" as [1, 2, 3]; [] for anything else.
+pub fn version(ref: Str) -> [Int] {
+    let mut s = ref
+    if len(s) > 0 && s[0] == 'v' {
+        s = s[1..len(s)]
+    }
+    let mut parts: [Int] = []
+    let mut n = 0
+    let mut digits = 0
+    for i in 0..len(s) + 1 {
+        if i == len(s) || s[i] == '.' {
+            if digits == 0 || digits > 9 {
+                return []
+            }
+            push(mut parts, n)
+            n = 0
+            digits = 0
+        } else if s[i] >= '0' && s[i] <= '9' {
+            n = n * 10 + int(s[i] - '0')
+            digits = digits + 1
+        } else {
+            return []
+        }
+    }
+    if len(parts) != 3 {
+        return []
+    }
+    return parts
+}
+
+fn newer(a: [Int], b: [Int]) -> Bool {
+    for i in 0..3 {
+        if a[i] != b[i] {
+            return a[i] > b[i]
+        }
+    }
+    return false
+}
+
+// ---- Where things are ----
+
+pub fn home() -> Str uses os {
+    match os.env("VELA_HOME") {
+        Some(h) => return h
+        None => {}
+    }
+    match os.env("HOME") {
+        Some(h) => return modules.join(h, ".vela")
+        None => return ".vela"
+    }
+}
+
+fn cache_dir(name: Str, commit: Str) -> Str uses os {
+    return modules.join(modules.join(home(), "pkg"), name + "@" + commit)
+}
+
+// The marker written last when a package is fetched: a directory without
+// it is a fetch that did not finish.
+fn fetched_marker(dir: Str) -> Str {
+    return modules.join(dir, ".vela-fetched")
+}
+
+fn exists(path: Str) -> Bool uses fs {
+    match files.read(path) {
+        Ok(_) => return true
+        Err(_) => return false
+    }
+}
+
+// The vela.mod in `dir`, or an empty one if there is none.
+fn manifest_in(dir: Str) -> Result[Manifest, Str] uses fs {
+    let path = modules.join(dir, "vela.mod")
+    match files.read(path) {
+        Ok(text) => return parse_manifest(text, path)
+        Err(_) => return Ok(Manifest { package: "", deps: [] })
+    }
+}
+
+// ---- For building: what vela.mod and vela.lock say, and nothing else ----
+
+// The packages of the program whose main file is `main_path`; none if
+// there is no vela.mod beside it.
+pub fn for_program(main_path: Str) -> Result[modules.Packages, Str] uses fs, os {
+    let dir = modules.dirname(main_path)
+    let mod_path = modules.join(dir, "vela.mod")
+    let mut text = ""
+    match files.read(mod_path) {
+        Ok(t) => text = t
+        Err(_) => return Ok(modules.no_packages())
+    }
+    let root = parse_manifest(text, mod_path)?
+    let mut locked: Map[Str, Locked] = [:]
+    let lock_path = modules.join(dir, "vela.lock")
+    match files.read(lock_path) {
+        Ok(t) => locked = parse_lock(t, lock_path)?
+        Err(_) => {}
+    }
+    let mut out = modules.Packages { deps: [], all: [:] }
+    for d in root.deps {
+        push(mut out.deps, d.name)
+    }
+    // Every package once, through what each uses.
+    let mut todo: [Dep] = root.deps
+    let mut bases: [Str] = []
+    for _ in root.deps {
+        push(mut bases, dir)
+    }
+    let mut i = 0
+    for i < len(todo) {
+        let d = todo[i]
+        let base = bases[i]
+        i = i + 1
+        if maps.has(out.all, d.name) {
+            continue
+        }
+        let mut pdir = ""
+        if is_dir_source(d) {
+            pdir = modules.normpath(modules.join(base, d.source))
+        } else {
+            let mut l = Locked { name: "", source: "", ref: "", commit: "" }
+            match maps.get(locked, d.name) {
+                Some(found) => l = found
+                None => return Err(mod_path + ": vela.lock has no commit for package '" + d.name + "'; run `vela get`")
+            }
+            // A package vela.mod names must be locked as it is named there:
+            // otherwise vela.mod changed since `vela get` wrote vela.lock.
+            if base == dir && (l.source != d.source || l.ref != d.ref) {
+                return Err(mod_path + ": '" + d.name + "' is " + d.source + " " + d.ref + " in vela.mod but " + l.source +
+                    " " + l.ref + " in vela.lock; run `vela get`")
+            }
+            pdir = cache_dir(d.name, l.commit)
+            if !exists(fetched_marker(pdir)) {
+                return Err("package '" + d.name + "' is not fetched yet; run `vela get`")
+            }
+        }
+        let m = manifest_in(pdir)?
+        if m.package != "" && m.package != d.name {
+            return Err("the package used as '" + d.name + "' (" + d.source + ") calls itself '" + m.package + "'")
+        }
+        let mut names: [Str] = []
+        for dd in m.deps {
+            push(mut names, dd.name)
+            push(mut todo, dd)
+            push(mut bases, pdir)
+        }
+        out.all[d.name] = modules.Package { name: d.name, dir: pdir, deps: names }
+    }
+    return Ok(out)
+}
+
+// ---- vela get ----
+
+// What one vela.mod asks for, with where it is and who it is.
+type Want = struct {
+    dep: Dep
+    base: Str  // the directory of the vela.mod naming it, for a directory source
+    by: Str  // "vela.mod", or the package that uses it
+}
+
+// Fetch what the vela.mod in `dir` says, choosing versions, and return the
+// commits to lock. `old` is the lock there was: a package named the same
+// way keeps its commit, so `vela get` changes nothing that did not change.
+pub fn get(dir: Str, old: Map[Str, Locked]) -> Result[[Locked], Str] uses fs, os {
+    let mod_path = modules.join(dir, "vela.mod")
+    let mut text = ""
+    match files.read(mod_path) {
+        Ok(t) => text = t
+        Err(_) => return Err("there is no vela.mod in " + dir + "; write one, or run `vela get NAME SOURCE [REF]`")
+    }
+    let root = parse_manifest(text, mod_path)?
+    let mut root_wants: [Want] = []
+    for d in root.deps {
+        push(mut root_wants, Want { dep: d, base: dir, by: "vela.mod" })
+    }
+    // Choose, fetch, read what the chosen use, and choose again, until the
+    // choice stays the same. Only what the chosen versions use counts.
+    let mut chosen = choose(root_wants, [])?
+    let mut commits: Map[Str, Str] = [:]  // by "source ref"
+    for round in 0..100 {
+        let mut wants = root_wants
+        for name in maps.keys(chosen) {
+            let w = chosen[name]
+            let pdir = place(w, mut commits, old)?
+            let m = manifest_in(pdir)?
+            if m.package != "" && m.package != name {
+                return Err("the package used as '" + name + "' (" + w.dep.source + ") calls itself '" + m.package + "'")
+            }
+            for d in m.deps {
+                push(mut wants, Want { dep: d, base: pdir, by: name })
+            }
+        }
+        let next = choose(root_wants, wants)?
+        if same_choice(next, chosen) {
+            let mut out: [Locked] = []
+            for name in maps.keys(chosen) {
+                let w = chosen[name]
+                if !is_dir_source(w.dep) {
+                    let c = commits[w.dep.source + " " + w.dep.ref]
+                    push(mut out, Locked { name: name, source: w.dep.source, ref: w.dep.ref, commit: c })
+                }
+            }
+            return Ok(sorted_locks(out))
+        }
+        chosen = next
+    }
+    return Err("the versions the packages ask for do not settle; name the versions to use in vela.mod")
+}
+
+fn same_choice(a: Map[Str, Want], b: Map[Str, Want]) -> Bool {
+    if len(maps.keys(a)) != len(maps.keys(b)) {
+        return false
+    }
+    for name in maps.keys(a) {
+        match maps.get(b, name) {
+            Some(w) => {
+                if w.dep.source != a[name].dep.source || w.dep.ref != a[name].dep.ref {
+                    return false
+                }
+            }
+            None => return false
+        }
+    }
+    return true
+}
+
+// One version of each package: what vela.mod says, or else what all who
+// use it agree on, or the highest version tag.
+fn choose(root: [Want], all: [Want]) -> Result[Map[Str, Want], Str] {
+    let mut out: Map[Str, Want] = [:]
+    for w in root {
+        out[w.dep.name] = w
+    }
+    for w in all {
+        let name = w.dep.name
+        if w.by == "vela.mod" {
+            continue
+        }
+        match maps.get(out, name) {
+            None => out[name] = w
+            Some(c) => {
+                if c.by == "vela.mod" {
+                    continue  // the program's own choice wins
+                }
+                let a = full_source(c)
+                let b = full_source(w)
+                if a != b {
+                    return Err("'" + c.by + "' and '" + w.by + "' use two different packages called '" + name + "': " + a +
+                        " and " + b)
+                }
+                if c.dep.ref == w.dep.ref {
+                    continue
+                }
+                let va = version(c.dep.ref)
+                let vb = version(w.dep.ref)
+                if len(va) == 0 || len(vb) == 0 {
+                    return Err("'" + c.by + "' uses " + name + " " + c.dep.ref + " and '" + w.by + "' uses " + name + " " +
+                        w.dep.ref + "; name the one to use in vela.mod: `use " + name + " " + a + " REF`")
+                }
+                if newer(vb, va) {
+                    out[name] = w
+                }
+            }
+        }
+    }
+    return Ok(out)
+}
+
+// A directory source as the directory it is, so two packages naming the
+// same directory from different places agree.
+fn full_source(w: Want) -> Str {
+    if is_dir_source(w.dep) {
+        return modules.normpath(modules.join(w.base, w.dep.source))
+    }
+    return w.dep.source
+}
+
+// Where the chosen package's files are, fetching them if need be.
+fn place(w: Want, commits: mut Map[Str, Str], old: Map[Str, Locked]) -> Result[Str, Str] uses fs, os {
+    if is_dir_source(w.dep) {
+        let dir = modules.normpath(modules.join(w.base, w.dep.source))
+        if !exists(modules.join(dir, w.dep.name + ".vl")) {
+            return Err("package '" + w.dep.name + "' is not in " + dir + ": there is no " + w.dep.name + ".vl there")
+        }
+        return Ok(dir)
+    }
+    let key = w.dep.source + " " + w.dep.ref
+    let mut commit = ""
+    match maps.get(commits, key) {
+        Some(c) => commit = c
+        None => {
+            commit = resolve(w.dep, old)?
+            commits[key] = commit
+        }
+    }
+    return fetch(w.dep.name, w.dep.source, commit)
+}
+
+// The commit `dep.ref` names: from the old lock when it locked the same
+// source and ref, else from the repository.
+fn resolve(dep: Dep, old: Map[Str, Locked]) -> Result[Str, Str] uses os {
+    match maps.get(old, dep.name) {
+        Some(l) => {
+            if l.source == dep.source && l.ref == dep.ref {
+                return Ok(l.commit)
+            }
+        }
+        None => {}
+    }
+    if is_commit(dep.ref) {
+        return Ok(dep.ref)
+    }
+    let mut listing = ""
+    match os.output(["git", "ls-remote", dep.source, dep.ref]) {
+        Ok(out) => listing = out
+        Err(e) => return Err("cannot look up " + dep.ref + " in " + dep.source + ": " + e)
+    }
+    match commit_of(listing, dep.ref) {
+        Some(c) => return Ok(c)
+        None => return Err("there is no tag or branch '" + dep.ref + "' in " + dep.source)
+    }
+}
+
+// The commit `ref` names in `git ls-remote` output: a tag's commit (the
+// `^{}` line, for an annotated tag), else a branch's.
+fn commit_of(listing: Str, ref: Str) -> Option[Str] {
+    let mut best = ""
+    let mut rank = 0
+    for line in lines(listing) {
+        let w = words(line)
+        if len(w) != 2 || !is_commit(w[0]) {
+            continue
+        }
+        let mut r = 0
+        if w[1] == "refs/tags/" + ref + "^{}" {
+            r = 4
+        } else if w[1] == "refs/tags/" + ref {
+            r = 3
+        } else if w[1] == "refs/heads/" + ref {
+            r = 2
+        } else if w[1] == ref {
+            r = 1
+        }
+        if r > rank {
+            rank = r
+            best = w[0]
+        }
+    }
+    if rank == 0 {
+        return None
+    }
+    return Some(best)
+}
+
+// The package's files at `commit`, in the cache: fetched into a directory
+// of their own, and renamed into place only when complete.
+fn fetch(name: Str, source: Str, commit: Str) -> Result[Str, Str] uses fs, os {
+    let dir = cache_dir(name, commit)
+    if exists(fetched_marker(dir)) {
+        return Ok(dir)
+    }
+    let partial = dir + ".partial"
+    let steps = [
+        ["mkdir", "-p", modules.join(home(), "pkg")], ["rm", "-rf", partial], ["rm", "-rf", dir],
+        ["git", "clone", "--quiet", "--no-checkout", source, partial],
+        ["git", "-C", partial, "checkout", "--quiet", "--detach", commit], ["mv", partial, dir],
+    ]
+    for step in steps {
+        match os.run(step) {
+            Ok(code) => {
+                if code != 0 {
+                    return Err("cannot fetch '" + name + "' from " + source + ": `" + join_words(step) + "` exited with " +
+                        strings.from_int(code))
+                }
+            }
+            Err(e) => return Err("cannot fetch '" + name + "': " + e)
+        }
+    }
+    match files.write(fetched_marker(dir), source + " " + commit + "\n") {
+        Ok(_) => return Ok(dir)
+        Err(e) => return Err(e)
+    }
+}
+
+fn join_words(ws: [Str]) -> Str {
+    let mut b = strings.builder()
+    for i in 0..len(ws) {
+        if i > 0 {
+            strings.add_byte(mut b, ' ')
+        }
+        strings.add(mut b, ws[i])
+    }
+    return strings.build(b)
+}
+
+// vela.mod's text with `use NAME ...` set to `line`: the line naming the
+// package is replaced, or the line added at the end.
+pub fn with_use(text: Str, name: Str, line: Str) -> Str {
+    let mut b = strings.builder()
+    let mut done = false
+    let ls = lines(text)
+    for i in 0..len(ls) {
+        let l = ls[i]
+        if i == len(ls) - 1 && l == "" {
+            break  // the end of a text that ends with a newline
+        }
+        let w = words(uncommented(l))
+        if !done && len(w) >= 2 && w[0] == "use" && w[1] == name {
+            strings.add(mut b, line + "\n")
+            done = true
+        } else {
+            strings.add(mut b, l + "\n")
+        }
+    }
+    if !done {
+        strings.add(mut b, line + "\n")
+    }
+    return strings.build(b)
+}
+
+// ---- Tests ----
+
+fn manifest_or_fail(text: Str) -> Manifest {
+    match parse_manifest(text, "vela.mod") {
+        Ok(m) => return m
+        Err(e) => {
+            print(e)
+            assert(false)
+        }
+    }
+    return Manifest { package: "", deps: [] }
+}
+
+fn error_of(text: Str) -> Str {
+    match parse_manifest(text, "vela.mod") {
+        Ok(_) => return "no error"
+        Err(e) => return e
+    }
+}
+
+test "vela.mod" {
+    let m = manifest_or_fail("// the orders program\npackage orders\n\nuse text https://example.com/text.git v1.2.0  // why\n" +
+        "use shapes ../shapes\n")
+    assert(m.package == "orders" && len(m.deps) == 2)
+    assert(m.deps[0].name == "text" && m.deps[0].source == "https://example.com/text.git" && m.deps[0].ref == "v1.2.0")
+    assert(m.deps[1].source == "../shapes" && m.deps[1].ref == "" && m.deps[1].line == 5)
+    assert(error_of("use text") == "vela.mod:1: write `use NAME URL REF` for a git repository, or `use NAME DIRECTORY`")
+    assert(error_of("use 9x ../x") == "vela.mod:1: '9x' is not a name: letters, digits and _, not starting with a digit")
+    assert(error_of("use os ../x") == "vela.mod:1: 'os' is the name of a built-in module")
+    assert(error_of("use a ../a\nuse a ../b") == "vela.mod:2: 'a' is already used, on line 1")
+    assert(error_of("require a ../a") == "vela.mod:1: a line is `package NAME` or `use NAME SOURCE [REF]`, not 'require'")
+}
+
+test "vela.lock" {
+    let c = "0123456789abcdef0123456789abcdef01234567"
+    let text = lock_text([Locked { name: "zed", source: "u2", ref: "main", commit: c },
+        Locked { name: "abc", source: "u1", ref: "v1.0.0", commit: c }])
+    match parse_lock(text, "vela.lock") {
+        Ok(l) => assert(l["abc"].source == "u1" && l["zed"].ref == "main" && l["zed"].commit == c)
+        Err(e) => {
+            print(e)
+            assert(false)
+        }
+    }
+    // Sorted by name, after the comment.
+    assert(lines(text)[2] == "abc u1 v1.0.0 " + c)
+    match parse_lock("abc u1 v1 short", "vela.lock") {
+        Ok(_) => assert(false)
+        Err(e) => assert(e == "vela.lock:1: a line is `NAME URL REF COMMIT`; run `vela get` to write it again")
+    }
+}
+
+test "versions" {
+    let v = version("v1.20.3")
+    assert(len(v) == 3 && v[1] == 20)
+    assert(len(version("1.2.3")) == 3 && len(version("main")) == 0 && len(version("v1.2")) == 0)
+    assert(len(version("v1..2")) == 0 && len(version("v1.2.3-rc1")) == 0)
+    assert(newer(version("v1.10.0"), version("v1.9.9")) && !newer(version("v1.2.3"), version("v1.2.3")))
+}
+
+test "choosing versions" {
+    let root = [Want { dep: Dep { name: "a", source: "A", ref: "v1.0.0", line: 1 }, base: ".", by: "vela.mod" }]
+    let b = Want { dep: Dep { name: "c", source: "C", ref: "v1.2.0", line: 1 }, base: ".", by: "b" }
+    let d = Want { dep: Dep { name: "c", source: "C", ref: "v1.10.0", line: 1 }, base: ".", by: "d" }
+    let a_old = Want { dep: Dep { name: "a", source: "A", ref: "v2.0.0", line: 1 }, base: ".", by: "d" }
+    match choose(root, [b, d, a_old]) {
+        Ok(chosen) => {
+            assert(chosen["c"].dep.ref == "v1.10.0" && chosen["c"].by == "d")
+            assert(chosen["a"].dep.ref == "v1.0.0")  // vela.mod's choice wins
+        }
+        Err(e) => {
+            print(e)
+            assert(false)
+        }
+    }
+    let main = Want { dep: Dep { name: "c", source: "C", ref: "main", line: 1 }, base: ".", by: "e" }
+    match choose(root, [b, main]) {
+        Ok(_) => assert(false)
+        Err(e) => assert(e == "'b' uses c v1.2.0 and 'e' uses c main; name the one to use in vela.mod: `use c C REF`")
+    }
+    let other = Want { dep: Dep { name: "c", source: "X", ref: "v1.2.0", line: 1 }, base: ".", by: "e" }
+    match choose(root, [b, other]) {
+        Ok(_) => assert(false)
+        Err(e) => assert(e == "'b' and 'e' use two different packages called 'c': C and X")
+    }
+}
+
+test "commits from git ls-remote" {
+    let t = "1111111111111111111111111111111111111111\trefs/heads/main\n" +
+        "2222222222222222222222222222222222222222\trefs/tags/v1.0.0\n" +
+        "3333333333333333333333333333333333333333\trefs/tags/v1.0.0^{}\n"
+    match commit_of(t, "v1.0.0") {
+        Some(c) => assert(c[0] == '3')
+        None => assert(false)
+    }
+    match commit_of(t, "main") {
+        Some(c) => assert(c[0] == '1')
+        None => assert(false)
+    }
+    match commit_of(t, "v2") {
+        Some(_) => assert(false)
+        None => {}
+    }
+}
+
+test "adding a use line" {
+    let text = "package app\n// a comment\nuse a ../a\n"
+    assert(with_use(text, "b", "use b ../b") == "package app\n// a comment\nuse a ../a\nuse b ../b\n")
+    assert(with_use(text, "a", "use a URL v1.0.0") == "package app\n// a comment\nuse a URL v1.0.0\n")
+    assert(with_use("", "a", "use a ../a") == "use a ../a\n")
+}

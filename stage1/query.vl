@@ -27,6 +27,7 @@ import lexer
 import maps
 import modules
 import os
+import packages
 import parser
 import strings
 
@@ -40,8 +41,16 @@ pub type Analysis = struct {
 // `path` checked as a program, with `source` as its text and `open` (texts
 // by path) instead of those files. Its tests are checked too, and it need
 // not have a main function.
-pub fn analyze(path: Str, source: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses fs {
-    let loaded = modules.load_open(path, source, std_dir, open)
+pub fn analyze(path: Str, source: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses fs, os {
+    let mut loaded = modules.load_open(path, source, std_dir, open)
+    match packages.for_program(path) {
+        Ok(pk) => loaded = modules.load_program(path, source, std_dir, open, pk)
+        Err(e) => {
+            let at = modules.join(modules.dirname(path), "vela.mod")
+            // Only this: without the packages, what imports them cannot load either.
+            loaded.errors = [errors.CompileError { path: at, line: 1, col: 1, message: e, warning: false }]
+        }
+    }
     if len(loaded.errors) > 0 {
         return Analysis { loaded: loaded, checked: None, errors: errors.merged(loaded.errors, loaded.warnings) }
     }
@@ -51,7 +60,7 @@ pub fn analyze(path: Str, source: Str, std_dir: Str, open: Map[Str, Str]) -> Ana
 
 // The program `path` is checked as part of, as above, with `open` (texts by
 // path) read instead of those files.
-pub fn program_of(path: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses fs {
+pub fn program_of(path: Str, std_dir: Str, open: Map[Str, Str]) -> Analysis uses fs, os {
     let main = modules.join(modules.dirname(path), "main.vl")
     if modules.normpath(main) != modules.normpath(path) {
         let mut text = ""
@@ -170,8 +179,13 @@ fn checked(a: Analysis) -> checker.Checked uses os {
     match a.checked {
         Some(k) => return k
         None => {
+            // The first error says why: a syntax error, a missing module, a package not fetched.
             let root = a.loaded.modules[0].file
-            fail("the program '" + root + "' has syntax errors; `vela check " + root + "` shows them")
+            let mut first = a.loaded.errors[0]
+            if first.path == "" {
+                first.path = root
+            }
+            fail("the program '" + root + "' does not load: " + errors.render(first))
         }
     }
     return checker.check_program(a.loaded, true)  // not reached

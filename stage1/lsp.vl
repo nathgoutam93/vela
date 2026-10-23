@@ -186,7 +186,7 @@ fn initialize(s: mut Server, params: json.Json) -> json.Json {
 
 // ---- Checking ----
 
-fn changed(s: mut Server, path: Str, text: Str) uses fs {
+fn changed(s: mut Server, path: Str, text: Str) uses fs, os {
     s.open[path] = text
     check(mut s, path)
     // Other open files that use this one see the change too. Those in the
@@ -205,7 +205,7 @@ fn changed(s: mut Server, path: Str, text: Str) uses fs {
     }
 }
 
-fn closed(s: mut Server, path: Str) uses fs {
+fn closed(s: mut Server, path: Str) uses fs, os {
     maps.remove(mut s.open, path)
     maps.remove(mut s.analyses, path)
     maps.remove(mut s.indexes, path)
@@ -231,7 +231,7 @@ fn uses_file(a: query.Analysis, path: Str) -> Bool {
     return false
 }
 
-fn check(s: mut Server, path: Str) uses fs {
+fn check(s: mut Server, path: Str) uses fs, os {
     if !maps.has(s.open, path) {
         return
     }
@@ -304,7 +304,7 @@ fn publish(s: mut Server, file: Str, errs: [errors.CompileError]) {
 }
 
 // The index of the program `path` is the root of, made when first needed.
-fn index_of(s: mut Server, path: Str) -> Option[index.Index] uses fs {
+fn index_of(s: mut Server, path: Str) -> Option[index.Index] uses fs, os {
     match maps.get(s.indexes, path) {
         Some(ix) => return Some(ix)
         None => {}
@@ -339,7 +339,7 @@ type Found = struct {
     use: Int
 }
 
-fn at_position(s: mut Server, params: json.Json) -> Option[Found] uses fs {
+fn at_position(s: mut Server, params: json.Json) -> Option[Found] uses fs, os {
     let path = uri_path(json.str_or(json.get(json.get(params, "textDocument"), "uri"), ""))
     let pos = json.get(params, "position")
     let line = json.int_or(json.get(pos, "line"), 0) + 1
@@ -358,7 +358,7 @@ fn at_position(s: mut Server, params: json.Json) -> Option[Found] uses fs {
 
 // ---- Requests ----
 
-fn hover(s: mut Server, params: json.Json) -> json.Json uses fs {
+fn hover(s: mut Server, params: json.Json) -> json.Json uses fs, os {
     match at_position(mut s, params) {
         Some(f) => {
             let u = f.ix.occurrences[f.use]
@@ -379,7 +379,7 @@ fn hover(s: mut Server, params: json.Json) -> json.Json uses fs {
     }
 }
 
-fn definition(s: mut Server, params: json.Json) -> json.Json uses fs {
+fn definition(s: mut Server, params: json.Json) -> json.Json uses fs, os {
     match at_position(mut s, params) {
         Some(f) => {
             let d = f.ix.defs[f.ix.occurrences[f.use].def]
@@ -392,7 +392,7 @@ fn definition(s: mut Server, params: json.Json) -> json.Json uses fs {
     return json.null()
 }
 
-fn references(s: mut Server, params: json.Json) -> json.Json uses fs {
+fn references(s: mut Server, params: json.Json) -> json.Json uses fs, os {
     let with_declaration = json.bool_or(json.get(json.get(params, "context"), "includeDeclaration"), true)
     let mut out: [json.Json] = []
     match at_position(mut s, params) {

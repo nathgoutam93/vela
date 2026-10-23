@@ -1,7 +1,10 @@
 // How Vela's types are laid out in C and how their memory is managed: a
 // port of stage0/c_layout.py, which explains tagged unions, boxing of
 // recursive fields, managed types and the generated retain/release
-// functions. Every name and line comes out as Stage 0 writes it.
+// functions. Since M10c the C is no longer Stage 0's line for line: share
+// functions for threads (M13) and names for packages' modules (M14) are
+// Stage 1's alone.
+// stage 1 only (it has tests, which Stage 0 cannot read)
 import maps
 import strings
 import types
@@ -20,12 +23,41 @@ pub type Layout = struct {
 }
 
 // The C name of `name` in `module`, with the module's length in front so
-// two different pairs never give the same name (see Stage 0).
+// two different pairs never give the same name (see Stage 0). A package's
+// own module, `greet.util`, cannot go into C as it is: each part goes in
+// with its length, after a P, which no other name starts with (they start
+// with a digit): `P5greet4util_hello`.
 pub fn mangle(module: Str, name: Str) -> Str {
     if module == "" {
         return name
     }
-    return strings.from_int(len(module)) + module + "_" + name
+    let mut dot = -1
+    for i in 0..len(module) {
+        if module[i] == '.' {
+            dot = i
+        }
+    }
+    if dot < 0 {
+        return strings.from_int(len(module)) + module + "_" + name
+    }
+    let mut b = strings.builder()
+    strings.add_byte(mut b, 'P')
+    let mut start = 0
+    for i in 0..len(module) + 1 {
+        if i == len(module) || module[i] == '.' {
+            strings.add_int(mut b, i - start)
+            strings.add(mut b, module[start..i])
+            start = i + 1
+        }
+    }
+    strings.add(mut b, "_" + name)
+    return strings.build(b)
+}
+
+test "C names of a module's things" {
+    assert(mangle("", "main") == "main")
+    assert(mangle("lexer", "Token") == "5lexer_Token")
+    assert(mangle("greet.util", "hello") == "P5greet4util_hello")
 }
 
 fn primitive_c(t: Int) -> Str {

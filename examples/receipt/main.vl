@@ -1,0 +1,49 @@
+// A receipt, split between friends: the money package (./money, named in
+// vela.mod) writes the amounts.
+//
+//     vela run examples/receipt/main.vl
+// stage 1 only
+import money
+import text
+
+type Line = struct {
+    what: Str
+    cents: Int
+}
+
+fn total(lines: [Line]) -> Int {
+    let mut t = 0
+    for l in lines {
+        t = t + l.cents
+    }
+    return t
+}
+
+fn receipt(lines: [Line], people: [Str]) -> [Str] {
+    let mut out: [Str] = []
+    for l in lines {
+        push(mut out, text.pad_right(l.what, 12) + text.pad_left(money.show(l.cents), 12))
+    }
+    let t = total(lines)
+    push(mut out, text.pad_right("total", 12) + text.pad_left(money.show(t), 12))
+    let shares = money.split(t, len(people))
+    for i in 0..len(people) {
+        push(mut out, text.pad_right("  " + people[i], 12) + text.pad_left(money.show(shares[i]), 12))
+    }
+    return out
+}
+
+fn main() {
+    let lines = [Line { what: "tent", cents: 1249900 }, Line { what: "stove", cents: 8950 },
+        Line { what: "maps", cents: 1201 }]
+    for l in receipt(lines, ["ada", "bo", "cy"]) {
+        print(l)
+    }
+}
+
+test "the shares add up to the total" {
+    let lines = [Line { what: "a", cents: 1001 }, Line { what: "b", cents: 1 }]
+    let r = receipt(lines, ["x", "y", "z"])
+    assert(r[2] == "total              10.02")
+    assert(r[3] == "  x                 3.34" && r[5] == "  z                 3.34")
+}

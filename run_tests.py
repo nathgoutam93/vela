@@ -50,7 +50,8 @@ The directory a test lives in decides what is checked:
 Besides these, the compiler (stage1/main.vl), every examples/*/main.vl and
 every std/*.vl with tests in it must pass `vela test`, and the language
 server must pass tests/lsp_client.py, a scripted editor, and, if Neovim is
-installed, tests/nvim_test.lua, which drives it from Neovim (Stage 1 only).
+installed, tests/nvim_test.lua, which drives it from Neovim; packages must
+pass tests/pkg_test.py, with git repositories it makes (Stage 1 only).
 
 The compiler runs inside the test's directory and is given the bare file
 name, so messages read `name.vl:3:7: ...` wherever the repo is checked out.
@@ -74,6 +75,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 TESTS = ROOT / "tests"
 LSP_CLIENT = TESTS / "lsp_client.py"
+PKG_TEST = TESTS / "pkg_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -154,7 +156,9 @@ def compare(what: str, expected: list[str], actual: str) -> list[str]:
 def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
     """Run one test. Returns a list of problems; empty means it passed."""
     if path == LSP_CLIENT:
-        return run_lsp_client(compiler, env)
+        return run_script(LSP_CLIENT, compiler, env)
+    if path == PKG_TEST:
+        return run_script(PKG_TEST, compiler, env)
     if path == NVIM_TEST:
         return run_nvim_test(compiler, env)
     if not path.is_relative_to(TESTS):
@@ -276,12 +280,13 @@ def run_vela_tests(compiler: list[str], path: Path, env: dict[str, str]) -> list
     return []
 
 
-def run_lsp_client(compiler: list[str], env: dict[str, str]) -> list[str]:
+def run_script(script: Path, compiler: list[str], env: dict[str, str]) -> list[str]:
+    """A test written in Python, given the compiler: the scripted editor, the packages test."""
     try:
-        ran = subprocess.run([sys.executable, str(LSP_CLIENT), *compiler], env=env, stdin=subprocess.DEVNULL,
+        ran = subprocess.run([sys.executable, str(script), *compiler], env=env, stdin=subprocess.DEVNULL,
                              capture_output=True, text=True, timeout=VELA_TEST_TIMEOUT)
     except subprocess.TimeoutExpired:
-        return [f"the lsp client took longer than {VELA_TEST_TIMEOUT}s"]
+        return [f"{script.name} took longer than {VELA_TEST_TIMEOUT}s"]
     if ran.returncode != 0:
         return [*ran.stdout.splitlines(), *ran.stderr.splitlines()]
     return []
@@ -307,6 +312,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(ROOT / "stage1" / "main.vl")  # the compiler's own tests
     tests += [p for p in sorted((ROOT / "std").glob("*.vl")) if 'test "' in p.read_text()]
     tests.append(LSP_CLIENT)
+    tests.append(PKG_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

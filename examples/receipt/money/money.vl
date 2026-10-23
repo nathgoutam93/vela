@@ -1,0 +1,40 @@
+// Amounts of money in cents, and writing them: 1234567 is "12,345.67".
+// The main module of the money package: `import money` gets this file.
+import digits
+
+pub fn show(cents: Int) -> Str {
+    let mut sign = ""
+    let mut n = cents
+    if n < 0 {
+        sign = "-"
+        n = -n
+    }
+    return sign + digits.grouped(n / 100) + "." + digits.two(n % 100)
+}
+
+// `amount` split into `parts` that differ by at most a cent and add up to
+// it, the larger first: 1000 in 3 is 334, 333, 333.
+pub fn split(amount: Int, parts: Int) -> [Int]
+    requires parts > 0 && amount >= 0
+    ensures len(result) == parts {
+    let mut out: [Int] = []
+    for i in 0..parts {
+        let mut share = amount / parts
+        if i < amount % parts {
+            share = share + 1
+        }
+        push(mut out, share)
+    }
+    return out
+}
+
+test "showing amounts" {
+    assert(show(0) == "0.00" && show(5) == "0.05" && show(1234567) == "12,345.67")
+    assert(show(-100050) == "-1,000.50" && show(99900) == "999.00")
+}
+
+test "splitting" {
+    let s = split(1000, 3)
+    assert(s[0] == 334 && s[1] == 333 && s[2] == 333)
+    assert(split(5, 5)[4] == 1 && split(0, 2)[1] == 0)
+}
