@@ -17,6 +17,8 @@
 //     vela get [-u] [NAME SOURCE [REF]]
 //                                 fetch the packages vela.mod names, and
 //                                 write vela.lock (see packages.vl)
+//     vela new [--package] NAME   make a program (or a package) to start
+//                                 from, in a new directory NAME
 //
 // Exit codes as in Stage 0: 0 success, 1 the program has errors, 2 bad
 // command line, 70 internal compiler error.
@@ -55,6 +57,10 @@ fn main() {
     let command = args[1]
     if command == "get" {
         get_command(args[2..len(args)])
+        return
+    }
+    if command == "new" {
+        new_command(args[2..len(args)])
         return
     }
     if command == "fmt" {
@@ -109,7 +115,7 @@ fn main() {
 }
 
 fn usage() uses os {
-    os.eprint("usage: vela (build | run | test | c | check | tokens | ast | fmt | query) FILE, vela lsp, or vela get")
+    os.eprint("usage: vela (build | run | test | c | check | tokens | ast | fmt | query) FILE, vela lsp, vela get, or vela new")
     os.exit(2)
 }
 
@@ -254,6 +260,55 @@ fn get_command(args: [Str]) uses fs, os {
             }
         }
         Err(e) => driver_error(e)
+    }
+}
+
+// `vela new [--package] NAME`: a directory NAME with a program to start
+// from (see packages.new_files), which builds, runs and tests as it is.
+fn new_command(args: [Str]) uses fs, os {
+    let mut rest = args
+    let mut package = false
+    if len(rest) > 0 && rest[0] == "--package" {
+        package = true
+        rest = rest[1..len(rest)]
+    }
+    if len(rest) != 1 {
+        os.eprint("usage: vela new [--package] NAME")
+        os.exit(2)
+    }
+    let name = rest[0]
+    let why = packages.bad_name(name)
+    if why != "" {
+        driver_error(why)
+    }
+    match os.run(["test", "-e", name]) {
+        Ok(code) => {
+            if code == 0 {
+                driver_error(name + " exists already")
+            }
+        }
+        Err(e) => driver_error(e)
+    }
+    match os.run(["mkdir", name]) {
+        Ok(code) => {
+            if code != 0 {
+                driver_error("cannot make the directory " + name)
+            }
+        }
+        Err(e) => driver_error(e)
+    }
+    let made = packages.new_files(name, package)
+    for f in made {
+        match files.write(f[0], f[1]) {
+            Ok(_) => {}
+            Err(e) => driver_error(e)
+        }
+        print("made " + f[0])
+    }
+    if package {
+        print("next: cd " + name + " && vela test " + name + ".vl")
+    } else {
+        print("next: cd " + name + " && vela run main.vl && vela test main.vl")
     }
 }
 

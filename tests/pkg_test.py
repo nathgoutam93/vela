@@ -138,6 +138,21 @@ def main_using(*names: str) -> str:
 
 
 def scenario(w: World) -> None:
+    # vela new: a program and a package that build, run and test as they are.
+    (w.base / "new").mkdir()
+    out = w.ok("new", "new", "hello")
+    expect("vela new", out.splitlines(), ["made hello/vela.mod", "made hello/main.vl", "made hello/.gitignore",
+                                          "next: cd hello && vela run main.vl && vela test main.vl"])
+    expect("a new program runs", w.ok("new/hello", "run", "main.vl"), "hello, world\n")
+    expect("and tests", w.ok("new/hello", "test", "main.vl").splitlines()[-1], "1 test: 1 passed, 0 failed")
+    w.ok("new", "new", "--package", "greeting")
+    expect("a new package tests", w.ok("new/greeting", "test", "greeting.vl").splitlines()[-1], "1 test: 1 passed, 0 failed")
+    w.ok("new/hello", "get", "greeting", "../greeting")
+    w.write("new/hello/main.vl", "import greeting\n\nfn main() {\n    print(greeting.greeting(\"you\"))\n}\n")
+    expect("the program uses the package", w.ok("new/hello", "run", "main.vl"), "hello, you\n")
+    expect("not twice", "hello exists already" in w.fails("new", "new", "hello"), True)
+    expect("fmt -l", w.ok("new", "fmt", "-l", "hello/main.vl", "greeting/greeting.vl"), "")
+
     commits = make_packages(w)
 
     # A package used by a package: shout's choice of greet, v1.0.0.
@@ -223,6 +238,34 @@ def scenario(w: World) -> None:
     r = w.vela("seven", "run", "main.vl")
     expect("hidden package: output", r.stdout, "mine\n")
     expect("hidden package: warning", "which hides the package greet from vela.mod" in r.stderr, True)
+
+    # A repository of several packages, each in a directory, with tags that
+    # start with the directory; one uses another beside it.
+    w.write("mono/hi/vela.mod", "package hi\nuse bye ../bye\n")
+    w.write("mono/hi/hi.vl", "import bye\n\npub fn hi(n: Str) -> Str {\n    return \"hi \" + n + \", \" + bye.bye()\n}\n")
+    w.write("mono/bye/vela.mod", "package bye\n")
+    w.write("mono/bye/bye.vl", "pub fn bye() -> Str {\n    return \"bye\"\n}\n")
+    w.commit("mono", "hi/v1.0.0")
+    w.write("mono/bye/bye.vl", "pub fn bye() -> Str {\n    return \"so long\"\n}\n")
+    later = w.commit("mono", "hi/v1.1.0")
+    w.write("eight/main.vl", main_using("hi"))
+    w.write("loud2/vela.mod", f"package loud2\nuse hi {w.url('mono')}//hi hi/v1.1.0\n")
+    w.write("loud2/loud2.vl", "import hi\n\npub fn loud2(n: Str) -> Str {\n    return hi.hi(n) + \"!\"\n}\n")
+    w.write("eight/vela.mod", f"use hi {w.url('mono')}//hi hi/v1.0.0\n")
+    w.ok("eight", "get")
+    expect("a package in a directory of a repository", w.ok("eight", "run", "main.vl"), "hi ada, bye\n")
+    w.write("eight/main.vl", main_using("loud2"))
+    w.write("eight/vela.mod", "use loud2 ../loud2\n")
+    w.write("loud3/vela.mod", f"package loud3\nuse hi {w.url('mono')}//hi hi/v1.0.0\n")
+    w.write("loud3/loud3.vl", "import hi\n\npub fn loud3(n: Str) -> Str {\n    return hi.hi(n)\n}\n")
+    w.write("eight/main.vl", main_using("loud2", "loud3"))
+    w.write("eight/vela.mod", "use loud2 ../loud2\nuse loud3 ../loud3\n")
+    out = w.ok("eight", "get")
+    expect("the higher of two directory tags", out.split()[:2], ["hi", "hi/v1.1.0"])
+    expect("locked", f"hi {w.url('mono')}//hi hi/v1.1.0 {later}" in (w.base / "eight/vela.lock").read_text(), True)
+    expect("run with it", w.ok("eight", "run", "main.vl"), "hi ada, so long!\nhi ada, so long\n")
+    w.write("eight/vela.mod", f"use nope {w.url('mono')}//nope hi/v1.0.0\n")
+    expect("no such directory", "there is no nope.vl in" in w.fails("eight", "get"), True)
 
     # vela query and vela check --json reach into packages.
     q = w.ok("two", "query", "def", "main.vl:6:17")

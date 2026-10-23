@@ -1,4 +1,9 @@
-// JSON: reading and writing it. `import json`.
+// JSON: reading and writing it. The json package (until M12b it was
+// std/json.vl): a program's vela.mod says
+//
+//     use json https://github.com/nathgoutam93/vela//packages/json packages/json/v1.0.0
+//
+// and `import json` gets this file.
 // stage 1 only
 //
 //     match json.parse("{\"id\": 1, \"tags\": [\"a\"]}") {

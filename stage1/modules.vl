@@ -319,7 +319,8 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
             match read(ld, path) {
                 Ok(text) => source = text
                 Err(_) => {
-                    report(mut ld, importer, imp, "cannot find module '" + imp.name + "': there is no file " + path)
+                    report(mut ld, importer, imp, "cannot find module '" + imp.name + "': there is no file " + path +
+                        moved_to_package(imp.name))
                     return
                 }
             }
@@ -327,6 +328,15 @@ fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {
         known = file(mut ld, name, package, path, source, shown)
     }
     ld.modules[importer].imports[imp.name] = known
+}
+
+// What to do about a module that was standard and is a package now.
+fn moved_to_package(name: Str) -> Str {
+    if name == "json" {
+        return "; json is a package since M12b: run `vela get json https://github.com/nathgoutam93/vela//packages/json " +
+            "packages/json/v1.0.0`"
+    }
+    return ""
 }
 
 fn read(ld: Loader, path: Str) -> Result[Str, Str] uses fs {

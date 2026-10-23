@@ -48,7 +48,7 @@ The directory a test lives in decides what is checked:
                   NAME.expected again must change nothing
 
 Besides these, the compiler (stage1/main.vl), every examples/*/main.vl and
-every std/*.vl with tests in it must pass `vela test`, and the language
+every std/*.vl and packages/*/*.vl with tests in it must pass `vela test`, and the language
 server must pass tests/lsp_client.py, a scripted editor, and, if Neovim is
 installed, tests/nvim_test.lua, which drives it from Neovim; packages must
 pass tests/pkg_test.py, with git repositories it makes (Stage 1 only).
@@ -311,6 +311,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests += sorted((ROOT / "examples").glob("*/main.vl"))
     tests.append(ROOT / "stage1" / "main.vl")  # the compiler's own tests
     tests += [p for p in sorted((ROOT / "std").glob("*.vl")) if 'test "' in p.read_text()]
+    tests += [p for p in sorted((ROOT / "packages").glob("*/*.vl")) if 'test "' in p.read_text()]
     tests.append(LSP_CLIENT)
     tests.append(PKG_TEST)
     if shutil.which("nvim"):

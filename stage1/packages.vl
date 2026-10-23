@@ -20,6 +20,12 @@
 // packages are kept in $VELA_HOME/pkg/NAME@COMMIT ($HOME/.vela by
 // default); git's own hashes check that the files are those of the commit.
 //
+// A repository may hold several packages, each in a directory of its own:
+// the source names it after `//`, and its version tags start with it, as
+// Go's do:
+//
+//     use json https://github.com/nathgoutam93/vela//packages/json packages/json/v1.0.0
+//
 // When two packages use different versions of a third, the one vela.mod
 // names wins if it names one; otherwise both must agree, or both be
 // version tags (v1.2.3), and the higher is taken, as Go does. A package
@@ -54,6 +60,54 @@ pub type Locked = struct {
 
 fn is_dir_source(d: Dep) -> Bool {
     return d.ref == ""
+}
+
+// A git source as [the repository, the package's directory in it]: the
+// part after a `//` that is not the one after `https:`, or "".
+fn split_source(source: Str) -> [Str] {
+    let mut start = 1
+    for i in 0..len(source) - 2 {
+        if source[i] == ':' && source[i + 1] == '/' && source[i + 2] == '/' {
+            start = i + 3
+            break
+        }
+    }
+    for i in start..len(source) - 1 {
+        if source[i] == '/' && source[i + 1] == '/' {
+            return [source[0..i], source[i + 2..len(source)]]
+        }
+    }
+    return [source, ""]
+}
+
+fn repository(source: Str) -> Str {
+    return split_source(source)[0]
+}
+
+// Where a git package is in the files fetched for it.
+fn in_repository(dir: Str, source: Str) -> Str {
+    let sub = split_source(source)[1]
+    if sub == "" {
+        return dir
+    }
+    return modules.normpath(modules.join(dir, sub))
+}
+
+// Whether a directory in a repository stays in it: relative, without "..".
+fn stays_inside(sub: Str) -> Bool {
+    if sub == "" || sub[0] == '/' {
+        return false
+    }
+    let mut start = 0
+    for i in 0..len(sub) + 1 {
+        if i == len(sub) || sub[i] == '/' {
+            if sub[start..i] == ".." || sub[start..i] == "" {
+                return false
+            }
+            start = i + 1
+        }
+    }
+    return true
 }
 
 // ---- vela.mod and vela.lock ----
@@ -109,7 +163,7 @@ fn is_name(s: Str) -> Bool {
 }
 
 // Why `name` cannot name a package, or "".
-fn bad_name(name: Str) -> Str {
+pub fn bad_name(name: Str) -> Str {
     if !is_name(name) {
         return "'" + name + "' is not a name: letters, digits and _, not starting with a digit"
     }
@@ -154,6 +208,9 @@ pub fn parse_manifest(text: Str, file: Str) -> Result[Manifest, Str] {
             let mut ref = ""
             if len(w) == 4 {
                 ref = w[3]
+                if repository(w[2]) != w[2] && !stays_inside(split_source(w[2])[1]) {
+                    return Err(at + "after `//` comes a directory in the repository, as URL//packages/json")
+                }
             }
             push(mut m.deps, Dep { name: w[1], source: w[2], ref: ref, line: i + 1 })
         } else {
@@ -218,9 +275,15 @@ fn is_commit(s: Str) -> Bool {
     return true
 }
 
-// "v1.2.3" or "1.2.3" as [1, 2, 3]; [] for anything else.
+// "v1.2.3" or "1.2.3" as [1, 2, 3], after the directory of a package in
+// a repository of several ("packages/json/v1.2.3"); [] for anything else.
 pub fn version(ref: Str) -> [Int] {
     let mut s = ref
+    for i in 0..len(ref) {
+        if ref[i] == '/' {
+            s = ref[i + 1..len(ref)]
+        }
+    }
     if len(s) > 0 && s[0] == 'v' {
         s = s[1..len(s)]
     }
@@ -352,6 +415,7 @@ pub fn for_program(main_path: Str) -> Result[modules.Packages, Str] uses fs, os 
             if !exists(fetched_marker(pdir)) {
                 return Err("package '" + d.name + "' is not fetched yet; run `vela get`")
             }
+            pdir = in_repository(pdir, l.source)
         }
         let m = manifest_in(pdir)?
         if m.package != "" && m.package != d.name {
@@ -496,23 +560,28 @@ fn full_source(w: Want) -> Str {
 
 // Where the chosen package's files are, fetching them if need be.
 fn place(w: Want, commits: mut Map[Str, Str], old: Map[Str, Locked]) -> Result[Str, Str] uses fs, os {
+    let mut dir = ""
+    let mut at = ""
     if is_dir_source(w.dep) {
-        let dir = modules.normpath(modules.join(w.base, w.dep.source))
-        if !exists(modules.join(dir, w.dep.name + ".vl")) {
-            return Err("package '" + w.dep.name + "' is not in " + dir + ": there is no " + w.dep.name + ".vl there")
+        dir = modules.normpath(modules.join(w.base, w.dep.source))
+        at = dir
+    } else {
+        let key = w.dep.source + " " + w.dep.ref
+        let mut commit = ""
+        match maps.get(commits, key) {
+            Some(c) => commit = c
+            None => {
+                commit = resolve(w.dep, old)?
+                commits[key] = commit
+            }
         }
-        return Ok(dir)
+        dir = in_repository(fetch(w.dep.name, w.dep.source, commit)?, w.dep.source)
+        at = w.dep.source + " " + w.dep.ref
     }
-    let key = w.dep.source + " " + w.dep.ref
-    let mut commit = ""
-    match maps.get(commits, key) {
-        Some(c) => commit = c
-        None => {
-            commit = resolve(w.dep, old)?
-            commits[key] = commit
-        }
+    if !exists(modules.join(dir, w.dep.name + ".vl")) {
+        return Err("package '" + w.dep.name + "' is not in " + at + ": there is no " + w.dep.name + ".vl in " + dir)
     }
-    return fetch(w.dep.name, w.dep.source, commit)
+    return Ok(dir)
 }
 
 // The commit `dep.ref` names: from the old lock when it locked the same
@@ -530,7 +599,7 @@ fn resolve(dep: Dep, old: Map[Str, Locked]) -> Result[Str, Str] uses os {
         return Ok(dep.ref)
     }
     let mut listing = ""
-    match os.output(["git", "ls-remote", dep.source, dep.ref]) {
+    match os.output(["git", "ls-remote", repository(dep.source), dep.ref]) {
         Ok(out) => listing = out
         Err(e) => return Err("cannot look up " + dep.ref + " in " + dep.source + ": " + e)
     }
@@ -581,7 +650,7 @@ fn fetch(name: Str, source: Str, commit: Str) -> Result[Str, Str] uses fs, os {
     let partial = dir + ".partial"
     let steps = [
         ["mkdir", "-p", modules.join(home(), "pkg")], ["rm", "-rf", partial], ["rm", "-rf", dir],
-        ["git", "clone", "--quiet", "--no-checkout", source, partial],
+        ["git", "clone", "--quiet", "--no-checkout", repository(source), partial],
         ["git", "-C", partial, "checkout", "--quiet", "--detach", commit], ["mv", partial, dir],
     ]
     for step in steps {
@@ -637,6 +706,32 @@ pub fn with_use(text: Str, name: Str, line: Str) -> Str {
     return strings.build(b)
 }
 
+// ---- vela new ----
+
+// The files `vela new` makes, as [path, text] pairs: a program (vela.mod,
+// main.vl with a function and a test, .gitignore), or a package (NAME.vl in
+// place of main.vl), in the directory `name`. Every program starts the
+// same way, so that an agent knows where everything is.
+pub fn new_files(name: Str, package: Bool) -> [[Str]] {
+    let mut public = ""
+    if package {
+        public = "pub "
+    }
+    let fn_text = "// The greeting for `who`.\n" + public + "fn greeting(who: Str) -> Str {\n    return \"hello, \" + who\n}\n\n" +
+        "test \"greeting\" {\n    assert(greeting(\"Vela\") == \"hello, Vela\")\n}\n"
+    if package {
+        let text = "// " + name + ": what the package is for. A program uses it with a line in\n" +
+            "// its vela.mod (`vela get " + name + " SOURCE [REF]` writes it) and `import " + name + "`.\n\n" + fn_text
+        return [[modules.join(name, "vela.mod"), "package " + name + "\n"], [modules.join(name, name + ".vl"), text]]
+    }
+    let manifest = "// The packages this program uses: `vela get NAME SOURCE [REF]` adds one.\npackage " + name + "\n"
+    let main_text = "// " + name + ": what the program does.\n//\n" +
+        "// `vela run main.vl` runs it, `vela test main.vl` runs its tests.\n\nfn main() {\n" +
+        "    print(greeting(\"world\"))\n}\n\n" + fn_text
+    return [[modules.join(name, "vela.mod"), manifest], [modules.join(name, "main.vl"), main_text],
+        [modules.join(name, ".gitignore"), "/main\n"]]
+}
+
 // ---- Tests ----
 
 fn manifest_or_fail(text: Str) -> Manifest {
@@ -667,6 +762,9 @@ test "vela.mod" {
     assert(error_of("use 9x ../x") == "vela.mod:1: '9x' is not a name: letters, digits and _, not starting with a digit")
     assert(error_of("use os ../x") == "vela.mod:1: 'os' is the name of a built-in module")
     assert(error_of("use a ../a\nuse a ../b") == "vela.mod:2: 'a' is already used, on line 1")
+    assert(error_of("use a https://h/r//../x v1.0.0") == "vela.mod:1: after `//` comes a directory in the repository, as " +
+        "URL//packages/json")
+    assert(error_of("use a /r// main") == "vela.mod:1: after `//` comes a directory in the repository, as URL//packages/json")
     assert(error_of("require a ../a") == "vela.mod:1: a line is `package NAME` or `use NAME SOURCE [REF]`, not 'require'")
 }
 
@@ -689,11 +787,22 @@ test "vela.lock" {
     }
 }
 
+test "a package in a repository of several" {
+    let s = split_source("https://github.com/nathgoutam93/vela//packages/json")
+    assert(s[0] == "https://github.com/nathgoutam93/vela" && s[1] == "packages/json")
+    assert(split_source("https://example.com/text.git")[1] == "")
+    assert(split_source("file:///srv/repos/mono//json")[0] == "file:///srv/repos/mono")
+    assert(split_source("/srv/repos/mono//a/b")[1] == "a/b" && split_source("/srv/repos/mono")[1] == "")
+    assert(in_repository("/c/x@1", "/r//a/b") == "/c/x@1/a/b" && in_repository("/c/x@1", "/r") == "/c/x@1")
+    assert(stays_inside("a/b") && !stays_inside("a/../../b") && !stays_inside("/a") && !stays_inside("a//b"))
+}
+
 test "versions" {
     let v = version("v1.20.3")
     assert(len(v) == 3 && v[1] == 20)
     assert(len(version("1.2.3")) == 3 && len(version("main")) == 0 && len(version("v1.2")) == 0)
     assert(len(version("v1..2")) == 0 && len(version("v1.2.3-rc1")) == 0)
+    assert(version("packages/json/v1.4.0")[1] == 4 && len(version("packages/json/main")) == 0)
     assert(newer(version("v1.10.0"), version("v1.9.9")) && !newer(version("v1.2.3"), version("v1.2.3")))
 }
 
@@ -740,6 +849,14 @@ test "commits from git ls-remote" {
         Some(_) => assert(false)
         None => {}
     }
+}
+
+test "vela new" {
+    let program = new_files("hello", false)
+    assert(len(program) == 3 && program[0][0] == "hello/vela.mod" && program[1][0] == "hello/main.vl")
+    assert(manifest_or_fail(program[0][1]).package == "hello")
+    let package = new_files("money", true)
+    assert(len(package) == 2 && package[1][0] == "money/money.vl" && package[0][1] == "package money\n")
 }
 
 test "adding a use line" {
