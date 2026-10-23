@@ -1,0 +1,402 @@
+// The native backend's intermediate representation (M11): what lower.vl
+// makes of a checked program, and what x64.vl turns into assembly.
+//
+// A function is a list of instructions on virtual registers, numbered
+// from 0, as many as it needs. Each holds a 64-bit integer (Int, Byte,
+// Bool, Unit, a pointer) or a Float, its class. A register can be
+// assigned more than once, as a variable is; most are assigned once, as in
+// SSA. Labels mark where jumps go: the instructions from one label to the
+// next jump or return are a basic block.
+//
+// Values bigger than a register (a Str, a struct, an enum, a function
+// value) live in memory: in a stack slot of the function, a fixed number
+// of bytes the backend places in its frame, or wherever a pointer says.
+// Registers then hold their addresses. So the IR has loads, stores and
+// copies of memory, at an address plus a constant offset.
+//
+// Calls: `Call` calls a Vela function, which takes its arguments in
+// registers as C would take integers and doubles; a Vela value in memory
+// is passed as its address, and a function returning one gets the address
+// to write it to as its first argument. `CCall` calls the C runtime with
+// the C calling convention, which passes a vela_str by value; each
+// argument has a kind saying how.
+//
+//     vela ir FILE    prints it
+// stage 1 only (it has tests, which Stage 0 cannot read)
+import strings
+
+pub type Op = enum {
+    Label  // imm: the label's number
+    Const  // dst = imm
+    FConst  // dst = the Float sym writes ("2.5")
+    Move  // dst = a, of the same class
+    SlotAddr  // dst = the address of slot imm
+    SymAddr  // dst = the address of the symbol sym
+    Load  // dst = the imm2 bytes at a + imm (1: zero-extended, 4: sign-extended, 8)
+    Store  // the imm2 low bytes of b to a + imm
+    FLoad  // dst = the Float at a + imm
+    FStore  // the Float b to a + imm
+    Copy  // imm bytes from b to a: memory to memory
+    Add  // dst = a + b, wrapping: for addresses
+    AddImm  // dst = a + imm, wrapping
+    Sub
+    Mul
+    MulImm  // dst = a * imm, wrapping
+    AddChk  // dst = a + b; a panic "integer overflow" at sym if it overflows
+    SubChk
+    MulChk
+    DivChk  // dst = a / b, truncated; panics for b == 0 and for overflow
+    RemChk
+    NegChk
+    ByteChk  // dst = a; a panic "byte overflow" at sym unless 0 <= a <= 255
+    ToByte  // dst = a; a panic "value does not fit in a Byte" at sym unless 0 <= a <= 255
+    Cmp  // dst = 1 if a (imm) b, else 0; imm: 0 ==, 1 !=, 2 <, 3 <=, 4 >, 5 >=, signed
+    CmpImm  // dst = 1 if a (imm) imm2, else 0
+    FCmp  // the same for Floats, as C compares them: false for NaN except !=
+    Not  // dst = 1 - a, for a Bool
+    FAdd
+    FSub
+    FMul
+    FDiv
+    FNeg
+    IntToFloat
+    Sext32  // dst = the low 32 bits of a, sign-extended: a C int argument
+    Jump  // to label imm
+    Branch  // to label imm if a != 0, else to label imm2
+    BranchCmp  // to label imm if a (sym: "eq" ... "ge") b, else on to the next instruction; a fast `if`
+    Ret  // returns a, or nothing when a is -1
+    Call  // dst = sym(args...), dst -1 for nothing
+    CallInd  // dst = (code at a)(args...)
+    CCall  // dst = sym(args...) in C's convention: kinds[i] says how args[i] goes (KIND_*); imm how
+    // the result comes back (RET_*); a is where a vela_str result goes, or -1
+    RcInc  // one more reference to the object at a, whose count is its first word
+    RcDec  // dst = 1 if a reference to the object at a was the last, after dropping it
+    Unreachable  // after a call that never returns
+}
+
+pub type Inst = struct {
+    op: Op
+    dst: Int
+    a: Int
+    b: Int
+    imm: Int
+    imm2: Int
+    sym: Str
+    args: [Int]
+    kinds: [Int]
+}
+
+// How a CCall passes an argument: in an integer register, in a Float one,
+// or as a vela_str whose address the register holds (copied to the stack).
+pub fn KIND_INT() -> Int {
+    return 0
+}
+
+pub fn KIND_FLOAT() -> Int {
+    return 1
+}
+
+pub fn KIND_STR() -> Int {
+    return 2
+}
+
+// How a CCall's result comes back: none, an integer, a Float, a bool or
+// byte (8 bits), or a vela_str written to the address in `a`.
+pub fn RET_NONE() -> Int {
+    return 0
+}
+
+pub fn RET_INT() -> Int {
+    return 1
+}
+
+pub fn RET_FLOAT() -> Int {
+    return 2
+}
+
+pub fn RET_BOOL() -> Int {
+    return 3
+}
+
+pub fn RET_STR() -> Int {
+    return 4
+}
+
+pub fn INT() -> Int {
+    return 0
+}
+
+pub fn FLOAT() -> Int {
+    return 1
+}
+
+pub type Func = struct {
+    name: Str  // its symbol
+    public: Bool  // seen by other object files: main, and nothing else
+    params: [Int]  // the registers its arguments arrive in, in order
+    result: Int  // the class of what it returns, or -1 for nothing
+    insts: [Inst]
+    classes: [Int]  // of each register
+    slot_sizes: [Int]
+    slot_aligns: [Int]
+    labels: Int  // labels made so far
+}
+
+// Read-only data: a label and the assembler lines that make it.
+pub type Data = struct {
+    label: Str
+    relocated: Bool  // holds addresses, so it goes where the loader can fix them
+    lines: [Str]
+}
+
+pub type Program = struct {
+    funcs: [Func]
+    data: [Data]
+}
+
+pub fn new_func(name: Str, result: Int) -> Func {
+    return Func {
+        name: name, public: false, params: [], result: result, insts: [], classes: [], slot_sizes: [], slot_aligns: [],
+        labels: 0,
+    }
+}
+
+pub fn reg(f: mut Func, class: Int) -> Int {
+    push(mut f.classes, class)
+    return len(f.classes) - 1
+}
+
+pub fn param(f: mut Func, class: Int) -> Int {
+    let r = reg(mut f, class)
+    push(mut f.params, r)
+    return r
+}
+
+pub fn slot(f: mut Func, size: Int, align: Int) -> Int {
+    let mut n = size
+    if n < 1 {
+        n = 1
+    }
+    push(mut f.slot_sizes, n)
+    push(mut f.slot_aligns, align)
+    return len(f.slot_sizes) - 1
+}
+
+pub fn label(f: mut Func) -> Int {
+    f.labels = f.labels + 1
+    return f.labels - 1
+}
+
+pub fn inst(op: Op, dst: Int, a: Int, b: Int, imm: Int) -> Inst {
+    return Inst { op: op, dst: dst, a: a, b: b, imm: imm, imm2: 0, sym: "", args: [], kinds: [] }
+}
+
+pub fn add(f: mut Func, i: Inst) {
+    push(mut f.insts, i)
+}
+
+// Whether control never goes on from `op` to the next instruction.
+pub fn ends_block(op: Op) -> Bool {
+    return op == Op.Jump || op == Op.Branch || op == Op.Ret || op == Op.Unreachable
+}
+
+// The registers `i` reads.
+pub fn reads(i: Inst) -> [Int] {
+    let mut out: [Int] = []
+    if i.a >= 0 && i.op != Op.Label && i.op != Op.Const && i.op != Op.FConst && i.op != Op.SlotAddr && i.op != Op.SymAddr &&
+        i.op != Op.Jump {
+        push(mut out, i.a)
+    }
+    if i.b >= 0 && reads_b(i.op) {
+        push(mut out, i.b)
+    }
+    for r in i.args {
+        push(mut out, r)
+    }
+    return out
+}
+
+fn reads_b(op: Op) -> Bool {
+    return match op {
+        Op.Store => true
+        Op.FStore => true
+        Op.Copy => true
+        Op.Add => true
+        Op.Sub => true
+        Op.Mul => true
+        Op.AddChk => true
+        Op.SubChk => true
+        Op.MulChk => true
+        Op.DivChk => true
+        Op.RemChk => true
+        Op.Cmp => true
+        Op.FCmp => true
+        Op.FAdd => true
+        Op.FSub => true
+        Op.FMul => true
+        Op.FDiv => true
+        Op.BranchCmp => true
+        _ => false
+    }
+}
+
+// ---- Printing, for `vela ir` ----
+
+pub fn op_name(op: Op) -> Str {
+    return match op {
+        Op.Label => "label"
+        Op.Const => "const"
+        Op.FConst => "fconst"
+        Op.Move => "move"
+        Op.SlotAddr => "slot"
+        Op.SymAddr => "sym"
+        Op.Load => "load"
+        Op.Store => "store"
+        Op.FLoad => "fload"
+        Op.FStore => "fstore"
+        Op.Copy => "copy"
+        Op.Add => "add"
+        Op.AddImm => "addi"
+        Op.Sub => "sub"
+        Op.Mul => "mul"
+        Op.MulImm => "muli"
+        Op.AddChk => "add.chk"
+        Op.SubChk => "sub.chk"
+        Op.MulChk => "mul.chk"
+        Op.DivChk => "div.chk"
+        Op.RemChk => "rem.chk"
+        Op.NegChk => "neg.chk"
+        Op.ByteChk => "byte.chk"
+        Op.ToByte => "tobyte"
+        Op.Cmp => "cmp"
+        Op.CmpImm => "cmpi"
+        Op.FCmp => "fcmp"
+        Op.Not => "not"
+        Op.FAdd => "fadd"
+        Op.FSub => "fsub"
+        Op.FMul => "fmul"
+        Op.FDiv => "fdiv"
+        Op.FNeg => "fneg"
+        Op.IntToFloat => "itof"
+        Op.Sext32 => "sext32"
+        Op.Jump => "jump"
+        Op.Branch => "branch"
+        Op.BranchCmp => "branch.cmp"
+        Op.Ret => "ret"
+        Op.Call => "call"
+        Op.CallInd => "call.ind"
+        Op.CCall => "ccall"
+        Op.RcInc => "rc.inc"
+        Op.RcDec => "rc.dec"
+        Op.Unreachable => "unreachable"
+    }
+}
+
+fn r(n: Int) -> Str {
+    return "%" + strings.from_int(n)
+}
+
+pub fn inst_text(i: Inst) -> Str {
+    if i.op == Op.Label {
+        return "L" + strings.from_int(i.imm) + ":"
+    }
+    let mut b = strings.builder()
+    strings.add(mut b, "    ")
+    if i.dst >= 0 {
+        strings.add(mut b, r(i.dst) + " = ")
+    }
+    strings.add(mut b, op_name(i.op))
+    if i.sym != "" {
+        strings.add(mut b, " " + i.sym)
+    }
+    if i.op == Op.Jump {
+        strings.add(mut b, " L" + strings.from_int(i.imm))
+        return strings.build(b)
+    }
+    if i.a >= 0 && i.op != Op.Const && i.op != Op.SlotAddr {
+        strings.add(mut b, " " + r(i.a))
+    }
+    if i.b >= 0 && reads_b(i.op) {
+        strings.add(mut b, ", " + r(i.b))
+    }
+    if len(i.args) > 0 {
+        strings.add(mut b, " (")
+        for k in 0..len(i.args) {
+            if k > 0 {
+                strings.add(mut b, ", ")
+            }
+            strings.add(mut b, r(i.args[k]))
+            if k < len(i.kinds) && i.kinds[k] == KIND_STR() {
+                strings.add(mut b, " as str")
+            }
+        }
+        strings.add(mut b, ")")
+    }
+    if i.op == Op.Branch || i.op == Op.BranchCmp {
+        strings.add(mut b, " L" + strings.from_int(i.imm))
+        if i.op == Op.Branch {
+            strings.add(mut b, " L" + strings.from_int(i.imm2))
+        }
+    } else if i.op == Op.Const || i.op == Op.SlotAddr || i.op == Op.Copy || i.op == Op.AddImm || i.op == Op.MulImm ||
+        i.op == Op.Cmp || i.op == Op.CmpImm || i.op == Op.CCall {
+        strings.add(mut b, " #" + strings.from_int(i.imm))
+        if i.op == Op.CmpImm {
+            strings.add(mut b, " #" + strings.from_int(i.imm2))
+        }
+    } else if i.op == Op.Load || i.op == Op.Store || i.op == Op.FLoad || i.op == Op.FStore {
+        strings.add(mut b, " +" + strings.from_int(i.imm))
+        if i.op == Op.Load || i.op == Op.Store {
+            strings.add(mut b, " (" + strings.from_int(i.imm2) + ")")
+        }
+    }
+    return strings.build(b)
+}
+
+pub fn func_text(f: Func) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, "fn " + f.name + "(")
+    for k in 0..len(f.params) {
+        if k > 0 {
+            strings.add(mut b, ", ")
+        }
+        strings.add(mut b, r(f.params[k]))
+        if f.classes[f.params[k]] == FLOAT() {
+            strings.add(mut b, ": f")
+        }
+    }
+    strings.add(mut b, ")")
+    for s in 0..len(f.slot_sizes) {
+        if s == 0 {
+            strings.add(mut b, "  slots")
+        }
+        strings.add(mut b, " " + strings.from_int(s) + ":" + strings.from_int(f.slot_sizes[s]))
+    }
+    strings.add(mut b, "\n")
+    for i in f.insts {
+        strings.add(mut b, inst_text(i) + "\n")
+    }
+    return strings.build(b)
+}
+
+pub fn program_text(p: Program) -> Str {
+    let mut b = strings.builder()
+    for d in p.data {
+        strings.add(mut b, d.label + ":\n")
+        for l in d.lines {
+            strings.add(mut b, "    " + l + "\n")
+        }
+    }
+    for f in p.funcs {
+        strings.add(mut b, "\n" + func_text(f))
+    }
+    return strings.build(b)
+}
+
+test "an instruction as text" {
+    let mut i = inst(Op.AddChk, 3, 1, 2, 0)
+    i.sym = ".Lloc4"
+    assert(inst_text(i) == "    %3 = add.chk .Lloc4 %1, %2")
+    assert(inst_text(inst(Op.Label, -1, -1, -1, 7)) == "L7:")
+    let u = reads(inst(Op.Store, -1, 5, 6, 8))
+    assert(len(u) == 2 && u[0] == 5 && u[1] == 6)
+}

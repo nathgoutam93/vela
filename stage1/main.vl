@@ -5,6 +5,8 @@
 //     vela test FILE [WORDS...]   run the program's tests (those whose names
 //                                 contain one of the words, if any are given)
 //     vela c FILE                 print the generated C
+//     vela ir FILE                print the native backend's IR (see ir.vl)
+//     vela asm FILE               print the x86-64 assembly (see x64.vl)
 //     vela check FILE             report the program's errors, generate nothing
 //     vela check --json FILE      the same, as one JSON document on stdout
 //     vela tokens FILE            print the token stream
@@ -29,7 +31,9 @@
 // stage 1 only (it says `uses`)
 //
 // VELA_CC picks the C compiler (default `cc`); VELA_CFLAGS adds flags to its
-// command line, split at spaces. The runtime and the standard modules are
+// command line, split at spaces. VELA_BACKEND=native compiles programs to
+// x86-64 assembly instead of C (M11, lower.vl and x64.vl); the C compiler
+// then assembles it and builds the runtime. The runtime and the standard modules are
 // found in runtime/ and std/ next to the build/ directory this program is
 // in, or under VELA_ROOT if it is set.
 import ast
@@ -39,7 +43,9 @@ import complete
 import errors
 import files
 import format
+import ir
 import lexer
+import lower
 import lsp
 import modules
 import os
@@ -49,6 +55,7 @@ import query
 import rename
 import strings
 import tasks
+import x64
 
 fn main() {
     let args = os.args()
@@ -127,6 +134,11 @@ fn main() {
         syntax_tree(path)
     } else if command == "check" {
         checked(path, root)
+    } else if command == "ir" {
+        print(ir.program_text(lowered(path, native_program(path, checked(path, root), false))))
+    } else if command == "asm" {
+        let out = x64.program(lowered(path, native_program(path, checked(path, root), false)))
+        print(out[0..len(out) - 1])
     } else if command == "c" {
         let out = c_code(path, codegen.generate(checked(path, root)))
         print(out[0..len(out) - 1])
@@ -136,7 +148,7 @@ fn main() {
 }
 
 fn usage() uses os {
-    os.eprint("usage: vela (build | run | test | c | check | tokens | ast | fmt | query) FILE, vela rename, vela lsp, " +
+    os.eprint("usage: vela (build | run | test | c | ir | asm | check | tokens | ast | fmt | query) FILE, vela rename, vela lsp, " +
         "vela get, or vela new")
     os.exit(2)
 }
@@ -372,7 +384,108 @@ fn split_flags(flags: Str) -> [Str] {
 
 // Compile a .vl file all the way to a native executable.
 fn build(path: Str, exe: Str, root: Str) uses fs, os {
+    if native() {
+        let p = lowered(path, native_program(path, checked(path, root), false))
+        assemble(x64.program(p), modules.stem(path), exe, root, "-O2")
+        return
+    }
     compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root, "-O2")
+}
+
+// VELA_BACKEND=native: assembly instead of C.
+fn native() -> Bool uses os {
+    match os.env("VELA_BACKEND") {
+        Some(b) => return b == "native"
+        None => return false
+    }
+}
+
+fn native_program(path: Str, k: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] {
+    return lower.lower(k, for_tests)
+}
+
+// The IR, or stop with the errors that only making it found.
+fn lowered(path: Str, made: Result[ir.Program, [errors.CompileError]]) -> ir.Program uses os {
+    match made {
+        Ok(p) => return p
+        Err(errs) => fail(path, errs)
+    }
+    return ir.Program { funcs: [], data: [] }  // not reached
+}
+
+// Assembly into a scratch directory, assembled by the C compiler at the
+// same time as it compiles the runtime (optimizing at `opt`), then linked.
+fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
+    let mut tmp = ""
+    match files.temp_dir() {
+        Ok(dir) => tmp = dir
+        Err(e) => driver_error(e)
+    }
+    let mut cc = "cc"
+    match os.env("VELA_CC") {
+        Some(name) => cc = name
+        None => {}
+    }
+    let mut flags: [Str] = []
+    match os.env("VELA_CFLAGS") {
+        Some(f) => flags = split_flags(f)
+        None => {}
+    }
+    let runtime = modules.join(root, "runtime")
+    let source = modules.join(tmp, stem + ".s")
+    match files.write(source, asm) {
+        Ok(_) => {}
+        Err(e) => driver_error(e)
+    }
+    let program_o = modules.join(tmp, "program.o")
+    let runtime_o = modules.join(tmp, "runtime.o")
+    let mut rt = [cc, "-std=c11", opt, "-pthread"]
+    for f in flags {
+        push(mut rt, f)
+    }
+    for word in ["-I", runtime, "-c", modules.join(runtime, "vela_rt.c"), "-o", runtime_o] {
+        push(mut rt, word)
+    }
+    let commands = [[cc, "-c", source, "-o", program_o], rt]
+    let codes = tasks.map(commands, fn(command) {
+        match os.run(command) {
+            Ok(code) => return code
+            Err(_) => return -1
+        }
+    })
+    let mut failed: [Str] = []
+    for i in 0..len(codes) {
+        if codes[i] < 0 {
+            driver_error("C compiler '" + cc + "' could not be run; install gcc or clang, or set VELA_CC")
+        }
+        if codes[i] != 0 {
+            failed = commands[i]
+        }
+    }
+    if len(failed) == 0 {
+        let mut link = [cc, "-pthread"]
+        for f in flags {
+            push(mut link, f)
+        }
+        for word in [program_o, runtime_o, "-o", exe] {
+            push(mut link, word)
+        }
+        match os.run(link) {
+            Ok(c) => {
+                if c != 0 {
+                    failed = link
+                }
+            }
+            Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + e + ")")
+        }
+    }
+    for f in [source, program_o, runtime_o] {
+        files.remove(f)
+    }
+    files.remove(tmp)
+    if len(failed) > 0 {
+        internal_error("the assembler or linker rejected the generated code\ncommand: " + join_words(failed))
+    }
 }
 
 // The C, or stop with the errors that only writing it found.
@@ -751,7 +864,11 @@ fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
     let exe = modules.join(tmp, "tests")
     // Tests are built often and run briefly, so the C compiler does not
     // optimize: building the compiler's own tests takes 3 s instead of 20.
-    compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root, "-O0")
+    if native() {
+        assemble(x64.program(lowered(path, native_program(path, k, true))), modules.stem(path) + "_tests", exe, root, "-O0")
+    } else {
+        compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root, "-O0")
+    }
     let mut failed = 0
     for i in chosen {
         let f = k.fns[ids[i]]

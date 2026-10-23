@@ -336,7 +336,10 @@ def main() -> int:
     ap.add_argument("--sanitize", action="store_true",
                     help="build with AddressSanitizer and UBSan; leaks fail the test")
     ap.add_argument("--tsan", action="store_true", help="build with ThreadSanitizer; data races fail the test")
+    ap.add_argument("--native", action="store_true",
+                    help="compile programs with the native backend (VELA_BACKEND=native) instead of through C")
     args = ap.parse_args()
+    global RUN_TIMEOUT
 
     if args.compiler:
         compiler = shlex.split(args.compiler)
@@ -352,11 +355,14 @@ def main() -> int:
     if args.sanitize:
         env["VELA_CFLAGS"] += SANITIZE_CFLAGS
         env["ASAN_OPTIONS"] = "detect_leaks=1"
+        # AddressSanitizer makes an allocating program 3 to 15 times slower.
+        RUN_TIMEOUT *= 3
+    if args.native:
+        env["VELA_BACKEND"] = "native"
     if args.tsan:
         env["VELA_CFLAGS"] += TSAN_CFLAGS
         env["TSAN_OPTIONS"] = "halt_on_error=1"
         # ThreadSanitizer makes a program 5 to 15 times slower.
-        global RUN_TIMEOUT
         RUN_TIMEOUT *= 10
 
     tests = find_tests(args.filters)

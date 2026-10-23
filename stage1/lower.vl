@@ -1,0 +1,2985 @@
+// Lowering (M11): a checked program as IR (ir.vl), for the native backend.
+//
+// This is codegen.vl again, writing IR where it writes C, function for
+// function: the same owned and borrowed values, the same frames of values
+// to release, the same copy-on-write, so that a program does the same
+// thing compiled either way. What C did for codegen.vl is done here:
+//
+// - Memory layout. Every type gets a size, an alignment, and offsets for
+//   its fields, as a C compiler lays out the structs layout.vl declares:
+//   an enum is an int32 tag, then a union of one struct per variant.
+// - Values. A Value is a register holding a scalar (an Int, a Bool, a
+//   pointer to an array) or the place in memory of a bigger one (a Str, a
+//   struct); a path into a value, `p.x`, is the same place at a greater
+//   offset, read when used, as C reads `v_p.m_x`.
+// - Locals. A local of a scalar type is a register, assigned as often as
+//   the program assigns it; one whose address is taken (`mut x` given to a
+//   function) and one of a bigger type live in a stack slot.
+// - Calls. A Vela function takes scalars in registers and bigger values as
+//   their addresses; one returning a bigger value writes it where its first
+//   argument points. The runtime is called with C's convention (CCall).
+// - The functions C generated from layout.vl: retain, release and share
+//   for each type, boxes, and the descriptors arrays and maps use.
+// stage 1 only (it has tests, which Stage 0 cannot read)
+import ast
+import checker
+import codegen
+import errors
+import ir
+import layout
+import maps
+import mono
+import strings
+import types
+
+// ---- Values ----
+
+pub type Val = struct {
+    reg: Int  // the register holding the scalar, or the address; -1 for no value
+    off: Int  // added to the address
+    mem: Bool  // the value is in memory at reg + off
+    ty: Int
+    owned: Bool  // holds a reference of its own, to release or hand on
+    is_static: Bool  // a Str literal: never counted, so free to copy
+    temp: Bool  // a temporary of this function's: nothing else changes it
+}
+
+fn reg_val(r: Int, t: Int) -> Val {
+    return Val { reg: r, off: 0, mem: false, ty: t, owned: false, is_static: false, temp: false }
+}
+
+fn mem_val(r: Int, off: Int, t: Int) -> Val {
+    return Val { reg: r, off: off, mem: true, ty: t, owned: false, is_static: false, temp: false }
+}
+
+fn no_value() -> Val {
+    return reg_val(-1, types.NOTHING())
+}
+
+fn same_place(a: Val, b: Val) -> Bool {
+    return a.reg == b.reg && a.off == b.off && a.mem == b.mem && a.ty == b.ty
+}
+
+// Values to release when a part of the program ends, as in codegen.vl;
+// kind is "function", "block", "body" (of a loop), "arm", "stmt" or
+// "branch". A loop's body knows where break and continue go.
+type Item = struct {
+    v: Val
+    ty: Int
+    restore: Str  // a fake to put back when the frame ends ("files", ...), or ""
+    saved: Int  // the register with what the fake replaced
+}
+
+type Frame = struct {
+    kind: Str
+    items: [Item]
+    exit: Int  // a loop body's: the label after the loop
+    next: Int  // and the label continue goes to
+}
+
+// The sizes of a type in memory, as C lays out layout.vl's structs.
+type Shape = struct {
+    size: Int
+    align: Int
+    offsets: [Int]  // a struct's fields
+    payloads: [[Int]]  // an enum's: each variant's values, from the start
+}
+
+// What is being written now: a function, or a closure inside one.
+type Fn = struct {
+    f: ir.Func
+    filename: Str
+    current_fn: Int
+    params: [Int]  // in a copy of a generic function, its type parameters
+    args: [Int]  // and what they are in this copy
+    cname: Str
+    locals: Map[Int, Val]  // where each local lives, by local id
+    captures: Map[Int, Val]  // in a closure: its copies, in the environment
+    closure_result: Int  // -2 outside a closure
+    closures: Int
+    frames: [Frame]
+    dead: Bool  // right after a return, break or continue
+    sret: Int  // the register with where the result goes, when it is in memory; -1 otherwise
+    taken: Map[Int, Bool]  // locals whose address is taken: they live in memory
+}
+
+type Low = struct {
+    k: checker.Checked
+    l: layout.Layout
+    shapes: Map[Int, Shape]
+    instance_names: Map[Str, Str]
+    fs: Fn
+    funcs: [ir.Func]
+    data: [ir.Data]
+    strs: Map[Str, Str]  // the label of each Str literal's vela_str
+    cstrs: Map[Str, Str]  // the label of each C string
+    made: Map[Str, Bool]  // functions written on demand (wrappers, thunks), by symbol
+    descs: Map[Int, Str]  // descriptors written, by type
+}
+
+fn new_fn(name: Str, result: Int) -> Fn {
+    return Fn {
+        f: ir.new_func(name, result), filename: "", current_fn: -1, params: [], args: [], cname: name, locals: [:],
+        captures: [:], closure_result: -2, closures: 0, frames: [], dead: false, sret: -1, taken: [:],
+    }
+}
+
+// ---- The program ----
+
+// The IR of a program, or of `vela test`'s program (`for_tests`), or the
+// errors only making the generic copies finds.
+pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] {
+    let mut k = checked
+    let mut roots: [Int] = []
+    for id in 0..len(k.fns) {
+        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test {
+            push(mut roots, id)
+        }
+    }
+    let tests = codegen.test_ids(k)
+    if for_tests {
+        for id in tests {
+            push(mut roots, id)
+        }
+    }
+    let copies = mono.collect(mut k, roots)
+    if len(copies.errors) > 0 {
+        return Err(copies.errors)
+    }
+    let mut elements: [Int] = []
+    for t in k.table.arrays {
+        if !types.is_open(k.table, t) {
+            add_new(mut elements, t)
+        }
+    }
+    for t in k.table.maps {
+        if !types.is_open(k.table, t) {
+            add_new(mut elements, t)
+        }
+    }
+    let mut user_types: [Int] = []
+    for t in k.decls {
+        if !types.is_generic(k.table, t) {
+            push(mut user_types, t)
+        }
+    }
+    let l = layout.new_layout(k.table, user_types, elements)
+    let mut g = Low {
+        k: k, l: l, shapes: [:], instance_names: [:], fs: new_fn("", -1), funcs: [], data: [], strs: [:], cstrs: [:],
+        made: [:], descs: [:],
+    }
+    // The copies of generic functions are named as codegen.vl names them.
+    let mut taken: Map[Str, Bool] = [:]
+    let mut copy_names: [Str] = []
+    for c in copies.instances {
+        let mut name = fn_name(k, c.fn_id) + "_"
+        for a in c.args {
+            name = name + "_" + layout.suffix(g.l, a)
+        }
+        let base = name
+        let mut n = 2
+        for maps.has(taken, name) {
+            name = base + "_" + strings.from_int(n)
+            n = n + 1
+        }
+        taken[name] = true
+        g.instance_names[mono.key(c.fn_id, c.args)] = name
+        push(mut copy_names, name)
+    }
+    for i in 0..len(roots) + len(copies.instances) {
+        if i < len(roots) {
+            function(mut g, roots[i], [], [], fn_name(k, roots[i]))
+        } else {
+            let c = copies.instances[i - len(roots)]
+            function(mut g, c.fn_id, g.k.fns[c.fn_id].type_params, c.args, copy_names[i - len(roots)])
+        }
+    }
+    memory_functions(mut g)
+    entry(mut g, for_tests, tests)
+    return Ok(ir.Program { funcs: g.funcs, data: g.data })
+}
+
+fn add_new(xs: mut [Int], x: Int) {
+    for y in xs {
+        if y == x {
+            return
+        }
+    }
+    push(mut xs, x)
+}
+
+fn fn_name(k: checker.Checked, id: Int) -> Str {
+    let f = k.fns[id]
+    if f.is_test {
+        return "vela_test_" + strings.from_int(id)
+    }
+    return "f_" + layout.mangle(k.modules[f.module].name, f.decl.name)
+}
+
+// `main`, called by C: it starts the runtime and calls the program's main,
+// or for `vela test`, the test whose number is the first argument.
+fn entry(g: mut Low, for_tests: Bool, tests: [Int]) {
+    g.fs = new_fn("main", ir.INT())
+    g.fs.f.public = true
+    let argc = ir.param(mut g.fs.f, ir.INT())
+    let argv = ir.param(mut g.fs.f, ir.INT())
+    ccall(mut g, "vela_init", [argc, argv], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+    if !for_tests {
+        call(mut g, "f_main", [], -1)
+        ret(mut g, konst(mut g, 0))
+        finish(mut g)
+        return
+    }
+    let n = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.Sext32, n, argc, -1, 0))
+    let which = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.Const, which, -1, -1, -1))
+    let none = label(mut g)
+    branch_cmp(mut g, "le", n, konst(mut g, 1), none)
+    let first = load(mut g, argv, 8, 8)
+    let parsed = ccall(mut g, "strtol", [first, konst(mut g, 0), konst(mut g, 10)],
+        [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    emit(mut g, ir.inst(ir.Op.Move, which, parsed, -1, 0))
+    place_label(mut g, none)
+    for i in 0..len(tests) {
+        let next = label(mut g)
+        branch_cmp(mut g, "ne", which, konst(mut g, i), next)
+        call(mut g, fn_name(g.k, tests[i]), [], -1)
+        ret(mut g, konst(mut g, 0))
+        place_label(mut g, next)
+    }
+    ret(mut g, konst(mut g, 2))
+    finish(mut g)
+}
+
+// The function being written is done.
+fn finish(g: mut Low) {
+    push(mut g.funcs, g.fs.f)
+}
+
+// ---- Emitting ----
+
+fn emit(g: mut Low, i: ir.Inst) {
+    ir.add(mut g.fs.f, i)
+}
+
+fn reg(g: mut Low, class: Int) -> Int {
+    return ir.reg(mut g.fs.f, class)
+}
+
+fn label(g: mut Low) -> Int {
+    return ir.label(mut g.fs.f)
+}
+
+fn place_label(g: mut Low, l: Int) {
+    emit(mut g, ir.inst(ir.Op.Label, -1, -1, -1, l))
+}
+
+fn jump(g: mut Low, l: Int) {
+    emit(mut g, ir.inst(ir.Op.Jump, -1, -1, -1, l))
+}
+
+// Go to `yes` if the register `c` is not 0, else to `no`.
+fn branch(g: mut Low, c: Int, yes: Int, no: Int) {
+    let mut i = ir.inst(ir.Op.Branch, -1, c, -1, yes)
+    i.imm2 = no
+    emit(mut g, i)
+}
+
+// Go to `to` if a (cond) b; otherwise on. cond: "eq", "ne", "lt", "le",
+// "gt", "ge", or "ult" and "uge" for unsigned comparisons.
+fn branch_cmp(g: mut Low, cond: Str, a: Int, b: Int, to: Int) {
+    let mut i = ir.inst(ir.Op.BranchCmp, -1, a, b, to)
+    i.sym = cond
+    emit(mut g, i)
+}
+
+// Go on if the register `c` is not 0, else to `fail`.
+fn fail_unless(g: mut Low, c: Int, fail: Int) {
+    let ok = label(mut g)
+    branch(mut g, c, ok, fail)
+    place_label(mut g, ok)
+}
+
+fn ret(g: mut Low, r: Int) {
+    emit(mut g, ir.inst(ir.Op.Ret, -1, r, -1, 0))
+}
+
+fn konst(g: mut Low, n: Int) -> Int {
+    let r = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.Const, r, -1, -1, n))
+    return r
+}
+
+fn op2(g: mut Low, op: ir.Op, a: Int, b: Int) -> Int {
+    let r = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(op, r, a, b, 0))
+    return r
+}
+
+fn fop2(g: mut Low, op: ir.Op, a: Int, b: Int) -> Int {
+    let r = reg(mut g, ir.FLOAT())
+    emit(mut g, ir.inst(op, r, a, b, 0))
+    return r
+}
+
+// An operation that may panic, at `loc` (a C string label).
+fn checked_op(g: mut Low, op: ir.Op, a: Int, b: Int, loc: Str) -> Int {
+    let r = reg(mut g, ir.INT())
+    let mut i = ir.inst(op, r, a, b, 0)
+    i.sym = loc
+    emit(mut g, i)
+    return r
+}
+
+fn add_imm(g: mut Low, a: Int, n: Int) -> Int {
+    if n == 0 {
+        return a
+    }
+    let r = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.AddImm, r, a, -1, n))
+    return r
+}
+
+fn cmp(g: mut Low, cond: Int, a: Int, b: Int) -> Int {
+    let r = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.Cmp, r, a, b, cond))
+    return r
+}
+
+fn cmp_imm(g: mut Low, cond: Int, a: Int, n: Int) -> Int {
+    let r = reg(mut g, ir.INT())
+    let mut i = ir.inst(ir.Op.CmpImm, r, a, -1, cond)
+    i.imm2 = n
+    emit(mut g, i)
+    return r
+}
+
+fn cond_code(op: Str) -> Int {
+    return match op {
+        "==" => 0
+        "!=" => 1
+        "<" => 2
+        "<=" => 3
+        ">" => 4
+        _ => 5
+    }
+}
+
+fn load(g: mut Low, addr: Int, off: Int, size: Int) -> Int {
+    let r = reg(mut g, ir.INT())
+    let mut i = ir.inst(ir.Op.Load, r, addr, -1, off)
+    i.imm2 = size
+    emit(mut g, i)
+    return r
+}
+
+fn store(g: mut Low, addr: Int, off: Int, size: Int, v: Int) {
+    let mut i = ir.inst(ir.Op.Store, -1, addr, v, off)
+    i.imm2 = size
+    emit(mut g, i)
+}
+
+fn sym_addr(g: mut Low, sym: Str) -> Int {
+    let r = reg(mut g, ir.INT())
+    let mut i = ir.inst(ir.Op.SymAddr, r, -1, -1, 0)
+    i.sym = sym
+    emit(mut g, i)
+    return r
+}
+
+fn copy_mem(g: mut Low, dst: Int, src: Int, size: Int) {
+    if size > 0 {
+        emit(mut g, ir.inst(ir.Op.Copy, -1, dst, src, size))
+    }
+}
+
+// A C function of the runtime; `sret` is where a vela_str result goes.
+fn ccall(g: mut Low, sym: Str, args: [Int], kinds: [Int], how: Int, sret: Int) -> Int {
+    let mut dst = -1
+    if how == ir.RET_INT() || how == ir.RET_BOOL() {
+        dst = reg(mut g, ir.INT())
+    } else if how == ir.RET_FLOAT() {
+        dst = reg(mut g, ir.FLOAT())
+    }
+    let mut i = ir.inst(ir.Op.CCall, dst, sret, -1, how)
+    i.sym = sym
+    i.args = args
+    i.kinds = kinds
+    emit(mut g, i)
+    return dst
+}
+
+// A Vela function, or one written here: `class` is its result's, or -1.
+fn call(g: mut Low, sym: Str, args: [Int], class: Int) -> Int {
+    let mut dst = -1
+    if class >= 0 {
+        dst = reg(mut g, class)
+    }
+    let mut i = ir.inst(ir.Op.Call, dst, -1, -1, 0)
+    i.sym = sym
+    i.args = args
+    emit(mut g, i)
+    return dst
+}
+
+// A runtime function that never returns.
+fn noreturn(g: mut Low, sym: Str, args: [Int], kinds: [Int]) {
+    ccall(mut g, sym, args, kinds, ir.RET_NONE(), -1)
+    emit(mut g, ir.inst(ir.Op.Unreachable, -1, -1, -1, 0))
+}
+
+// ---- Data ----
+
+// An assembler string of any bytes, with a 0 after them.
+fn asm_string(data: Str) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, ".asciz \"")
+    for c in data {
+        if c == '"' || c == '\\' {
+            strings.add_byte(mut b, '\\')
+            strings.add_byte(mut b, c)
+        } else if c >= 32 && c < 127 {
+            strings.add_byte(mut b, c)
+        } else {
+            let n = int(c)
+            strings.add_byte(mut b, '\\')
+            strings.add_byte(mut b, byte(48 + n / 64))
+            strings.add_byte(mut b, byte(48 + n / 8 % 8))
+            strings.add_byte(mut b, byte(48 + n % 8))
+        }
+    }
+    strings.add_byte(mut b, '"')
+    return strings.build(b)
+}
+
+// The label of a C string with these bytes, made once.
+fn cstring(g: mut Low, text: Str) -> Str {
+    match maps.get(g.cstrs, text) {
+        Some(l) => return l
+        None => {}
+    }
+    let name = ".Lc" + strings.from_int(len(g.data))
+    push(mut g.data, ir.Data { label: name, relocated: false, lines: [asm_string(text)] })
+    g.cstrs[text] = name
+    return name
+}
+
+// The label of a vela_str for the literal: {no object, its bytes, its length}.
+fn str_literal(g: mut Low, s: Str) -> Str {
+    match maps.get(g.strs, s) {
+        Some(l) => return l
+        None => {}
+    }
+    let bytes = cstring(mut g, s)
+    let name = ".Ls" + strings.from_int(len(g.data))
+    push(mut g.data, ir.Data {
+        label: name, relocated: true, lines: [".quad 0", ".quad " + bytes, ".quad " + strings.from_int(len(s))],
+    })
+    g.strs[s] = name
+    return name
+}
+
+fn loc(g: mut Low, line: Int, col: Int) -> Str {
+    return cstring(mut g, g.fs.filename + ":" + strings.from_int(line) + ":" + strings.from_int(col))
+}
+
+fn loc_of(g: mut Low, e: ast.Expr) -> Int {
+    return sym_addr(mut g, loc(mut g, e.line, e.col))
+}
+
+// ---- Types ----
+
+fn sub(g: Low, t: Int) -> Int {
+    return types.find_subst(g.k.table, t, g.fs.params, g.fs.args)
+}
+
+fn ty(g: Low, e: ast.Expr) -> Int {
+    return sub(g, g.k.ty[e.id])
+}
+
+fn local_ty(g: Low, id: Int) -> Int {
+    return sub(g, g.k.locals[id].ty)
+}
+
+fn is_array_like(g: Low, t: Int) -> Bool {
+    return t == types.BUILDER() || types.is_array(g.k.table, t)
+}
+
+// Whether values of `t` live in memory rather than in a register.
+fn in_memory(g: Low, t: Int) -> Bool {
+    if t == types.STR() {
+        return true
+    }
+    if t == types.NOTHING() || t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.UNIT() ||
+        t == types.FLOAT() || is_array_like(g, t) || types.is_map(g.k.table, t) {
+        return false
+    }
+    return true
+}
+
+fn class_of(t: Int) -> Int {
+    if t == types.FLOAT() {
+        return ir.FLOAT()
+    }
+    return ir.INT()
+}
+
+// The bytes a scalar takes in memory.
+fn scalar_size(t: Int) -> Int {
+    if t == types.BYTE() || t == types.BOOL() || t == types.UNIT() {
+        return 1
+    }
+    return 8
+}
+
+fn managed(g: mut Low, t: Int) -> Bool {
+    return layout.managed(mut g.l, t)
+}
+
+fn align_up(n: Int, a: Int) -> Int {
+    return (n + a - 1) / a * a
+}
+
+fn shape(g: mut Low, t: Int) -> Shape {
+    match maps.get(g.shapes, t) {
+        Some(s) => return s
+        None => {}
+    }
+    let mut s = Shape { size: 8, align: 8, offsets: [], payloads: [] }
+    if t == types.STR() {
+        s.size = 24
+    } else if types.is_func(g.k.table, t) {
+        s.size = 16
+    } else if !in_memory(g, t) {
+        s.size = scalar_size(t)
+        s.align = s.size
+    } else {
+        let ti = types.get(g.k.table, t)
+        if ti.tag == types.Tag.Struct {
+            let mut at = 0
+            let mut align = 1
+            for f in ti.fields {
+                let mut fs = Shape { size: 8, align: 8, offsets: [], payloads: [] }
+                if !layout.is_boxed(g.l, t, f.name, 0) {
+                    fs = shape(mut g, f.ty)
+                }
+                at = align_up(at, fs.align)
+                push(mut s.offsets, at)
+                at = at + fs.size
+                if fs.align > align {
+                    align = fs.align
+                }
+            }
+            s.align = align
+            s.size = align_up(at, align)
+        } else {
+            // An int32 tag, then a union of one struct per variant.
+            let mut union_align = 1
+            let mut union_size = 0
+            let mut inner: [[Int]] = []
+            for v in ti.variants {
+                let mut at = 0
+                let mut align = 1
+                let mut offs: [Int] = []
+                for i in 0..len(v.payload) {
+                    let mut ps = Shape { size: 8, align: 8, offsets: [], payloads: [] }
+                    if !layout.is_boxed(g.l, t, v.name, i) {
+                        ps = shape(mut g, v.payload[i])
+                    }
+                    at = align_up(at, ps.align)
+                    push(mut offs, at)
+                    at = at + ps.size
+                    if ps.align > align {
+                        align = ps.align
+                    }
+                }
+                if len(v.payload) > 0 {
+                    at = align_up(at, align)
+                    if align > union_align {
+                        union_align = align
+                    }
+                    if at > union_size {
+                        union_size = at
+                    }
+                }
+                push(mut inner, offs)
+            }
+            let start = align_up(4, union_align)
+            for offs in inner {
+                let mut abs: [Int] = []
+                for o in offs {
+                    push(mut abs, start + o)
+                }
+                push(mut s.payloads, abs)
+            }
+            let mut align = 4
+            if union_align > align {
+                align = union_align
+            }
+            s.align = align
+            if union_size == 0 {
+                s.size = 4
+            } else {
+                s.size = align_up(start + union_size, align)
+            }
+        }
+    }
+    g.shapes[t] = s
+    return s
+}
+
+fn size_of(g: mut Low, t: Int) -> Int {
+    return shape(mut g, t).size
+}
+
+// ---- Values in registers and in memory ----
+
+// The address a value in memory is at.
+fn address(g: mut Low, v: Val) -> Int {
+    return add_imm(mut g, v.reg, v.off)
+}
+
+// The register holding a scalar value, read from memory if it is there.
+fn scalar(g: mut Low, v: Val) -> Int {
+    if !v.mem {
+        return v.reg
+    }
+    if v.ty == types.FLOAT() {
+        let r = reg(mut g, ir.FLOAT())
+        emit(mut g, ir.inst(ir.Op.FLoad, r, v.reg, -1, v.off))
+        return r
+    }
+    return load(mut g, v.reg, v.off, scalar_size(v.ty))
+}
+
+// Write the value `v` of type `t` to the memory at addr + off.
+fn put(g: mut Low, addr: Int, off: Int, t: Int, v: Val) {
+    if in_memory(g, t) {
+        let size = size_of(mut g, t)
+        copy_mem(mut g, add_imm(mut g, addr, off), address(mut g, v), size)
+    } else if t == types.FLOAT() {
+        emit(mut g, ir.inst(ir.Op.FStore, -1, addr, scalar(mut g, v), off))
+    } else {
+        store(mut g, addr, off, scalar_size(t), scalar(mut g, v))
+    }
+}
+
+// Write `v` to the place `p` (a register or memory).
+fn put_place(g: mut Low, p: Val, v: Val) {
+    if p.mem {
+        put(mut g, p.reg, p.off, p.ty, v)
+    } else {
+        emit(mut g, ir.inst(ir.Op.Move, p.reg, scalar(mut g, v), -1, 0))
+    }
+}
+
+// A new stack slot for a value of type t.
+fn slot_val(g: mut Low, t: Int) -> Val {
+    let s = shape(mut g, t)
+    let n = ir.slot(mut g.fs.f, s.size, s.align)
+    let r = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.SlotAddr, r, -1, -1, n))
+    let mut v = mem_val(r, 0, t)
+    v.temp = true
+    return v
+}
+
+// A temporary holding a copy of v's bits: a slot, or a new register.
+fn fresh(g: mut Low, v: Val) -> Val {
+    if in_memory(g, v.ty) {
+        let s = slot_val(mut g, v.ty)
+        put(mut g, s.reg, 0, v.ty, v)
+        return s
+    }
+    let r = reg(mut g, class_of(v.ty))
+    emit(mut g, ir.inst(ir.Op.Move, r, scalar(mut g, v), -1, 0))
+    let mut out = reg_val(r, v.ty)
+    out.temp = true
+    return out
+}
+
+// A new register for a scalar value of type t, as a temporary.
+fn temp_reg(g: mut Low, t: Int) -> Val {
+    let mut v = reg_val(reg(mut g, class_of(t)), t)
+    v.temp = true
+    return v
+}
+
+// ---- Ownership, as in codegen.vl ----
+
+fn push_frame(g: mut Low, kind: Str) {
+    push(mut g.fs.frames, Frame { kind: kind, items: [], exit: -1, next: -1 })
+}
+
+fn pop_frame(g: mut Low) {
+    let frame = g.fs.frames[len(g.fs.frames) - 1]
+    g.fs.frames = g.fs.frames[0..len(g.fs.frames) - 1]
+    if !g.fs.dead {
+        release_frame(mut g, frame)
+    }
+}
+
+fn release_frame(g: mut Low, frame: Frame) {
+    let mut i = len(frame.items) - 1
+    for i >= 0 {
+        let item = frame.items[i]
+        if item.restore != "" {
+            ccall(mut g, "vela_fake_" + item.restore + "_restore", [item.saved], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        } else {
+            release(mut g, item.ty, item.v)
+        }
+        i = i - 1
+    }
+}
+
+// Record a new owned temporary in the innermost frame.
+fn own(g: mut Low, v: Val) -> Val {
+    let mut out = v
+    out.owned = true
+    out.temp = true
+    if managed(mut g, v.ty) {
+        push(mut g.fs.frames[len(g.fs.frames) - 1].items, Item { v: out, ty: v.ty, restore: "", saved: -1 })
+    }
+    return out
+}
+
+// Take ownership of a value: the value itself if it was owned, else a
+// copy with a reference of its own.
+fn consume(g: mut Low, v: Val) -> Val {
+    if !managed(mut g, v.ty) || v.is_static {
+        return v
+    }
+    if v.owned {
+        let mut f = len(g.fs.frames) - 1
+        for f >= 0 {
+            let items = g.fs.frames[f].items
+            for i in 0..len(items) {
+                if items[i].restore == "" && same_place(items[i].v, v) {
+                    let mut kept = items[0..i]
+                    for rest in items[i + 1..len(items)] {
+                        push(mut kept, rest)
+                    }
+                    g.fs.frames[f].items = kept
+                    return v
+                }
+            }
+            f = f - 1
+        }
+        return v
+    }
+    let mut c = v
+    if !v.temp {
+        // As in codegen.vl: a variable or a path is copied first, so later
+        // changes to where it came from cannot change the copy.
+        c = fresh(mut g, v)
+    }
+    retain(mut g, v.ty, c)
+    return c
+}
+
+fn is_scope(kind: Str) -> Bool {
+    return kind == "function" || kind == "block" || kind == "body" || kind == "arm"
+}
+
+// Where local `id` lives: made the first time it is declared.
+fn local_place(g: mut Low, id: Int) -> Val {
+    match maps.get(g.fs.locals, id) {
+        Some(v) => return v
+        None => {}
+    }
+    let t = local_ty(g, id)
+    let mut p = reg_val(-1, t)
+    if in_memory(g, t) || maps.has(g.fs.taken, id) {
+        p = slot_val(mut g, t)
+        p.temp = false
+    } else {
+        p = reg_val(reg(mut g, class_of(t)), t)
+    }
+    g.fs.locals[id] = p
+    return p
+}
+
+fn local(g: mut Low, id: Int) -> Val {
+    match maps.get(g.fs.captures, id) {
+        Some(v) => return v  // a closure's copy, in its environment
+        None => {}
+    }
+    return local_place(mut g, id)
+}
+
+// Declare a local holding an owned value, released when its scope ends.
+fn declare(g: mut Low, id: Int, v: Val) -> Val {
+    let p = local_place(mut g, id)
+    put_place(mut g, p, v)
+    if managed(mut g, p.ty) {
+        let mut f = len(g.fs.frames) - 1
+        for !is_scope(g.fs.frames[f].kind) {
+            f = f - 1
+        }
+        push(mut g.fs.frames[f].items, Item { v: p, ty: p.ty, restore: "", saved: -1 })
+    }
+    return p
+}
+
+// Release every frame up to and including the innermost one of kind
+// `stop` (for break and continue), or every frame ("", for return).
+fn release_until(g: mut Low, stop: Str) {
+    let mut f = len(g.fs.frames) - 1
+    for f >= 0 {
+        let frame = g.fs.frames[f]
+        release_frame(mut g, frame)
+        if frame.kind == stop {
+            break
+        }
+        f = f - 1
+    }
+}
+
+fn local_of(g: Low, id: Int) -> Int {
+    return match g.k.refs[id] {
+        checker.Ref.Local(l) => l
+        _ => -1
+    }
+}
+
+// ---- Retain, release, share ----
+
+fn object(g: mut Low, v: Val, off: Int) -> Int {
+    if v.mem {
+        return load(mut g, v.reg, v.off + off, 8)
+    }
+    return v.reg
+}
+
+fn retain(g: mut Low, t: Int, v: Val) {
+    if !managed(mut g, t) {
+        return
+    }
+    if t == types.STR() || types.is_func(g.k.table, t) {
+        // A Str's object, or a function value's environment: there may be none.
+        let mut at = 0
+        if t != types.STR() {
+            at = 8
+        }
+        let obj = object(mut g, v, at)
+        let done = label(mut g)
+        branch_cmp(mut g, "eq", obj, konst(mut g, 0), done)
+        emit(mut g, ir.inst(ir.Op.RcInc, -1, obj, -1, 0))
+        place_label(mut g, done)
+        return
+    }
+    if is_array_like(g, t) || types.is_map(g.k.table, t) {
+        emit(mut g, ir.inst(ir.Op.RcInc, -1, scalar(mut g, v), -1, 0))
+        return
+    }
+    call(mut g, "rc_retain_" + layout.name_of(g.l, t), [address(mut g, v)], -1)
+}
+
+fn release(g: mut Low, t: Int, v: Val) {
+    if !managed(mut g, t) {
+        return
+    }
+    if t == types.STR() {
+        let obj = object(mut g, v, 0)
+        let done = label(mut g)
+        branch_cmp(mut g, "eq", obj, konst(mut g, 0), done)
+        let last = reg(mut g, ir.INT())
+        emit(mut g, ir.inst(ir.Op.RcDec, last, obj, -1, 0))
+        branch_cmp(mut g, "eq", last, konst(mut g, 0), done)
+        ccall(mut g, "free", [obj], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        place_label(mut g, done)
+        return
+    }
+    if types.is_func(g.k.table, t) {
+        let env = object(mut g, v, 8)
+        let done = label(mut g)
+        branch_cmp(mut g, "eq", env, konst(mut g, 0), done)
+        let last = reg(mut g, ir.INT())
+        emit(mut g, ir.inst(ir.Op.RcDec, last, env, -1, 0))
+        branch_cmp(mut g, "eq", last, konst(mut g, 0), done)
+        let drop = load(mut g, env, 8, 8)
+        let mut i = ir.inst(ir.Op.CallInd, -1, drop, -1, 0)
+        i.args = [env]
+        emit(mut g, i)
+        place_label(mut g, done)
+        return
+    }
+    if is_array_like(g, t) {
+        ccall(mut g, "vela_array_release", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        return
+    }
+    if types.is_map(g.k.table, t) {
+        ccall(mut g, "vela_map_release", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        return
+    }
+    call(mut g, "rc_release_" + layout.name_of(g.l, t), [address(mut g, v)], -1)
+}
+
+// Marks the object at `obj` shared (vela_rc_share): 1 if it was not before.
+fn mark_shared(g: mut Low, obj: Int) -> Int {
+    let n = load(mut g, obj, 0, 8)
+    let was = cmp_imm(mut g, 4, n, 0)  // n > 0
+    let done = label(mut g)
+    branch_cmp(mut g, "le", n, konst(mut g, 0), done)
+    store(mut g, obj, 0, 8, op2(mut g, ir.Op.Sub, konst(mut g, 0), n))
+    place_label(mut g, done)
+    return was
+}
+
+fn share(g: mut Low, t: Int, v: Val) {
+    if !managed(mut g, t) {
+        return
+    }
+    if t == types.STR() {
+        let obj = object(mut g, v, 0)
+        let done = label(mut g)
+        branch_cmp(mut g, "eq", obj, konst(mut g, 0), done)
+        mark_shared(mut g, obj)
+        place_label(mut g, done)
+        return
+    }
+    if types.is_func(g.k.table, t) {
+        let env = object(mut g, v, 8)
+        let done = label(mut g)
+        branch_cmp(mut g, "eq", env, konst(mut g, 0), done)
+        let was = mark_shared(mut g, env)
+        branch_cmp(mut g, "eq", was, konst(mut g, 0), done)
+        let mark = load(mut g, env, 16, 8)
+        let mut i = ir.inst(ir.Op.CallInd, -1, mark, -1, 0)
+        i.args = [env]
+        emit(mut g, i)
+        place_label(mut g, done)
+        return
+    }
+    if is_array_like(g, t) {
+        ccall(mut g, "vela_array_share", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        return
+    }
+    if types.is_map(g.k.table, t) {
+        ccall(mut g, "vela_map_share", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        return
+    }
+    call(mut g, "rc_share_" + layout.name_of(g.l, t), [address(mut g, v)], -1)
+}
+
+// The vela_type describing `t` to arrays and maps: the runtime's, or one
+// written here.
+fn descriptor(g: mut Low, t: Int) -> Int {
+    let builtin = match t {
+        1 => "vela_type_int"
+        2 => "vela_type_byte"
+        3 => "vela_type_bool"
+        4 => "vela_type_str"
+        5 => "vela_type_unit"
+        7 => "vela_type_float"
+        _ => ""
+    }
+    if builtin != "" {
+        return sym_addr(mut g, builtin)
+    }
+    if is_array_like(g, t) {
+        return sym_addr(mut g, "vela_type_array")
+    }
+    if types.is_map(g.k.table, t) {
+        return sym_addr(mut g, "vela_type_map")
+    }
+    match maps.get(g.descs, t) {
+        Some(name) => return sym_addr(mut g, name)
+        None => {}
+    }
+    let n = layout.name_of(g.l, t)
+    let name = "vt_" + n
+    let mut retain_fn = "0"
+    let mut release_fn = "0"
+    let mut share_fn = "0"
+    if managed(mut g, t) {
+        retain_fn = "rc_retain_" + n
+        release_fn = "rc_release_" + n
+        share_fn = "rc_share_" + n
+    }
+    push(mut g.data, ir.Data {
+        label: name, relocated: true,
+        lines: [".quad " + strings.from_int(size_of(mut g, t)), ".quad " + retain_fn, ".quad " + release_fn, ".quad 0", ".quad 0",
+            ".quad " + share_fn],
+    })
+    g.descs[t] = name
+    return sym_addr(mut g, name)
+}
+
+// ---- The functions C got from layout.vl ----
+
+// A function written here, of pointer parameters, returning nothing or
+// (class) a register's worth. g.fs is it until `done_helper`.
+fn helper(g: mut Low, name: Str, nparams: Int, class: Int) -> [Int] {
+    g.fs = new_fn(name, class)
+    let mut ps: [Int] = []
+    for _ in 0..nparams {
+        push(mut ps, ir.param(mut g.fs.f, ir.INT()))
+    }
+    return ps
+}
+
+// retain, release and share for every managed type and function type,
+// taking a pointer to the value; the helpers of every boxed type.
+fn memory_functions(g: mut Low) {
+    for t in g.l.funcs {
+        let n = layout.name_of(g.l, t)
+        for op in ["retain", "release", "share"] {
+            let p = helper(mut g, "rc_" + op + "_" + n, 1, -1)
+            memory_op(mut g, op, t, mem_val(p[0], 0, t))
+            ret(mut g, -1)
+            finish(mut g)
+        }
+    }
+    let all = g.l.types
+    for t in all {
+        if !managed(mut g, t) {
+            continue
+        }
+        let n = layout.name_of(g.l, t)
+        let ti = types.get(g.k.table, t)
+        let s = shape(mut g, t)
+        for op in ["retain", "release", "share"] {
+            let p = helper(mut g, "rc_" + op + "_" + n, 1, -1)[0]
+            if ti.tag == types.Tag.Struct {
+                for i in 0..len(ti.fields) {
+                    let f = ti.fields[i]
+                    slot_op(mut g, t, f.name, 0, f.ty, mem_val(p, s.offsets[i], f.ty), op)
+                }
+            } else {
+                let tag = load(mut g, p, 0, 4)
+                let done = label(mut g)
+                for vi in 0..len(ti.variants) {
+                    let v = ti.variants[vi]
+                    let mut any = false
+                    for i in 0..len(v.payload) {
+                        if layout.is_boxed(g.l, t, v.name, i) || managed(mut g, v.payload[i]) {
+                            any = true
+                        }
+                    }
+                    if !any {
+                        continue
+                    }
+                    let next = label(mut g)
+                    branch_cmp(mut g, "ne", tag, konst(mut g, vi), next)
+                    for i in 0..len(v.payload) {
+                        slot_op(mut g, t, v.name, i, v.payload[i], mem_val(p, s.payloads[vi][i], v.payload[i]), op)
+                    }
+                    jump(mut g, done)
+                    place_label(mut g, next)
+                }
+                place_label(mut g, done)
+            }
+            ret(mut g, -1)
+            finish(mut g)
+        }
+    }
+    let boxes = g.l.box_types
+    for t in boxes {
+        let b = layout.box_name(g.l, t)
+        let size = size_of(mut g, t)
+        // new: a box holding a copy of the value at the pointer.
+        let v = helper(mut g, b + "_new", 1, ir.INT())[0]
+        let box = ccall(mut g, "vela_alloc", [konst(mut g, 8 + size)], [ir.KIND_INT()], ir.RET_INT(), -1)
+        store(mut g, box, 0, 8, konst(mut g, 1))
+        copy_mem(mut g, add_imm(mut g, box, 8), v, size)
+        ret(mut g, box)
+        finish(mut g)
+        // release: the value, and the box, when this was the last reference.
+        let r = helper(mut g, b + "_release", 1, -1)[0]
+        let last = reg(mut g, ir.INT())
+        emit(mut g, ir.inst(ir.Op.RcDec, last, r, -1, 0))
+        let done = label(mut g)
+        branch_cmp(mut g, "eq", last, konst(mut g, 0), done)
+        release(mut g, t, mem_val(r, 8, t))
+        ccall(mut g, "free", [r], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        place_label(mut g, done)
+        ret(mut g, -1)
+        finish(mut g)
+        let s = helper(mut g, b + "_share", 1, -1)[0]
+        let was = mark_shared(mut g, s)
+        let after = label(mut g)
+        branch_cmp(mut g, "eq", was, konst(mut g, 0), after)
+        share(mut g, t, mem_val(s, 8, t))
+        place_label(mut g, after)
+        ret(mut g, -1)
+        finish(mut g)
+        // unique: copy-on-write, given where the box pointer is.
+        let pp = helper(mut g, b + "_unique", 1, -1)[0]
+        let old = load(mut g, pp, 0, 8)
+        let same = label(mut g)
+        branch_cmp(mut g, "eq", load(mut g, old, 0, 8), konst(mut g, 1), same)
+        let copy = call(mut g, b + "_new", [add_imm(mut g, old, 8)], ir.INT())
+        retain(mut g, t, mem_val(copy, 8, t))
+        call(mut g, b + "_release", [old], -1)
+        store(mut g, pp, 0, 8, copy)
+        place_label(mut g, same)
+        ret(mut g, -1)
+        finish(mut g)
+    }
+}
+
+fn memory_op(g: mut Low, op: Str, t: Int, v: Val) {
+    if op == "retain" {
+        retain(mut g, t, v)
+    } else if op == "release" {
+        release(mut g, t, v)
+    } else {
+        share(mut g, t, v)
+    }
+}
+
+// One slot of a struct or enum: through its box when it is boxed.
+fn slot_op(g: mut Low, t: Int, name: Str, index: Int, slot_type: Int, v: Val, op: Str) {
+    if !layout.is_boxed(g.l, t, name, index) {
+        memory_op(mut g, op, slot_type, v)
+        return
+    }
+    let box = load(mut g, v.reg, v.off, 8)
+    if op == "retain" {
+        emit(mut g, ir.inst(ir.Op.RcInc, -1, box, -1, 0))
+    } else {
+        call(mut g, layout.box_name(g.l, slot_type) + "_" + op, [box], -1)
+    }
+}
+
+// ---- Locals whose address is taken ----
+
+// The locals given as `mut` arguments to functions, or faked as stdout:
+// they must be in memory, where a pointer can reach them.
+fn taken_in_block(g: Low, b: ast.Block, out: mut Map[Int, Bool]) {
+    for s in b.stmts {
+        taken_in_stmt(g, s, mut out)
+    }
+}
+
+fn taken_in_stmt(g: Low, s: ast.Stmt, out: mut Map[Int, Bool]) {
+    match s.kind {
+        ast.StmtKind.Block(b) => taken_in_block(g, b, mut out)
+        ast.StmtKind.ExprStmt(e) => taken_in_expr(g, e, mut out)
+        ast.StmtKind.Let(_, _, _, v) => taken_in_expr(g, v, mut out)
+        ast.StmtKind.Assign(t, v) => {
+            taken_in_expr(g, t, mut out)
+            taken_in_expr(g, v, mut out)
+        }
+        ast.StmtKind.If(c, then, otherwise) => {
+            taken_in_expr(g, c, mut out)
+            taken_in_block(g, then, mut out)
+            match otherwise {
+                ast.Else.NoElse => {}
+                ast.Else.ElseBlock(b) => taken_in_block(g, b, mut out)
+                ast.Else.ElseIf(s2) => taken_in_stmt(g, s2, mut out)
+            }
+        }
+        ast.StmtKind.For(c, body) => {
+            match c {
+                Some(e) => taken_in_expr(g, e, mut out)
+                None => {}
+            }
+            taken_in_block(g, body, mut out)
+        }
+        ast.StmtKind.ForRange(_, a, b, body) => {
+            taken_in_expr(g, a, mut out)
+            taken_in_expr(g, b, mut out)
+            taken_in_block(g, body, mut out)
+        }
+        ast.StmtKind.ForEach(_, xs, body) => {
+            taken_in_expr(g, xs, mut out)
+            taken_in_block(g, body, mut out)
+        }
+        ast.StmtKind.Return(v) => {
+            match v {
+                Some(e) => taken_in_expr(g, e, mut out)
+                None => {}
+            }
+        }
+        ast.StmtKind.MatchStmt(e, arms) => {
+            taken_in_expr(g, e, mut out)
+            taken_in_arms(g, arms, mut out)
+        }
+        ast.StmtKind.With(items, body) => {
+            for w in items {
+                match w.value.kind {
+                    ast.ExprKind.MutArg(p) => taken_place(g, p, mut out)
+                    _ => taken_in_expr(g, w.value, mut out)
+                }
+            }
+            taken_in_block(g, body, mut out)
+        }
+        _ => {}
+    }
+}
+
+fn taken_in_arms(g: Low, arms: [ast.Arm], out: mut Map[Int, Bool]) {
+    for a in arms {
+        match a.body {
+            ast.ArmBody.Value(e) => taken_in_expr(g, e, mut out)
+            ast.ArmBody.Do(s) => taken_in_stmt(g, s, mut out)
+        }
+    }
+}
+
+// A `mut` place: the local it starts from is taken.
+fn taken_place(g: Low, p: ast.Expr, out: mut Map[Int, Bool]) {
+    match p.kind {
+        ast.ExprKind.Name(_) => {
+            let l = local_of(g, p.id)
+            if l >= 0 {
+                out[l] = true
+            }
+        }
+        ast.ExprKind.Field(obj, _) => taken_place(g, obj, mut out)
+        ast.ExprKind.Index(obj, i) => {
+            taken_place(g, obj, mut out)
+            taken_in_expr(g, i, mut out)
+        }
+        _ => taken_in_expr(g, p, mut out)
+    }
+}
+
+fn taken_in_expr(g: Low, e: ast.Expr, out: mut Map[Int, Bool]) {
+    match e.kind {
+        ast.ExprKind.Unary(_, x) => taken_in_expr(g, x, mut out)
+        ast.ExprKind.Binary(_, a, b) => {
+            taken_in_expr(g, a, mut out)
+            taken_in_expr(g, b, mut out)
+        }
+        ast.ExprKind.Call(callee, args) => {
+            let user = match g.k.refs[e.id] {
+                checker.Ref.Function(_) => true
+                _ => false
+            }
+            taken_in_expr(g, callee, mut out)
+            for a in args {
+                match a.kind {
+                    ast.ExprKind.MutArg(p) => {
+                        if user {
+                            taken_place(g, p, mut out)
+                        } else {
+                            taken_in_expr(g, p, mut out)
+                        }
+                    }
+                    _ => taken_in_expr(g, a, mut out)
+                }
+            }
+        }
+        ast.ExprKind.Field(obj, _) => taken_in_expr(g, obj, mut out)
+        ast.ExprKind.Index(obj, i) => {
+            taken_in_expr(g, obj, mut out)
+            taken_in_expr(g, i, mut out)
+        }
+        ast.ExprKind.Try(x) => taken_in_expr(g, x, mut out)
+        ast.ExprKind.MutArg(x) => taken_in_expr(g, x, mut out)
+        ast.ExprKind.Slice(a, b, c) => {
+            taken_in_expr(g, a, mut out)
+            taken_in_expr(g, b, mut out)
+            taken_in_expr(g, c, mut out)
+        }
+        ast.ExprKind.ArrayLit(xs) => {
+            for x in xs {
+                taken_in_expr(g, x, mut out)
+            }
+        }
+        ast.ExprKind.MapLit(entries) => {
+            for en in entries {
+                taken_in_expr(g, en.key, mut out)
+                taken_in_expr(g, en.value, mut out)
+            }
+        }
+        ast.ExprKind.StructLit(_, _, fields) => {
+            for f in fields {
+                taken_in_expr(g, f.value, mut out)
+            }
+        }
+        ast.ExprKind.Match(x, arms) => {
+            taken_in_expr(g, x, mut out)
+            taken_in_arms(g, arms, mut out)
+        }
+        ast.ExprKind.Closure(_, _, body, _) => taken_in_block(g, body, mut out)
+        _ => {}
+    }
+}
+
+// ---- Functions and statements ----
+
+fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
+    let f = g.k.fns[id]
+    g.fs = new_fn(name, -1)
+    g.fs.filename = g.k.modules[f.module].path
+    g.fs.current_fn = id
+    g.fs.params = params
+    g.fs.args = args
+    let mut taken: Map[Int, Bool] = [:]
+    taken_in_block(g, f.decl.body, mut taken)
+    g.fs.taken = taken
+    let rt = sub(g, f.result)
+    if rt != types.NOTHING() {
+        if in_memory(g, rt) {
+            g.fs.sret = ir.param(mut g.fs.f, ir.INT())
+        } else {
+            g.fs.f.result = class_of(rt)
+        }
+    }
+    push_frame(mut g, "function")
+    for i in 0..len(f.decl.params) {
+        // The caller passes each argument owned and the callee releases it,
+        // except a mut parameter, which stays the caller's.
+        let lid = f.param_locals[i]
+        let t = local_ty(g, lid)
+        let mutable = f.decl.params[i].mutable
+        param_local(mut g, lid, t, mutable)
+        if managed(mut g, t) && !mutable {
+            push(mut g.fs.frames[0].items, Item { v: g.fs.locals[lid], ty: t, restore: "", saved: -1 })
+        }
+    }
+    for r in f.decl.requires {
+        push_frame(mut g, "stmt")
+        assert_code(mut g, r, r, "requires of '" + f.decl.name + "'")
+        pop_frame(mut g)
+    }
+    for s in f.decl.body.stmts {
+        stmt(mut g, s)
+    }
+    if !g.fs.dead && f.result == types.NOTHING() {
+        ensures_code(mut g, no_value())
+    }
+    pop_frame(mut g)
+    end_function(mut g, rt)
+    finish(mut g)
+}
+
+// A parameter arrives in a register: a scalar, or the address of a bigger
+// value or of a mut parameter's place.
+fn param_local(g: mut Low, lid: Int, t: Int, mutable: Bool) {
+    if mutable || in_memory(g, t) {
+        let p = ir.param(mut g.fs.f, ir.INT())
+        g.fs.locals[lid] = mem_val(p, 0, t)
+        return
+    }
+    let p = ir.param(mut g.fs.f, class_of(t))
+    if maps.has(g.fs.taken, lid) {
+        let s = slot_val(mut g, t)
+        put(mut g, s.reg, 0, t, reg_val(p, t))
+        let mut place = s
+        place.temp = false
+        g.fs.locals[lid] = place
+    } else {
+        g.fs.locals[lid] = reg_val(p, t)
+    }
+}
+
+// The end of a function's code: nothing to return, or not reached.
+fn end_function(g: mut Low, rt: Int) {
+    if g.fs.dead {
+        return
+    }
+    if rt == types.NOTHING() || in_memory(g, rt) {
+        ret(mut g, -1)
+    } else {
+        emit(mut g, ir.inst(ir.Op.Unreachable, -1, -1, -1, 0))
+    }
+}
+
+// The ensures clauses, checked as the function returns `result` (no
+// value when it returns nothing): `result` names the value there.
+fn ensures_code(g: mut Low, result: Val) {
+    let f = g.k.fns[g.fs.current_fn]
+    if len(f.decl.ensures) == 0 || g.fs.closure_result != -2 {
+        return  // a closure's returns are not its function's
+    }
+    push_frame(mut g, "stmt")
+    if f.result_local >= 0 && result.reg >= 0 {
+        let mut r = result
+        r.owned = false
+        r.temp = false
+        g.fs.locals[f.result_local] = r
+    }
+    for e in f.decl.ensures {
+        assert_code(mut g, e, e, "ensures of '" + f.decl.name + "'")
+    }
+    pop_frame(mut g)
+}
+
+fn block(g: mut Low, b: ast.Block, kind: Str) {
+    push_frame(mut g, kind)
+    for s in b.stmts {
+        stmt(mut g, s)
+    }
+    pop_frame(mut g)
+}
+
+fn stmt(g: mut Low, s: ast.Stmt) {
+    match s.kind {
+        ast.StmtKind.Block(b) => {
+            block(mut g, b, "block")
+            g.fs.dead = false
+            return
+        }
+        _ => {}
+    }
+    push_frame(mut g, "stmt")
+    stmt_body(mut g, s)
+    pop_frame(mut g)
+}
+
+// The innermost loop's frame.
+fn loop_frame(g: Low) -> Frame {
+    let mut f = len(g.fs.frames) - 1
+    for f > 0 && g.fs.frames[f].kind != "body" {
+        f = f - 1
+    }
+    return g.fs.frames[f]
+}
+
+fn push_loop(g: mut Low, exit: Int, next: Int) {
+    push(mut g.fs.frames, Frame { kind: "body", items: [], exit: exit, next: next })
+}
+
+fn stmt_body(g: mut Low, s: ast.Stmt) {
+    match s.kind {
+        ast.StmtKind.ExprStmt(e) => {
+            expr(mut g, e)
+        }
+        ast.StmtKind.Let(_, _, _, v) => {
+            let c = consume(mut g, expr(mut g, v))
+            declare(mut g, local_of(g, s.id), c)
+        }
+        ast.StmtKind.Assign(target, v) => assign(mut g, target, v)
+        ast.StmtKind.If(cond, then, otherwise) => if_stmt(mut g, cond, then, otherwise)
+        ast.StmtKind.For(cond, body) => {
+            let head = label(mut g)
+            let exit = label(mut g)
+            place_label(mut g, head)
+            push_loop(mut g, exit, head)
+            match cond {
+                Some(e) => {
+                    // The condition's statements run on every iteration.
+                    push_frame(mut g, "stmt")
+                    let c = fresh(mut g, reg_val(scalar(mut g, expr(mut g, e)), types.BOOL()))
+                    pop_frame(mut g)
+                    let go = label(mut g)
+                    branch(mut g, c.reg, go, exit)
+                    place_label(mut g, go)
+                }
+                None => {}
+            }
+            for inner in body.stmts {
+                stmt(mut g, inner)
+            }
+            pop_frame(mut g)
+            if !g.fs.dead {
+                jump(mut g, head)
+            }
+            place_label(mut g, exit)
+            g.fs.dead = false
+            // `for { ... }` with no break ends only by return: no code after it.
+            match cond {
+                None => g.fs.dead = !g.k.breaks[s.id]
+                Some(_) => {}
+            }
+        }
+        ast.StmtKind.ForRange(_, start, end, body) => {
+            let from = scalar(mut g, expr(mut g, start))
+            // The range is fixed when the loop starts.
+            let to = fresh(mut g, reg_val(scalar(mut g, expr(mut g, end)), types.INT())).reg
+            let i = reg(mut g, ir.INT())
+            emit(mut g, ir.inst(ir.Op.Move, i, from, -1, 0))
+            let head = label(mut g)
+            let latch = label(mut g)
+            let exit = label(mut g)
+            place_label(mut g, head)
+            branch_cmp(mut g, "ge", i, to, exit)
+            push_loop(mut g, exit, latch)
+            declare(mut g, local_of(g, s.id), reg_val(i, types.INT()))
+            for inner in body.stmts {
+                stmt(mut g, inner)
+            }
+            pop_frame(mut g)
+            place_label(mut g, latch)
+            emit(mut g, ir.inst(ir.Op.AddImm, i, i, -1, 1))
+            jump(mut g, head)
+            place_label(mut g, exit)
+            g.fs.dead = false
+        }
+        ast.StmtKind.ForEach(_, iterable, body) => for_each(mut g, s, iterable, body)
+        ast.StmtKind.Break => {
+            release_until(mut g, "body")
+            jump(mut g, loop_frame(g).exit)
+            g.fs.dead = true
+        }
+        ast.StmtKind.Continue => {
+            release_until(mut g, "body")
+            jump(mut g, loop_frame(g).next)
+            g.fs.dead = true
+        }
+        ast.StmtKind.Return(v) => {
+            match v {
+                None => {
+                    ensures_code(mut g, no_value())
+                    release_until(mut g, "")
+                    ret(mut g, -1)
+                }
+                Some(e) => {
+                    let c = consume(mut g, expr(mut g, e))
+                    let t = ty(g, e)
+                    if in_memory(g, t) {
+                        put(mut g, g.fs.sret, 0, t, c)
+                        let result = mem_val(g.fs.sret, 0, t)
+                        ensures_code(mut g, result)
+                        release_until(mut g, "")
+                        ret(mut g, -1)
+                    } else {
+                        let result = fresh(mut g, c)
+                        ensures_code(mut g, result)
+                        release_until(mut g, "")
+                        ret(mut g, result.reg)
+                    }
+                }
+            }
+            g.fs.dead = true
+        }
+        ast.StmtKind.MatchStmt(scrutinee, arms) => match_code(mut g, scrutinee, arms, no_value())
+        ast.StmtKind.With(items, body) => with_code(mut g, items, body)
+        ast.StmtKind.Block(_) => {}  // handled in stmt
+    }
+}
+
+// `with`: each fake is set when the block starts and put back however the
+// block is left, as its frame ends.
+fn with_code(g: mut Low, items: [ast.WithItem], body: ast.Block) {
+    push_frame(mut g, "block")
+    for w in items {
+        let mut saved = -1
+        if w.name == "stdout" {
+            let p = place(mut g, mut_place(w.value))
+            saved = ccall(mut g, "vela_fake_stdout", [address(mut g, p)], [ir.KIND_INT()], ir.RET_INT(), -1)
+        } else {
+            let v = consume(mut g, expr(mut g, w.value))
+            if w.name == "stdin" {
+                saved = ccall(mut g, "vela_fake_stdin", [address(mut g, v)], [ir.KIND_STR()], ir.RET_INT(), -1)
+            } else {
+                saved = ccall(mut g, "vela_fake_" + w.name, [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_INT(), -1)
+            }
+        }
+        push(mut g.fs.frames[len(g.fs.frames) - 1].items, Item { v: no_value(), ty: -3, restore: w.name, saved: saved })
+    }
+    for s in body.stmts {
+        stmt(mut g, s)
+    }
+    pop_frame(mut g)
+    g.fs.dead = false
+}
+
+fn if_stmt(g: mut Low, cond: ast.Expr, then: ast.Block, otherwise: ast.Else) {
+    let c = scalar(mut g, expr(mut g, cond))
+    let yes = label(mut g)
+    let no = label(mut g)
+    let end = label(mut g)
+    branch(mut g, c, yes, no)
+    place_label(mut g, yes)
+    block(mut g, then, "block")
+    let then_ends = g.fs.dead
+    if !g.fs.dead {
+        jump(mut g, end)
+    }
+    g.fs.dead = false
+    place_label(mut g, no)
+    let mut else_ends = false
+    match otherwise {
+        ast.Else.NoElse => {
+            place_label(mut g, end)
+            return
+        }
+        ast.Else.ElseIf(s) => {
+            // `else if`'s condition may need statements of its own, which
+            // must only run when the first condition was false.
+            push_frame(mut g, "branch")
+            match s.kind {
+                ast.StmtKind.If(c2, then2, else2) => if_stmt(mut g, c2, then2, else2)
+                _ => {}
+            }
+            else_ends = g.fs.dead
+            pop_frame(mut g)
+        }
+        ast.Else.ElseBlock(b) => {
+            block(mut g, b, "block")
+            else_ends = g.fs.dead
+        }
+    }
+    if !g.fs.dead {
+        jump(mut g, end)
+    }
+    place_label(mut g, end)
+    g.fs.dead = then_ends && else_ends
+}
+
+// `for x in xs`: the loop keeps its own reference to xs.
+fn for_each(g: mut Low, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
+    let t = ty(g, iterable)
+    let c = consume(mut g, expr(mut g, iterable))
+    let it = own(mut g, fresh(mut g, c))  // released when the for statement ends
+    let i = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.Const, i, -1, -1, 0))
+    let head = label(mut g)
+    let latch = label(mut g)
+    let exit = label(mut g)
+    place_label(mut g, head)
+    let mut length = -1
+    if t == types.STR() {
+        length = load(mut g, it.reg, it.off + 16, 8)
+    } else {
+        length = load(mut g, scalar(mut g, it), 8, 8)
+    }
+    branch_cmp(mut g, "ge", i, length, exit)
+    push_loop(mut g, exit, latch)
+    let lid = local_of(g, s.id)
+    if t == types.STR() {
+        let data = load(mut g, it.reg, it.off + 8, 8)
+        let b = load(mut g, op2(mut g, ir.Op.Add, data, i), 0, 1)
+        declare(mut g, lid, reg_val(b, types.BYTE()))
+    } else {
+        let et = local_ty(g, lid)
+        let data = load(mut g, scalar(mut g, it), 32, 8)
+        let at = op2(mut g, ir.Op.Add, data, mul_imm(mut g, i, size_of(mut g, et)))
+        let p = declare(mut g, lid, mem_val(at, 0, et))
+        retain(mut g, et, p)
+    }
+    for inner in body.stmts {
+        stmt(mut g, inner)
+    }
+    pop_frame(mut g)
+    place_label(mut g, latch)
+    emit(mut g, ir.inst(ir.Op.AddImm, i, i, -1, 1))
+    jump(mut g, head)
+    place_label(mut g, exit)
+    g.fs.dead = false
+}
+
+fn mul_imm(g: mut Low, a: Int, n: Int) -> Int {
+    if n == 1 {
+        return a
+    }
+    let r = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.MulImm, r, a, -1, n))
+    return r
+}
+
+// ---- Assignment and places ----
+
+fn assign(g: mut Low, target: ast.Expr, v: ast.Expr) {
+    // The new value is worked out first; then the place is changed.
+    let c = consume(mut g, expr(mut g, v))
+    match target.kind {
+        ast.ExprKind.Name(_) => {
+            let p = local(mut g, local_of(g, target.id))
+            release(mut g, ty(g, target), p)
+            put_place(mut g, p, c)
+        }
+        ast.ExprKind.Field(obj, field) => {
+            let owner = ty(g, obj)
+            let base = place(mut g, obj)
+            let member = field_place(mut g, base, owner, field)
+            if layout.is_boxed(g.l, owner, field, 0) {
+                // Never write into a box someone else may share: drop this
+                // value's box and give the field a new one.
+                let tt = ty(g, target)
+                let box = layout.box_name(g.l, tt)
+                call(mut g, box + "_release", [load(mut g, member.reg, member.off, 8)], -1)
+                let fresh_box = call(mut g, box + "_new", [address(mut g, in_memory_copy(mut g, c))], ir.INT())
+                store(mut g, member.reg, member.off, 8, fresh_box)
+            } else {
+                release(mut g, ty(g, target), member)
+                put_place(mut g, member, c)
+            }
+        }
+        ast.ExprKind.Index(obj, i) => {
+            let container = writable(mut g, obj)
+            let ot = ty(g, obj)
+            if types.is_map(g.k.table, ot) {
+                let key = consume(mut g, expr(mut g, i))
+                let ka = element_copy(mut g, key)
+                let va = element_copy(mut g, c)
+                ccall(mut g, "vela_map_set", [scalar(mut g, container), ka, va], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()],
+                    ir.RET_NONE(), -1)
+            } else {
+                let index = scalar(mut g, expr(mut g, i))
+                let va = element_copy(mut g, c)
+                ccall(mut g, "vela_array_set", [scalar(mut g, container), index, va, loc_of(mut g, target)],
+                    [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+            }
+        }
+        _ => {}
+    }
+}
+
+// A value in memory: itself if it is there, else a copy in a slot.
+fn in_memory_copy(g: mut Low, v: Val) -> Val {
+    if v.mem {
+        return v
+    }
+    let s = slot_val(mut g, v.ty)
+    put(mut g, s.reg, 0, v.ty, v)
+    return s
+}
+
+// The address of a copy of `v`, for runtime functions that take an
+// element by pointer.
+fn element_copy(g: mut Low, v: Val) -> Int {
+    let s = slot_val(mut g, v.ty)
+    put(mut g, s.reg, 0, v.ty, v)
+    return s.reg
+}
+
+// A field of the value at `base`: the field itself, or the value in its box.
+fn field_place(g: mut Low, base: Val, owner: Int, field: Str) -> Val {
+    let fi = types.field_index(g.k.table, owner, field)
+    let ft = types.get(g.k.table, owner).fields[fi].ty
+    let off = shape(mut g, owner).offsets[fi]
+    return mem_val(base.reg, base.off + off, ft)
+}
+
+fn field_value(g: mut Low, base: Val, owner: Int, field: Str) -> Val {
+    let member = field_place(mut g, base, owner, field)
+    if layout.is_boxed(g.l, owner, field, 0) {
+        return mem_val(load(mut g, member.reg, member.off, 8), 8, member.ty)
+    }
+    return member
+}
+
+// An array or map about to change, made unique first (copy-on-write).
+fn writable(g: mut Low, e: ast.Expr) -> Val {
+    let p = place(mut g, e)
+    let mut kind = "array"
+    if types.is_map(g.k.table, ty(g, e)) {
+        kind = "map"
+    }
+    let done = label(mut g)
+    let ptr = scalar(mut g, p)
+    branch_cmp(mut g, "eq", load(mut g, ptr, 0, 8), konst(mut g, 1), done)
+    if p.mem {
+        ccall(mut g, "vela_" + kind + "_unique", [address(mut g, p)], [ir.KIND_INT()], ir.RET_NONE(), -1)
+    } else {
+        // A local in a register: through a slot the runtime can write to.
+        let s = slot_val(mut g, p.ty)
+        store(mut g, s.reg, 0, 8, p.reg)
+        ccall(mut g, "vela_" + kind + "_unique", [s.reg], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        emit(mut g, ir.inst(ir.Op.Move, p.reg, load(mut g, s.reg, 0, 8), -1, 0))
+    }
+    place_label(mut g, done)
+    return p
+}
+
+// The place of a variable, or a path inside one, about to be written
+// through; shared boxes and arrays on the way are copied first.
+fn place(g: mut Low, e: ast.Expr) -> Val {
+    match e.kind {
+        ast.ExprKind.Name(_) => return local(mut g, local_of(g, e.id))
+        ast.ExprKind.Field(obj, field) => {
+            let owner = ty(g, obj)
+            let base = place(mut g, obj)
+            let member = field_place(mut g, base, owner, field)
+            if !layout.is_boxed(g.l, owner, field, 0) {
+                return member
+            }
+            call(mut g, layout.box_name(g.l, ty(g, e)) + "_unique", [address(mut g, member)], -1)
+            return mem_val(load(mut g, member.reg, member.off, 8), 8, member.ty)
+        }
+        ast.ExprKind.Index(obj, i) => {
+            let container = writable(mut g, obj)
+            let ot = ty(g, obj)
+            if types.is_map(g.k.table, ot) {
+                let key = expr(mut g, i)
+                let ka = element_copy(mut g, key)
+                let at = ccall(mut g, "vela_map_at", [scalar(mut g, container), ka, loc_of(mut g, e)],
+                    [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+                return mem_val(at, 0, ty(g, e))
+            }
+            let index = scalar(mut g, expr(mut g, i))
+            return mem_val(element_at(mut g, scalar(mut g, container), index, ty(g, e), e), 0, ty(g, e))
+        }
+        _ => return no_value()
+    }
+}
+
+// The address of element `i` of the array `a`, after checking the index:
+// out of range, vela_array_at panics as it does for C.
+fn element_at(g: mut Low, a: Int, i: Int, et: Int, e: ast.Expr) -> Int {
+    let ok = label(mut g)
+    branch_cmp(mut g, "ult", i, load(mut g, a, 8, 8), ok)
+    noreturn(mut g, "vela_array_at", [a, i, loc_of(mut g, e)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()])
+    place_label(mut g, ok)
+    let data = load(mut g, a, 32, 8)
+    return op2(mut g, ir.Op.Add, data, mul_imm(mut g, i, size_of(mut g, et)))
+}
+
+// ---- Match ----
+
+// One test per arm, in order; the last arm has none, since the checker
+// proved the arms exhaustive. `result` is where a match expression's
+// arms put their value, or no value for a statement.
+fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
+    let v = expr(mut g, scrutinee)
+    let t = ty(g, scrutinee)
+    let end = label(mut g)
+    let mut all_end = true  // every arm returns, breaks or continues
+    for i in 0..len(arms) {
+        let a = arms[i]
+        let last = i == len(arms) - 1
+        g.fs.dead = false  // each arm is reachable, whatever the last one ended with
+        let mut next = -1
+        if !last {
+            next = label(mut g)
+            tests(mut g, a.pattern, v, t, next)
+        }
+        push_frame(mut g, "arm")
+        for bound in bindings(mut g, a.pattern, v, t) {
+            // A binding is a copy of part of the value: it gets a reference of its own.
+            let p = declare(mut g, bound.local, bound.path)
+            retain(mut g, local_ty(g, bound.local), p)
+        }
+        if result.reg < 0 {
+            match a.body {
+                ast.ArmBody.Do(s) => {
+                    match s.kind {
+                        ast.StmtKind.Block(b) => {
+                            for inner in b.stmts {
+                                stmt(mut g, inner)
+                            }
+                        }
+                        _ => stmt(mut g, s)
+                    }
+                }
+                ast.ArmBody.Value(_) => {}
+            }
+        } else {
+            match a.body {
+                ast.ArmBody.Value(e) => {
+                    let c = consume(mut g, expr(mut g, e))
+                    put_place(mut g, result, c)
+                }
+                ast.ArmBody.Do(_) => {}
+            }
+        }
+        if !g.fs.dead {
+            all_end = false
+        }
+        pop_frame(mut g)
+        if !g.fs.dead {
+            jump(mut g, end)
+        }
+        if !last {
+            place_label(mut g, next)
+        }
+    }
+    place_label(mut g, end)
+    // When every arm ends the function or the loop, nothing after the match runs.
+    g.fs.dead = all_end
+}
+
+// The value at payload `i` of variant `vi`, inside the enum at `path`.
+fn payload(g: mut Low, path: Val, enum: Int, vi: Int, i: Int) -> Val {
+    let v = types.get(g.k.table, enum).variants[vi]
+    let off = shape(mut g, enum).payloads[vi][i]
+    if layout.is_boxed(g.l, enum, v.name, i) {
+        return mem_val(load(mut g, path.reg, path.off + off, 8), 8, v.payload[i])
+    }
+    return mem_val(path.reg, path.off + off, v.payload[i])
+}
+
+fn variant_ref(g: Low, id: Int) -> [Int] {
+    return match g.k.refs[id] {
+        checker.Ref.Variant(e, v) => [sub(g, e), v]
+        _ => [0, 0]
+    }
+}
+
+fn tag_of(g: mut Low, v: Val) -> Int {
+    return load(mut g, v.reg, v.off, 4)
+}
+
+// Go to `fail` unless the value at `path` matches `p`.
+fn tests(g: mut Low, p: ast.Pattern, path: Val, t: Int, fail: Int) {
+    match p.kind {
+        ast.PatternKind.Wild => {}
+        ast.PatternKind.Bind(_) => {}
+        ast.PatternKind.Lit(e) => {
+            match e.kind {
+                ast.ExprKind.BoolLit(b) => {
+                    let s = scalar(mut g, path)
+                    if b {
+                        fail_unless(mut g, s, fail)
+                    } else {
+                        branch_cmp(mut g, "ne", s, konst(mut g, 0), fail)
+                    }
+                }
+                ast.ExprKind.StrLit(s) => {
+                    let lit = sym_addr(mut g, str_literal(mut g, s))
+                    let eq = ccall(mut g, "vela_str_eq", [address(mut g, path), lit], [ir.KIND_STR(), ir.KIND_STR()],
+                        ir.RET_BOOL(), -1)
+                    fail_unless(mut g, eq, fail)
+                }
+                ast.ExprKind.IntLit(n) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
+                ast.ExprKind.ByteLit(n) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
+                _ => {}
+            }
+        }
+        ast.PatternKind.Range(lo, hi) => {
+            let s = scalar(mut g, path)
+            branch_cmp(mut g, "lt", s, konst(mut g, literal(lo)), fail)
+            branch_cmp(mut g, "gt", s, konst(mut g, literal(hi)), fail)
+        }
+        ast.PatternKind.Variant(_, _, _, _, args) => {
+            let r = variant_ref(g, p.id)
+            let enum = r[0]
+            let vi = r[1]
+            let v = types.get(g.k.table, enum).variants[vi]
+            branch_cmp(mut g, "ne", tag_of(mut g, path), konst(mut g, vi), fail)
+            for i in 0..len(args) {
+                tests(mut g, args[i], payload(mut g, path, enum, vi, i), v.payload[i], fail)
+            }
+        }
+    }
+}
+
+fn literal(e: ast.Expr) -> Int {
+    return match e.kind {
+        ast.ExprKind.IntLit(n) => n
+        ast.ExprKind.ByteLit(n) => n
+        _ => 0
+    }
+}
+
+type Binding = struct {
+    local: Int
+    path: Val
+}
+
+fn bindings(g: mut Low, p: ast.Pattern, path: Val, t: Int) -> [Binding] {
+    let mut out: [Binding] = []
+    match p.kind {
+        ast.PatternKind.Bind(_) => push(mut out, Binding { local: local_of(g, p.id), path: path })
+        ast.PatternKind.Variant(_, _, _, _, args) => {
+            let r = variant_ref(g, p.id)
+            let v = types.get(g.k.table, r[0]).variants[r[1]]
+            for i in 0..len(args) {
+                let inner = payload(mut g, path, r[0], r[1], i)
+                for b in bindings(mut g, args[i], inner, v.payload[i]) {
+                    push(mut out, b)
+                }
+            }
+        }
+        _ => {}
+    }
+    return out
+}
+
+// ---- Expressions ----
+
+// The code for `e`, and its value: a register, a temporary, a variable, or
+// a path into one of those, so that using it has no side effects.
+fn expr(g: mut Low, e: ast.Expr) -> Val {
+    let t = ty(g, e)
+    match e.kind {
+        ast.ExprKind.IntLit(n) => {
+            if t == types.FLOAT() {
+                return float_const(mut g, strings.from_int(n) + ".0")
+            }
+            return reg_val(konst(mut g, n), t)
+        }
+        ast.ExprKind.FloatLit(text) => return float_const(mut g, text)
+        ast.ExprKind.ByteLit(n) => return reg_val(konst(mut g, n), t)
+        ast.ExprKind.BoolLit(b) => {
+            if b {
+                return reg_val(konst(mut g, 1), t)
+            }
+            return reg_val(konst(mut g, 0), t)
+        }
+        ast.ExprKind.StrLit(s) => {
+            let mut v = mem_val(sym_addr(mut g, str_literal(mut g, s)), 0, t)
+            v.is_static = true
+            return v
+        }
+        ast.ExprKind.UnitLit => return reg_val(konst(mut g, 0), t)
+        ast.ExprKind.Name(_) => {
+            match g.k.refs[e.id] {
+                checker.Ref.Local(id) => return local(mut g, id)
+                checker.Ref.Variant(enum, vi) => return enum_value(mut g, sub(g, enum), vi, [])  // `None`
+                checker.Ref.Function(id) => return function_value(mut g, id, e)  // a function as a value
+                _ => return no_value()
+            }
+        }
+        ast.ExprKind.Unary(op, operand) => {
+            let c = scalar(mut g, expr(mut g, operand))
+            if op == "-" && t == types.FLOAT() {
+                let r = reg(mut g, ir.FLOAT())
+                emit(mut g, ir.inst(ir.Op.FNeg, r, c, -1, 0))
+                return reg_val(r, t)
+            }
+            if op == "-" {
+                return reg_val(checked_op(mut g, ir.Op.NegChk, c, -1, loc(mut g, e.line, e.col)), t)
+            }
+            let r = reg(mut g, ir.INT())
+            emit(mut g, ir.inst(ir.Op.Not, r, c, -1, 0))
+            return reg_val(r, t)
+        }
+        ast.ExprKind.Binary(op, l, r) => return binary(mut g, e, op, l, r)
+        ast.ExprKind.Call(_, args) => {
+            match g.k.refs[e.id] {
+                checker.Ref.Variant(enum, vi) => {
+                    let mut consumed: [Val] = []
+                    for a in args {
+                        push(mut consumed, consume(mut g, expr(mut g, a)))
+                    }
+                    return enum_value(mut g, sub(g, enum), vi, consumed)
+                }
+                checker.Ref.Builtin(name) => return builtin(mut g, e, name, args)
+                checker.Ref.Function(id) => return direct_call(mut g, e, id, args)
+                checker.Ref.Indirect => return indirect_call(mut g, e, args)
+                _ => return no_value()
+            }
+        }
+        ast.ExprKind.Field(obj, name) => {
+            match g.k.refs[e.id] {
+                checker.Ref.Variant(enum, vi) => return enum_value(mut g, sub(g, enum), vi, [])
+                checker.Ref.Function(id) => return function_value(mut g, id, e)  // `module.f` as a value
+                _ => {}
+            }
+            let base = expr(mut g, obj)
+            return field_value(mut g, base, ty(g, obj), name)
+        }
+        ast.ExprKind.Index(obj, i) => return index(mut g, e, obj, i)
+        ast.ExprKind.Try(inner) => return try_value(mut g, e, inner)
+        ast.ExprKind.MutArg(p) => return expr(mut g, p)  // not reached: only in calls
+        ast.ExprKind.Slice(obj, lo, hi) => {
+            let o = expr(mut g, obj)
+            let a = scalar(mut g, expr(mut g, lo))
+            let b = scalar(mut g, expr(mut g, hi))
+            if t == types.STR() {
+                let out = slot_val(mut g, t)
+                ccall(mut g, "vela_str_slice", [address(mut g, o), a, b, loc_of(mut g, e)],
+                    [ir.KIND_STR(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_STR(), out.reg)
+                return own(mut g, out)
+            }
+            let r = ccall(mut g, "vela_array_slice", [scalar(mut g, o), a, b, loc_of(mut g, e)],
+                [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+            return own(mut g, reg_val(r, t))
+        }
+        ast.ExprKind.ArrayLit(elems) => {
+            let elem_t = types.get(g.k.table, t).args[0]
+            let a = ccall(mut g, "vela_array_new", [descriptor(mut g, elem_t), konst(mut g, len(elems))],
+                [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+            let array = own(mut g, reg_val(a, t))
+            for x in elems {
+                let c = consume(mut g, expr(mut g, x))
+                let at = element_copy(mut g, c)
+                ccall(mut g, "vela_array_push", [array.reg, at], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+            }
+            return array
+        }
+        ast.ExprKind.MapLit(entries) => {
+            let ti = types.get(g.k.table, t)
+            let kd = descriptor(mut g, ti.args[0])
+            let vd = descriptor(mut g, ti.args[1])
+            let m = ccall(mut g, "vela_map_new", [kd, vd], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+            let map = own(mut g, reg_val(m, t))
+            for en in entries {
+                let key = consume(mut g, expr(mut g, en.key))
+                let val = consume(mut g, expr(mut g, en.value))
+                let ka = element_copy(mut g, key)
+                let va = element_copy(mut g, val)
+                ccall(mut g, "vela_map_set", [map.reg, ka, va], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+            }
+            return map
+        }
+        ast.ExprKind.StructLit(_, _, fields) => return struct_value(mut g, t, fields)
+        ast.ExprKind.Match(scrutinee, arms) => {
+            let mut result = no_value()
+            if in_memory(g, t) {
+                result = slot_val(mut g, t)
+            } else {
+                result = temp_reg(mut g, t)
+            }
+            match_code(mut g, scrutinee, arms, result)
+            return own(mut g, result)
+        }
+        ast.ExprKind.Closure(_, _, body, _) => return closure_value(mut g, e, body)
+    }
+}
+
+fn float_const(g: mut Low, text: Str) -> Val {
+    let r = reg(mut g, ir.FLOAT())
+    let mut i = ir.inst(ir.Op.FConst, r, -1, -1, 0)
+    i.sym = text
+    emit(mut g, i)
+    return reg_val(r, types.FLOAT())
+}
+
+// What the function (or closure) being written returns.
+fn result_type(g: Low) -> Int {
+    if g.fs.closure_result != -2 {
+        return sub(g, g.fs.closure_result)
+    }
+    return sub(g, g.k.fns[g.fs.current_fn].result)
+}
+
+// The symbol called, or named as a value, at node `e`: for a generic
+// function, the copy for its type arguments there.
+fn function_name(g: Low, id: Int, e: ast.Expr) -> Str {
+    if len(g.k.fns[id].type_params) == 0 {
+        return fn_name(g.k, id)
+    }
+    let mut targs: [Int] = []
+    for t in g.k.targs[e.id] {
+        push(mut targs, sub(g, t))
+    }
+    return g.instance_names[mono.key(id, targs)]
+}
+
+// The register an argument of type `t` goes in: a scalar, or the address
+// of a value in memory, copied first unless it is a temporary nothing else
+// can change.
+fn argument(g: mut Low, v: Val, t: Int) -> Int {
+    if !in_memory(g, t) {
+        return scalar(mut g, v)
+    }
+    if v.temp || v.is_static {
+        return address(mut g, v)
+    }
+    return fresh(mut g, v).reg
+}
+
+// The register for a result: a slot for a value in memory, whose address
+// goes first; or the class of the register it comes back in.
+fn call_result(g: mut Low, t: Int, args: mut [Int]) -> Val {
+    if t == types.NOTHING() {
+        return no_value()
+    }
+    if in_memory(g, t) {
+        let s = slot_val(mut g, t)
+        let mut all = [s.reg]
+        for a in args {
+            push(mut all, a)
+        }
+        args = all
+        return s
+    }
+    return temp_reg(mut g, t)
+}
+
+fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
+    // The other arguments first, left to right; then the places of the mut
+    // ones, so nothing evaluated in between can move them.
+    let mut vals: [Val] = []
+    for a in args {
+        match a.kind {
+            ast.ExprKind.MutArg(_) => push(mut vals, no_value())
+            _ => push(mut vals, consume(mut g, expr(mut g, a)))
+        }
+    }
+    let mut regs: [Int] = []
+    for i in 0..len(args) {
+        match args[i].kind {
+            ast.ExprKind.MutArg(p) => push(mut regs, address(mut g, place(mut g, p)))
+            _ => push(mut regs, argument(mut g, vals[i], vals[i].ty))
+        }
+    }
+    let t = ty(g, e)
+    let result = call_result(mut g, t, mut regs)
+    let mut i = ir.inst(ir.Op.Call, -1, -1, -1, 0)
+    i.sym = function_name(g, id, e)
+    if result.reg >= 0 && !result.mem {
+        i.dst = result.reg
+    }
+    i.args = regs
+    emit(mut g, i)
+    if t == types.NOTHING() {
+        return no_value()
+    }
+    return own(mut g, result)
+}
+
+// A call through a function value: its code gets its environment first.
+fn indirect_call(g: mut Low, e: ast.Expr, args: [ast.Expr]) -> Val {
+    let mut callee = no_value()
+    match e.kind {
+        ast.ExprKind.Call(f, _) => {
+            callee = expr(mut g, f)
+            if !callee.temp {
+                callee = fresh(mut g, callee)  // evaluated once
+            }
+        }
+        _ => {}
+    }
+    let mut vals: [Val] = []
+    for a in args {
+        push(mut vals, consume(mut g, expr(mut g, a)))
+    }
+    let code = load(mut g, callee.reg, callee.off, 8)
+    let env = load(mut g, callee.reg, callee.off + 8, 8)
+    let mut regs = [env]
+    for v in vals {
+        push(mut regs, argument(mut g, v, v.ty))
+    }
+    let t = ty(g, e)
+    let result = call_result(mut g, t, mut regs)
+    let mut i = ir.inst(ir.Op.CallInd, -1, code, -1, 0)
+    if result.reg >= 0 && !result.mem {
+        i.dst = result.reg
+    }
+    i.args = regs
+    emit(mut g, i)
+    if t == types.NOTHING() {
+        return no_value()
+    }
+    return own(mut g, result)
+}
+
+// A function used as a value: a wrapper that takes (and ignores) an
+// environment, and no environment.
+fn function_value(g: mut Low, id: Int, e: ast.Expr) -> Val {
+    let t = ty(g, e)
+    let target = function_name(g, id, e)
+    let wrapper = "vw_" + target
+    if !maps.has(g.made, wrapper) {
+        g.made[wrapper] = true
+        let ft = types.get(g.k.table, t)
+        let saved = g.fs
+        g.fs = new_fn(wrapper, -1)
+        let mut sret = -1
+        if ft.result != types.NOTHING() {
+            if in_memory(g, ft.result) {
+                sret = ir.param(mut g.fs.f, ir.INT())
+            } else {
+                g.fs.f.result = class_of(ft.result)
+            }
+        }
+        ir.param(mut g.fs.f, ir.INT())  // the environment, unused
+        let mut regs: [Int] = []
+        if sret >= 0 {
+            push(mut regs, sret)
+        }
+        for a in ft.args {
+            let mut class = ir.INT()
+            if !in_memory(g, a) {
+                class = class_of(a)
+            }
+            push(mut regs, ir.param(mut g.fs.f, class))
+        }
+        let mut r = -1
+        if g.fs.f.result >= 0 {
+            r = call(mut g, target, regs, g.fs.f.result)
+        } else {
+            call(mut g, target, regs, -1)
+        }
+        ret(mut g, r)
+        finish(mut g)
+        g.fs = saved
+    }
+    let v = slot_val(mut g, t)
+    store(mut g, v.reg, 0, 8, sym_addr(mut g, wrapper))
+    store(mut g, v.reg, 8, 8, konst(mut g, 0))
+    return own(mut g, v)
+}
+
+// A closure: its body becomes a function of its own, which gets the
+// captured copies through an environment, a counted block made here: the
+// runtime's vela_env header (count, drop, share), then the copies.
+fn closure_value(g: mut Low, e: ast.Expr, body: ast.Block) -> Val {
+    let t = ty(g, e)
+    let info = g.k.closures[e.id]
+    g.fs.closures = g.fs.closures + 1
+    let name = g.fs.cname + "_c" + strings.from_int(g.fs.closures)
+    let env_name = "ve_" + name
+    let fname = "vc_" + name
+    // Where each copy is in the environment.
+    let mut offs: [Int] = []
+    let mut at = 24
+    for cid in info.captures {
+        let s = shape(mut g, local_ty(g, cid))
+        at = align_up(at, s.align)
+        push(mut offs, at)
+        at = at + s.size
+    }
+    let env_size = at
+    // The body, written as a function of its own.
+    let saved = g.fs
+    let mut inner = new_fn(fname, -1)
+    inner.filename = saved.filename
+    inner.current_fn = saved.current_fn
+    inner.params = saved.params
+    inner.args = saved.args
+    inner.cname = name
+    inner.closure_result = info.result
+    inner.taken = saved.taken
+    g.fs = inner
+    let rt = sub(g, info.result)
+    if rt != types.NOTHING() {
+        if in_memory(g, rt) {
+            g.fs.sret = ir.param(mut g.fs.f, ir.INT())
+        } else {
+            g.fs.f.result = class_of(rt)
+        }
+    }
+    let env = ir.param(mut g.fs.f, ir.INT())
+    for i in 0..len(info.captures) {
+        let cid = info.captures[i]
+        g.fs.captures[cid] = mem_val(env, offs[i], local_ty(g, cid))
+    }
+    push_frame(mut g, "function")
+    for lid in info.params {
+        let pt = local_ty(g, lid)
+        param_local(mut g, lid, pt, false)
+        if managed(mut g, pt) {
+            push(mut g.fs.frames[0].items, Item { v: g.fs.locals[lid], ty: pt, restore: "", saved: -1 })
+        }
+    }
+    for s in body.stmts {
+        stmt(mut g, s)
+    }
+    pop_frame(mut g)
+    end_function(mut g, rt)
+    finish(mut g)
+    g.fs = saved
+    let n = len(info.captures)
+    let v = slot_val(mut g, t)
+    store(mut g, v.reg, 0, 8, sym_addr(mut g, fname))
+    if n == 0 {
+        store(mut g, v.reg, 8, 8, konst(mut g, 0))
+        return own(mut g, v)
+    }
+    // drop and share, for the runtime.
+    let outer = g.fs
+    g.fs = new_fn(env_name + "_drop", -1)
+    let d = ir.param(mut g.fs.f, ir.INT())
+    for i in 0..n {
+        release(mut g, local_ty(g, info.captures[i]), mem_val(d, offs[i], local_ty(g, info.captures[i])))
+    }
+    ccall(mut g, "free", [d], [ir.KIND_INT()], ir.RET_NONE(), -1)
+    ret(mut g, -1)
+    finish(mut g)
+    g.fs = new_fn(env_name + "_share", -1)
+    let sh = ir.param(mut g.fs.f, ir.INT())
+    for i in 0..n {
+        share(mut g, local_ty(g, info.captures[i]), mem_val(sh, offs[i], local_ty(g, info.captures[i])))
+    }
+    ret(mut g, -1)
+    finish(mut g)
+    g.fs = outer
+    let block = ccall(mut g, "vela_alloc", [konst(mut g, env_size)], [ir.KIND_INT()], ir.RET_INT(), -1)
+    store(mut g, block, 0, 8, konst(mut g, 1))
+    store(mut g, block, 8, 8, sym_addr(mut g, env_name + "_drop"))
+    store(mut g, block, 16, 8, sym_addr(mut g, env_name + "_share"))
+    for i in 0..n {
+        let cid = info.captures[i]
+        let member = mem_val(block, offs[i], local_ty(g, cid))
+        put(mut g, block, offs[i], member.ty, local(mut g, cid))
+        retain(mut g, member.ty, member)
+    }
+    store(mut g, v.reg, 8, 8, block)
+    return own(mut g, v)
+}
+
+// tasks.map(xs, f) or tasks.each(xs, f): the runtime runs the calls, through
+// a thunk written once per function type, vk_<type>, that calls f on one
+// element and stores its result. The element is the array's, so the thunk
+// retains it: a call takes its arguments owned.
+fn tasks_call(g: mut Low, name: Str, args: [ast.Expr], t: Int) -> Val {
+    let xs = scalar(mut g, expr(mut g, args[0]))
+    let fv = expr(mut g, args[1])
+    let f = fresh(mut g, fv)
+    let ft = types.get(g.k.table, fv.ty)
+    let thunk = "vk_" + layout.name_of(g.l, fv.ty)
+    if !maps.has(g.made, thunk) {
+        g.made[thunk] = true
+        let saved = g.fs
+        let ps = helper(mut g, thunk, 3, -1)
+        let at = ft.args[0]
+        // A copy of the element, with a reference of its own.
+        let a = fresh(mut g, mem_val(ps[1], 0, at))
+        retain(mut g, at, a)
+        let code = load(mut g, ps[0], 0, 8)
+        let env = load(mut g, ps[0], 8, 8)
+        let mut regs: [Int] = []
+        if ft.result != types.NOTHING() && in_memory(g, ft.result) {
+            push(mut regs, ps[2])  // the result goes straight where the runtime wants it
+        }
+        push(mut regs, env)
+        push(mut regs, argument(mut g, a, at))
+        let mut i = ir.inst(ir.Op.CallInd, -1, code, -1, 0)
+        i.args = regs
+        if ft.result != types.NOTHING() && !in_memory(g, ft.result) {
+            i.dst = reg(mut g, class_of(ft.result))
+            emit(mut g, i)
+            put(mut g, ps[2], 0, ft.result, reg_val(i.dst, ft.result))
+        } else {
+            emit(mut g, i)
+        }
+        ret(mut g, -1)
+        finish(mut g)
+        g.fs = saved
+    }
+    let env = load(mut g, f.reg, 8, 8)
+    let code = sym_addr(mut g, thunk)
+    if name == "tasks.each" {
+        ccall(mut g, "vela_tasks_each", [xs, f.reg, env, code], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()],
+            ir.RET_NONE(), -1)
+        return no_value()
+    }
+    let result = descriptor(mut g, types.get(g.k.table, t).args[0])
+    let r = ccall(mut g, "vela_tasks_map", [xs, f.reg, env, code, result],
+        [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    return own(mut g, reg_val(r, t))
+}
+
+// `x?`: if x is an Err (or None), return it from the function now,
+// releasing everything that is live, exactly as `return` does. Otherwise
+// the value inside the Ok (or Some), borrowed from x.
+fn try_value(g: mut Low, e: ast.Expr, inner: ast.Expr) -> Val {
+    let v = expr(mut g, inner)
+    let t = ty(g, inner)
+    let result = result_type(g)
+    let ti = types.get(g.k.table, t)
+    let mut fail = "None"
+    let mut ok = "Some"
+    if ti.name == "Result" {
+        fail = "Err"
+        ok = "Ok"
+    }
+    let go_on = label(mut g)
+    branch_cmp(mut g, "ne", tag_of(mut g, v), konst(mut g, types.variant_index(g.k.table, t, fail)), go_on)
+    // The function's own Result (or Option), in its result place.
+    let out = mem_val(g.fs.sret, 0, result)
+    let fi = types.variant_index(g.k.table, result, fail)
+    store(mut g, out.reg, 0, 4, konst(mut g, fi))
+    if fail == "Err" {
+        // The error moves into the function's own Result type; it gets a
+        // reference of its own, since x is released below.
+        let err = payload(mut g, v, t, types.variant_index(g.k.table, t, "Err"), 0)
+        retain(mut g, ti.args[1], err)
+        put_payload(mut g, out, result, fi, 0, err)
+    }
+    ensures_code(mut g, out)
+    release_until(mut g, "")
+    ret(mut g, -1)
+    place_label(mut g, go_on)
+    return payload(mut g, v, t, types.variant_index(g.k.table, t, ok), 0)
+}
+
+// Store `v` as payload `i` of variant `vi` of the enum at `dst`: in a box
+// of its own when the slot is boxed.
+fn put_payload(g: mut Low, dst: Val, enum: Int, vi: Int, i: Int, v: Val) {
+    let variant = types.get(g.k.table, enum).variants[vi]
+    let off = shape(mut g, enum).payloads[vi][i]
+    if layout.is_boxed(g.l, enum, variant.name, i) {
+        let box = call(mut g, layout.box_name(g.l, variant.payload[i]) + "_new", [address(mut g, in_memory_copy(mut g, v))],
+            ir.INT())
+        store(mut g, dst.reg, dst.off + off, 8, box)
+    } else {
+        put(mut g, dst.reg, dst.off + off, variant.payload[i], v)
+    }
+}
+
+// Reading `xs[i]`, `s[i]` or `m[k]`: the element is copied into a
+// temporary, borrowed (it still belongs to the container).
+fn index(g: mut Low, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Val {
+    let o = expr(mut g, obj)
+    let t = ty(g, obj)
+    if t == types.STR() {
+        let ix = scalar(mut g, expr(mut g, i))
+        let ok = label(mut g)
+        branch_cmp(mut g, "ult", ix, load(mut g, o.reg, o.off + 16, 8), ok)
+        noreturn(mut g, "vela_str_at", [address(mut g, o), ix, loc_of(mut g, e)], [ir.KIND_STR(), ir.KIND_INT(), ir.KIND_INT()])
+        place_label(mut g, ok)
+        let data = load(mut g, o.reg, o.off + 8, 8)
+        let mut out = reg_val(load(mut g, op2(mut g, ir.Op.Add, data, ix), 0, 1), types.BYTE())
+        out.temp = true
+        return out
+    }
+    let et = ty(g, e)
+    if types.is_map(g.k.table, t) {
+        let key = expr(mut g, i)
+        let ka = element_copy(mut g, key)
+        let at = ccall(mut g, "vela_map_at", [scalar(mut g, o), ka, loc_of(mut g, e)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()],
+            ir.RET_INT(), -1)
+        return fresh(mut g, mem_val(at, 0, et))
+    }
+    let ix = scalar(mut g, expr(mut g, i))
+    return fresh(mut g, mem_val(element_at(mut g, scalar(mut g, o), ix, et, e), 0, et))
+}
+
+// An enum value, owned; `args` are already consumed.
+fn enum_value(g: mut Low, enum: Int, vi: Int, args: [Val]) -> Val {
+    let v = slot_val(mut g, enum)
+    store(mut g, v.reg, 0, 4, konst(mut g, vi))
+    let variant = types.get(g.k.table, enum).variants[vi]
+    for i in 0..len(args) {
+        if i >= len(variant.payload) {
+            break
+        }
+        put_payload(mut g, v, enum, vi, i, args[i])
+    }
+    return own(mut g, v)
+}
+
+fn struct_value(g: mut Low, t: Int, fields: [ast.FieldInit]) -> Val {
+    let mut values: Map[Str, Val] = [:]
+    for f in fields {  // in source order: evaluation is left to right
+        values[f.name] = consume(mut g, expr(mut g, f.value))
+    }
+    let v = slot_val(mut g, t)
+    let decl = types.get(g.k.table, t).fields
+    let offs = shape(mut g, t).offsets
+    for i in 0..len(decl) {
+        let c = values[decl[i].name]
+        if layout.is_boxed(g.l, t, decl[i].name, 0) {
+            let box = call(mut g, layout.box_name(g.l, decl[i].ty) + "_new", [address(mut g, in_memory_copy(mut g, c))], ir.INT())
+            store(mut g, v.reg, offs[i], 8, box)
+        } else {
+            put(mut g, v.reg, offs[i], decl[i].ty, c)
+        }
+    }
+    return own(mut g, v)
+}
+
+fn binary(g: mut Low, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Val {
+    if op == "&&" || op == "||" {
+        // Short-circuit: the right side runs only if it can change the
+        // answer, in a frame of its own.
+        let result = fresh(mut g, reg_val(scalar(mut g, expr(mut g, l)), types.BOOL()))
+        let right_l = label(mut g)
+        let done = label(mut g)
+        if op == "||" {
+            branch(mut g, result.reg, done, right_l)
+        } else {
+            branch(mut g, result.reg, right_l, done)
+        }
+        place_label(mut g, right_l)
+        push_frame(mut g, "branch")
+        let right = scalar(mut g, expr(mut g, r))
+        emit(mut g, ir.inst(ir.Op.Move, result.reg, right, -1, 0))
+        pop_frame(mut g)
+        jump(mut g, done)
+        place_label(mut g, done)
+        g.fs.dead = false
+        return result
+    }
+    let left = expr(mut g, l)
+    let right = expr(mut g, r)
+    return operation(mut g, e, op, left, right, ty(g, l))
+}
+
+fn arith_op(op: Str) -> ir.Op {
+    return match op {
+        "+" => ir.Op.AddChk
+        "-" => ir.Op.SubChk
+        "*" => ir.Op.MulChk
+        "/" => ir.Op.DivChk
+        _ => ir.Op.RemChk
+    }
+}
+
+fn float_op(op: Str) -> ir.Op {
+    return match op {
+        "+" => ir.Op.FAdd
+        "-" => ir.Op.FSub
+        "*" => ir.Op.FMul
+        _ => ir.Op.FDiv
+    }
+}
+
+// `left op right`, for operands already worked out, of type `operand`.
+fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: Int) -> Val {
+    if op == "+" || op == "-" || op == "*" || op == "/" || op == "%" {
+        if operand == types.FLOAT() {
+            // IEEE arithmetic: no overflow checks, and x / 0.0 is an infinity.
+            return reg_val(fop2(mut g, float_op(op), scalar(mut g, left), scalar(mut g, right)), operand)
+        }
+        if operand == types.STR() {
+            let out = slot_val(mut g, types.STR())
+            ccall(mut g, "vela_str_concat", [address(mut g, left), address(mut g, right)], [ir.KIND_STR(), ir.KIND_STR()],
+                ir.RET_STR(), out.reg)
+            return own(mut g, out)
+        }
+        let at = loc(mut g, e.line, e.col)
+        let a = scalar(mut g, left)
+        let b = scalar(mut g, right)
+        let t = ty(g, e)
+        if operand == types.BYTE() {
+            // In 64 bits nothing overflows; then the result must fit a Byte.
+            let wide = match op {
+                "+" => op2(mut g, ir.Op.Add, a, b)
+                "-" => op2(mut g, ir.Op.Sub, a, b)
+                "*" => op2(mut g, ir.Op.Mul, a, b)
+                _ => checked_op(mut g, arith_op(op), a, b, at)
+            }
+            if op == "/" || op == "%" {
+                return reg_val(wide, t)
+            }
+            return reg_val(checked_op(mut g, ir.Op.ByteChk, wide, -1, at), t)
+        }
+        return reg_val(checked_op(mut g, arith_op(op), a, b, at), t)
+    }
+    if operand == types.STR() {
+        if op == "==" || op == "!=" {
+            let eq = ccall(mut g, "vela_str_eq", [address(mut g, left), address(mut g, right)], [ir.KIND_STR(), ir.KIND_STR()],
+                ir.RET_BOOL(), -1)
+            if op == "!=" {
+                let r = reg(mut g, ir.INT())
+                emit(mut g, ir.inst(ir.Op.Not, r, eq, -1, 0))
+                return reg_val(r, types.BOOL())
+            }
+            return reg_val(eq, types.BOOL())
+        }
+        let c = ccall(mut g, "vela_str_cmp", [address(mut g, left), address(mut g, right)], [ir.KIND_STR(), ir.KIND_STR()],
+            ir.RET_INT(), -1)
+        let wide = reg(mut g, ir.INT())
+        emit(mut g, ir.inst(ir.Op.Sext32, wide, c, -1, 0))
+        return reg_val(cmp_imm(mut g, cond_code(op), wide, 0), types.BOOL())
+    }
+    if types.is_enum(g.k.table, operand) {
+        return reg_val(cmp(mut g, cond_code(op), tag_of(mut g, left), tag_of(mut g, right)), types.BOOL())
+    }
+    if operand == types.FLOAT() {
+        let r = reg(mut g, ir.INT())
+        emit(mut g, ir.inst(ir.Op.FCmp, r, scalar(mut g, left), scalar(mut g, right), cond_code(op)))
+        return reg_val(r, types.BOOL())
+    }
+    return reg_val(cmp(mut g, cond_code(op), scalar(mut g, left), scalar(mut g, right)), types.BOOL())
+}
+
+fn print_function(t: Int) -> Str {
+    if t == types.BOOL() {
+        return "vela_print_bool"
+    }
+    if t == types.FLOAT() {
+        return "vela_print_float"
+    }
+    if t == types.STR() {
+        return "vela_print_str"
+    }
+    return "vela_print_int"  // Int and Byte
+}
+
+fn mut_place(e: ast.Expr) -> ast.Expr {
+    return match e.kind {
+        ast.ExprKind.MutArg(p) => p
+        _ => e
+    }
+}
+
+// `assert(cond)`: a panic if cond is false. When cond compares two values
+// that can be printed, the message shows both.
+fn assert_code(g: mut Low, e: ast.Expr, cond: ast.Expr, kind: Str) {
+    let what = sym_addr(mut g, cstring(mut g, kind))
+    let text = sym_addr(mut g, cstring(mut g, ast.expr_text(cond)))
+    match cond.kind {
+        ast.ExprKind.Binary(op, l, r) => {
+            let t = ty(g, l)
+            let comparison = op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">="
+            let printable = t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.STR() ||
+                t == types.FLOAT()
+            if comparison && printable {
+                let left = expr(mut g, l)
+                let right = expr(mut g, r)
+                let ok = operation(mut g, cond, op, left, right, t).reg
+                let good = label(mut g)
+                let bad = label(mut g)
+                branch(mut g, ok, good, bad)
+                place_label(mut g, bad)
+                let mut quote = 0
+                if t == types.STR() {
+                    quote = 1
+                }
+                let a = shown(mut g, t, left)
+                let b = shown(mut g, t, right)
+                noreturn(mut g, "vela_assert_failed_values", [loc_of(mut g, e), what, text, a, b, konst(mut g, quote)],
+                    [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_STR(), ir.KIND_STR(), ir.KIND_INT()])
+                place_label(mut g, good)
+                return
+            }
+        }
+        _ => {}
+    }
+    let c = scalar(mut g, expr(mut g, cond))
+    let good = label(mut g)
+    let bad = label(mut g)
+    branch(mut g, c, good, bad)
+    place_label(mut g, bad)
+    noreturn(mut g, "vela_assert_failed", [loc_of(mut g, e), what, text], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()])
+    place_label(mut g, good)
+}
+
+// A printable value as the address of a Str, for an assertion's message.
+fn shown(g: mut Low, t: Int, v: Val) -> Int {
+    if t == types.STR() {
+        return address(mut g, v)
+    }
+    if t == types.BOOL() {
+        let out = slot_val(mut g, types.STR())
+        let yes = label(mut g)
+        let no = label(mut g)
+        let done = label(mut g)
+        branch(mut g, scalar(mut g, v), yes, no)
+        place_label(mut g, yes)
+        copy_mem(mut g, out.reg, sym_addr(mut g, str_literal(mut g, "true")), 24)
+        jump(mut g, done)
+        place_label(mut g, no)
+        copy_mem(mut g, out.reg, sym_addr(mut g, str_literal(mut g, "false")), 24)
+        place_label(mut g, done)
+        return out.reg
+    }
+    let out = slot_val(mut g, types.STR())
+    if t == types.FLOAT() {
+        ccall(mut g, "vela_from_float", [scalar(mut g, v)], [ir.KIND_FLOAT()], ir.RET_STR(), out.reg)
+    } else {
+        ccall(mut g, "vela_from_int", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_STR(), out.reg)
+    }
+    return out.reg
+}
+
+// ---- Built-in functions ----
+
+fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    let t = ty(g, e)
+    if name == "tasks.map" || name == "tasks.each" {
+        return tasks_call(mut g, name, args, t)
+    }
+    if name == "tasks.workers" {
+        return reg_val(ccall(mut g, "vela_tasks_workers", [], [], ir.RET_INT(), -1), types.INT())
+    }
+    if name == "assert" {
+        assert_code(mut g, e, args[0], "assertion")
+        return no_value()
+    }
+    if name == "print" || name == "os.eprint" {
+        let arg = expr(mut g, args[0])
+        let mut func = print_function(arg.ty)
+        if name == "os.eprint" {
+            func = "vela_eprint" + func[10..len(func)]
+        }
+        if arg.ty == types.STR() {
+            ccall(mut g, func, [address(mut g, arg)], [ir.KIND_STR()], ir.RET_NONE(), -1)
+        } else if arg.ty == types.FLOAT() {
+            ccall(mut g, func, [scalar(mut g, arg)], [ir.KIND_FLOAT()], ir.RET_NONE(), -1)
+        } else {
+            ccall(mut g, func, [scalar(mut g, arg)], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        }
+        return no_value()
+    }
+    if name == "os.args" {
+        return own(mut g, reg_val(ccall(mut g, "vela_os_args", [], [], ir.RET_INT(), -1), t))
+    }
+    if name == "strings.build" || name == "strings.from_int" || name == "strings.from_float" {
+        let arg = scalar(mut g, expr(mut g, args[0]))
+        let out = slot_val(mut g, t)
+        if name == "strings.build" {
+            ccall(mut g, "vela_builder_build", [arg], [ir.KIND_INT()], ir.RET_STR(), out.reg)
+        } else if name == "strings.from_float" {
+            ccall(mut g, "vela_from_float", [arg], [ir.KIND_FLOAT()], ir.RET_STR(), out.reg)
+        } else {
+            ccall(mut g, "vela_from_int", [arg], [ir.KIND_INT()], ir.RET_STR(), out.reg)
+        }
+        return own(mut g, out)
+    }
+    if name == "os.read" {
+        let n = scalar(mut g, expr(mut g, args[0]))
+        let out = slot_val(mut g, t)
+        ccall(mut g, "vela_os_read", [n, loc_of(mut g, e)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_STR(), out.reg)
+        return own(mut g, out)
+    }
+    if name == "os.write" {
+        let s = expr(mut g, args[0])
+        ccall(mut g, "vela_os_write", [address(mut g, s)], [ir.KIND_STR()], ir.RET_NONE(), -1)
+        return no_value()
+    }
+    if name == "os.exit" {
+        let code = scalar(mut g, expr(mut g, args[0]))
+        ccall(mut g, "vela_os_exit", [code, loc_of(mut g, e)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+        return no_value()
+    }
+    if name == "strings.builder" {
+        let b = ccall(mut g, "vela_array_new", [sym_addr(mut g, "vela_type_byte"), konst(mut g, 0)], [ir.KIND_INT(), ir.KIND_INT()],
+            ir.RET_INT(), -1)
+        return own(mut g, reg_val(b, t))
+    }
+    if name == "strings.add" || name == "strings.add_byte" || name == "strings.add_int" {
+        let v = expr(mut g, args[1])  // the value first, then the place, as for any mut argument
+        let b = scalar(mut g, writable(mut g, mut_place(args[0])))
+        if name == "strings.add_byte" {
+            let a = element_copy(mut g, v)
+            ccall(mut g, "vela_array_push", [b, a], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+        } else if name == "strings.add" {
+            ccall(mut g, "vela_builder_add", [b, address(mut g, v)], [ir.KIND_INT(), ir.KIND_STR()], ir.RET_NONE(), -1)
+        } else {
+            ccall(mut g, "vela_builder_add_int", [b, scalar(mut g, v)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+        }
+        return no_value()
+    }
+    if name == "files.read" || name == "files.write" || name == "files.remove" || name == "files.temp_dir" ||
+        name == "os.run" || name == "os.output" {
+        return file_call(mut g, e, name, args)
+    }
+    if name == "os.env" || name == "os.read_line" || name == "strings.parse_float" {
+        let mut arg = no_value()
+        if name != "os.read_line" {
+            arg = expr(mut g, args[0])
+        }
+        let opt = slot_val(mut g, t)
+        let some = types.variant_index(g.k.table, t, "Some")
+        let none = types.variant_index(g.k.table, t, "None")
+        let out = shape(mut g, t).payloads[some][0]
+        let at = add_imm(mut g, opt.reg, out)
+        // The runtime writes the value straight into the Some's payload.
+        let mut ok = -1
+        if name == "strings.parse_float" {
+            ok = ccall(mut g, "vela_parse_float", [address(mut g, arg), at], [ir.KIND_STR(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+        } else {
+            copy_mem(mut g, at, sym_addr(mut g, str_literal(mut g, "")), 24)
+            if name == "os.env" {
+                ok = ccall(mut g, "vela_os_env", [address(mut g, arg), at], [ir.KIND_STR(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+            } else {
+                ok = ccall(mut g, "vela_os_read_line", [at], [ir.KIND_INT()], ir.RET_BOOL(), -1)
+            }
+        }
+        set_tag(mut g, opt, ok, some, none)
+        return own(mut g, opt)
+    }
+    if name == "len" {
+        let arg = expr(mut g, args[0])
+        if arg.ty == types.STR() {
+            return reg_val(load(mut g, arg.reg, arg.off + 16, 8), types.INT())
+        }
+        return reg_val(load(mut g, scalar(mut g, arg), 8, 8), types.INT())
+    }
+    if name == "int" {
+        let arg = expr(mut g, args[0])
+        if arg.ty == types.FLOAT() {
+            let r = ccall(mut g, "vela_float_to_int", [scalar(mut g, arg), loc_of(mut g, e)], [ir.KIND_FLOAT(), ir.KIND_INT()],
+                ir.RET_INT(), -1)
+            return reg_val(r, types.INT())
+        }
+        return reg_val(scalar(mut g, arg), types.INT())
+    }
+    if name == "float" {
+        let r = reg(mut g, ir.FLOAT())
+        emit(mut g, ir.inst(ir.Op.IntToFloat, r, scalar(mut g, expr(mut g, args[0])), -1, 0))
+        return reg_val(r, types.FLOAT())
+    }
+    if name == "byte" {
+        let c = scalar(mut g, expr(mut g, args[0]))
+        return reg_val(checked_op(mut g, ir.Op.ToByte, c, -1, loc(mut g, e.line, e.col)), types.BYTE())
+    }
+    if name == "push" {
+        let v = consume(mut g, expr(mut g, args[1]))
+        let array = scalar(mut g, writable(mut g, mut_place(args[0])))
+        let a = element_copy(mut g, v)
+        ccall(mut g, "vela_array_push", [array, a], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+        return no_value()
+    }
+    let mt = ty(g, args[0])
+    let mti = types.get(g.k.table, mt)
+    if name == "maps.remove" {
+        let key = expr(mut g, args[1])
+        let m = scalar(mut g, writable(mut g, mut_place(args[0])))
+        let ka = element_copy(mut g, key)
+        ccall(mut g, "vela_map_remove", [m, ka], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+        return no_value()
+    }
+    let m = scalar(mut g, expr(mut g, args[0]))
+    if name == "maps.keys" {
+        return own(mut g, reg_val(ccall(mut g, "vela_map_keys", [m], [ir.KIND_INT()], ir.RET_INT(), -1), t))
+    }
+    let key = expr(mut g, args[1])
+    let ka = element_copy(mut g, key)
+    let found = ccall(mut g, "vela_map_find", [m, ka], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    if name == "maps.has" {
+        return reg_val(cmp_imm(mut g, 1, found, 0), types.BOOL())
+    }
+    // get: Some(a copy of the value), or None.
+    let opt = slot_val(mut g, t)
+    let some = types.variant_index(g.k.table, t, "Some")
+    let none = types.variant_index(g.k.table, t, "None")
+    let yes = label(mut g)
+    let no = label(mut g)
+    let done = label(mut g)
+    branch(mut g, found, yes, no)
+    place_label(mut g, yes)
+    store(mut g, opt.reg, 0, 4, konst(mut g, some))
+    let value = mem_val(found, 0, mti.args[1])
+    put_payload(mut g, opt, t, some, 0, value)
+    retain(mut g, mti.args[1], payload(mut g, opt, t, some, 0))
+    jump(mut g, done)
+    place_label(mut g, no)
+    store(mut g, opt.reg, 0, 4, konst(mut g, none))
+    place_label(mut g, done)
+    return own(mut g, opt)
+}
+
+// The tag of the enum at `v`: `yes` if the register `ok` is not 0, else `no`.
+fn set_tag(g: mut Low, v: Val, ok: Int, yes: Int, no: Int) {
+    let a = label(mut g)
+    let b = label(mut g)
+    let done = label(mut g)
+    branch(mut g, ok, a, b)
+    place_label(mut g, a)
+    store(mut g, v.reg, v.off, 4, konst(mut g, yes))
+    jump(mut g, done)
+    place_label(mut g, b)
+    store(mut g, v.reg, v.off, 4, konst(mut g, no))
+    place_label(mut g, done)
+}
+
+// files.read, files.write, files.remove, files.temp_dir, os.run and
+// os.output: the runtime reports success with a bool and fills in the
+// result or the error message; this builds the Result.
+fn file_call(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    let mut vs: [Val] = []
+    for a in args {
+        push(mut vs, expr(mut g, a))
+    }
+    let r = ty(g, e)
+    let result = slot_val(mut g, r)
+    let ok_i = types.variant_index(g.k.table, r, "Ok")
+    let err_i = types.variant_index(g.k.table, r, "Err")
+    let text = slot_val(mut g, types.STR())  // the contents, or the error message
+    copy_mem(mut g, text.reg, sym_addr(mut g, str_literal(mut g, "")), 24)
+    let mut ok = -1
+    let mut success = text
+    if name == "files.read" {
+        ok = ccall(mut g, "vela_files_read", [address(mut g, vs[0]), text.reg], [ir.KIND_STR(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+    } else if name == "files.write" {
+        ok = ccall(mut g, "vela_files_write", [address(mut g, vs[0]), address(mut g, vs[1]), text.reg],
+            [ir.KIND_STR(), ir.KIND_STR(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+        success = reg_val(load(mut g, vs[1].reg, vs[1].off + 16, 8), types.INT())
+    } else if name == "files.remove" {
+        ok = ccall(mut g, "vela_files_remove", [address(mut g, vs[0]), text.reg], [ir.KIND_STR(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+        success = reg_val(konst(mut g, 0), types.UNIT())
+    } else if name == "files.temp_dir" {
+        ok = ccall(mut g, "vela_files_temp_dir", [text.reg], [ir.KIND_INT()], ir.RET_BOOL(), -1)
+    } else if name == "os.output" {
+        ok = ccall(mut g, "vela_os_output", [scalar(mut g, vs[0]), text.reg], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+    } else {
+        let code = slot_val(mut g, types.INT())
+        store(mut g, code.reg, 0, 8, konst(mut g, 0))
+        ok = ccall(mut g, "vela_os_run", [scalar(mut g, vs[0]), code.reg, text.reg], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()],
+            ir.RET_BOOL(), -1)
+        success = reg_val(load(mut g, code.reg, 0, 8), types.INT())
+    }
+    let yes = label(mut g)
+    let no = label(mut g)
+    let done = label(mut g)
+    branch(mut g, ok, yes, no)
+    place_label(mut g, yes)
+    store(mut g, result.reg, 0, 4, konst(mut g, ok_i))
+    let ok_t = types.get(g.k.table, r).variants[ok_i].payload[0]
+    let mut s = success
+    s.ty = ok_t
+    put_payload(mut g, result, r, ok_i, 0, s)
+    jump(mut g, done)
+    place_label(mut g, no)
+    store(mut g, result.reg, 0, 4, konst(mut g, err_i))
+    put_payload(mut g, result, r, err_i, 0, text)
+    place_label(mut g, done)
+    return own(mut g, result)
+}
