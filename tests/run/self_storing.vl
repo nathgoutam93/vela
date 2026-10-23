@@ -1,0 +1,43 @@
+// A value stored into a part of itself: what is stored is the value as it
+// was before, as with any argument, so it holds the old part. Until M13
+// the code generator copied the value only after making the part unique,
+// so the part held a value holding the part: the wrong answer here, and a
+// reference cycle that leaked (run_tests.py --sanitize catches that).
+// out: push: 1 then 0
+// out: index: 1 then 1, the item it replaced: 0
+// out: map: 1 then 0
+type Holder = struct {
+    n: Int
+    items: [Holder]
+    named: Map[Str, Holder]
+}
+
+fn empty(n: Int) -> Holder {
+    return Holder { n: n, items: [], named: [:] }
+}
+
+fn main() {
+    let mut a = empty(1)
+    push(mut a.items, a)
+    print("push: " + text(len(a.items)) + " then " + text(len(a.items[0].items)))
+
+    let mut b = empty(2)
+    push(mut b.items, empty(0))
+    b.items[0] = b
+    print("index: " + text(len(b.items)) + " then " + text(len(b.items[0].items)) + ", the item it replaced: " +
+        text(b.items[0].items[0].n))
+
+    let mut c = empty(3)
+    c.named["self"] = c
+    print("map: " + text(len(c.named)) + " then " + text(len(c.named["self"].named)))
+}
+
+fn text(n: Int) -> Str {
+    if n == 0 {
+        return "0"
+    }
+    if n == 1 {
+        return "1"
+    }
+    return "many"
+}

@@ -248,9 +248,12 @@ class FunctionGen:
                     frame.items.remove((v.c, v.ty))
                     break
             return v.c
-        if not re.fullmatch(r"v_\w+|_t\d+", v.c):
-            # Copy a field or element path into a temporary first, so later
-            # changes to where it came from cannot change the copy.
+        if not re.fullmatch(r"_t\d+", v.c):
+            # Copy a variable, field or element path into a temporary first,
+            # so later changes to where it came from cannot change the copy:
+            # in `push(mut b.items, b)` the b pushed is b before the push.
+            # (Copying only paths let b.items hold a b holding b.items: a
+            # cycle, and the wrong answer. Fixed in M13.)
             temp = self.new_temp()
             self.emit(f"{self.c_type(v.ty)} {temp} = {v.c};")
             v = Value(temp, v.ty)

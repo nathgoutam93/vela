@@ -1,0 +1,53 @@
+// stage 1 only
+// Vela values cannot refer to themselves: a value is changed in place only
+// when nothing else refers to it, so what is stored into it cannot refer
+// to it, and closures' copies never change. Here every way of trying to
+// build a cycle, with arrays, maps, recursive enums, closures and tasks;
+// run_tests.py --sanitize would report a cycle as a leak.
+// out: 46
+// out: 4
+import tasks
+
+type Node = enum {
+    End
+    Link(Node, [Node])
+}
+
+type Holder = struct {
+    f: fn() -> Int
+    items: [Holder]
+}
+
+fn main() {
+    // An array stored into itself, and a map into itself.
+    let mut xs: [[Int]] = [[1]]
+    let mut nested: [[[Int]]] = [xs]
+    nested[0] = nested[0]
+    let mut m: Map[Str, [Str]] = ["a": ["x"]]
+    m["b"] = m["a"]
+    // A recursive enum linked to itself, again and again.
+    let mut n = Node.Link(Node.End, [])
+    for _ in 0..100 {
+        n = Node.Link(n, [n, n])
+    }
+    // A struct holding closures that capture the struct.
+    let mut h = Holder { f: fn() => 1, items: [] }
+    for _ in 0..10 {
+        let copy = h
+        h.f = fn() => len(copy.items) + copy.f()
+        let snapshot = h
+        push(mut h.items, snapshot)
+    }
+    print(h.f())
+    // The same, shared between threads first.
+    let made = tasks.map([1, 2, 3, 4], fn(k) {
+        let mut hs: [Holder] = []
+        for i in 0..k {
+            let mut one = Holder { f: fn() => i, items: hs }
+            push(mut hs, one)
+            one.items = hs
+        }
+        return hs
+    })
+    print(len(made[3]))
+}

@@ -491,6 +491,19 @@ fn is_word(c: Byte) -> Bool {
 }
 
 // A C variable or temporary (`v_x`, `_t3`), not a path into one.
+// A temporary of this function's, `_t12`: nothing else changes it.
+fn is_temp(c: Str) -> Bool {
+    if len(c) <= 2 || c[0..2] != "_t" {
+        return false
+    }
+    for ch in c[2..len(c)] {
+        if ch < '0' || ch > '9' {
+            return false
+        }
+    }
+    return true
+}
+
 fn is_simple(c: Str) -> Bool {
     if len(c) > 2 && c[0..2] == "v_" {
         for ch in c[2..len(c)] {
@@ -535,9 +548,13 @@ fn consume(g: mut Gen, v: Value) -> Str {
         return v.c
     }
     let mut c = v.c
-    if !is_simple(c) {
-        // Copy a field or element path into a temporary first, so later
-        // changes to where it came from cannot change the copy.
+    if !is_temp(c) {
+        // Copy a variable, field or element path into a temporary first, so
+        // later changes to where it came from cannot change the copy: in
+        // `push(mut b.items, b)` the b pushed is b before the push, and the
+        // place's copy-on-write must not show through it. Copying only
+        // paths once let b.items hold a b that held b.items, a cycle that
+        // leaked (found in M13).
         let temp = new_temp(mut g)
         emit(mut g, c_type(g, v.ty) + " " + temp + " = " + c + ";")
         c = temp

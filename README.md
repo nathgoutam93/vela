@@ -47,7 +47,8 @@ then use it.
 ```
 stage1/      the compiler, written in Vela
 bootstrap/   the seed (Stage 1 compiled to C) and the bootstrap script
-examples/    larger programs: orders/ prices orders read from CSV
+examples/    larger programs: orders/ prices orders read from CSV;
+             mandelbrot/ renders rows on every core
 editors/     Neovim and VS Code support for `vela lsp`
 stage0/      the first compiler, in Python: frozen at M9 as the readable reference
 runtime/     C runtime linked into every program
@@ -79,9 +80,13 @@ effects (`uses fs, os`), fakes for tests (`with files = ...`), contracts
 (`requires`, `ensures`) and warnings; M10c added closures
 (`fn(x) => x * k`), `Float`, and `std/text.vl`. M12 added a language
 server (`vela lsp`) and `vela query` for agents, with `std/json.vl` and
-reading from stdin. All of M10 and M12 is in Stage 1 only.
+reading from stdin. M13 added structured concurrency: `tasks.map(xs, f)`
+runs f on every core and returns the results in order, safely, since
+values are copies; the compiler uses it to compile its C in parallel.
+All of M10, M12 and M13 is in Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
-`python3 run_tests.py --sanitize` runs the suite under AddressSanitizer.
+`python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
+`--tsan` under ThreadSanitizer.
 
 ```
 fn fib(n: Int) -> Int {
