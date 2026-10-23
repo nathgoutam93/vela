@@ -1,0 +1,19 @@
+import dedupe
+import strings
+
+test "small" {
+    let out = dedupe.dedupe(["b", "a", "b", "c", "a", "b"])
+    assert(len(out) == 3 && out[0] == "b" && out[1] == "a" && out[2] == "c")
+    assert(len(dedupe.dedupe([])) == 0)
+}
+
+test "large" {
+    let mut xs: [Str] = []
+    for i in 0..100000 {
+        push(mut xs, "w" + strings.from_int(i * 7919 % 100003))
+    }
+    push(mut xs, "w0")
+    let out = dedupe.dedupe(xs)
+    assert(len(out) == 100000)
+    assert(out[0] == "w0" && out[1] == "w7919")
+}

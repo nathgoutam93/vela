@@ -1,0 +1,8 @@
+{
+  "title": "Higher-order functions with effects (uses f)",
+  "category": "new module",
+  "main": "retry.vl",
+  "tests": [
+    "retry_test.vl"
+  ]
+}

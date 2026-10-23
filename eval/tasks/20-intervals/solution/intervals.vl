@@ -1,0 +1,37 @@
+// Intervals of whole numbers.
+import lists
+
+pub type Interval = struct {
+    lo: Int
+    hi: Int
+}
+
+pub fn merge(xs: [Interval]) -> [Interval] {
+    let mut kept: [Interval] = []
+    for x in xs {
+        if x.lo <= x.hi {
+            push(mut kept, x)
+        }
+    }
+    let sorted = lists.sort_by(kept, fn(x: Interval) => x.lo)
+    let mut out: [Interval] = []
+    for x in sorted {
+        let n = len(out)
+        if n > 0 && x.lo <= out[n - 1].hi + 1 {
+            if x.hi > out[n - 1].hi {
+                out[n - 1].hi = x.hi
+            }
+        } else {
+            push(mut out, x)
+        }
+    }
+    return out
+}
+
+pub fn covered(xs: [Interval]) -> Int {
+    let mut total = 0
+    for x in merge(xs) {
+        total = total + x.hi - x.lo + 1
+    }
+    return total
+}

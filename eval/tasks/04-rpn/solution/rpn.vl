@@ -1,0 +1,46 @@
+// Reverse Polish notation.
+import text
+
+pub fn eval(expr: Str) -> Result[Int, Str] {
+    let mut stack: [Int] = []
+    let mut any = false
+    for token in text.split(expr, " ") {
+        if token == "" {
+            continue
+        }
+        any = true
+        if token == "+" || token == "-" || token == "*" || token == "/" {
+            let n = len(stack)
+            if n < 2 {
+                return Err("not enough operands")
+            }
+            let a = stack[n - 2]
+            let b = stack[n - 1]
+            stack = stack[0..n - 2]
+            if token == "+" {
+                push(mut stack, a + b)
+            } else if token == "-" {
+                push(mut stack, a - b)
+            } else if token == "*" {
+                push(mut stack, a * b)
+            } else {
+                if b == 0 {
+                    return Err("division by zero")
+                }
+                push(mut stack, a / b)
+            }
+            continue
+        }
+        match text.parse_int(token) {
+            Some(v) => push(mut stack, v)
+            None => return Err("unknown token '" + token + "'")
+        }
+    }
+    if !any {
+        return Err("empty")
+    }
+    if len(stack) > 1 {
+        return Err("too many values")
+    }
+    return Ok(stack[0])
+}

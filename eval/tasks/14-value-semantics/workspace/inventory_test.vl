@@ -1,0 +1,9 @@
+import inventory
+
+test "restock and sell" {
+    let mut items = [inventory.Item { name: "pen", qty: 2 }, inventory.Item { name: "ink", qty: 0 }]
+    inventory.restock(mut items, "ink", 5)
+    assert(items[1].qty == 5)
+    assert(inventory.sell(mut items, "pen", 2))
+    assert(items[0].qty == 0)
+}

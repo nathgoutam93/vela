@@ -1,0 +1,31 @@
+import inventory
+
+fn stock() -> [inventory.Item] {
+    return [inventory.Item { name: "pen", qty: 2 }, inventory.Item { name: "ink", qty: 0 },
+        inventory.Item { name: "pad", qty: 7 }]
+}
+
+test "restock" {
+    let mut items = stock()
+    inventory.restock(mut items, "ink", 5)
+    inventory.restock(mut items, "pad", 1)
+    inventory.restock(mut items, "nib", 9)
+    assert(items[0].qty == 2 && items[1].qty == 5 && items[2].qty == 8 && len(items) == 3)
+}
+
+test "sell" {
+    let mut items = stock()
+    assert(inventory.sell(mut items, "pad", 3))
+    assert(items[2].qty == 4)
+    assert(!inventory.sell(mut items, "pen", 3))
+    assert(items[0].qty == 2)
+    assert(!inventory.sell(mut items, "nib", 1))
+    assert(inventory.sell(mut items, "pen", 2) && items[0].qty == 0)
+}
+
+test "a copy is not changed" {
+    let mut items = stock()
+    let before = items
+    inventory.restock(mut items, "pen", 1)
+    assert(before[0].qty == 2 && items[0].qty == 3)
+}

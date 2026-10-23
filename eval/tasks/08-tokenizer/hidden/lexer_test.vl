@@ -1,0 +1,40 @@
+import lexer
+import strings
+
+fn show(r: Result[[lexer.Token], Str]) -> Str {
+    match r {
+        Ok(tokens) => {
+            let mut b = strings.builder()
+            for i in 0..len(tokens) {
+                if i > 0 {
+                    strings.add(mut b, " ")
+                }
+                let word = match tokens[i] {
+                    lexer.Token.Num(n) => "num(" + strings.from_int(n) + ")"
+                    lexer.Token.Ident(s) => "ident(" + s + ")"
+                    lexer.Token.Op(c) => "op(" + strings.from_int(int(c)) + ")"
+                    lexer.Token.LParen => "("
+                    lexer.Token.RParen => ")"
+                }
+                strings.add(mut b, word)
+            }
+            return strings.build(b)
+        }
+        Err(e) => return "error: " + e
+    }
+}
+
+test "tokens" {
+    assert(show(lexer.tokenize("12 + x_1*(y - 3)")) == "num(12) op(43) ident(x_1) op(42) ( ident(y) op(45) num(3) )")
+    assert(show(lexer.tokenize("")) == "")
+    assert(show(lexer.tokenize("  \t\n ")) == "")
+    assert(show(lexer.tokenize("a/b")) == "ident(a) op(47) ident(b)")
+    assert(show(lexer.tokenize("007")) == "num(7)")
+    assert(show(lexer.tokenize("_x9")) == "ident(_x9)")
+}
+
+test "errors" {
+    assert(show(lexer.tokenize("1 + $")) == "error: unexpected '$' at column 5")
+    assert(show(lexer.tokenize("#")) == "error: unexpected '#' at column 1")
+    assert(show(lexer.tokenize("a\n b ? c")) == "error: unexpected '?' at column 6")
+}

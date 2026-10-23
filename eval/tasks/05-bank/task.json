@@ -1,0 +1,8 @@
+{
+  "title": "Accounts with value semantics",
+  "category": "new module",
+  "main": "bank.vl",
+  "tests": [
+    "bank_test.vl"
+  ]
+}

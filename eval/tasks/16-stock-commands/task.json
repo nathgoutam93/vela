@@ -1,0 +1,6 @@
+{
+  "title": "Add commands to a multi-file program",
+  "category": "feature",
+  "main": "main.vl",
+  "cases": "cases.json"
+}

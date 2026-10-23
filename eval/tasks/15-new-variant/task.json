@@ -1,0 +1,8 @@
+{
+  "title": "Add a variant to an enum",
+  "category": "feature",
+  "main": "ledger.vl",
+  "tests": [
+    "ledger_test.vl"
+  ]
+}

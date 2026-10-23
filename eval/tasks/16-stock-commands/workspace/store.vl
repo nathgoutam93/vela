@@ -1,0 +1,44 @@
+// The stock file: one item per line, `name qty`.
+import files
+import lists
+import maps
+import strings
+import text
+
+// The stock in the file at `path`; none when there is no file.
+pub fn read(path: Str) -> Result[Map[Str, Int], Str] uses fs {
+    let mut m: Map[Str, Int] = [:]
+    let mut content = ""
+    match files.read(path) {
+        Ok(t) => content = t
+        Err(_) => return Ok(m)
+    }
+    for line in text.lines(content) {
+        if text.trim(line) == "" {
+            continue
+        }
+        let words = text.split(text.trim(line), " ")
+        if len(words) != 2 {
+            return Err("bad line in " + path + ": " + line)
+        }
+        match text.parse_int(words[1]) {
+            Some(n) => m[words[0]] = n
+            None => return Err("bad line in " + path + ": " + line)
+        }
+    }
+    return Ok(m)
+}
+
+// The stock as the file holds it: by name.
+pub fn render(m: Map[Str, Int]) -> Str {
+    let mut b = strings.builder()
+    for name in lists.sort(maps.keys(m)) {
+        strings.add(mut b, name + " " + strings.from_int(m[name]) + "\n")
+    }
+    return strings.build(b)
+}
+
+pub fn write(path: Str, m: Map[Str, Int]) -> Result[Unit, Str] uses fs {
+    files.write(path, render(m))?
+    return Ok(())
+}

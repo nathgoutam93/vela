@@ -1,0 +1,49 @@
+import stack
+
+fn is_int(o: Option[Int], n: Int) -> Bool {
+    return match o {
+        Some(x) => x == n
+        None => false
+    }
+}
+
+fn is_str(o: Option[Str], v: Str) -> Bool {
+    return match o {
+        Some(x) => x == v
+        None => false
+    }
+}
+
+fn empty_int(o: Option[Int]) -> Bool {
+    return match o {
+        Some(_) => false
+        None => true
+    }
+}
+
+test "ints" {
+    let mut s: stack.Stack[Int] = stack.new()
+    assert(stack.size(s) == 0)
+    assert(empty_int(stack.pop(mut s)))
+    assert(empty_int(stack.peek(s)))
+    stack.add(mut s, 1)
+    stack.add(mut s, 2)
+    stack.add(mut s, 3)
+    assert(stack.size(s) == 3)
+    assert(is_int(stack.peek(s), 3))
+    assert(is_int(stack.pop(mut s), 3))
+    assert(is_int(stack.pop(mut s), 2))
+    assert(stack.size(s) == 1)
+    assert(is_int(stack.pop(mut s), 1))
+    assert(empty_int(stack.pop(mut s)))
+}
+
+test "strings, and a copy is its own stack" {
+    let mut s: stack.Stack[Str] = stack.new()
+    stack.add(mut s, "a")
+    let copy = s
+    stack.add(mut s, "b")
+    assert(stack.size(copy) == 1 && stack.size(s) == 2)
+    assert(is_str(stack.peek(copy), "a"))
+    assert(is_str(stack.pop(mut s), "b"))
+}

@@ -1,0 +1,15 @@
+// Removing repeats.
+import maps
+
+// The strings of xs without repeats, each where it first appears.
+pub fn dedupe(xs: [Str]) -> [Str] {
+    let mut out: [Str] = []
+    let mut seen: Map[Str, Bool] = [:]
+    for x in xs {
+        if !maps.has(seen, x) {
+            seen[x] = true
+            push(mut out, x)
+        }
+    }
+    return out
+}

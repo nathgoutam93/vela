@@ -1,0 +1,9 @@
+import geometry
+import paths
+
+test "renamed" {
+    let a = geometry.Point { x: 3, y: 4 }
+    assert(geometry.distance_squared(a, geometry.origin()) == 25)
+    assert(paths.spread([a, geometry.origin(), a]) == 50)
+    assert(paths.farthest([a]) == 25)
+}

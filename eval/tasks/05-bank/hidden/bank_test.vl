@@ -1,0 +1,56 @@
+import bank
+
+fn balance_is(r: Result[Int, Str], n: Int) -> Bool {
+    return match r {
+        Ok(v) => v == n
+        Err(_) => false
+    }
+}
+
+fn fails_with(r: Result[Int, Str], message: Str) -> Bool {
+    return match r {
+        Ok(_) => false
+        Err(e) => e == message
+    }
+}
+
+test "deposit and withdraw" {
+    let mut a = bank.open("ann")
+    assert(a.owner == "ann" && a.balance == 0)
+    assert(balance_is(bank.deposit(mut a, 50), 50))
+    assert(balance_is(bank.withdraw(mut a, 20), 30))
+    assert(a.balance == 30)
+}
+
+test "bad amounts change nothing" {
+    let mut a = bank.open("ann")
+    bank.deposit(mut a, 10)
+    assert(fails_with(bank.deposit(mut a, 0), "amount must be positive"))
+    assert(fails_with(bank.withdraw(mut a, -5), "amount must be positive"))
+    assert(fails_with(bank.withdraw(mut a, 11), "insufficient funds"))
+    assert(a.balance == 10)
+}
+
+test "transfer" {
+    let mut a = bank.open("ann")
+    let mut b = bank.open("bob")
+    bank.deposit(mut a, 100)
+    match bank.transfer(mut a, mut b, 30) {
+        Ok(_) => {}
+        Err(_) => assert(false)
+    }
+    assert(a.balance == 70 && b.balance == 30)
+    match bank.transfer(mut a, mut b, 71) {
+        Ok(_) => assert(false)
+        Err(e) => assert(e == "insufficient funds")
+    }
+    assert(a.balance == 70 && b.balance == 30)
+}
+
+test "accounts are values" {
+    let mut a = bank.open("ann")
+    bank.deposit(mut a, 5)
+    let copy = a
+    bank.deposit(mut a, 5)
+    assert(copy.balance == 5 && a.balance == 10)
+}

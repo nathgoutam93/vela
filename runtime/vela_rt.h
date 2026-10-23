@@ -302,6 +302,13 @@ int64_t vela_tasks_workers(void);
 vela_array *vela_tasks_map(vela_array *xs, void *f, vela_env *env, vela_task_call call, const vela_type *result);
 void vela_tasks_each(vela_array *xs, void *f, vela_env *env, vela_task_call call);
 
+// ---- math ----
+//
+// math.sqrt (M16): inline in generated C, where gcc makes it one
+// instruction; a function for the native backend to call.
+double vela_math_sqrt(double x);
+static inline double vela_sqrt(double x) { return __builtin_sqrt(x); }
+
 // strings.Builder is an array of bytes (elem = &vela_type_byte); building
 // copies them into a new Str. The builder must already be unique.
 void vela_builder_add(vela_array *b, vela_str s);

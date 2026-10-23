@@ -1,0 +1,8 @@
+{
+  "title": "A tokenizer with error positions",
+  "category": "new module",
+  "main": "lexer.vl",
+  "tests": [
+    "lexer_test.vl"
+  ]
+}

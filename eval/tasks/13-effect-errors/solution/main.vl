@@ -1,0 +1,15 @@
+import os
+import report
+
+fn show(first: Int, xs: mut [Int]) {
+    push(mut xs, first)
+    print(report.numbers(xs))
+}
+
+fn main() {
+    let args = os.args()
+    print(report.summary(args[1]))
+    let mut xs = [4, 5]
+    let first = xs[0]
+    show(first, mut xs)
+}

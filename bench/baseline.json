@@ -1,0 +1,259 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "os": "Linux x86_64",
+    "gcc": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "commit": "7ff0620",
+    "date": "2026-10-23"
+  },
+  "runs": 5,
+  "quick": false,
+  "results": {
+    "nbody": {
+      "c": {
+        "build": 0.11,
+        "size": 16144,
+        "best": 0.3346,
+        "median": 0.3422
+      },
+      "rust": {
+        "build": 0.233,
+        "size": 4370208,
+        "best": 0.2266,
+        "median": 0.2346
+      },
+      "vela": {
+        "build": 0.687,
+        "size": 56512,
+        "best": 3.0455,
+        "median": 3.2129
+      },
+      "vela-native": {
+        "build": 0.616,
+        "size": 64632,
+        "best": 3.0736,
+        "median": 3.241
+      }
+    },
+    "spectralnorm": {
+      "c": {
+        "build": 0.094,
+        "size": 16248,
+        "best": 0.2368,
+        "median": 0.2578
+      },
+      "rust": {
+        "build": 0.232,
+        "size": 4366504,
+        "best": 0.2384,
+        "median": 0.2596
+      },
+      "vela": {
+        "build": 0.692,
+        "size": 56376,
+        "best": 0.5551,
+        "median": 0.5761
+      },
+      "vela-native": {
+        "build": 0.676,
+        "size": 56304,
+        "best": 0.7861,
+        "median": 0.9147
+      }
+    },
+    "fannkuch": {
+      "c": {
+        "build": 0.069,
+        "size": 16232,
+        "best": 0.2412,
+        "median": 0.2469
+      },
+      "rust": {
+        "build": 0.228,
+        "size": 4363856,
+        "best": 0.2459,
+        "median": 0.2605
+      },
+      "vela": {
+        "build": 0.599,
+        "size": 56168,
+        "best": 1.6494,
+        "median": 1.6577
+      },
+      "vela-native": {
+        "build": 0.684,
+        "size": 56096,
+        "best": 1.4347,
+        "median": 1.447
+      }
+    },
+    "binarytrees": {
+      "c": {
+        "build": 0.15,
+        "size": 20288,
+        "best": 0.2831,
+        "median": 0.3079
+      },
+      "rust": {
+        "build": 0.196,
+        "size": 4364408,
+        "best": 0.36,
+        "median": 0.3929
+      },
+      "vela": {
+        "build": 0.671,
+        "size": 68600,
+        "best": 0.8959,
+        "median": 1.0015
+      },
+      "vela-native": {
+        "build": 0.605,
+        "size": 56480,
+        "best": 1.0059,
+        "median": 1.0285
+      }
+    },
+    "mandelbrot": {
+      "c": {
+        "build": 0.065,
+        "size": 16008,
+        "best": 0.3042,
+        "median": 0.3136
+      },
+      "rust": {
+        "build": 0.186,
+        "size": 4362432,
+        "best": 0.3329,
+        "median": 0.3393
+      },
+      "vela": {
+        "build": 0.636,
+        "size": 52072,
+        "best": 0.302,
+        "median": 0.3208
+      },
+      "vela-native": {
+        "build": 0.729,
+        "size": 47904,
+        "best": 0.3823,
+        "median": 0.3897
+      }
+    },
+    "fasta": {
+      "c": {
+        "build": 0.085,
+        "size": 16288,
+        "best": 0.3818,
+        "median": 0.3942
+      },
+      "rust": {
+        "build": 0.293,
+        "size": 4375408,
+        "best": 0.4001,
+        "median": 0.412
+      },
+      "vela": {
+        "build": 0.667,
+        "size": 56384,
+        "best": 0.8499,
+        "median": 0.8788
+      },
+      "vela-native": {
+        "build": 0.675,
+        "size": 56312,
+        "best": 0.8919,
+        "median": 0.919
+      }
+    },
+    "knucleotide": {
+      "c": {
+        "build": 0.126,
+        "size": 16632,
+        "best": 0.2421,
+        "median": 0.2569
+      },
+      "rust": {
+        "build": 0.477,
+        "size": 4407488,
+        "best": 0.2709,
+        "median": 0.3093
+      },
+      "vela": {
+        "build": 0.763,
+        "size": 60336,
+        "best": 0.5508,
+        "median": 0.6039
+      },
+      "vela-native": {
+        "build": 0.699,
+        "size": 60416,
+        "best": 0.5252,
+        "median": 0.5492
+      }
+    },
+    "wordfreq": {
+      "c": {
+        "build": 0.12,
+        "size": 16560,
+        "best": 0.1815,
+        "median": 0.1991
+      },
+      "rust": {
+        "build": 0.381,
+        "size": 4392152,
+        "best": 0.2207,
+        "median": 0.2951
+      },
+      "vela": {
+        "build": 0.704,
+        "size": 56176,
+        "best": 0.4499,
+        "median": 0.4941
+      },
+      "vela-native": {
+        "build": 0.687,
+        "size": 60344,
+        "best": 0.3838,
+        "median": 0.4164
+      }
+    }
+  },
+  "compiler": {
+    "vela": {
+      "check": 0.2492893080000158,
+      "c": 0.3735968579999849
+    },
+    "vela-native": {
+      "check": 0.19192661599998928,
+      "c": 0.3554231769999774
+    }
+  },
+  "sizes": {
+    "nbody": [
+      "5000000"
+    ],
+    "spectralnorm": [
+      "2000"
+    ],
+    "fannkuch": [
+      "10"
+    ],
+    "binarytrees": [
+      "16"
+    ],
+    "mandelbrot": [
+      "2000"
+    ],
+    "fasta": [
+      "2500000"
+    ],
+    "knucleotide": [
+      "{fasta}"
+    ],
+    "wordfreq": [
+      "{words}"
+    ]
+  }
+}

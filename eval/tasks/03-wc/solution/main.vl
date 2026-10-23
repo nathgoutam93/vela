@@ -1,0 +1,28 @@
+import os
+import strings
+
+fn main() {
+    let mut lines = 0
+    let mut words = 0
+    let mut bytes = 0
+    let mut in_word = false
+    for {
+        let part = os.read(65536)
+        if len(part) == 0 {
+            break
+        }
+        bytes = bytes + len(part)
+        for c in part {
+            if c == '\n' {
+                lines = lines + 1
+            }
+            if c == ' ' || c == '\t' || c == '\n' {
+                in_word = false
+            } else if !in_word {
+                in_word = true
+                words = words + 1
+            }
+        }
+    }
+    print(strings.from_int(lines) + " " + strings.from_int(words) + " " + strings.from_int(bytes))
+}

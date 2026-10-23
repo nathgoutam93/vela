@@ -1,0 +1,8 @@
+{
+  "title": "Fix a binary search",
+  "category": "fix",
+  "main": "search.vl",
+  "tests": [
+    "search_hidden_test.vl"
+  ]
+}

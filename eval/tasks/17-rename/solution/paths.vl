@@ -1,0 +1,23 @@
+// Paths of points.
+import geometry
+
+// The sum of the squared distances along the path.
+pub fn spread(points: [geometry.Point]) -> Int {
+    let mut total = 0
+    for i in 1..len(points) {
+        total = total + geometry.distance_squared(points[i - 1], points[i])
+    }
+    return total
+}
+
+pub fn farthest(points: [geometry.Point]) -> Int {
+    let o = geometry.origin()
+    let mut best = 0
+    for p in points {
+        let d = geometry.distance_squared(o, p)
+        if d > best {
+            best = d
+        }
+    }
+    return best
+}

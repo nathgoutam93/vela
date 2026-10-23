@@ -1,0 +1,6 @@
+{
+  "title": "Totals per name from a CSV file",
+  "category": "new program",
+  "main": "main.vl",
+  "cases": "cases.json"
+}

@@ -1078,9 +1078,10 @@ fn private(c: mut Checker, line: Int, col: Int, module: Int, what: Str, name: St
 
 // `; it is maps.get` for a name that lives in a built-in module.
 fn std_hint(c: Checker, name: Str) -> Str {
-    for module in ["maps", "files", "os", "strings", "tasks"] {
+    for module in ["maps", "files", "os", "strings", "tasks", "math"] {
         let fns = match module {
             "maps" => ["has", "get", "remove", "keys"]
+            "math" => ["sqrt"]
             "files" => ["read", "write", "remove", "temp_dir"]
             "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write", "output"]
             "tasks" => ["map", "each", "workers"]
@@ -3525,7 +3526,7 @@ fn has_signature(name: Str) -> Bool {
     return len(name) > 6 && name[0..6] == "files." || name == "os.args" || name == "os.exit" ||
         name == "os.run" || name == "os.env" || name == "os.read_line" || name == "os.read" || name == "os.write" ||
         name == "os.output" ||
-        name == "tasks.workers" ||
+        name == "tasks.workers" || name == "math.sqrt" ||
         len(name) > 8 && name[0..8] == "strings."
 }
 
@@ -3570,6 +3571,7 @@ fn signature(c: mut Checker, name: Str) -> [Int] {
         "os.exit" => [types.INT(), nothing]
         "os.read" => [types.INT(), s]
         "tasks.workers" => [types.INT()]
+        "math.sqrt" => [types.FLOAT(), types.FLOAT()]
         "os.write" => [s, nothing]
         "strings.builder" => [b]
         "strings.add" => [b, s, nothing]

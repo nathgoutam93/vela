@@ -1,0 +1,51 @@
+import files
+import lists
+import maps
+import os
+import strings
+import text
+
+fn fail(message: Str) uses os {
+    os.eprint(message)
+    os.exit(1)
+}
+
+fn main() {
+    let args = os.args()
+    if len(args) != 2 {
+        fail("usage: csv FILE")
+    }
+    let mut content = ""
+    match files.read(args[1]) {
+        Ok(t) => content = t
+        Err(e) => fail("cannot read " + args[1] + ": " + e)
+    }
+    let lines = text.lines(content)
+    let mut totals: Map[Str, Int] = [:]
+    let mut total = 0
+    for i in 1..len(lines) {
+        let line = text.trim(lines[i])
+        if line == "" {
+            continue
+        }
+        let fields = text.split(line, ",")
+        if len(fields) != 2 {
+            fail("line " + strings.from_int(i + 1) + ": bad row")
+        }
+        let name = text.trim(fields[0])
+        match text.parse_int(text.trim(fields[1])) {
+            Some(n) => {
+                match maps.get(totals, name) {
+                    Some(t) => totals[name] = t + n
+                    None => totals[name] = n
+                }
+                total = total + n
+            }
+            None => fail("line " + strings.from_int(i + 1) + ": bad row")
+        }
+    }
+    for name in lists.sort(maps.keys(totals)) {
+        print(name + ": " + strings.from_int(totals[name]))
+    }
+    print("total: " + strings.from_int(total))
+}

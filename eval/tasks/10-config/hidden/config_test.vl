@@ -1,0 +1,37 @@
+import config
+
+fn ok(r: Result[config.Config, Str], name: Str, port: Int, debug: Bool) -> Bool {
+    return match r {
+        Ok(c) => c.name == name && c.port == port && c.debug == debug
+        Err(_) => false
+    }
+}
+
+fn err(r: Result[config.Config, Str], message: Str) -> Bool {
+    return match r {
+        Ok(_) => false
+        Err(e) => e == message
+    }
+}
+
+test "parse" {
+    assert(ok(config.parse("name = web\nport = 81\ndebug = true\n"), "web", 81, true))
+    assert(ok(config.parse("# a comment\n\n   name=api  \n"), "api", 8080, false))
+    assert(ok(config.parse("  # indented comment\nname = a b c"), "a b c", 8080, false))
+}
+
+test "errors" {
+    assert(err(config.parse("port = 1"), "missing name"))
+    assert(err(config.parse("name = x\noops"), "line 2: expected key = value"))
+    assert(err(config.parse("name = x\ncolour = red"), "line 2: unknown key 'colour'"))
+    assert(err(config.parse("name = x\nport = 70000"), "line 2: bad value for port"))
+    assert(err(config.parse("port = zero\nname = x"), "line 1: bad value for port"))
+    assert(err(config.parse("name = x\ndebug = yes"), "line 2: bad value for debug"))
+}
+
+test "load" {
+    with files = ["app.conf": "name = app\nport = 9000\n"] {
+        assert(ok(config.load("app.conf"), "app", 9000, false))
+        assert(err(config.load("other.conf"), "cannot read other.conf"))
+    }
+}

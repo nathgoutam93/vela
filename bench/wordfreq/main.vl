@@ -1,0 +1,69 @@
+// word-frequency: count the words of a text file and print the ten most
+// common. A realistic mix: reading a file, slicing strings, a map.
+//
+//     vela run bench/wordfreq/main.vl TEXT
+// stage 1 only
+import files
+import maps
+import os
+import strings
+
+// Whether word a comes before word b in the list: more frequent first,
+// ties in order.
+fn before(counts: Map[Str, Int], a: Str, b: Str) -> Bool {
+    return counts[a] > counts[b] || counts[a] == counts[b] && a < b
+}
+
+fn main() uses fs, os {
+    let args = os.args()
+    if len(args) < 2 {
+        print("usage: wordfreq TEXT")
+        os.exit(2)
+    }
+    let mut text = ""
+    match files.read(args[1]) {
+        Ok(t) => text = t
+        Err(e) => {
+            print(e)
+            os.exit(1)
+        }
+    }
+    let mut counts: Map[Str, Int] = [:]
+    let mut total = 0
+    let mut start = 0
+    for i in 0..len(text) + 1 {
+        if i == len(text) || text[i] == ' ' || text[i] == '\n' {
+            if i > start {
+                let w = text[start..i]
+                match maps.get(counts, w) {
+                    Some(c) => counts[w] = c + 1
+                    None => counts[w] = 1
+                }
+                total = total + 1
+            }
+            start = i + 1
+        }
+    }
+    let mut top: [Str] = []
+    for w in maps.keys(counts) {
+        if len(top) < 10 || before(counts, w, top[len(top) - 1]) {
+            if len(top) == 10 {
+                top[9] = w
+            } else {
+                push(mut top, w)
+            }
+            let mut j = len(top) - 1
+            for j > 0 && before(counts, top[j], top[j - 1]) {
+                let t = top[j]
+                top[j] = top[j - 1]
+                top[j - 1] = t
+                j = j - 1
+            }
+        }
+    }
+    print("words " + strings.from_int(total))
+    print("unique " + strings.from_int(len(counts)))
+    for w in top {
+        print(w + " " + strings.from_int(counts[w]))
+    }
+}

@@ -1,0 +1,39 @@
+import os
+import strings
+import text
+
+fn line(i: Int) -> Str {
+    if i % 15 == 0 {
+        return "FizzBuzz"
+    }
+    if i % 3 == 0 {
+        return "Fizz"
+    }
+    if i % 5 == 0 {
+        return "Buzz"
+    }
+    return strings.from_int(i)
+}
+
+fn usage() uses os {
+    os.eprint("usage: fizzbuzz N")
+    os.exit(2)
+}
+
+fn main() {
+    let args = os.args()
+    if len(args) != 2 {
+        usage()
+    }
+    match text.parse_int(args[1]) {
+        Some(n) => {
+            if n < 1 {
+                usage()
+            }
+            for i in 1..n + 1 {
+                print(line(i))
+            }
+        }
+        None => usage()
+    }
+}

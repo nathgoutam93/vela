@@ -1,0 +1,96 @@
+// fasta: write DNA sequences, one copied from a string and two drawn at
+// random from weighted letters (the Benchmarks Game's fasta). String
+// building and output.
+//
+//     vela run bench/fasta/main.vl N
+// stage 1 only
+import os
+import strings
+
+fn alu() -> Str {
+    return "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
+}
+
+fn arg(i: Int, default: Int) -> Int uses os {
+    let a = os.args()
+    if len(a) <= i {
+        return default
+    }
+    match strings.parse_float(a[i]) {
+        Some(x) => return int(x)
+        None => return default
+    }
+}
+
+fn smaller(a: Int, b: Int) -> Int {
+    if a < b {
+        return a
+    }
+    return b
+}
+
+// The next of the benchmark's pseudo-random numbers, from 0 up to max.
+fn next_random(seed: mut Int, max: Float) -> Float {
+    seed = (seed * 3877 + 29573) % 139968
+    return max * float(seed) / 139968.0
+}
+
+fn cumulative(probs: [Float]) -> [Float] {
+    let mut out: [Float] = []
+    let mut sum = 0.0
+    for p in probs {
+        sum = sum + p
+        push(mut out, sum)
+    }
+    return out
+}
+
+fn repeat_fasta(header: Str, s: Str, n: Int) {
+    print(header)
+    let k = len(s)
+    let mut pos = 0
+    let mut left = n
+    for left > 0 {
+        let line = smaller(60, left)
+        let mut b = strings.builder()
+        for _ in 0..line {
+            strings.add_byte(mut b, s[pos])
+            pos = pos + 1
+            if pos == k {
+                pos = 0
+            }
+        }
+        print(strings.build(b))
+        left = left - line
+    }
+}
+
+fn random_fasta(header: Str, letters: Str, cum: [Float], n: Int, seed: mut Int) {
+    print(header)
+    let m = len(letters)
+    let mut left = n
+    for left > 0 {
+        let line = smaller(60, left)
+        let mut b = strings.builder()
+        for _ in 0..line {
+            let r = next_random(mut seed, 1.0)
+            let mut i = 0
+            for i < m - 1 && r >= cum[i] {
+                i = i + 1
+            }
+            strings.add_byte(mut b, letters[i])
+        }
+        print(strings.build(b))
+        left = left - line
+    }
+}
+
+fn main() {
+    let n = arg(1, 1000)
+    let iub = cumulative([0.27, 0.12, 0.12, 0.27, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02, 0.02])
+    let homo = cumulative([0.3029549426680, 0.1979883004921, 0.1975473066391, 0.3015094502008])
+    let mut seed = 42
+    repeat_fasta(">ONE Homo sapiens alu", alu(), 2 * n)
+    random_fasta(">TWO IUB ambiguity codes", "acgtBDHKMNRSVWY", iub, 3 * n, mut seed)
+    random_fasta(">THREE Homo sapiens frequency", "acgt", homo, 5 * n, mut seed)
+}

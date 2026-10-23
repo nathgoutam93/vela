@@ -1,0 +1,52 @@
+// Tokens of arithmetic expressions.
+import bytes
+import strings
+
+pub type Token = enum {
+    Num(Int)
+    Ident(Str)
+    Op(Byte)
+    LParen
+    RParen
+}
+
+fn ident_char(c: Byte) -> Bool {
+    return bytes.is_alnum(c) || c == '_'
+}
+
+pub fn tokenize(src: Str) -> Result[[Token], Str] {
+    let mut out: [Token] = []
+    let n = len(src)
+    let mut i = 0
+    for i < n {
+        let c = src[i]
+        if c == ' ' || c == '\t' || c == '\n' {
+            i = i + 1
+        } else if bytes.is_digit(c) {
+            let mut v = 0
+            for i < n && bytes.is_digit(src[i]) {
+                v = v * 10 + (int(src[i]) - 48)
+                i = i + 1
+            }
+            push(mut out, Token.Num(v))
+        } else if bytes.is_letter(c) || c == '_' {
+            let start = i
+            for i < n && ident_char(src[i]) {
+                i = i + 1
+            }
+            push(mut out, Token.Ident(src[start..i]))
+        } else if c == '+' || c == '-' || c == '*' || c == '/' {
+            push(mut out, Token.Op(c))
+            i = i + 1
+        } else if c == '(' {
+            push(mut out, Token.LParen)
+            i = i + 1
+        } else if c == ')' {
+            push(mut out, Token.RParen)
+            i = i + 1
+        } else {
+            return Err("unexpected '" + src[i..i + 1] + "' at column " + strings.from_int(i + 1))
+        }
+    }
+    return Ok(out)
+}

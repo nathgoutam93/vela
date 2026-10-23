@@ -78,6 +78,8 @@ TESTS = ROOT / "tests"
 LSP_CLIENT = TESTS / "lsp_client.py"
 PKG_TEST = TESTS / "pkg_test.py"
 NATIVE_TEST = TESTS / "native_test.py"
+BENCH_TEST = TESTS / "bench_test.py"
+EVAL_TEST = TESTS / "eval_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -163,6 +165,10 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(PKG_TEST, compiler, env)
     if path == NATIVE_TEST:
         return run_script(NATIVE_TEST, compiler, env)
+    if path == BENCH_TEST:
+        return run_script(BENCH_TEST, compiler, env)
+    if path == EVAL_TEST:
+        return run_script(EVAL_TEST, compiler, env)
     if path == NVIM_TEST:
         return run_nvim_test(compiler, env)
     if not path.is_relative_to(TESTS):
@@ -319,6 +325,8 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(LSP_CLIENT)
     tests.append(PKG_TEST)
     tests.append(NATIVE_TEST)
+    tests.append(BENCH_TEST)
+    tests.append(EVAL_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

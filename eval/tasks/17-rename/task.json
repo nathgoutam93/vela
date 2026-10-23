@@ -1,0 +1,17 @@
+{
+  "title": "Rename a type and a function across modules",
+  "category": "refactor",
+  "main": "main.vl",
+  "cases": "cases.json",
+  "tests": [
+    "geometry_test.vl"
+  ],
+  "forbid": [
+    {
+      "pattern": "\\bPt\\b"
+    },
+    {
+      "pattern": "dist2"
+    }
+  ]
+}

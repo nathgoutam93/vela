@@ -1,0 +1,7 @@
+{
+  "title": "FizzBuzz with argument checking",
+  "category": "new program",
+  "main": "main.vl",
+  "cases": "cases.json",
+  "time_limit": 60
+}

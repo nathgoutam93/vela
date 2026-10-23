@@ -80,6 +80,7 @@ fn builtin_functions(name: Str) -> [Str] {
         "os" => ["args", "exit", "eprint", "run", "env", "read_line", "read", "write", "output"]
         "strings" => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float", "parse_float"]
         "tasks" => ["map", "each", "workers"]
+        "math" => ["sqrt"]
         _ => []
     }
 }

@@ -338,6 +338,7 @@ pub fn builtin_info(name: Str) -> [Str] {
             "f of every element, on every core, in the elements' order; returns when all are done."]
         "tasks.each" => ["fn each(xs: [T], f: fn(T))", "f of every element, on every core; returns when all are done."]
         "tasks.workers" => ["fn workers() -> Int", "How many threads tasks.map and tasks.each use."]
+        "math.sqrt" => ["fn sqrt(x: Float) -> Float", "The square root of x; NaN when x is negative."]
         _ => []
     }
 }

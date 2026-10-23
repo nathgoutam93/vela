@@ -1,0 +1,8 @@
+{
+  "title": "Reading a configuration file, with effects",
+  "category": "new module",
+  "main": "config.vl",
+  "tests": [
+    "config_test.vl"
+  ]
+}

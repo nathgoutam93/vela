@@ -37,6 +37,8 @@ build/vela lsp                # a language server on stdin and stdout, for edito
 build/vela new hello          # a program to start from, in hello/ (--package for a package)
 build/vela get                # fetch the packages vela.mod names; write vela.lock
 python3 run_tests.py          # run the test suite with build/vela (--backend c|native)
+python3 bench/run.py          # the benchmarks: Vela against C and Rust (bench/profile.py: where the time goes)
+python3 eval/prepare.py TASK DIR   # a task for an AI agent; eval/grade.py grades it (see eval/README.md)
 ```
 
 For Neovim and VS Code, see [`editors/`](editors/README.md).
@@ -107,7 +109,11 @@ code. M15 put effects in function types: `fn(Str) -> Int uses fs` is a
 function value that reads files, and `uses f` after a signature says the
 function uses whatever its parameter f uses, so `lists.map` with a
 function that reads files reads files, and with one that does not, does
-not. All of M10 to M15 is in Stage 1 only.
+not. M16 measured the baseline for the goal of an agent-first language
+with systems-language performance: eight benchmarks against C and Rust
+(Vela is 2.95 times slower than C, mostly from array access through
+runtime calls) and an evaluation of twenty tasks for AI agents. All of M10
+to M16 is in Stage 1 only.
 See `docs/` for a walkthrough of each milestone.
 `python3 run_tests.py --sanitize` runs the suite under AddressSanitizer, and
 `--tsan` under ThreadSanitizer.

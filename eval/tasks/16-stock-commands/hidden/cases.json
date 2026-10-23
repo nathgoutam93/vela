@@ -1,0 +1,116 @@
+[
+  {
+    "name": "list",
+    "args": [
+      "s.txt",
+      "list"
+    ],
+    "files": {
+      "s.txt": "ink 4\npen 10\n"
+    },
+    "stdout": "ink 4\npen 10\n"
+  },
+  {
+    "name": "add",
+    "args": [
+      "s.txt",
+      "add",
+      "nib",
+      "3"
+    ],
+    "files": {
+      "s.txt": "ink 4\npen 10\n"
+    },
+    "stdout": "",
+    "files_after": {
+      "s.txt": "ink 4\nnib 3\npen 10\n"
+    }
+  },
+  {
+    "name": "remove-some",
+    "args": [
+      "s.txt",
+      "remove",
+      "pen",
+      "3"
+    ],
+    "files": {
+      "s.txt": "ink 4\npen 10\n"
+    },
+    "stdout": "",
+    "files_after": {
+      "s.txt": "ink 4\npen 7\n"
+    }
+  },
+  {
+    "name": "remove-all",
+    "args": [
+      "s.txt",
+      "remove",
+      "ink",
+      "4"
+    ],
+    "files": {
+      "s.txt": "ink 4\npen 10\n"
+    },
+    "stdout": "",
+    "files_after": {
+      "s.txt": "pen 10\n"
+    }
+  },
+  {
+    "name": "remove-too-many",
+    "args": [
+      "s.txt",
+      "remove",
+      "ink",
+      "5"
+    ],
+    "files": {
+      "s.txt": "ink 4\npen 10\n"
+    },
+    "stdout": "",
+    "exit": 1,
+    "stderr_contains": "not enough ink",
+    "files_after": {
+      "s.txt": "ink 4\npen 10\n"
+    }
+  },
+  {
+    "name": "remove-unknown",
+    "args": [
+      "s.txt",
+      "remove",
+      "cap",
+      "1"
+    ],
+    "files": {
+      "s.txt": "ink 4\npen 10\n"
+    },
+    "stdout": "",
+    "exit": 1,
+    "stderr_contains": "not enough cap",
+    "files_after": {
+      "s.txt": "ink 4\npen 10\n"
+    }
+  },
+  {
+    "name": "total",
+    "args": [
+      "s.txt",
+      "total"
+    ],
+    "files": {
+      "s.txt": "ink 4\npen 10\n"
+    },
+    "stdout": "14\n"
+  },
+  {
+    "name": "total-empty",
+    "args": [
+      "none.txt",
+      "total"
+    ],
+    "stdout": "0\n"
+  }
+]

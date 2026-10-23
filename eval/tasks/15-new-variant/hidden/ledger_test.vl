@@ -1,0 +1,28 @@
+import ledger
+
+fn parsed(line: Str) -> Str {
+    return match ledger.parse(line) {
+        Ok(e) => ledger.describe(e)
+        Err(e) => "error: " + e
+    }
+}
+
+test "balance" {
+    let events = [ledger.Event.Deposit(100), ledger.Event.Fee(5, "monthly"), ledger.Event.Withdraw(20)]
+    assert(ledger.balance(events) == 75)
+}
+
+test "describe" {
+    assert(ledger.describe(ledger.Event.Fee(5, "monthly")) == "fee 5 (monthly)")
+    assert(ledger.describe(ledger.Event.Deposit(3)) == "deposit 3")
+}
+
+test "parse" {
+    assert(parsed("fee 5 monthly") == "fee 5 (monthly)")
+    assert(parsed("fee 2 late payment") == "fee 2 (late payment)")
+    assert(parsed("deposit 9") == "deposit 9")
+    assert(parsed("withdraw 4") == "withdraw 4")
+    assert(parsed("fee 5") == "error: bad line: fee 5")
+    assert(parsed("fee x monthly") == "error: bad line: fee x monthly")
+    assert(parsed("tip 5") == "error: bad line: tip 5")
+}

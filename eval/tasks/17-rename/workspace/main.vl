@@ -1,0 +1,10 @@
+import geometry
+import paths
+import strings
+
+fn main() {
+    let pts = [geometry.Pt { x: 1, y: 2 }, geometry.Pt { x: 4, y: 6 }, geometry.Pt { x: -3, y: 0 }]
+    print(strings.from_int(paths.spread(pts)))
+    print(strings.from_int(paths.farthest(pts)))
+    print(strings.from_int(geometry.dist2(pts[0], geometry.origin())))
+}

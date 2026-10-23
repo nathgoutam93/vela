@@ -1,0 +1,8 @@
+{
+  "title": "An RPN calculator module",
+  "category": "new module",
+  "main": "rpn.vl",
+  "tests": [
+    "rpn_test.vl"
+  ]
+}

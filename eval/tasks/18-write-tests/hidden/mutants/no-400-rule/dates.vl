@@ -1,0 +1,37 @@
+// Dates in the Gregorian calendar.
+
+pub fn is_leap(y: Int) -> Bool {
+    return y % 4 == 0 && y % 100 != 0
+}
+
+// How many days month m (1 to 12) of year y has, or None for a month that
+// does not exist.
+pub fn days_in_month(y: Int, m: Int) -> Option[Int] {
+    if m < 1 || m > 12 {
+        return None
+    }
+    if m == 2 {
+        if is_leap(y) {
+            return Some(29)
+        }
+        return Some(28)
+    }
+    if m == 4 || m == 6 || m == 9 || m == 11 {
+        return Some(30)
+    }
+    return Some(31)
+}
+
+// The day of the year, from 1 for January 1st, or None for a date that does
+// not exist.
+pub fn day_of_year(y: Int, m: Int, d: Int) -> Option[Int] {
+    let days = days_in_month(y, m)?
+    if d < 1 || d > days {
+        return None
+    }
+    let mut n = d
+    for month in 1..m {
+        n = n + days_in_month(y, month)?
+    }
+    return Some(n)
+}

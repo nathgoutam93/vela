@@ -1,0 +1,35 @@
+// Bank accounts.
+
+pub type Account = struct {
+    owner: Str
+    balance: Int
+}
+
+pub fn open(owner: Str) -> Account {
+    return Account { owner: owner, balance: 0 }
+}
+
+pub fn deposit(a: mut Account, amount: Int) -> Result[Int, Str] {
+    if amount <= 0 {
+        return Err("amount must be positive")
+    }
+    a.balance = a.balance + amount
+    return Ok(a.balance)
+}
+
+pub fn withdraw(a: mut Account, amount: Int) -> Result[Int, Str] {
+    if amount <= 0 {
+        return Err("amount must be positive")
+    }
+    if a.balance < amount {
+        return Err("insufficient funds")
+    }
+    a.balance = a.balance - amount
+    return Ok(a.balance)
+}
+
+pub fn transfer(from: mut Account, to: mut Account, amount: Int) -> Result[Unit, Str] {
+    withdraw(mut from, amount)?
+    deposit(mut to, amount)?
+    return Ok(())
+}

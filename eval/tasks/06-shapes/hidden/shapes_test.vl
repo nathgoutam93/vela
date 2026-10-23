@@ -1,0 +1,49 @@
+import shapes
+
+fn near(a: Option[Float], b: Float) -> Bool {
+    return match a {
+        Some(x) => x - b < 0.000001 && b - x < 0.000001
+        None => false
+    }
+}
+
+fn none(a: Option[Float]) -> Bool {
+    return match a {
+        Some(_) => false
+        None => true
+    }
+}
+
+fn index(a: Option[Int], i: Int) -> Bool {
+    return match a {
+        Some(x) => x == i
+        None => i < 0
+    }
+}
+
+test "areas" {
+    assert(near(shapes.area(shapes.Shape.Circle(1.0)), 3.141592653589793))
+    assert(near(shapes.area(shapes.Shape.Rect(2.0, 3.5)), 7.0))
+    assert(near(shapes.area(shapes.Shape.Triangle(3.0, 4.0, 5.0)), 6.0))
+}
+
+test "perimeters" {
+    assert(near(shapes.perimeter(shapes.Shape.Circle(2.0)), 12.566370614359172))
+    assert(near(shapes.perimeter(shapes.Shape.Rect(2.0, 3.5)), 11.0))
+    assert(near(shapes.perimeter(shapes.Shape.Triangle(3.0, 4.0, 5.0)), 12.0))
+}
+
+test "invalid shapes" {
+    assert(none(shapes.area(shapes.Shape.Circle(0.0))))
+    assert(none(shapes.area(shapes.Shape.Rect(-1.0, 2.0))))
+    assert(none(shapes.area(shapes.Shape.Triangle(1.0, 2.0, 3.0))))
+    assert(none(shapes.perimeter(shapes.Shape.Triangle(1.0, 1.0, 5.0))))
+}
+
+test "largest" {
+    let xs = [shapes.Shape.Rect(1.0, 1.0), shapes.Shape.Circle(1.0), shapes.Shape.Triangle(1.0, 1.0, 9.0),
+        shapes.Shape.Rect(1.0, 3.141592653589793)]
+    assert(index(shapes.largest(xs), 1))
+    assert(index(shapes.largest([shapes.Shape.Circle(-1.0)]), -1))
+    assert(index(shapes.largest([]), -1))
+}

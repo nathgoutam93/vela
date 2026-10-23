@@ -1,0 +1,13 @@
+{
+  "title": "Write tests that catch bugs",
+  "category": "tests",
+  "main": "dates.vl",
+  "mutants": {
+    "tests": [
+      "dates_test.vl"
+    ],
+    "reference": "reference",
+    "dir": "mutants",
+    "least": 5
+  }
+}

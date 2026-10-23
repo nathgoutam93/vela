@@ -1,0 +1,29 @@
+// Items in stock.
+
+pub type Item = struct {
+    name: Str
+    qty: Int
+}
+
+// Adds n to the quantity of the item called `name`.
+pub fn restock(items: mut [Item], name: Str, n: Int) {
+    for i in 0..len(items) {
+        let mut item = items[i]
+        if item.name == name {
+            item.qty = item.qty + n
+        }
+    }
+}
+
+// Takes n of the item called `name`, if there are that many; says whether
+// it did.
+pub fn sell(items: mut [Item], name: Str, n: Int) -> Bool {
+    for i in 0..len(items) {
+        let mut item = items[i]
+        if item.name == name && item.qty >= n {
+            item.qty = item.qty - n
+            return true
+        }
+    }
+    return false
+}

@@ -1,0 +1,65 @@
+[
+  {
+    "name": "example",
+    "args": [
+      "a.csv"
+    ],
+    "files": {
+      "a.csv": "name,amount\nann,10\nbob,5\nann,-3\n"
+    },
+    "stdout": "ann: 7\nbob: 5\ntotal: 12\n"
+  },
+  {
+    "name": "blank-lines-and-spaces",
+    "args": [
+      "b.csv"
+    ],
+    "files": {
+      "b.csv": "name,amount\n zed , 4\n\nann,1\n\n"
+    },
+    "stdout": "ann: 1\nzed: 4\ntotal: 5\n"
+  },
+  {
+    "name": "only-header",
+    "args": [
+      "c.csv"
+    ],
+    "files": {
+      "c.csv": "name,amount\n"
+    },
+    "stdout": "total: 0\n"
+  },
+  {
+    "name": "bad-amount",
+    "args": [
+      "d.csv"
+    ],
+    "files": {
+      "d.csv": "name,amount\nann,10\nbob,lots\n"
+    },
+    "stdout": "",
+    "exit": 1,
+    "stderr_contains": "line 3: bad row"
+  },
+  {
+    "name": "too-many-fields",
+    "args": [
+      "e.csv"
+    ],
+    "files": {
+      "e.csv": "name,amount\nann,1,2\n"
+    },
+    "stdout": "",
+    "exit": 1,
+    "stderr_contains": "line 2: bad row"
+  },
+  {
+    "name": "missing-file",
+    "args": [
+      "nope.csv"
+    ],
+    "stdout": "",
+    "exit": 1,
+    "stderr_contains": "cannot read"
+  }
+]

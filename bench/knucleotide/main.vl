@@ -1,0 +1,94 @@
+// k-nucleotide: count every substring of length k of a DNA sequence, for
+// several k, in maps (the Benchmarks Game's k-nucleotide, with counts
+// instead of percentages). Maps with string keys, slicing, hashing. The
+// input is fasta's output; the sequence is the one after ">THREE".
+//
+//     vela run bench/knucleotide/main.vl FASTA_OUTPUT
+// stage 1 only
+import files
+import maps
+import os
+import strings
+
+fn sequence(text: Str) -> Str {
+    let mut b = strings.builder()
+    let mut in_three = false
+    let mut start = 0
+    for i in 0..len(text) {
+        if text[i] == '\n' {
+            let line = text[start..i]
+            if len(line) > 0 && line[0] == '>' {
+                in_three = len(line) >= 6 && line[0..6] == ">THREE"
+            } else if in_three {
+                for c in line {
+                    if c >= 'a' && c <= 'z' {
+                        strings.add_byte(mut b, byte(int(c) - 32))
+                    } else {
+                        strings.add_byte(mut b, c)
+                    }
+                }
+            }
+            start = i + 1
+        }
+    }
+    return strings.build(b)
+}
+
+fn counts(seq: Str, k: Int) -> Map[Str, Int] {
+    let mut m: Map[Str, Int] = [:]
+    for i in 0..len(seq) - k + 1 {
+        let key = seq[i..i + k]
+        match maps.get(m, key) {
+            Some(c) => m[key] = c + 1
+            None => m[key] = 1
+        }
+    }
+    return m
+}
+
+// The keys of m, the most frequent first, ties in order.
+fn by_count(m: Map[Str, Int]) -> [Str] {
+    let mut keys = maps.keys(m)
+    for i in 1..len(keys) {
+        let mut j = i
+        for j > 0 && (m[keys[j]] > m[keys[j - 1]] || m[keys[j]] == m[keys[j - 1]] && keys[j] < keys[j - 1]) {
+            let t = keys[j]
+            keys[j] = keys[j - 1]
+            keys[j - 1] = t
+            j = j - 1
+        }
+    }
+    return keys
+}
+
+fn main() uses fs, os {
+    let args = os.args()
+    if len(args) < 2 {
+        print("usage: knucleotide FASTA_OUTPUT")
+        os.exit(2)
+    }
+    let mut text = ""
+    match files.read(args[1]) {
+        Ok(t) => text = t
+        Err(e) => {
+            print(e)
+            os.exit(1)
+        }
+    }
+    let seq = sequence(text)
+    for k in 1..3 {
+        let m = counts(seq, k)
+        for key in by_count(m) {
+            print(key + " " + strings.from_int(m[key]))
+        }
+        print("")
+    }
+    for s in ["GGT", "GGTA", "GGTATT", "GGTATTTTAATT", "GGTATTTTAATTTATAGT"] {
+        let mut n = 0
+        match maps.get(counts(seq, len(s)), s) {
+            Some(c) => n = c
+            None => {}
+        }
+        print(strings.from_int(n) + "\t" + s)
+    }
+}

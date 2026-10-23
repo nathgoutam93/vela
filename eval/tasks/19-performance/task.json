@@ -1,0 +1,9 @@
+{
+  "title": "Make a quadratic function fast",
+  "category": "performance",
+  "main": "dedupe.vl",
+  "tests": [
+    "dedupe_test.vl"
+  ],
+  "time_limit": 15
+}

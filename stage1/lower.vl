@@ -2828,6 +2828,10 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     if name == "tasks.workers" {
         return reg_val(ccall(mut g, "vela_tasks_workers", [], [], ir.RET_INT(), -1), types.INT())
     }
+    if name == "math.sqrt" {
+        let x = scalar(mut g, expr(mut g, args[0]))
+        return reg_val(ccall(mut g, "vela_math_sqrt", [x], [ir.KIND_FLOAT()], ir.RET_FLOAT(), -1), types.FLOAT())
+    }
     if name == "assert" {
         assert_code(mut g, e, args[0], "assertion")
         return no_value()

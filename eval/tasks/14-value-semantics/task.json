@@ -1,0 +1,8 @@
+{
+  "title": "Fix updates that change copies",
+  "category": "fix",
+  "main": "inventory.vl",
+  "tests": [
+    "inventory_hidden_test.vl"
+  ]
+}

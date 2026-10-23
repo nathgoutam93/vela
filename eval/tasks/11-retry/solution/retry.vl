@@ -1,0 +1,24 @@
+// Calling a function again, and on every element.
+
+pub fn retry(times: Int, f: fn() -> Result[Int, Str]) -> Result[Int, Str] uses f {
+    if times < 1 {
+        return Err("times must be at least 1")
+    }
+    let mut last: Result[Int, Str] = Err("")
+    for _ in 0..times {
+        last = f()
+        match last {
+            Ok(_) => return last
+            Err(_) => {}
+        }
+    }
+    return last
+}
+
+pub fn map_all(xs: [Str], f: fn(Str) -> Result[Int, Str]) -> Result[[Int], Str] uses f {
+    let mut out: [Int] = []
+    for x in xs {
+        push(mut out, f(x)?)
+    }
+    return Ok(out)
+}

@@ -1,0 +1,23 @@
+import files
+import strings
+import text
+
+pub fn load(path: Str) -> [Str] {
+    match files.read(path) {
+        Ok(t) => return text.lines(t)
+        Err(_) => return []
+    }
+}
+
+pub fn summary(path: Str) -> Str uses os {
+    let lines = load(path)
+    return strings.from_int(len(lines)) + " lines"
+}
+
+pub fn numbers(xs: [Int]) -> Str {
+    let mut parts: [Str] = []
+    for x in xs {
+        push(mut parts, strings.from_int(x))
+    }
+    return text.join(parts, ",")
+}

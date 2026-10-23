@@ -1,0 +1,68 @@
+// Shapes, their areas and perimeters.
+import math
+
+pub type Shape = enum {
+    Circle(Float)
+    Rect(Float, Float)
+    Triangle(Float, Float, Float)
+}
+
+fn pi() -> Float {
+    return 3.141592653589793
+}
+
+fn valid(s: Shape) -> Bool {
+    return match s {
+        Shape.Circle(r) => r > 0.0
+        Shape.Rect(w, h) => w > 0.0 && h > 0.0
+        Shape.Triangle(a, b, c) => a > 0.0 && b > 0.0 && c > 0.0 && a < b + c && b < a + c && c < a + b
+    }
+}
+
+pub fn area(s: Shape) -> Option[Float] {
+    if !valid(s) {
+        return None
+    }
+    return match s {
+        Shape.Circle(r) => Some(pi() * r * r)
+        Shape.Rect(w, h) => Some(w * h)
+        Shape.Triangle(a, b, c) => Some(heron(a, b, c))
+    }
+}
+
+fn heron(a: Float, b: Float, c: Float) -> Float {
+    let p = (a + b + c) / 2.0
+    return math.sqrt(p * (p - a) * (p - b) * (p - c))
+}
+
+pub fn perimeter(s: Shape) -> Option[Float] {
+    if !valid(s) {
+        return None
+    }
+    return match s {
+        Shape.Circle(r) => Some(2.0 * pi() * r)
+        Shape.Rect(w, h) => Some(2.0 * (w + h))
+        Shape.Triangle(a, b, c) => Some(a + b + c)
+    }
+}
+
+pub fn largest(shapes: [Shape]) -> Option[Int] {
+    let mut best: Option[Int] = None
+    let mut best_area = 0.0
+    for i in 0..len(shapes) {
+        match area(shapes[i]) {
+            Some(a) => {
+                let first = match best {
+                    Some(_) => false
+                    None => true
+                }
+                if first || a > best_area {
+                    best = Some(i)
+                    best_area = a
+                }
+            }
+            None => {}
+        }
+    }
+    return best
+}

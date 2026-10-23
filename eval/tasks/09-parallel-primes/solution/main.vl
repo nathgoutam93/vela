@@ -1,0 +1,53 @@
+import os
+import strings
+import tasks
+import text
+
+fn is_prime(n: Int) -> Bool {
+    if n < 2 {
+        return false
+    }
+    let mut d = 2
+    for d * d <= n {
+        if n % d == 0 {
+            return false
+        }
+        d = d + 1
+    }
+    return true
+}
+
+fn count(lo: Int, hi: Int) -> Int {
+    let mut c = 0
+    for x in lo..hi {
+        if is_prime(x) {
+            c = c + 1
+        }
+    }
+    return c
+}
+
+fn main() {
+    let args = os.args()
+    let mut n = 0
+    if len(args) == 2 {
+        match text.parse_int(args[1]) {
+            Some(v) => n = v
+            None => {}
+        }
+    }
+    if n < 10 {
+        os.eprint("usage: primes N (N at least 10)")
+        os.exit(2)
+    }
+    let parts = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    let counts = tasks.map(parts, fn(i) => count(i * n / 10, (i + 1) * n / 10))
+    let mut total = 0
+    for c in counts {
+        total = total + c
+    }
+    print("total " + strings.from_int(total))
+    for i in parts {
+        print(strings.from_int(i) + ": " + strings.from_int(counts[i]))
+    }
+}

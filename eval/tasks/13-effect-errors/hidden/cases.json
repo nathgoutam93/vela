@@ -1,0 +1,19 @@
+[
+  {
+    "name": "three-lines",
+    "args": [
+      "data.txt"
+    ],
+    "files": {
+      "data.txt": "a\nb\nc\n"
+    },
+    "stdout": "3 lines\n4,5,4\n"
+  },
+  {
+    "name": "missing-file",
+    "args": [
+      "none.txt"
+    ],
+    "stdout": "0 lines\n4,5,4\n"
+  }
+]

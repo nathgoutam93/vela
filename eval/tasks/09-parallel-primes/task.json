@@ -1,0 +1,12 @@
+{
+  "title": "Counting primes on every core",
+  "category": "new program",
+  "main": "main.vl",
+  "cases": "cases.json",
+  "require": [
+    {
+      "pattern": "tasks\\.(map|each)"
+    }
+  ],
+  "time_limit": 60
+}

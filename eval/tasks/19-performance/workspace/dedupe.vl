@@ -1,0 +1,18 @@
+// Removing repeats.
+
+// The strings of xs without repeats, each where it first appears.
+pub fn dedupe(xs: [Str]) -> [Str] {
+    let mut out: [Str] = []
+    for x in xs {
+        let mut seen = false
+        for y in out {
+            if y == x {
+                seen = true
+            }
+        }
+        if !seen {
+            push(mut out, x)
+        }
+    }
+    return out
+}

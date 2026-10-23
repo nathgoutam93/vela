@@ -1,0 +1,25 @@
+// Searching sorted arrays.
+
+// The index of an element equal to x, or None.
+pub fn find(xs: [Int], x: Int) -> Option[Int] {
+    let i = count_less(xs, x)
+    if i < len(xs) && xs[i] == x {
+        return Some(i)
+    }
+    return None
+}
+
+// How many elements are less than x.
+pub fn count_less(xs: [Int], x: Int) -> Int {
+    let mut lo = 0
+    let mut hi = len(xs)
+    for lo < hi {
+        let mid = (lo + hi) / 2
+        if xs[mid] < x {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return lo
+}

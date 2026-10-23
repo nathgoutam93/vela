@@ -1,0 +1,8 @@
+{
+  "title": "Merging intervals",
+  "category": "new module",
+  "main": "intervals.vl",
+  "tests": [
+    "intervals_test.vl"
+  ]
+}

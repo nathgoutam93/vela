@@ -1130,6 +1130,10 @@ bool vela_os_env(vela_str name, vela_str *out) {
 
 static int64_t workers = 0;  // 0 until first asked
 
+double vela_math_sqrt(double x) {
+    return sqrt(x);
+}
+
 int64_t vela_tasks_workers(void) {
     int64_t n = __atomic_load_n(&workers, __ATOMIC_RELAXED);
     if (n > 0) return n;

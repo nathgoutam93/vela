@@ -1,0 +1,19 @@
+// math.sqrt (M16): the square root of a Float; NaN for a negative one.
+// stage 1 only
+// out: 1.4142135623730951
+// out: true
+// out: 5
+// out: nan
+import math
+import strings
+
+fn hypot(a: Float, b: Float) -> Float {
+    return math.sqrt(a * a + b * b)
+}
+
+fn main() {
+    print(strings.from_float(math.sqrt(2.0)))
+    print(math.sqrt(16.0) == 4.0)
+    print(int(hypot(3.0, 4.0)))
+    print(strings.from_float(math.sqrt(0.0 - 1.0)))
+}

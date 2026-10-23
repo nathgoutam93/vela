@@ -1,0 +1,6 @@
+{
+  "title": "Count lines, words and bytes of standard input",
+  "category": "new program",
+  "main": "main.vl",
+  "cases": "cases.json"
+}

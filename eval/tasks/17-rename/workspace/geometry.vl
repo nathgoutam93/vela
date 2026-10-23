@@ -1,0 +1,17 @@
+// Points on a grid.
+
+pub type Pt = struct {
+    x: Int
+    y: Int
+}
+
+pub fn origin() -> Pt {
+    return Pt { x: 0, y: 0 }
+}
+
+// The square of the distance between a and b.
+pub fn dist2(a: Pt, b: Pt) -> Int {
+    let dx = a.x - b.x
+    let dy = a.y - b.y
+    return dx * dx + dy * dy
+}

@@ -1,0 +1,36 @@
+import rpn
+
+fn ok(r: Result[Int, Str], n: Int) -> Bool {
+    return match r {
+        Ok(v) => v == n
+        Err(_) => false
+    }
+}
+
+fn err(r: Result[Int, Str], message: Str) -> Bool {
+    return match r {
+        Ok(_) => false
+        Err(e) => e == message
+    }
+}
+
+test "arithmetic" {
+    assert(ok(rpn.eval("3 4 +"), 7))
+    assert(ok(rpn.eval("3 4 -"), -1))
+    assert(ok(rpn.eval("6 7 *"), 42))
+    assert(ok(rpn.eval("7 2 /"), 3))
+    assert(ok(rpn.eval("-7 2 /"), -3))
+    assert(ok(rpn.eval("1 2 + 3 *"), 9))
+    assert(ok(rpn.eval("  5   1 2 + 4 * + 3 -  "), 14))
+    assert(ok(rpn.eval("42"), 42))
+}
+
+test "errors" {
+    assert(err(rpn.eval(""), "empty"))
+    assert(err(rpn.eval("   "), "empty"))
+    assert(err(rpn.eval("1 +"), "not enough operands"))
+    assert(err(rpn.eval("+"), "not enough operands"))
+    assert(err(rpn.eval("1 0 /"), "division by zero"))
+    assert(err(rpn.eval("1 x +"), "unknown token 'x'"))
+    assert(err(rpn.eval("1 2"), "too many values"))
+}

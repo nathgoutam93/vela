@@ -504,7 +504,7 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
         for f in flags {
             push(mut link, f)
         }
-        for word in [program_o, runtime_o, "-o", exe] {
+        for word in [program_o, runtime_o, "-lm", "-o", exe] {
             push(mut link, word)
         }
         match os.run(link) {
@@ -609,6 +609,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
     for o in objects {
         push(mut link, o)
     }
+    push(mut link, "-lm")  // math.sqrt
     push(mut link, "-o")
     push(mut link, exe)
     let mut code = 0

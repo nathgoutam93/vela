@@ -1790,6 +1790,10 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     if name == "tasks.workers" {
         return value(scalar(mut g, types.INT(), "vela_tasks_workers()"), types.INT())
     }
+    if name == "math.sqrt" {
+        let x = expr(mut g, args[0]).c
+        return value(scalar(mut g, types.FLOAT(), "vela_sqrt(" + x + ")"), types.FLOAT())
+    }
     if name == "assert" {
         assert_code(mut g, e, args[0], "assertion")
         return no_value()

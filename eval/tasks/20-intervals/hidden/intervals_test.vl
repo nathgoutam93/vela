@@ -1,0 +1,31 @@
+import intervals
+import strings
+
+fn show(xs: [intervals.Interval]) -> Str {
+    let mut b = strings.builder()
+    for x in xs {
+        strings.add(mut b, "[" + strings.from_int(x.lo) + "," + strings.from_int(x.hi) + "]")
+    }
+    return strings.build(b)
+}
+
+fn iv(lo: Int, hi: Int) -> intervals.Interval {
+    return intervals.Interval { lo: lo, hi: hi }
+}
+
+test "merge" {
+    assert(show(intervals.merge([iv(5, 6), iv(1, 3)])) == "[1,3][5,6]")
+    assert(show(intervals.merge([iv(3, 5), iv(1, 3)])) == "[1,5]")
+    assert(show(intervals.merge([iv(1, 3), iv(4, 5)])) == "[1,5]")
+    assert(show(intervals.merge([iv(1, 10), iv(2, 3), iv(4, 5)])) == "[1,10]")
+    assert(show(intervals.merge([iv(4, 2), iv(7, 7)])) == "[7,7]")
+    assert(show(intervals.merge([])) == "")
+    assert(show(intervals.merge([iv(-5, -1), iv(-3, 0), iv(9, 12), iv(13, 13)])) == "[-5,0][9,13]")
+}
+
+test "covered" {
+    assert(intervals.covered([iv(1, 3), iv(2, 5), iv(10, 10)]) == 6)
+    assert(intervals.covered([iv(3, 1)]) == 0)
+    assert(intervals.covered([]) == 0)
+    assert(intervals.covered([iv(-2, 2), iv(-2, 2)]) == 5)
+}

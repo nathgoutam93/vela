@@ -1,0 +1,84 @@
+// The stock keeper:
+//
+//     vela run main.vl FILE list
+//     vela run main.vl FILE add NAME N
+//     vela run main.vl FILE remove NAME N
+//     vela run main.vl FILE total
+import maps
+import os
+import store
+import strings
+import text
+
+fn fail(message: Str, code: Int) uses os {
+    os.eprint(message)
+    os.exit(code)
+}
+
+fn count(s: Str) -> Int uses os {
+    match text.parse_int(s) {
+        Some(n) => {
+            if n > 0 {
+                return n
+            }
+        }
+        None => {}
+    }
+    fail("not a positive number: " + s, 2)
+    return 0
+}
+
+fn main() {
+    let args = os.args()
+    if len(args) < 3 {
+        fail("usage: main.vl FILE list|add NAME N", 2)
+    }
+    let path = args[1]
+    let mut m: Map[Str, Int] = [:]
+    match store.read(path) {
+        Ok(s) => m = s
+        Err(e) => fail(e, 1)
+    }
+    let command = args[2]
+    if command == "list" {
+        os.write(store.render(m))
+    } else if command == "add" && len(args) == 5 {
+        let n = count(args[4])
+        match maps.get(m, args[3]) {
+            Some(have) => m[args[3]] = have + n
+            None => m[args[3]] = n
+        }
+        match store.write(path, m) {
+            Ok(_) => {}
+            Err(e) => fail(e, 1)
+        }
+    } else if command == "remove" && len(args) == 5 {
+        let n = count(args[4])
+        let name = args[3]
+        let mut have = 0
+        match maps.get(m, name) {
+            Some(h) => have = h
+            None => {}
+        }
+        if have < n {
+            fail("not enough " + name, 1)
+        }
+        if have == n {
+            maps.remove(mut m, name)
+        } else {
+            m[name] = have - n
+        }
+        match store.write(path, m) {
+            Ok(_) => {}
+            Err(e) => fail(e, 1)
+        }
+    } else if command == "total" && len(args) == 3 {
+        let mut total = 0
+        for name in maps.keys(m) {
+            total = total + m[name]
+        }
+        print(strings.from_int(total))
+    } else {
+        fail("usage: main.vl FILE list|add|remove NAME N, or FILE total", 2)
+    }
+}

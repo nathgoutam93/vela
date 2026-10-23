@@ -1,0 +1,96 @@
+import files
+import retry
+
+fn ok(r: Result[Int, Str], n: Int) -> Bool {
+    return match r {
+        Ok(v) => v == n
+        Err(_) => false
+    }
+}
+
+fn err(r: Result[Int, Str], message: Str) -> Bool {
+    return match r {
+        Ok(_) => false
+        Err(e) => e == message
+    }
+}
+
+// Fails twice, then works: it counts its calls in a file.
+fn flaky() -> Result[Int, Str] uses fs {
+    let mut calls = ""
+    match files.read("calls") {
+        Ok(t) => calls = t
+        Err(_) => {}
+    }
+    calls = calls + "x"
+    match files.write("calls", calls) {
+        Ok(_) => {}
+        Err(_) => {}
+    }
+    if len(calls) < 3 {
+        return Err("not yet")
+    }
+    return Ok(len(calls))
+}
+
+fn size(path: Str) -> Result[Int, Str] uses fs {
+    match files.read(path) {
+        Ok(t) => return Ok(len(t))
+        Err(_) => return Err("no " + path)
+    }
+}
+
+// Uses nothing, so neither may retry nor map_all here.
+fn pure_calls() -> Bool {
+    let a = retry.retry(1, fn() -> Result[Int, Str] {
+        return Ok(7)
+    })
+    let b = retry.map_all(["a", "bb"], fn(s: Str) -> Result[Int, Str] {
+        return Ok(len(s))
+    })
+    let lengths_ok = match b {
+        Ok(xs) => len(xs) == 2 && xs[0] == 1 && xs[1] == 2
+        Err(_) => false
+    }
+    return ok(a, 7) && lengths_ok
+}
+
+test "a function that uses nothing" {
+    assert(pure_calls())
+    assert(err(retry.retry(0, fn() -> Result[Int, Str] {
+        return Ok(1)
+    }), "times must be at least 1"))
+}
+
+test "retry until it works" {
+    with files = ["calls": ""] {
+        assert(ok(retry.retry(5, flaky), 3))
+        match files.read("calls") {
+            Ok(t) => assert(t == "xxx")
+            Err(_) => assert(false)
+        }
+    }
+}
+
+test "retry gives up" {
+    with files = ["calls": ""] {
+        assert(err(retry.retry(2, flaky), "not yet"))
+        match files.read("calls") {
+            Ok(t) => assert(t == "xx")
+            Err(_) => assert(false)
+        }
+    }
+}
+
+test "map_all with a function that reads files" {
+    with files = ["a": "123", "b": "45"] {
+        match retry.map_all(["a", "b"], size) {
+            Ok(xs) => assert(len(xs) == 2 && xs[0] == 3 && xs[1] == 2)
+            Err(_) => assert(false)
+        }
+        match retry.map_all(["a", "missing", "b"], size) {
+            Ok(_) => assert(false)
+            Err(e) => assert(e == "no missing")
+        }
+    }
+}

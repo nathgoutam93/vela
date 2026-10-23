@@ -1,0 +1,36 @@
+// A stack of values of one type.
+
+pub type Stack[T] = struct {
+    items: [T]
+}
+
+pub fn new[T]() -> Stack[T] {
+    let items: [T] = []
+    return Stack { items: items }
+}
+
+pub fn add[T](s: mut Stack[T], x: T) {
+    push(mut s.items, x)
+}
+
+pub fn pop[T](s: mut Stack[T]) -> Option[T] {
+    let n = len(s.items)
+    if n == 0 {
+        return None
+    }
+    let top = s.items[n - 1]
+    s.items = s.items[0..n - 1]
+    return Some(top)
+}
+
+pub fn peek[T](s: Stack[T]) -> Option[T] {
+    let n = len(s.items)
+    if n == 0 {
+        return None
+    }
+    return Some(s.items[n - 1])
+}
+
+pub fn size[T](s: Stack[T]) -> Int {
+    return len(s.items)
+}

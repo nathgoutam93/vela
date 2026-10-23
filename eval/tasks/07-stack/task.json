@@ -1,0 +1,8 @@
+{
+  "title": "A generic stack",
+  "category": "new module",
+  "main": "stack.vl",
+  "tests": [
+    "stack_test.vl"
+  ]
+}

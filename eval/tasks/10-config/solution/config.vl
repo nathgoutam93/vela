@@ -1,0 +1,65 @@
+// A small configuration format.
+import files
+import strings
+import text
+
+pub type Config = struct {
+    name: Str
+    port: Int
+    debug: Bool
+}
+
+pub fn parse(src: Str) -> Result[Config, Str] {
+    let mut c = Config { name: "", port: 8080, debug: false }
+    let mut named = false
+    let lines = text.lines(src)
+    for i in 0..len(lines) {
+        let line = text.trim(lines[i])
+        if line == "" || text.starts_with(line, "#") {
+            continue
+        }
+        let at = "line " + strings.from_int(i + 1) + ": "
+        let mut eq = -1
+        match text.index_of(line, "=") {
+            Some(k) => eq = k
+            None => return Err(at + "expected key = value")
+        }
+        let key = text.trim(line[0..eq])
+        let value = text.trim(line[eq + 1..len(line)])
+        if key == "name" {
+            c.name = value
+            named = true
+        } else if key == "port" {
+            match text.parse_int(value) {
+                Some(p) => {
+                    if p < 1 || p > 65535 {
+                        return Err(at + "bad value for port")
+                    }
+                    c.port = p
+                }
+                None => return Err(at + "bad value for port")
+            }
+        } else if key == "debug" {
+            if value == "true" {
+                c.debug = true
+            } else if value == "false" {
+                c.debug = false
+            } else {
+                return Err(at + "bad value for debug")
+            }
+        } else {
+            return Err(at + "unknown key '" + key + "'")
+        }
+    }
+    if !named {
+        return Err("missing name")
+    }
+    return Ok(c)
+}
+
+pub fn load(path: Str) -> Result[Config, Str] uses fs {
+    match files.read(path) {
+        Ok(t) => return parse(t)
+        Err(_) => return Err("cannot read " + path)
+    }
+}

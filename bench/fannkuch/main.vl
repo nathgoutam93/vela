@@ -1,0 +1,82 @@
+// fannkuch-redux: the most pancake flips over all permutations of 0..n
+// (the Benchmarks Game's fannkuch-redux, one thread). Int arrays and
+// indexing.
+//
+//     vela run bench/fannkuch/main.vl N
+// stage 1 only
+import os
+import strings
+
+fn arg(i: Int, default: Int) -> Int uses os {
+    let a = os.args()
+    if len(a) <= i {
+        return default
+    }
+    match strings.parse_float(a[i]) {
+        Some(x) => return int(x)
+        None => return default
+    }
+}
+
+fn main() {
+    let n = arg(1, 7)
+    let mut perm1: [Int] = []
+    let mut count: [Int] = []
+    for i in 0..n {
+        push(mut perm1, i)
+        push(mut count, 0)
+    }
+    let mut max_flips = 0
+    let mut checksum = 0
+    let mut perm_count = 0
+    let mut r = n
+    for {
+        for r != 1 {
+            count[r - 1] = r
+            r = r - 1
+        }
+        let mut perm = perm1
+        let mut flips = 0
+        let mut k = perm[0]
+        for k != 0 {
+            let mut i = 0
+            let mut j = k
+            for i < j {
+                let t = perm[i]
+                perm[i] = perm[j]
+                perm[j] = t
+                i = i + 1
+                j = j - 1
+            }
+            flips = flips + 1
+            k = perm[0]
+        }
+        if flips > max_flips {
+            max_flips = flips
+        }
+        if perm_count % 2 == 0 {
+            checksum = checksum + flips
+        } else {
+            checksum = checksum - flips
+        }
+        // The next permutation.
+        for {
+            if r == n {
+                print(strings.from_int(checksum))
+                print("Pfannkuchen(" + strings.from_int(n) + ") = " + strings.from_int(max_flips))
+                return
+            }
+            let first = perm1[0]
+            for i in 0..r {
+                perm1[i] = perm1[i + 1]
+            }
+            perm1[r] = first
+            count[r] = count[r] - 1
+            if count[r] > 0 {
+                break
+            }
+            r = r + 1
+        }
+        perm_count = perm_count + 1
+    }
+}

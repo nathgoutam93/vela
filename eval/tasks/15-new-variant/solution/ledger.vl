@@ -1,0 +1,55 @@
+// A ledger of events on one account.
+import strings
+import text
+
+pub type Event = enum {
+    Deposit(Int)
+    Withdraw(Int)
+    Fee(Int, Str)
+}
+
+pub fn balance(events: [Event]) -> Int {
+    let mut b = 0
+    for e in events {
+        match e {
+            Event.Deposit(n) => b = b + n
+            Event.Withdraw(n) => b = b - n
+            Event.Fee(n, _) => b = b - n
+        }
+    }
+    return b
+}
+
+pub fn describe(e: Event) -> Str {
+    return match e {
+        Event.Deposit(n) => "deposit " + strings.from_int(n)
+        Event.Withdraw(n) => "withdraw " + strings.from_int(n)
+        Event.Fee(n, why) => "fee " + strings.from_int(n) + " (" + why + ")"
+    }
+}
+
+// "deposit 5", "withdraw 3" or "fee 2 late payment".
+pub fn parse(line: Str) -> Result[Event, Str] {
+    let words = text.split(text.trim(line), " ")
+    if len(words) < 2 {
+        return Err("bad line: " + line)
+    }
+    let mut n = 0
+    match text.parse_int(words[1]) {
+        Some(v) => n = v
+        None => return Err("bad line: " + line)
+    }
+    if words[0] == "fee" && len(words) >= 3 {
+        return Ok(Event.Fee(n, text.join(words[2..len(words)], " ")))
+    }
+    if len(words) != 2 {
+        return Err("bad line: " + line)
+    }
+    if words[0] == "deposit" {
+        return Ok(Event.Deposit(n))
+    }
+    if words[0] == "withdraw" {
+        return Ok(Event.Withdraw(n))
+    }
+    return Err("bad line: " + line)
+}

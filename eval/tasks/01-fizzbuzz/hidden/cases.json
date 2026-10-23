@@ -1,0 +1,60 @@
+[
+  {
+    "name": "fifteen",
+    "args": [
+      "15"
+    ],
+    "stdout": "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz\n"
+  },
+  {
+    "name": "one",
+    "args": [
+      "1"
+    ],
+    "stdout": "1\n"
+  },
+  {
+    "name": "no-argument",
+    "args": [],
+    "stdout": "",
+    "exit": 2,
+    "stderr_contains": "usage: fizzbuzz N"
+  },
+  {
+    "name": "two-arguments",
+    "args": [
+      "3",
+      "4"
+    ],
+    "stdout": "",
+    "exit": 2,
+    "stderr_contains": "usage: fizzbuzz N"
+  },
+  {
+    "name": "not-a-number",
+    "args": [
+      "abc"
+    ],
+    "stdout": "",
+    "exit": 2,
+    "stderr_contains": "usage: fizzbuzz N"
+  },
+  {
+    "name": "zero",
+    "args": [
+      "0"
+    ],
+    "stdout": "",
+    "exit": 2,
+    "stderr_contains": "usage: fizzbuzz N"
+  },
+  {
+    "name": "negative",
+    "args": [
+      "-5"
+    ],
+    "stdout": "",
+    "exit": 2,
+    "stderr_contains": "usage: fizzbuzz N"
+  }
+]
