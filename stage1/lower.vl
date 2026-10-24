@@ -159,7 +159,7 @@ pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [e
     }
     let mut user_types: [Int] = []
     for t in k.decls {
-        if !types.is_generic(k.table, t) {
+        if !types.is_generic(k.table, t) && !types.is_interface(k.table, t) {
             push(mut user_types, t)
         }
     }
@@ -1005,9 +1005,31 @@ fn descriptor(g: mut Low, t: Int) -> Int {
         release_fn = "rc_release_" + n
         share_fn = "rc_share_" + n
     }
+    let mut hash_fn = "0"
+    let mut eq_fn = "0"
+    let hash = checker.method(g.k, t, "hash")
+    let eq = checker.method(g.k, t, "eq")
+    if types.used_as_key(g.k.table, t) && hash.fn_id >= 0 && eq.fn_id >= 0 {
+        hash_fn = "vt_hash_" + n
+        eq_fn = "vt_eq_" + n
+        let saved = g.fs
+        for which in 0..2 {
+            let mut dispatch = hash
+            let mut wrapper = hash_fn
+            let mut count = 1
+            if which == 1 { dispatch = eq; wrapper = eq_fn; count = 2 }
+            let ps = helper(mut g, wrapper, count, ir.INT())
+            let mut target = fn_name(g.k, dispatch.fn_id)
+            if len(dispatch.args) > 0 { target = g.instance_names[mono.key(dispatch.fn_id, dispatch.args)] }
+            let result = call(mut g, target, ps, ir.INT())
+            ret(mut g, result)
+            finish(mut g)
+        }
+        g.fs = saved
+    }
     push(mut g.data, ir.Data {
         label: name, relocated: true,
-        lines: [".quad " + strings.from_int(size_of(mut g, t)), ".quad " + retain_fn, ".quad " + release_fn, ".quad 0", ".quad 0",
+        lines: [".quad " + strings.from_int(size_of(mut g, t)), ".quad " + retain_fn, ".quad " + release_fn, ".quad " + hash_fn, ".quad " + eq_fn,
             ".quad " + share_fn],
     })
     g.descs[t] = name
@@ -2059,6 +2081,7 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
                     return enum_value(mut g, sub(g, enum), vi, consumed)
                 }
                 checker.Ref.Builtin(name) => return builtin(mut g, e, name, args)
+                checker.Ref.Method(t, name) => return method_value(mut g, e, checker.method_args(e, args), sub(g, t), name)
                 checker.Ref.Function(id) => return direct_call(mut g, e, id, args)
                 checker.Ref.Indirect => return indirect_call(mut g, e, args)
                 _ => return no_value()
@@ -2645,6 +2668,18 @@ fn branch_on(g: mut Low, e: ast.Expr, yes: Int, no: Int) {
 }
 
 fn binary(g: mut Low, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Val {
+    match g.k.refs[e.id] {
+        checker.Ref.Method(t, name) => {
+            let v = method_value(mut g, e, [l, r], sub(g, t), name)
+            if name == "eq" {
+                if op == "!=" { return reg_val(cmp(mut g, cond_code("=="), scalar(mut g, v), konst(mut g, 0)), types.BOOL()) }
+                return v
+            }
+            return reg_val(cmp(mut g, cond_code(op), scalar(mut g, v), konst(mut g, 0)), types.BOOL())
+        }
+        _ => {}
+    }
+
     if op == "&&" || op == "||" {
         // Short-circuit: the right side runs only if it can change the
         // answer, in a frame of its own.
@@ -3180,4 +3215,53 @@ fn integer_builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val 
     store(mut g, out.reg, 0, 4, konst(mut g, none))
     place_label(mut g, done)
     return own(mut g, out)
+}
+
+fn method_value(g: mut Low, e: ast.Expr, args: [ast.Expr], t: Int, name: Str) -> Val {
+    let mut dispatch = checker.method(g.k, t, name)
+    if dispatch.fn_id >= 0 {
+        let written = g.k.targs[e.id]
+        if len(written) > 0 && len(written) == len(dispatch.args) {
+            for i in 0..len(written) { dispatch.args[i] = sub(g, written[i]) }
+        }
+        let saved = g.k.targs[e.id]
+        let saved_type = g.k.ty[e.id]
+        g.k.targs[e.id] = dispatch.args
+        g.k.ty[e.id] = types.find_subst(g.k.table, g.k.fns[dispatch.fn_id].result, g.k.fns[dispatch.fn_id].type_params, dispatch.args)
+        let out = direct_call(mut g, e, dispatch.fn_id, args)
+        g.k.targs[e.id] = saved
+        g.k.ty[e.id] = saved_type
+        return out
+    }
+    let left = fresh(mut g, expr(mut g, args[0]))
+    if name == "hash" {
+        let slot = slot_val(mut g, t)
+        put_place(mut g, slot, left)
+        let r = ccall(mut g, "vela_hash_value", [descriptor(mut g, t), slot.reg], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+        return reg_val(r, 13)
+    }
+    let right = expr(mut g, args[1])
+    if name == "eq" { return operation(mut g, e, "==", left, right, t) }
+    let equal = operation(mut g, e, "==", left, right, t)
+    let less = operation(mut g, e, "<", left, right, t)
+    let r = reg(mut g, ir.INT())
+    let yes = label(mut g)
+    let no = label(mut g)
+    let done = label(mut g)
+    branch(mut g, scalar(mut g, equal), yes, no)
+    place_label(mut g, yes)
+    emit(mut g, ir.inst(ir.Op.Const, r, -1, -1, 0))
+    jump(mut g, done)
+    place_label(mut g, no)
+    let negative = label(mut g)
+    let positive = label(mut g)
+    branch(mut g, scalar(mut g, less), negative, positive)
+    place_label(mut g, negative)
+    emit(mut g, ir.inst(ir.Op.Const, r, -1, -1, -1))
+    jump(mut g, done)
+    place_label(mut g, positive)
+    emit(mut g, ir.inst(ir.Op.Const, r, -1, -1, 1))
+    jump(mut g, done)
+    place_label(mut g, done)
+    return reg_val(r, types.INT())
 }

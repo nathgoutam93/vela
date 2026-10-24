@@ -139,6 +139,11 @@ checked/wrapping/saturating arithmetic, and bit operations. Int aliases i64
 and Byte aliases u8. SHA-256 and CRC-32 pass standard vectors and run at
 1.05 and 0.91 times C on the measured macOS ARM64 host. See
 [`docs/m19-integers.md`](docs/m19-integers.md) for validation and platform limits.
+M20 adds structural interfaces, user-defined generic bounds, and method-call
+syntax with static dispatch. Eq, Ord, and Key use ordinary interface declarations;
+custom structs can sort, deduplicate, and serve as map keys through their own
+methods. The compiler uses interfaces for shared metadata lookup. See
+[`docs/m20-interfaces.md`](docs/m20-interfaces.md).
 What comes next, toward a systems language that is also agent-first, is in
 [`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
 See `docs/` for a walkthrough of each milestone.

@@ -30,6 +30,7 @@ pub type Tag = enum {
     Enum  // a user enum, or Option / Result (which have args)
     Param  // a type parameter
     Func  // a function type, fn(Int) -> Str: its parameter types in args
+    Interface  // compile-time signatures in fields, Self in params, parents in bounds
 }
 
 pub type Variant = struct {
@@ -470,12 +471,44 @@ pub fn has_bound(table: Table, t: Int, bound: Str) -> Bool {
         return false
     }
     for b in table.types[t].bounds {
-        // Ord includes Eq: whatever can be ordered can be compared.
-        if b == bound || b == "Ord" && bound == "Eq" {
+        if bound_includes(table, b, bound, 0) {
             return true
         }
     }
     return false
+}
+
+pub fn interface_id(table: Table, name: Str) -> Int {
+    for i in 0..len(table.types) {
+        let ti = table.types[i]
+        if ti.tag == Tag.Interface && interface_name(ti) == name { return i }
+    }
+    return -1
+}
+
+pub fn interface_name(ti: TypeInfo) -> Str {
+    if ti.module == "" || ti.module == "<prelude>" { return ti.name }
+    return ti.module + "." + ti.name
+}
+
+pub fn bound_includes(table: Table, actual: Str, want: Str, depth: Int) -> Bool {
+    let mut queue = [actual]
+    let mut seen: Map[Str, Bool] = [:]
+    let mut i = 0
+    for i < len(queue) {
+        let name = queue[i]
+        i = i + 1
+        if name == want { return true }
+        if maps.has(seen, name) { continue }
+        seen[name] = true
+        let id = interface_id(table, name)
+        if id >= 0 { for parent in table.types[id].bounds { push(mut queue, parent) } }
+    }
+    return false
+}
+
+pub fn is_interface(table: Table, t: Int) -> Bool {
+    return t >= 0 && table.types[t].tag == Tag.Interface
 }
 
 // `decl[args]`, a generic struct or enum with its parameters filled in.
@@ -723,24 +756,12 @@ fn erase(table: mut Table, memo: mut Map[Int, Int], t: Int) -> Int {
 
 // The index of the variant called `name`, or -1.
 pub fn variant_index(table: Table, t: Int, name: Str) -> Int {
-    let vs = table.types[t].variants
-    for i in 0..len(vs) {
-        if vs[i].name == name {
-            return i
-        }
-    }
-    return -1
+    return named_index(table.types[t].variants, name)
 }
 
 // The index of the field called `name`, or -1.
 pub fn field_index(table: Table, t: Int, name: Str) -> Int {
-    let fs = table.types[t].fields
-    for i in 0..len(fs) {
-        if fs[i].name == name {
-            return i
-        }
-    }
-    return -1
+    return named_index(table.types[t].fields, name)
 }
 
 // No variant carries data, so values compare by variant alone.
@@ -765,6 +786,7 @@ pub fn show(table: Table, t: Int, viewpoint: Str) -> Str {
         Tag.Map => "Map[" + show(table, ti.args[0], viewpoint) + ", " + show(table, ti.args[1], viewpoint) + "]"
         Tag.Struct => show_enum(table, ti, viewpoint)
         Tag.Enum => show_enum(table, ti, viewpoint)
+        Tag.Interface => interface_name(ti)
         Tag.Param => ti.name
         Tag.Func => show_func(table, ti, viewpoint)
     }
@@ -864,4 +886,22 @@ test "instances of a generic type are interned and filled" {
     assert(a != instantiate(mut t, decl, [INT()]))
     assert(get(t, a).fields[0].ty == STR())
     assert(show(t, a, "") == "Box[Str]")
+}
+
+// One lookup algorithm for the compiler's named metadata. The interfaces are
+// checked and monomorphized by the same path available to user programs.
+pub type Named = interface { fn label(value: Self) -> Str }
+pub fn FieldInfo.label(value: FieldInfo) -> Str { return value.name }
+pub fn Variant.label(value: Variant) -> Str { return value.name }
+
+fn named_index[T: Named](values: [T], name: Str) -> Int {
+    for i in 0..len(values) { if values[i].label() == name { return i } }
+    return -1
+}
+
+// Descriptors for array elements and map values must not acquire unrelated
+// methods merely because they happen to be named hash/eq.
+pub fn used_as_key(table: Table, t: Int) -> Bool {
+    for i in 0..len(table.maps) { if i % 2 == 0 && table.maps[i] == t { return true } }
+    return false
 }

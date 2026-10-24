@@ -200,6 +200,9 @@ pub type TypeDecl = struct {
     name: Str
     params: [TypeParam]
     is_struct: Bool
+    is_interface: Bool
+    parents: [Str]
+    methods: [FnDecl]
     fields: [FieldDecl]
     variants: [VariantDecl]
     line: Int
@@ -393,7 +396,12 @@ fn sx_type_decl(d: TypeDecl) -> Sx {
     if d.public {
         push(mut items, atom("pub"))
     }
-    if d.is_struct {
+    if d.is_interface {
+        push(mut items, atom("interface"))
+        push(mut items, atom(d.name))
+        for parent in d.parents { push(mut items, atom(parent)) }
+        for method in d.methods { push(mut items, sx_fn(method)) }
+    } else if d.is_struct {
         push(mut items, atom("struct"))
         push(mut items, atom(d.name))
         add_type_params(mut items, d.params)

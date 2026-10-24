@@ -1,5 +1,5 @@
 // Syntax errors in type declarations; each skips to the next declaration.
-// err: type_decl_syntax.vl:5:10: error: expected 'struct' or 'enum' after 'type A =', found identifier 'union' [E2011]
+// err: type_decl_syntax.vl:5:10: error: expected 'struct', 'enum' or 'interface' after 'type A =', found identifier 'union' [E2011]
 // err: type_decl_syntax.vl:6:21: error: expected ':' and a type after field 'x', found identifier 'Int' [E2001]
 // err: type_decl_syntax.vl:7:26: error: expected ',' or a new line in the struct, found identifier 'y' [E2004]
 type A = union { x: Int }

@@ -189,6 +189,11 @@ fn declare_type(b: mut Builder, t: Int) {
             b.members[member_key(t, i)] = add_def(mut b, def_at(f.name, "field", m.file, f.line, f.col, detail,
                 joined(comment_above(lines, f.line), trailing_comment(lines, f.line))))
         }
+        for i in 0..len(decl.methods) {
+            let method = decl.methods[i]
+            b.members[member_key(t, i)] = add_def(mut b, def_at(method.name, "interface method", m.file, method.line, method.col,
+                signature(method), comment_above(lines, method.line)))
+        }
         for i in 0..len(decl.variants) {
             let v = decl.variants[i]
             b.members[member_key(t, i)] = add_def(mut b, def_at(v.name, "variant", m.file, v.line, v.col,
@@ -217,7 +222,19 @@ fn declare_fn(b: mut Builder, id: Int) {
             detail = detail + "\n    ensures " + ast.expr_text(e)
         }
     }
-    b.fns[id] = add_def(mut b, def_at(f.decl.name, kind, m.file, f.decl.line, f.decl.col, detail,
+    let mut name = f.decl.name
+    let mut col = f.decl.col
+    for i in 0..len(name) {
+        if name[i] == '.' {
+            name = name[i + 1..len(name)]
+            let tokens = lexer.tokenize(b.lines[f.module][f.decl.line - 1]).tokens
+            for j in 1..len(tokens) {
+                if tokens[j].text == name && tokens[j - 1].kind == lexer.Kind.Dot && tokens[j].col > f.decl.col { col = tokens[j].col; break }
+            }
+            break
+        }
+    }
+    b.fns[id] = add_def(mut b, def_at(name, kind, m.file, f.decl.line, col, detail,
         comment_above(b.lines[f.module], f.decl.line)))
 }
 
@@ -427,7 +444,12 @@ pub fn type_detail(t: ast.TypeDecl) -> Str {
     }
     strings.add(mut s, "type " + t.name + type_params_text(t.params) + " = ")
     let mut lines: [Str] = []
-    if t.is_struct {
+    if t.is_interface {
+        strings.add(mut s, "interface")
+        for i in 0..len(t.parents) { if i == 0 { strings.add(mut s, ": ") } else { strings.add(mut s, " + ") }; strings.add(mut s, t.parents[i]) }
+        strings.add(mut s, " {")
+        for method in t.methods { push(mut lines, signature(method)) }
+    } else if t.is_struct {
         strings.add(mut s, "struct {")
         for f in t.fields {
             push(mut lines, f.name + ": " + ast.type_text(f.ty))
@@ -647,8 +669,11 @@ fn scope_params(b: mut Builder, params: [ast.TypeParam]) {
         b.type_params[p.name] = d
         add_use(mut b, p.line, p.col, p.name, d, "")
         // `T: Ord + Key`: the bounds are the names after the `:` and each `+`.
-        for i in 0..len(p.bounds) {
-            qualified_part(mut b, p.line, p.col, i + 1, p.bounds[i], word_def(mut b, p.bounds[i]))
+        let mut offset = 2
+        for bound in p.bounds {
+            match token_after(b, p.line, p.col, offset) { Some(tok) => bound_use(mut b, bound, tok), None => {} }
+            offset = offset + 2
+            for j in 0..len(bound) { if bound[j] == '.' { offset = offset + 2 } }
         }
     }
 }
@@ -659,6 +684,33 @@ fn type_decl(b: mut Builder, t: ast.TypeDecl, id: Int) {
         None => return
     }
     scope_params(mut b, t.params)
+    if t.is_interface {
+        let mut offset = 0
+        for {
+            match token_after(b, t.line, t.col, offset) {
+                Some(tok) => {
+                    if tok.kind == lexer.Kind.LBrace { break }
+                    if tok.kind == lexer.Kind.Ident && tok.text == "interface" { break }
+                }
+                None => break
+            }
+            offset = offset + 1
+        }
+        offset = offset + 2
+        for parent in t.parents {
+            match token_after(b, t.line, t.col, offset) { Some(tok) => bound_use(mut b, parent, tok), None => {} }
+            offset = offset + 2
+            for j in 0..len(parent) { if parent[j] == '.' { offset = offset + 2 } }
+        }
+        let self = builtin_def(mut b, "Self", "interface receiver type")
+        b.type_params["Self"] = self
+        for i in 0..len(t.methods) {
+            let method = t.methods[i]
+            add_use(mut b, method.line, method.col, method.name, member(b, id, i), "")
+            for p in method.params { type_name(mut b, p.ty) }
+            match method.result { Some(t) => type_name(mut b, t), None => {} }
+        }
+    }
     for i in 0..len(t.fields) {
         let f = t.fields[i]
         add_use(mut b, f.line, f.col, f.name, member(b, id, i), "")
@@ -704,7 +756,13 @@ fn function(b: mut Builder, id: Int) {
     let f = b.k.fns[id]
     let d = f.decl
     if !f.is_test {
-        add_use(mut b, d.line, d.col, d.name, b.fns[id], "")
+        let def = b.defs[b.fns[id]]
+        add_use(mut b, def.line, def.col, def.name, b.fns[id], "")
+        if def.col != d.col {
+            let mut owner = ""
+            for i in 0..len(d.name) { if d.name[i] == '.' { owner = d.name[0..i]; break } }
+            match maps.get(b.k.modules[b.module].types, owner) { Some(t) => add_use(mut b, d.line, d.col, owner, decl_def(b, t), ""), None => {} }
+        }
     }
     scope_params(mut b, d.type_params)
     // `uses fs, os`: the effects are the names after `uses` and each comma.
@@ -1022,9 +1080,16 @@ fn callee_name(callee: ast.Expr) -> Str {
 fn call(b: mut Builder, e: ast.Expr, callee: ast.Expr) {
     let name = callee_name(callee)
     match b.k.refs[e.id] {
+        checker.Ref.Method(t, method) => {
+            add_use(mut b, callee.line, callee.col, name, method_def(mut b, t, method), "")
+            match callee.kind { ast.ExprKind.Field(obj, _) => expr(mut b, obj), _ => {} }
+        }
         checker.Ref.Function(id) => {
             add_use(mut b, callee.line, callee.col, name, b.fns[id], "")
-            qualifier(mut b, callee, -1)
+            let f = b.k.fns[id]
+            let mut owner = -1
+            for i in 0..len(f.decl.name) { if f.decl.name[i] == '.' && len(f.params) > 0 { owner = f.params[0]; break } }
+            qualifier(mut b, callee, owner)
         }
         checker.Ref.Variant(t, vi) => {
             add_use(mut b, callee.line, callee.col, name, variant_def(mut b, t, vi, name), show(b, b.k.ty[e.id]))
@@ -1137,9 +1202,8 @@ pub fn symbols(program: ast.Program) -> [Symbol] {
             push(mut children, sym(v.name, "variant", variant_text(v), v.line, v.col, v.line, v.col + len(v.name)))
         }
         let mut kind = "struct"
-        if !t.is_struct {
-            kind = "enum"
-        }
+        if t.is_interface { kind = "interface" } else if !t.is_struct { kind = "enum" }
+        for method in t.methods { push(mut children, sym(method.name, "method", signature(method), method.line, method.col, method.line, method.col + len(method.name))) }
         let mut s = sym(t.name, kind, "", t.line, t.col, t.line, t.col + len(t.name))
         let n = len(children)
         if n > 0 {
@@ -1162,4 +1226,38 @@ fn sym(name: Str, kind: Str, detail: Str, line: Int, col: Int, end_line: Int, en
     return Symbol {
         name: name, kind: kind, detail: detail, line: line, col: col, end_line: end_line, end_col: end_col, children: [],
     }
+}
+
+fn method_def(b: mut Builder, t: Int, name: Str) -> Int {
+    let dispatch = checker.method(b.k, t, name)
+    if dispatch.fn_id >= 0 { return b.fns[dispatch.fn_id] }
+    if types.is_param(b.k.table, t) {
+        let mut queue: [Int] = []
+        let mut seen: Map[Int, Bool] = [:]
+        for bound in types.get(b.k.table, t).bounds { push(mut queue, types.interface_id(b.k.table, bound)) }
+        let mut i = 0
+        for i < len(queue) {
+            let id = queue[i]
+            i = i + 1
+            if id < 0 || maps.has(seen, id) { continue }
+            seen[id] = true
+            let ti = types.get(b.k.table, id)
+            for j in 0..len(ti.fields) { if ti.fields[j].name == name { return member(b, id, j) } }
+            for parent in ti.bounds { push(mut queue, types.interface_id(b.k.table, parent)) }
+        }
+    }
+    return builtin_def(mut b, name, "interface method")
+}
+
+fn bound_use(b: mut Builder, name: Str, tok: lexer.Token) {
+    let mut dot = -1
+    for i in 0..len(name) { if name[i] == '.' { dot = i } }
+    if dot < 0 && (name == "Eq" || name == "Ord" || name == "Key") {
+        add_use(mut b, tok.line, tok.col, name, word_def(mut b, name), "")
+        return
+    }
+    let mut module = ""
+    let mut terminal = name
+    if dot >= 0 { module = name[0..dot]; terminal = name[dot + 1..len(name)] }
+    type_name(mut b, ast.TypeName { module: module, name: terminal, args: [], effects: [], line: tok.line, col: tok.col })
 }

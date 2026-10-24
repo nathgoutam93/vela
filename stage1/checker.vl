@@ -11,9 +11,12 @@
 import ast
 import errors
 import integers
+import interfaces
+import lexer
 import maps
 import match_check
 import modules
+import parser
 import repairs
 import strings
 import types
@@ -46,6 +49,7 @@ pub type Ref = enum {
     Builtin(Str)  // "print", "maps.get", ...
     Variant(Int, Int)  // the enum's type, the variant's index
     Indirect  // a call through a function value
+    Method(Int, Str)  // receiver type and statically dispatched method name
 }
 
 // A closure, by the node id of its expression.
@@ -101,8 +105,14 @@ type Msg = struct {
     after: Str
 }
 
+type BoundUse = struct { module: Int, line: Int, col: Int, owner: Str, param: Int, actual: Int }
+type KeyUse = struct { module: Int, line: Int, col: Int, actual: Int }
+
 type Checker = struct {
     library: Bool
+    signatures_done: Bool
+    bound_uses: [BoundUse]
+    key_uses: [KeyUse]
     last_error: Int  // the reported diagnostic, including a deduplicated one
     errors: [errors.CompileError]
     warnings: [errors.CompileError]
@@ -156,7 +166,7 @@ pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> C
         push(mut targs, [])
     }
     let mut c = Checker {
-        library: for_tests, last_error: -1,
+        library: for_tests, signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
         undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
@@ -170,6 +180,14 @@ pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> C
         }
     }
     c.warnings = loaded.warnings
+    let source = interfaces.source()
+    let parsed = parser.parse(lexer.tokenize(source).tokens, loaded.node_count)
+    let prelude = modules.Module { name: "<prelude>", package: "std", path: "<prelude>", file: "<prelude>", source: source,
+        program: parsed.program, has_program: true, imports: [:], std: [], is_std: true, types: [:], fns: [:] }
+    let mut order = [len(c.modules)]
+    for m in c.order { push(mut order, m) }
+    c.order = order
+    push(mut c.modules, prelude)
     program(mut c, for_tests)
     return Checked {
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
@@ -272,6 +290,19 @@ fn program(c: mut Checker, for_tests: Bool) {
     }
     for k in 0..len(c.order) {
         c.current = c.order[k]
+        let decls = c.modules[c.current].program.types
+        for i in 0..len(decls) {
+            let d = decls[i]
+            let t = c.decls[decl_start[k] + i]
+            if d.is_interface {
+                c.table.types[t].params = [types.param(mut c.table, "Self", [types.interface_name(types.get(c.table, t))], d.line, d.col)]
+            } else {
+                c.table.types[t].params = make_type_params(mut c, d.params)
+            }
+        }
+    }
+    for k in 0..len(c.order) {
+        c.current = c.order[k]
         define_types(mut c, decl_start[k])
     }
     types.fill_instances(mut c.table)
@@ -280,6 +311,18 @@ fn program(c: mut Checker, for_tests: Bool) {
         c.current = m
         push(mut fn_start, len(c.fns))
         signatures(mut c)
+    }
+    c.signatures_done = true
+    validate_interfaces(mut c)
+    for use in c.bound_uses {
+        c.current = use.module
+        check_bounds(mut c, use.line, use.col, use.owner, use.param, use.actual)
+    }
+    for use in c.key_uses {
+        c.current = use.module
+        if !key_type(c, use.actual) {
+            report(mut c, use.line, use.col, "E3026", "Map key " + show(c, use.actual) + " does not implement Key")
+        }
     }
     for k in 0..len(c.order) {
         c.current = c.order[k]
@@ -324,9 +367,9 @@ fn declare_types(c: mut Checker) {
     let m = c.current
     for d in c.modules[m].program.types {
         let id = types.add_user(mut c.table, d.is_struct, d.name, c.modules[m].name, d.public, d.line, d.col)
+        if d.is_interface { c.table.types[id].tag = types.Tag.Interface; c.table.types[id].open = true }
         push(mut c.decls, id)
-        c.table.types[id].params = make_type_params(mut c, d.params)
-        if types.primitive(d.name) >= 0 || types.generic_arity(d.name) >= 0 {
+        if types.primitive(d.name) >= 0 || types.generic_arity(d.name) >= 0 || d.is_interface && c.modules[m].name != "<prelude>" && (d.name == "Eq" || d.name == "Ord" || d.name == "Key") {
             report(mut c, d.line, d.col, "E3005", "'" + d.name + "' is a built-in type and cannot be redefined")
         } else if maps.has(module_types(c), d.name) {
             let first = types.get(c.table, module_types(c)[d.name])
@@ -352,12 +395,9 @@ fn make_type_params(c: mut Checker, params: [ast.TypeParam]) -> [Int] {
         if types.primitive(p.name) >= 0 || types.generic_arity(p.name) >= 0 {
             report(mut c, p.line, p.col, "E3008", "type parameter '" + p.name + "' has the name of a built-in type")
         }
-        for b in p.bounds {
-            if b != "Eq" && b != "Ord" && b != "Key" {
-                report(mut c, p.line, p.col, "E3009", "unknown bound '" + b + "'; the bounds are Eq (==), Ord (<) and Key (map keys)")
-            }
-        }
-        push(mut out, types.param(mut c.table, p.name, p.bounds, p.line, p.col))
+        let mut bounds: [Str] = []
+        for b in p.bounds { push(mut bounds, resolve_bound(mut c, b, p.line, p.col)) }
+        push(mut out, types.param(mut c.table, p.name, bounds, p.line, p.col))
     }
     return out
 }
@@ -379,6 +419,13 @@ fn define_types(c: mut Checker, first_decl: Int) {
         let id = c.decls[first_decl + k]
         c.type_scope = scope_of(c, types.get(c.table, id).params)
         c.defining = id
+        if d.public && !d.is_interface { public_bounds(mut c, types.get(c.table, id).params, d.line, d.col) }
+        if d.is_interface {
+            define_interface(mut c, id, d)
+            c.type_scope = [:]
+            c.defining = -1
+            continue
+        }
         let mut what = "enum '" + d.name + "'"
         if d.is_struct {
             what = "struct '" + d.name + "'"
@@ -458,6 +505,7 @@ fn signatures(c: mut Checker) {
     let m = c.current
     for f in c.modules[m].program.fns {
         let type_params = make_type_params(mut c, f.type_params)
+        if f.public { public_bounds(mut c, type_params, f.line, f.col) }
         c.type_scope = scope_of(c, type_params)
         let mut params: [Int] = []
         let mut mutable: [Bool] = []
@@ -618,6 +666,11 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
             push(mut args, resolve_type(mut c, a))
         }
         if t.name == "Map" {
+            if !c.signatures_done && (types.is_struct(c.table, args[0]) || types.is_enum(c.table, args[0])) {
+                let k = t.args[0]
+                push(mut c.key_uses, KeyUse { module: c.current, line: k.line, col: k.col, actual: args[0] })
+                return types.map(mut c.table, args[0], args[1])
+            }
             if !key_type(c, args[0]) && args[0] != types.ERROR() {
                 let k = t.args[0]
                 report(mut c, k.line, k.col, "E3026", "Map keys must be integers, Bool or Str, not " + show(c, args[0]))
@@ -648,6 +701,10 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
     }
     if known < 0 {
         report(mut c, t.line, t.col, "E3027", "unknown type '" + t.name + "'")
+        return types.ERROR()
+    }
+    if types.is_interface(c.table, known) {
+        report(mut c, t.line, t.col, "E3190", "interface '" + t.name + "' is a bound, not a value type; use a type parameter")
         return types.ERROR()
     }
     if types.is_generic(c.table, known) {
@@ -710,26 +767,20 @@ fn param_names(c: Checker, params: [Int]) -> Str {
 
 // Whether `t` can be a map key.
 fn key_type(c: Checker, t: Int) -> Bool {
-    return types.is_map_key(t) || types.has_bound(c.table, t, "Key")
+    return satisfies_depth(c, t, "Key", 0)
 }
 
 // Whether `t` meets bound `b`.
 fn satisfies(c: Checker, t: Int, b: Str) -> Bool {
-    if t == types.ERROR() {
-        return true
-    }
-    if b == "Eq" {
-        return comparable(c, t)
-    }
-    if b == "Ord" {
-        return types.is_integer(t) || t == types.STR() || t == types.FLOAT() ||
-            types.has_bound(c.table, t, "Ord")
-    }
-    return key_type(c, t)
+    return satisfies_depth(c, t, b, 0)
 }
 
 // Report each bound of type parameter `p` that `t`, given for it, does not meet.
 fn check_bounds(c: mut Checker, line: Int, col: Int, owner: Str, p: Int, t: Int) {
+    if !c.signatures_done {
+        push(mut c.bound_uses, BoundUse { module: c.current, line: line, col: col, owner: owner, param: p, actual: t })
+        return
+    }
     let pname = types.get(c.table, p).name
     for b in types.get(c.table, p).bounds {
         if satisfies(c, t, b) {
@@ -738,7 +789,8 @@ fn check_bounds(c: mut Checker, line: Int, col: Int, owner: Str, p: Int, t: Int)
         let need = match b {
             "Eq" => "to work with ==, as Int, Byte, Bool, Str and enums without values do"
             "Ord" => "to be ordered by <, as Int, Byte, Float and Str are"
-            _ => "to be a map key: Int, Byte, Bool or Str"
+            "Key" => "to be a map key: Int, Byte, Bool or Str"
+            _ => "to implement interface " + b
         }
         report(mut c, line, col, "E3031", owner + " needs " + pname + " " + need + ", but here " + pname + " is " + show(c, t))
     }
@@ -2098,7 +2150,7 @@ fn comparable(c: Checker, t: Int) -> Bool {
     if ti.tag == types.Tag.Prim || types.has_bound(c.table, t, "Eq") {
         return true
     }
-    return ti.tag == types.Tag.Enum && len(ti.args) == 0 && types.c_like(c.table, t)
+    return satisfies_depth(c, t, "Eq", 0)
 }
 
 fn is_bitwise(op: Str) -> Bool { return op == "&" || op == "|" || op == "^" || op == "<<" || op == ">>" }
@@ -2150,7 +2202,7 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr, expect
         }
     } else if is_ordering(op) && left == types.STR() && right == types.STR() {
         // Strs are ordered byte by byte
-    } else if is_ordering(op) && left == right && types.has_bound(c.table, left, "Ord") {
+    } else if is_ordering(op) && left == right && satisfies(c, left, "Ord") {
         // a type parameter bound by Ord
     } else if left == types.FLOAT() && right == types.FLOAT() {
         if op == "%" {
@@ -2178,6 +2230,14 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr, expect
                 " and " + show(c, right))
         } else {
             report_at(mut c, e, "E3107", "operator '" + op + "' needs Int operands, found " + show(c, left) + " and " + show(c, right))
+        }
+    }
+    if left == right && (op == "==" || op == "!=" || is_ordering(op)) {
+        let mut bound = "Eq"
+        let mut method_name = "eq"
+        if is_ordering(op) { bound = "Ord"; method_name = "compare" }
+        if !intrinsic(c.table, left, bound) && satisfies(c, left, bound) {
+            c.refs[e.id] = Ref.Method(left, method_name)
         }
     }
     // The result type is known even when the operands were wrong.
@@ -2287,7 +2347,7 @@ fn map_lit(c: mut Checker, e: ast.Expr, entries: [ast.MapEntry]) -> Int {
     }
     let mut k = value(mut c, entries[0].key)
     let v = value(mut c, entries[0].value)
-    if !types.is_map_key(k) && k != types.ERROR() {
+    if !key_type(c, k) && k != types.ERROR() {
         report_at(mut c, entries[0].key, "E3116", "Map keys must be integers, Bool or Str, not " + show(c, k))
         k = types.ERROR()
     }
@@ -2426,6 +2486,8 @@ fn struct_lit(c: mut Checker, e: ast.Expr, module: Str, name: Str, fields: [ast.
     if t < 0 || !types.is_struct(c.table, t) {
         if t < 0 {
             report_at(mut c, e, "E3125", "unknown type '" + name + "'")
+        } else if types.is_interface(c.table, t) {
+            report_at(mut c, e, "E3190", "interface '" + written + "' is a bound, not a value constructor")
         } else if t != types.ERROR() {
             report_at(mut c, e, "E3126", "'" + written + "' is an enum; build its values with " + written + ".Variant")
         }
@@ -2995,6 +3057,7 @@ fn stale_copies(c: mut Checker, args: [ast.Expr]) {
 fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expected: Int) -> Int {
     let target = call_target(mut c, callee)
     match target {
+        Ref.Method(t, name) => return method_call(mut c, e, callee, args, t, name, expected)
         Ref.NoRef => {
             for a in args {
                 infer(mut c, a)  // still look for errors inside the arguments
@@ -3040,43 +3103,7 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
             construct(mut c, e, args, enum, vi, show(c, enum) + "." + types.get(c.table, enum).variants[vi].name)
             return enum
         }
-        Ref.Function(id) => {
-            let f = c.fns[id]
-            c.refs[e.id] = Ref.Function(id)
-            let name = written(callee)
-            if len(f.type_params) > 0 {
-                let t = generic_call(mut c, e, id, name, args, expected)
-                use_call_effects(mut c, e, f, args, name)
-                return t
-            }
-            arity(mut c, e, name, len(f.params), len(args))
-            for i in 0..len(args) {
-                let arg = args[i]
-                let n = strings.from_int(i + 1)
-                if i >= len(f.params) {
-                    infer(mut c, arg)
-                    continue
-                }
-                let want = f.params[i]
-                if f.mutable[i] {
-                    mut_argument(mut c, arg, want, "argument " + n + " of '" + name + "'")
-                } else {
-                    let m = msg("argument " + n + " of '" + name + "' must be " + show(c, want) + ", found ", "")
-                    match arg.kind {
-                        ast.ExprKind.MutArg(p) => {
-                            report_at(mut c, arg, "E3141", "argument " + n + " of '" + name + "' is not a mut parameter; remove `mut`")
-                            last_fix(mut c, repairs.remove_mut(c.modules[c.current].source, c.modules[c.current].path, arg.line, arg.col))
-                            check_expr(mut c, p, want, m)
-                        }
-                        _ => check_expr(mut c, arg, want, m)
-                    }
-                }
-            }
-            exclusive(mut c, args)
-            use_call_effects(mut c, e, f, args, name)
-            // Even after an argument error, the call has the declared result type.
-            return f.result
-        }
+        Ref.Function(id) => return known_call(mut c, e, id, written(callee), args, expected)
         Ref.Local(id) => {
             set_ty(mut c, callee, c.locals[id].ty)
             c.refs[callee.id] = Ref.Local(id)
@@ -3242,9 +3269,20 @@ fn construct(c: mut Checker, e: ast.Expr, args: [ast.Expr], enum: Int, vi: Int, 
 fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
     match callee.kind {
         ast.ExprKind.Field(obj, name) => {
+            completing(mut c, name, [obj])
             let module = module_named(c, obj)
             if module >= 0 {
                 return module_fn(mut c, callee.line, callee.col, module, name)
+            }
+            let owner = named_receiver(mut c, obj)
+            if owner >= 0 {
+                let ti = types.get(c.table, owner)
+                for m in 0..len(c.modules) {
+                    if c.modules[m].name == ti.module && maps.has(c.modules[m].fns, ti.name + "." + name) {
+                        if m == c.current { return Ref.Function(c.modules[m].fns[ti.name + "." + name]) }
+                        return module_fn(mut c, callee.line, callee.col, m, ti.name + "." + name)
+                    }
+                }
             }
             let enum = enum_named(mut c, obj)
             if enum == types.ERROR() {
@@ -3269,7 +3307,17 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
                 }
                 _ => {}
             }
-            return callee_value(mut c, callee)
+            let receiver = value(mut c, obj)
+            if receiver == types.ERROR() { return Ref.NoRef }
+            if types.is_struct(c.table, receiver) {
+                let field = types.field_index(c.table, receiver, name)
+                if field >= 0 {
+                    let ft = types.get(c.table, receiver).fields[field].ty
+                    let method = lookup_method(c.table, c.fns, c.modules, receiver, name)
+                    if types.is_func(c.table, ft) || method.fn_id < 0 { return callee_value(mut c, callee) }
+                }
+            }
+            return Ref.Method(receiver, name)
         }
         ast.ExprKind.Name(name) => {
             completing(mut c, name, [])
@@ -4004,4 +4052,375 @@ fn erase_id(er: [Int], t: Int) -> Int {
         return er[t]
     }
     return t
+}
+
+// ---- Interfaces and coherent method lookup (M20) ----
+
+fn resolve_bound(c: mut Checker, name: Str, line: Int, col: Int) -> Str {
+    let mut id = -1
+    let mut dot = -1
+    for i in 0..len(name) { if name[i] == '.' { dot = i } }
+    if dot >= 0 {
+        let module = module_in_type(mut c, line, col, name[0..dot])
+        if module >= 0 { id = module_type(mut c, line, col, module, name[dot + 1..len(name)]) }
+    } else {
+        match maps.get(module_types(c), name) { Some(t) => id = t, None => {} }
+        if !types.is_interface(c.table, id) {
+            for t in c.decls {
+                let ti = types.get(c.table, t)
+                if ti.module == "<prelude>" && ti.name == name { id = t }
+            }
+        }
+    }
+    if !types.is_interface(c.table, id) {
+        report(mut c, line, col, "E3009", "unknown interface bound '" + name + "'")
+        return name
+    }
+    return types.interface_name(types.get(c.table, id))
+}
+
+fn define_interface(c: mut Checker, id: Int, d: ast.TypeDecl) {
+    if len(d.params) > 0 { report(mut c, d.line, d.col, "E3191", "interfaces use Self, not type parameters") }
+    for parent in d.parents { push(mut c.table.types[id].bounds, resolve_bound(mut c, parent, d.line, d.col)) }
+    let self = types.get(c.table, id).params[0]
+    for method in d.methods {
+        if len(method.type_params) > 0 || len(method.requires) > 0 || len(method.ensures) > 0 {
+            report(mut c, method.line, method.col, "E3191", "interface signatures cannot have type parameters, bodies or contracts")
+        }
+        let mut params: [Int] = []
+        for p in method.params {
+            if p.mutable { report(mut c, p.line, p.col, "E3191", "interface parameters are immutable values") }
+            push(mut params, resolve_type(mut c, p.ty))
+            if d.public { exposes(mut c, p.ty, "interface '" + d.name + "'") }
+        }
+        if len(params) == 0 || params[0] != self {
+            report(mut c, method.line, method.col, "E3191", "an interface method's first parameter must be Self")
+        }
+        let mut result = types.NOTHING()
+        match method.result { Some(t) => { result = resolve_type(mut c, t); if d.public { exposes(mut c, t, "interface '" + d.name + "'") } }, None => {} }
+        for effect in method.effects {
+            if effect != "fs" && effect != "os" { report(mut c, method.line, method.col, "E3191", "interface effects must be fs or os") }
+        }
+        if types.field_index(c.table, id, method.name) >= 0 {
+            report(mut c, method.line, method.col, "E3192", "duplicate interface method '" + method.name + "'")
+        }
+        let ft = types.func_with(mut c.table, params, result, method.effects)
+        push(mut c.table.types[id].fields, types.FieldInfo { name: method.name, ty: ft })
+    }
+    c.table.types[id].filled = true
+}
+
+fn interface_fields(table: types.Table, id: Int, depth: Int) -> [types.FieldInfo] {
+    let mut out: [types.FieldInfo] = []
+    let mut queue = [id]
+    let mut seen: Map[Int, Bool] = [:]
+    let mut i = 0
+    for i < len(queue) {
+        let current = queue[i]
+        i = i + 1
+        if current < 0 || maps.has(seen, current) { continue }
+        seen[current] = true
+        for field in table.types[current].fields { push(mut out, field) }
+        for parent in table.types[current].bounds { push(mut queue, types.interface_id(table, parent)) }
+    }
+    return out
+}
+
+fn interface_signature(c: mut Checker, t: Int, name: Str) -> Int {
+    let mut found = -1
+    for bound in types.get(c.table, t).bounds {
+        let id = types.interface_id(c.table, bound)
+        for field in interface_fields(c.table, id, 0) {
+            if field.name != name { continue }
+            // Each inherited method has the Self of its declaring interface.
+            let signature = replace_self(mut c.table, field.ty, t)
+            if found >= 0 && found != signature { return -2 }
+            found = signature
+        }
+    }
+    return found
+}
+
+fn replace_self(table: mut types.Table, ft: Int, t: Int) -> Int {
+    let mut params: [Int] = []
+    let mut args: [Int] = []
+    for i in 0..len(table.types) {
+        let ti = table.types[i]
+        if ti.tag == types.Tag.Interface && len(ti.params) == 1 { push(mut params, ti.params[0]); push(mut args, t) }
+    }
+    return types.subst(mut table, ft, params, args)
+}
+
+pub type Dispatch = struct { fn_id: Int, args: [Int] }
+
+fn method_unify(table: types.Table, pattern: Int, actual: Int, params: [Int], bound: mut [Int]) -> Bool {
+    for i in 0..len(params) {
+        if pattern == params[i] {
+            if bound[i] < 0 { bound[i] = actual }
+            return bound[i] == actual
+        }
+    }
+    if pattern == actual { return true }
+    if pattern < 0 || actual < 0 { return false }
+    let p = types.get(table, pattern)
+    let a = types.get(table, actual)
+    if p.tag != a.tag || p.origin != a.origin || p.name != a.name || p.module != a.module || len(p.args) != len(a.args) { return false }
+    for i in 0..len(p.args) { if !method_unify(table, p.args[i], a.args[i], params, mut bound) { return false } }
+    if len(p.args) == 0 { return false }
+    return p.result == a.result || method_unify(table, p.result, a.result, params, mut bound)
+}
+
+fn lookup_method(table: types.Table, fns: [FnInfo], mods: [modules.Module], t: Int, name: Str) -> Dispatch {
+    let empty = Dispatch { fn_id: -1, args: [] }
+    if t < 0 { return empty }
+    let ti = types.get(table, t)
+    if ti.tag != types.Tag.Struct && ti.tag != types.Tag.Enum { return empty }
+    let qualified = ti.name + "." + name
+    for pass in 0..2 {
+        for id in 0..len(fns) {
+            let f = fns[id]
+            if len(f.params) == 0 { continue }
+            let owner = types.get(table, f.params[0]).module
+            if owner != ti.module || mods[f.module].name != ti.module { continue }
+            if pass == 0 && f.decl.name != qualified || pass == 1 && f.decl.name != name { continue }
+            let mut args = unknown(len(f.type_params))
+            if !method_unify(table, f.params[0], t, f.type_params, mut args) { continue }
+            return Dispatch { fn_id: id, args: args }
+        }
+    }
+    return empty
+}
+
+pub fn method(k: Checked, t: Int, name: Str) -> Dispatch { return lookup_method(k.table, k.fns, k.modules, t, name) }
+
+fn intrinsic(table: types.Table, t: Int, bound: Str) -> Bool {
+    if bound == "Eq" {
+        let ti = types.get(table, t)
+        return ti.tag == types.Tag.Prim || ti.tag == types.Tag.Enum && len(ti.args) == 0 && types.c_like(table, t)
+    }
+    if bound == "Ord" { return types.is_integer(t) || t == types.FLOAT() || t == types.STR() }
+    return bound == "Key" && types.is_map_key(t)
+}
+
+fn satisfies_depth(c: Checker, t: Int, bound: Str, depth: Int) -> Bool {
+    if t == types.ERROR() || types.has_bound(c.table, t, bound) || intrinsic(c.table, t, bound) { return true }
+    if types.is_param(c.table, t) || depth > 32 { return false }
+    let id = types.interface_id(c.table, bound)
+    if id < 0 { return false }
+    let ti = types.get(c.table, id)
+    let mut table = c.table
+    for parent in ti.bounds { if !satisfies_depth(c, t, parent, depth + 1) { return false } }
+    for field in ti.fields {
+        let dispatch = lookup_method(table, c.fns, c.modules, t, field.name)
+        if dispatch.fn_id < 0 {
+            let primitive_bound = intrinsic_bound(field.name)
+            if primitive_bound == "" || !intrinsic(table, t, primitive_bound) { return false }
+            let core = types.interface_id(table, primitive_bound)
+            let actual = replace_self(mut table, types.get(table, core).fields[0].ty, t)
+            let want = replace_self(mut table, field.ty, t)
+            if types.plain(table, actual) != types.plain(table, want) || !types.effects_within(types.effects_of(table, actual), types.effects_of(table, want)) { return false }
+            continue
+        }
+        let f = c.fns[dispatch.fn_id]
+        for arg in dispatch.args { if arg < 0 { return false } }
+        if !f.decl.public && c.modules[f.module].name != types.get(table, id).module && c.current != f.module { return false }
+        for i in 0..len(f.type_params) {
+            for need in types.get(table, f.type_params[i]).bounds {
+                if !satisfies_depth(c, dispatch.args[i], need, depth + 1) { return false }
+            }
+        }
+        for mutable in f.mutable { if mutable { return false } }
+        let want = replace_self(mut table, field.ty, t)
+        let actual = types.func_with(mut table, f.params, f.result, f.decl.effects)
+        let concrete = types.subst(mut table, actual, f.type_params, dispatch.args)
+        // Pure implementations can satisfy signatures permitting effects.
+        let a = types.get(table, concrete)
+        let b = types.get(table, want)
+        if types.plain(table, concrete) != types.plain(table, want) || !types.effects_within(a.effects, b.effects) { return false }
+    }
+    return true
+}
+
+fn validate_interfaces(c: mut Checker) {
+    for f in c.fns {
+        if f.is_test { continue }
+        c.current = f.module
+        let name = f.decl.name
+        for i in 0..len(name) {
+            if name[i] != '.' { continue }
+            let owner = name[0..i]
+            if len(f.params) == 0 {
+                report(mut c, f.decl.line, f.decl.col, "E3196", "a qualified method needs a receiver parameter")
+                continue
+            }
+            let ti = types.get(c.table, f.params[0])
+            if ti.name != owner || ti.module != c.modules[f.module].name || (!types.is_struct(c.table, f.params[0]) && !types.is_enum(c.table, f.params[0])) || f.mutable[0] {
+                report(mut c, f.decl.line, f.decl.col, "E3196", "a qualified method must take its local receiver type as an immutable first parameter")
+            }
+            if types.is_enum(c.table, f.params[0]) && types.variant_index(c.table, f.params[0], name[i + 1..len(name)]) >= 0 {
+                report(mut c, f.decl.line, f.decl.col, "E3196", "a method cannot have the name of an enum variant")
+            }
+        }
+    }
+    for id in c.decls {
+        if !types.is_interface(c.table, id) { continue }
+        let ti = types.get(c.table, id)
+        for m in 0..len(c.modules) { if c.modules[m].name == ti.module { c.current = m } }
+        let mut methods: Map[Str, Int] = [:]
+        for field in interface_fields(c.table, id, 0) {
+            let signature = replace_self(mut c.table, field.ty, ti.params[0])
+            match maps.get(methods, field.name) {
+                Some(previous) => {
+                    if previous != signature { report(mut c, ti.line, ti.col, "E3192", "conflicting inherited signatures for method '" + field.name + "'") }
+                }
+                None => methods[field.name] = signature
+            }
+        }
+        for parent in ti.bounds {
+            let parent_id = types.interface_id(c.table, parent)
+            if ti.public && parent_id >= 0 && !types.get(c.table, parent_id).public {
+                report(mut c, ti.line, ti.col, "E3195", "a public interface cannot extend a private interface")
+            }
+            if types.bound_includes(c.table, parent, types.interface_name(ti), 0) {
+                report(mut c, ti.line, ti.col, "E3193", "interface inheritance cycle involving '" + ti.name + "'")
+            }
+        }
+    }
+}
+
+fn known_call(c: mut Checker, e: ast.Expr, id: Int, name: Str, args: [ast.Expr], expected: Int) -> Int {
+    let f = c.fns[id]
+    c.refs[e.id] = Ref.Function(id)
+    if len(f.type_params) > 0 {
+        let t = generic_call(mut c, e, id, name, args, expected)
+        use_call_effects(mut c, e, f, args, name)
+        return t
+    }
+    arity(mut c, e, name, len(f.params), len(args))
+    for i in 0..len(args) {
+        let arg = args[i]
+        let n = strings.from_int(i + 1)
+        if i >= len(f.params) {
+            infer(mut c, arg)
+            continue
+        }
+        let want = f.params[i]
+        if f.mutable[i] {
+            mut_argument(mut c, arg, want, "argument " + n + " of '" + name + "'")
+        } else {
+            let m = msg("argument " + n + " of '" + name + "' must be " + show(c, want) + ", found ", "")
+            match arg.kind {
+                ast.ExprKind.MutArg(p) => {
+                    report_at(mut c, arg, "E3141", "argument " + n + " of '" + name + "' is not a mut parameter; remove `mut`")
+                    last_fix(mut c, repairs.remove_mut(c.modules[c.current].source, c.modules[c.current].path, arg.line, arg.col))
+                    check_expr(mut c, p, want, m)
+                }
+                _ => check_expr(mut c, arg, want, m)
+            }
+        }
+    }
+    exclusive(mut c, args)
+    use_call_effects(mut c, e, f, args, name)
+    // Even after an argument error, the call has the declared result type.
+    return f.result
+}
+
+fn method_call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], t: Int, name: Str, expected: Int) -> Int {
+    let mut all: [ast.Expr] = []
+    match callee.kind { ast.ExprKind.Field(obj, _) => push(mut all, obj), _ => {} }
+    for arg in args { push(mut all, arg) }
+    let mut result = types.ERROR()
+    if types.is_param(c.table, t) {
+        let signature = interface_signature(mut c, t, name)
+        if signature < 0 { report_at(mut c, e, "E3194", "missing or ambiguous interface method '" + name + "'"); return result }
+        result = indirect_call(mut c, e, signature, all, "method '" + name + "'")
+    } else {
+        let dispatch = lookup_method(c.table, c.fns, c.modules, t, name)
+        if dispatch.fn_id >= 0 {
+            let f = c.fns[dispatch.fn_id]
+            if f.module != c.current && !f.decl.public {
+                report_at(mut c, e, "E3195", "method '" + name + "' is private to its type's module")
+            }
+            result = known_call(mut c, e, dispatch.fn_id, name, all, expected)
+        } else {
+            let bound = intrinsic_bound(name)
+            if bound == "" || !intrinsic(c.table, t, bound) {
+                report_at(mut c, e, "E3194", "no method '" + name + "' on " + show(c, t))
+                for arg in args { infer(mut c, arg) }
+                return result
+            }
+            let id = types.interface_id(c.table, bound)
+            let signature = replace_self(mut c.table, types.get(c.table, id).fields[0].ty, t)
+            result = indirect_call(mut c, e, signature, all, "method '" + name + "'")
+        }
+    }
+    c.refs[e.id] = Ref.Method(t, name)
+    return result
+}
+
+fn intrinsic_bound(name: Str) -> Str {
+    return match name { "eq" => "Eq", "compare" => "Ord", "hash" => "Key", _ => "" }
+}
+
+fn named_receiver(c: mut Checker, e: ast.Expr) -> Int {
+    match e.kind {
+        ast.ExprKind.Name(name) => {
+            if lookup_local(c, name) < 0 {
+                match maps.get(module_types(c), name) { Some(t) => return t, None => {} }
+            }
+        }
+        ast.ExprKind.Field(obj, name) => {
+            let m = module_named(c, obj)
+            if m >= 0 && maps.has(c.modules[m].types, name) { return module_type(mut c, e.line, e.col, m, name) }
+        }
+        _ => {}
+    }
+    return -1
+}
+
+pub fn method_args(e: ast.Expr, args: [ast.Expr]) -> [ast.Expr] {
+    let mut out: [ast.Expr] = []
+    match e.kind {
+        ast.ExprKind.Call(callee, _) => {
+            match callee.kind { ast.ExprKind.Field(obj, _) => push(mut out, obj), _ => {} }
+        }
+        _ => {}
+    }
+    for arg in args { push(mut out, arg) }
+    return out
+}
+
+pub fn method_names(k: Checked, t: Int, module: Int) -> [Str] {
+    let mut out: [Str] = []
+    let mut seen: Map[Str, Bool] = [:]
+    if t < 0 { return out }
+    if types.is_param(k.table, t) {
+        for bound in types.get(k.table, t).bounds {
+            for field in interface_fields(k.table, types.interface_id(k.table, bound), 0) {
+                if !maps.has(seen, field.name) { seen[field.name] = true; push(mut out, field.name) }
+            }
+        }
+    } else {
+        for id in 0..len(k.fns) {
+            let f = k.fns[id]
+            if f.module != module && !f.decl.public { continue }
+            let mut name = f.decl.name
+            for i in 0..len(name) { if name[i] == '.' { name = name[i + 1..len(name)]; break } }
+            if maps.has(seen, name) { continue }
+            if method(k, t, name).fn_id == id { seen[name] = true; push(mut out, name) }
+        }
+        for name in ["eq", "compare", "hash"] {
+            if intrinsic(k.table, t, intrinsic_bound(name)) && !maps.has(seen, name) { push(mut out, name) }
+        }
+    }
+    return out
+}
+
+fn public_bounds(c: mut Checker, params: [Int], line: Int, col: Int) {
+    for param in params {
+        for bound in types.get(c.table, param).bounds {
+            let id = types.interface_id(c.table, bound)
+            if id >= 0 && !types.get(c.table, id).public { report(mut c, line, col, "E3195", "a public declaration cannot require a private interface") }
+        }
+    }
 }

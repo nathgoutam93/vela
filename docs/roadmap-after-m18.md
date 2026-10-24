@@ -70,6 +70,9 @@ for semantics, benchmark measurements, and outstanding Linux native/sanitizer va
 
 ## M20: Interfaces
 
+**Status:** implemented; see [the walkthrough](m20-interfaces.md) for static
+dispatch, custom-key acceptance, and remaining platform validation.
+
 **Needs:** nothing before it.
 
 **What gets built:** Interfaces: user-defined bounds for generics, met by functions on a type, with static dispatch (monomorphization); Eq, Ord and Key become ordinary interfaces; method-call syntax x.f() for a type's functions.

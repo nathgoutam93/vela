@@ -540,6 +540,8 @@ static inline uint8_t vela_to_byte(int64_t n, const char *loc) {
     return (uint8_t)n;
 }
 
+uint64_t vela_hash_value(const vela_type *type, const void *value);
+
 #include "vela_int.h"
 
 #endif

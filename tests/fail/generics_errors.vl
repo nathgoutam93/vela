@@ -3,7 +3,7 @@
 // err: generics_errors.vl:24:19: error: 'Grow' can only contain itself with its own type parameters, as in Grow[T] [E3030]
 // err: generics_errors.vl:37:14: error: T values cannot be compared with '=='; declare the type parameter as `T: Eq` [E3098]
 // err: generics_errors.vl:41:14: error: operator '<' needs values that can be ordered; declare the type parameter as `T: Ord` [E3105]
-// err: generics_errors.vl:52:10: error: unknown bound 'Wobbly'; the bounds are Eq (==), Ord (<) and Key (map keys) [E3009]
+// err: generics_errors.vl:52:10: error: unknown interface bound 'Wobbly' [E3009]
 // err: generics_errors.vl:52:26: error: type parameter 'T' is declared twice [E3007]
 // err: generics_errors.vl:57:12: error: 'deeper' calls itself with [T] for T; a generic function can only call itself with its own type parameters [E3145]
 // err: generics_errors.vl:61:14: error: T has no fields [E3123]

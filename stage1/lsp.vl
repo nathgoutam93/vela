@@ -557,6 +557,8 @@ fn location(s: Server, file: Str, line: Int, col: Int, n: Int) -> json.Json {
 fn symbol_kind(kind: Str) -> Int {
     return match kind {
         "struct" => 23
+        "interface" => 11
+        "method" => 6
         "enum" => 10
         "field" => 8
         "variant" => 22

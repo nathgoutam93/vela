@@ -1,0 +1,7 @@
+// Prelude interfaces use the same declarations and structural rules as user interfaces.
+// Primitive operations are intrinsic implementations of these signatures.
+pub fn source() -> Str {
+    return "pub type Eq = interface { fn eq(a: Self, b: Self) -> Bool }\n" +
+        "pub type Ord = interface: Eq { fn compare(a: Self, b: Self) -> Int }\n" +
+        "pub type Key = interface: Eq { fn hash(value: Self) -> u64 }\n"
+}

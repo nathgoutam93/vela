@@ -151,7 +151,7 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
                     }
                     if len(chain) == 2 {
                         match maps.get(k.modules[target].types, chain[1]) {
-                            Some(t) => return variants(k, t, mi)
+                            Some(t) => return type_members(k, t, mi)
                             None => return []
                         }
                     }
@@ -161,7 +161,7 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
             }
             if len(chain) == 1 {
                 match maps.get(m.types, chain[0]) {
-                    Some(t) => return variants(k, t, mi)
+                    Some(t) => return type_members(k, t, mi)
                     None => {}
                 }
             }
@@ -169,8 +169,18 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
         // A value: its fields.
         if len(k.completion.object) == 1 {
             let t = k.ty[k.completion.object[0].id]
-            if t >= 0 && types.is_struct(k.table, t) {
-                return fields(k, t, mi)
+            if t >= 0 {
+                let mut out: [Item] = []
+                let mut occupied: Map[Str, Bool] = [:]
+                if types.is_struct(k.table, t) { out = fields(k, t, mi); for field in out { occupied[field.name] = true } }
+                for name in checker.method_names(k, t, mi) {
+                    if maps.has(occupied, name) { continue }
+                    let dispatch = checker.method(k, t, name)
+                    let mut detail = name + " (interface method)"
+                    if dispatch.fn_id >= 0 { detail = index.signature(k.fns[dispatch.fn_id].decl) }
+                    push(mut out, Item { name: name, kind: "function", detail: detail, doc: "A statically resolved method on this receiver." })
+                }
+                return out
             }
         }
         return []
@@ -207,7 +217,7 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
     for name in ["print", "len", "push", "int", "float", "byte", "assert"] {
         push(mut out, builtin_item(name, name))
     }
-    for name in ["Int", "Float", "Bool", "Byte", "Str", "Option", "Result", "Map", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64"] {
+    for name in ["Int", "Float", "Bool", "Byte", "Str", "Option", "Result", "Map", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "Eq", "Ord", "Key"] {
         push(mut out, Item { name: name, kind: "built-in", detail: name, doc: "A built-in type." })
     }
     for v in [["Some", "Some(T)"], ["None", "None"], ["Ok", "Ok(T)"], ["Err", "Err(E)"]] {
@@ -530,4 +540,18 @@ test "the text around the cursor" {
     assert(in_string_or_comment("let s = \"a.b") && in_string_or_comment("x // p.") && !in_string_or_comment("f(\"a\", p."))
     assert(closers("print(f(a, [1, p.") == "]))" && closers("g(\")\", ") == ")")
     assert(indent("\t  x") == "\t  " && joined_lines(["a", "b", "c"], 2, "B") == "a\nB\nc")
+}
+
+fn type_members(k: checker.Checked, t: Int, mi: Int) -> [Item] {
+    let mut out = variants(k, t, mi)
+    let ti = types.get(k.table, t)
+    let prefix = ti.name + "."
+    for f in k.fns {
+        let name = f.decl.name
+        if k.modules[f.module].name != ti.module || (f.module != mi && !f.decl.public) { continue }
+        if len(name) > len(prefix) && name[0..len(prefix)] == prefix {
+            push(mut out, Item { name: name[len(prefix)..len(name)], kind: "function", detail: index.signature(f.decl), doc: "A function on this type." })
+        }
+    }
+    return out
 }

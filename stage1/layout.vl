@@ -20,6 +20,7 @@ pub type Layout = struct {
     managed_cache: Map[Int, Bool]
     compact: Map[Int, Int]  // boxed enums whose empty variant can be NULL
     funcs: [Int]  // function types, which are C function pointer typedefs
+    key_methods: Map[Int, [Str]]  // hash/eq symbols and prototypes for custom keys
 }
 
 // The C name of `name` in `module`, with the module's length in front so
@@ -29,6 +30,11 @@ pub type Layout = struct {
 // the main module starts with a letter or _, another module's with its
 // length, which is never 0): `05greet4util_hello`.
 pub fn mangle(module: Str, name: Str) -> Str {
+    for i in 0..len(name) {
+        if name[i] == '.' {
+            return mangle(module, "0" + strings.from_int(i) + name[0..i] + "_" + name[i + 1..len(name)])
+        }
+    }
     if module == "" {
         return name
     }
@@ -107,7 +113,7 @@ pub fn new_layout(table: types.Table, user_types: [Int], element_types: [Int]) -
     }
     let mut l = Layout {
         table: table, types: all, element_types: element_types, names: [:], used: [:], tags: [:], boxed: [:],
-        box_types: [], managed_cache: [:], compact: [:], funcs: [],
+        box_types: [], managed_cache: [:], compact: [:], funcs: [], key_methods: [:],
     }
     for t in all {
         let name = unique(mut l, base_name(l, t))
@@ -761,8 +767,19 @@ fn memory_functions(l: mut Layout) -> [Str] {
             funcs = "vt_retain_" + n + ", vt_release_" + n
             mark = "vt_share_" + n
         }
+        let mut keys = "NULL, NULL"
+        match maps.get(l.key_methods, t) {
+            Some(methods) => {
+                push(mut out, methods[2] + ";")
+                push(mut out, methods[3] + ";")
+                push(mut out, "static inline VELA_UNUSED uint64_t vt_hash_" + n + "(const void *p) { return " + methods[0] + "(*(" + n + " const *)p); }")
+                push(mut out, "static inline VELA_UNUSED bool vt_eq_" + n + "(const void *a, const void *b) { return " + methods[1] + "(*(" + n + " const *)a, *(" + n + " const *)b); }")
+                keys = "vt_hash_" + n + ", vt_eq_" + n
+            }
+            None => {}
+        }
         push(mut out, "static inline VELA_UNUSED const vela_type *vt_" + n + "(void) {")
-        push(mut out, "    static const vela_type t = {sizeof(" + n + "), " + funcs + ", NULL, NULL, " + mark + "};")
+        push(mut out, "    static const vela_type t = {sizeof(" + n + "), " + funcs + ", " + keys + ", " + mark + "};")
         push(mut out, "    return &t;")
         push(mut out, "}")
     }

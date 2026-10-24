@@ -1620,3 +1620,7 @@ void vela_eprint_uint(uint64_t n) {
     int len = snprintf(buf, sizeof buf, "%" PRIu64, n);
     print_line(stderr, buf, (size_t)len);
 }
+
+uint64_t vela_hash_value(const vela_type *type, const void *value) {
+    return type->hash(value);
+}

@@ -304,8 +304,17 @@ fn end_of_item(p: mut Parser, what: Str) -> Result[Unit, errors.CompileError] {
 }
 
 fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
+    return fn_decl_in(mut p, true)
+}
+
+fn fn_decl_in(p: mut Parser, with_body: Bool) -> Result[ast.FnDecl, errors.CompileError] {
     advance(mut p)  // "fn"
-    let name = expect_name(mut p, "after 'fn'")?
+    let mut name = expect_name(mut p, "after 'fn'")?
+    if with_body && peek(p, 0).kind == lexer.Kind.Dot {
+        advance(mut p)
+        let method = expect_name(mut p, "after the receiver type and '.'")?
+        name.text = name.text + "." + method.text
+    }
     let type_params = type_params(mut p, name.text)?
     expect(mut p, lexer.Kind.LParen, "after the function name")?
     let mut params: [ast.Param] = []
@@ -368,7 +377,8 @@ fn fn_decl(p: mut Parser) -> Result[ast.FnDecl, errors.CompileError] {
             push(mut ensures, cond)
         }
     }
-    let body = block(mut p, "to start the body of '" + name.text + "'")?
+    let mut body = ast.Block { stmts: [], end_line: name.line, end_col: name.col }
+    if with_body { body = block(mut p, "to start the body of '" + name.text + "'")? }
     return Ok(ast.FnDecl {
         name: name.text, type_params: type_params, params: params, result: result, effects: effects, effects_line: effects_line,
         effects_col: effects_col, requires: requires, ensures: ensures, body: body, line: name.line, col: name.col,
@@ -383,8 +393,31 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
     expect(mut p, lexer.Kind.Eq, "after 'type " + name.text + "'")?
     let kind = peek(p, 0)
     let mut decl = ast.TypeDecl {
-        name: name.text, params: params, is_struct: true, fields: [], variants: [], line: name.line, col: name.col,
+        name: name.text, params: params, is_struct: true, is_interface: false, parents: [], methods: [], fields: [], variants: [], line: name.line, col: name.col,
         public: false,
+    }
+    if kind.kind == lexer.Kind.Ident && kind.text == "interface" {
+        advance(mut p)
+        decl.is_struct = false
+        decl.is_interface = true
+        if peek(p, 0).kind == lexer.Kind.Colon {
+            advance(mut p)
+            for {
+                push(mut decl.parents, bound_name(mut p)?)
+                if peek(p, 0).kind != lexer.Kind.Plus { break }
+                advance(mut p)
+            }
+        }
+        expect(mut p, lexer.Kind.LBrace, "after 'interface'")?
+        for peek(p, 0).kind != lexer.Kind.RBrace {
+            list_not_ended(p, "interface")?
+            expect(mut p, lexer.Kind.Fn, "for an interface method")?
+            p.i = p.i - 1
+            push(mut decl.methods, fn_decl_in(mut p, false)?)
+            list_separator(mut p, "interface")?
+        }
+        advance(mut p)
+        return Ok(decl)
     }
     if kind.kind == lexer.Kind.Ident && kind.text == "struct" {
         advance(mut p)
@@ -412,7 +445,7 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
         advance(mut p)
         return Ok(decl)
     }
-    return Err(error(kind, "E2011", "expected 'struct' or 'enum' after 'type " + name.text + " ='" + found(kind)))
+    return Err(error(kind, "E2011", "expected 'struct', 'enum' or 'interface' after 'type " + name.text + " ='" + found(kind)))
 }
 
 // Skip the line end before `uses`, `requires` or `ensures` on a line of its
@@ -441,8 +474,7 @@ fn type_params(p: mut Parser, owner: Str) -> Result[[ast.TypeParam], errors.Comp
         if peek(p, 0).kind == lexer.Kind.Colon {
             advance(mut p)
             for {
-                let b = expect_name(mut p, "for a bound of '" + name.text + "' (Eq, Ord or Key)")?
-                push(mut bounds, b.text)
+                push(mut bounds, bound_name(mut p)?)
                 if peek(p, 0).kind != lexer.Kind.Plus {
                     break
                 }
@@ -457,6 +489,16 @@ fn type_params(p: mut Parser, owner: Str) -> Result[[ast.TypeParam], errors.Comp
     }
     expect(mut p, lexer.Kind.RBracket, "after the type parameters of '" + owner + "'")?
     return Ok(out)
+}
+
+fn bound_name(p: mut Parser) -> Result[Str, errors.CompileError] {
+    let first = expect_name(mut p, "for an interface bound")?
+    let mut name = first.text
+    if peek(p, 0).kind == lexer.Kind.Dot {
+        advance(mut p)
+        name = name + "." + expect_name(mut p, "after the module name in an interface bound")?.text
+    }
+    return Ok(name)
 }
 
 fn variant_decl(p: mut Parser) -> Result[ast.VariantDecl, errors.CompileError] {

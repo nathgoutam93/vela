@@ -1,0 +1,78 @@
+// out: record:2
+// out: record:2
+// out: record:2
+// out: 20
+// out: true
+// out: true
+// out: 1
+// out: 2
+// out: 2
+// out: kept
+// out: true
+// out: 9
+// out: 1
+// out: true
+// out: true
+// out: -1
+import lists
+import maps
+import ints
+
+pub type Show = interface { fn show(value: Self) -> Str }
+pub type Scored = interface: Show { fn score(value: Self) -> Int }
+pub type Copies = interface { fn copies(value: Self) -> [Self] }
+pub type Record = struct { id: Int, text: Str }
+
+pub fn Record.show(value: Record) -> Str { return "record:" + ints.to_str(value.id) }
+pub fn Record.score(value: Record) -> Int { return value.id * 10 }
+pub fn Record.copies(value: Record) -> [Record] { return [value, value] }
+pub fn Record.eq(a: Record, b: Record) -> Bool { return a.id == b.id }
+pub fn Record.compare(a: Record, b: Record) -> Int {
+    if a.id < b.id { return -1 }
+    if a.id > b.id { return 1 }
+    return 0
+}
+// Deliberately collide: equality must distinguish keys and preserve the first key.
+pub fn Record.hash(value: Record) -> u64 { return 0xffff_ffff_ffff_ffffu64 }
+
+pub type Box[T] = struct { value: T }
+pub fn Box.eq[T: Eq](a: Box[T], b: Box[T]) -> Bool { return a.value.eq(b.value) }
+pub fn Box.hash[T: Key](value: Box[T]) -> u64 { return value.value.hash() }
+
+fn render[T: Show](value: T) -> Str { return value.show() }
+fn points[T: Scored](value: T) -> Int { return value.score() }
+fn copy_count[T: Copies](value: T) -> Int { return len(value.copies()) }
+
+fn main() {
+    let a = Record { id: 2, text: "kept" }
+    let b = Record { id: 1, text: "one" }
+    let equal = Record { id: 2, text: "different" }
+    print(a.show())
+    print(Record.show(a))
+    print(render(a))
+    print(points(a))
+    print(a == equal)
+    print(a != b)
+    let sorted = lists.sort([a, b, equal])
+    print(sorted[0].id)
+    print(len(lists.unique(sorted)))
+    print(copy_count(a))
+    let mut values: Map[Record, Int] = [:]
+    values[a] = 1
+    values[b] = 2
+    let saved = values
+    values[equal] = 9
+    for key in maps.keys(values) { if key == a { print(key.text) } }
+    print(maps.has(values, equal))
+    print(values[a])
+    print(saved[a])
+    maps.remove(mut values, b)
+    assert(!maps.has(values, b) && maps.has(saved, b))
+    let mut generic: Map[Box[Record], Int] = [:]
+    generic[Box { value: a }] = 7
+    print(generic[Box { value: equal }] == 7)
+    let mut unsigned: Map[Box[u64], Int] = [:]
+    unsigned[Box { value: 18446744073709551615u64 }] = 3
+    print(unsigned[Box { value: 18446744073709551615u64 }] == 3)
+    print(3.compare(5))
+}

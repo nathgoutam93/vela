@@ -1,0 +1,126 @@
+{
+  "machine": {
+    "cpu": "arm",
+    "cores": 8,
+    "os": "Darwin arm64",
+    "gcc": "Apple clang version 17.0.0 (clang-1700.3.19.1)",
+    "rustc": "",
+    "commit": "a34cb51",
+    "date": "2026-10-24"
+  },
+  "runs": 7,
+  "quick": false,
+  "results": {
+    "sha256": {
+      "c": {
+        "build": 0.121,
+        "size": 33896,
+        "best": 0.237,
+        "median": 0.2374
+      },
+      "vela": {
+        "build": 0.272,
+        "size": 95736,
+        "best": 0.2486,
+        "median": 0.2489
+      }
+    },
+    "crc32": {
+      "c": {
+        "build": 0.101,
+        "size": 33768,
+        "best": 0.5569,
+        "median": 0.5574
+      },
+      "vela": {
+        "build": 0.222,
+        "size": 95368,
+        "best": 0.5073,
+        "median": 0.5093
+      }
+    }
+  },
+  "compiler": {
+    "vela": {
+      "check": 0.14472683297935873,
+      "c": 0.3511205830145627
+    }
+  },
+  "sizes": {
+    "sha256": [
+      "1048576",
+      "32"
+    ],
+    "crc32": [
+      "4194304",
+      "32"
+    ]
+  },
+  "build_identity": {
+    "baseline_commit": "a34cb51",
+    "dirty_worktree": true,
+    "note": "M20 measured before commit; fingerprints identify the compiler and sources.",
+    "compiler_sha256": "8a7fe2911f7b8e34c76a480d2bed96fa4a3e273dd87f22444c644f9fb11f89c1",
+    "source_sha256": {
+      "bench/crc32/crc32.vl": "940fa4bc09d8d34ab68ac3fe6df50e70981cbec778b472d827deb62b1f558e57",
+      "bench/crc32/main.c": "64bf516e5d8779b1eedc2e1f021988e1b1e1c3fe342c856911728fa3b4ab62db",
+      "bench/crc32/main.rs": "74a089aa854974eeaf33918a7219fbbd26a9db4b4d45e809df8285b07de8887f",
+      "bench/crc32/main.vl": "659c723a12dbaaf51a65f34d887ec4c65db0596c79af9fbc001b2b82cf535dc5",
+      "bench/run.py": "09ce0bf37a744a17992bd669b2f0d6bd69f124ed34d5f17d75869f181644e0a0",
+      "bench/sha256/main.c": "1b870bbf6256a16fe2288cc52d03ca3165d91796982d670eafaa3237866bd436",
+      "bench/sha256/main.rs": "42ba06a4758adff7ec42a7db64a4dd10dbc8ced5cb4cdf61774dee852bfd7ae4",
+      "bench/sha256/main.vl": "4e2e40e32af28142fd28a32eaabee00c3ec7f209a5ec3e4b26b87e1392c66858",
+      "bench/sha256/sha256.vl": "b6c34fef785be9a10097bf16a3b265b3dfc9a899dd9b33a7a511bf301429fcd3",
+      "bootstrap/vela1.c": "6170c75f69f8e0e37f363db8d6f34e00202dbcff3acfc452511ef8b57cbd363b",
+      "runtime/vela_int.h": "e600cfd5cab132401aba9e03b5e4a3c45995c33cbbab7f8b581739a258d74059",
+      "runtime/vela_rt.c": "2fc8334933ee27b4423791e21ae414869720a2d2cf2023f01005a795a1a673d5",
+      "runtime/vela_rt.h": "7c7bab605943ebb85be2ddf474a54f4cb4b3972d966177fc358f0c917b706c85",
+      "stage1/ast.vl": "6cdc294fa68b74c11b9ccb13de22fe5f11a18e1e9bf412da5bbc8319a9c571a7",
+      "stage1/chars.vl": "c42a95f8a5cb41d535981094761ccd447db7eb643ba40a8449b3504e7e7652d9",
+      "stage1/checker.vl": "7f99a39ed5734d599d7d03a5d671afc54bb49a9ed35c849bbb7e92edbfe1ab5b",
+      "stage1/codegen.vl": "bfdcf2c1dabf947f7a31a6b4843ce77f965258a22ab853873e960416363e5ae2",
+      "stage1/complete.vl": "80de3888037515820d64c84c042e2f5e854d289113a7197fdb9a473ca1929d7c",
+      "stage1/diagnostics.vl": "3d30fa23a0f23ab7167f943363e176bdbc79711ebf9910092fa6434dc9f29b2e",
+      "stage1/errors.vl": "2a31eea563f9ea1b591e700955c82c1ee887bd24b4797bb7c9eb3d5d733a8e27",
+      "stage1/fixer.vl": "7370240f796cc19c3e6b38f0e03dc66061d0e6343154f29b31e7a7d9ac87a2a8",
+      "stage1/format.vl": "d8a7a58a851aa909e1e7818a8850888c11998c25c8eee56915cad77c93b5baf0",
+      "stage1/guide.vl": "0f5f77a8309a523e11a572d5eea006aade4364cc838e688452b5ad3f5189b37f",
+      "stage1/index.vl": "0f3c5add100152698396cda20203d5a038a73360551d16a3e50806411c6665b2",
+      "stage1/integers.vl": "8a580cd712b592475ea30bb4fd06ce61dc033c1183ebb77cad55a7b5b9865012",
+      "stage1/interfaces.vl": "990c820ed20895079cc23b0a926d935f32844d30919da49fb91d8f8875af110f",
+      "stage1/ir.vl": "f7b96c8c2fb167c77411a8133585fa217a3e63d254d075b165b17d16d79e08ca",
+      "stage1/layout.vl": "7009b7f6ca6b117037ce2302513df23bb038e16771df012dfaec141d82fd762c",
+      "stage1/lexer.vl": "b253ef64ffe1a5e5f8466e666c8379010eba177c28d2a619d7a6d666ebfcc2e3",
+      "stage1/lower.vl": "1133b2e3a3c792c9869a019030a3b0a0c356c026e9e2aa4587f5a01cad03731d",
+      "stage1/lsp.vl": "4c5d880e580b92557dfffcd9eabf6fccc7c3d78130b83148e58c42ef1b1d5ead",
+      "stage1/main.vl": "bc10bc11f04c8c7121ef9a049ab14788a686bc7811fa3c872109eea21a93ebf6",
+      "stage1/match_check.vl": "e91be1b1bf88c868bba3b5c986d66834688dc1f626922357d594d781ba4bc8b5",
+      "stage1/modules.vl": "517e45dbd34dd3675d04e72d0ecbe77f1ea637ce761fbbf9deeefd3eb59f7dfd",
+      "stage1/mono.vl": "62c4936734545428605f9c82d8d34a5eb5c1696eca553378f182f8b091814468",
+      "stage1/opt.vl": "f4627b4006e9ec856e5983226c9d6c2c0d18e5cbbc29fbdb1dca25c4eff7ce6b",
+      "stage1/packages.vl": "19078c587f5e3843c14cd1b518134798b9b20a834cef8b83daf026d6bb23074f",
+      "stage1/parser.vl": "517e124483f8540e942bee6bb41ccf7486390f41d86c34d66c9d155fe6fa9d2a",
+      "stage1/query.vl": "87a8253057b331fc292d24c1278e176e0a28fb99a4b2ff773b80fb719c32d145",
+      "stage1/ranges.vl": "79ee75453e095ab856d5e269aa203669567ae296064de1811918ec54e319248f",
+      "stage1/rename.vl": "97c6492de8603c0bc85d44c35740c19368915cf351bfaad9e2129deab48a6c6b",
+      "stage1/repairs.vl": "5c2d697e1a7d7056ed8e8dbf3890985390d089ffc5f49ee9f26b603dea214958",
+      "stage1/types.vl": "6eceffb9b27f5297cff5065bc1212cafb3a6dd8457f13f66e008c4fb4f5c8b73",
+      "stage1/x64.vl": "ece00db5f6610bae19eaf79971b859a56030d9d2162002efb830e9a77c93147a",
+      "std/bytes.vl": "2a893336976e500559bd2684d211454bb70226423e53c6f9550911988510d6cc",
+      "std/lists.vl": "dfbc5cf2b06d0b26af0e6e312da5024fb0dd8bba774df005d592712f47996f59",
+      "std/text.vl": "8e3fcd808bfd5d8f8e4f0028e0043850a85173b50c78aaf3d4410e1df0f95bfa"
+    }
+  },
+  "acceptance": {
+    "sha256": {
+      "vela_over_c": 1.0489451476793248,
+      "limit": 1.2,
+      "passed": true
+    },
+    "crc32": {
+      "vela_over_c": 0.910935536002873,
+      "limit": 1.2,
+      "passed": true
+    }
+  }
+}

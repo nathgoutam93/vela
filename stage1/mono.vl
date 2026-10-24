@@ -64,9 +64,33 @@ pub fn collect(k: mut checker.Checked, roots: [Int]) -> Collected {
         walk_fn(mut w, Instance { fn_id: id, args: [] })
     }
     let mut i = 0
-    for i < len(w.queue) {
-        walk_fn(mut w, w.queue[i])
-        i = i + 1
+    let mut scanned: Map[Int, Bool] = [:]
+    for {
+        for i < len(w.queue) {
+            walk_fn(mut w, w.queue[i])
+            i = i + 1
+        }
+        let mut added = false
+        let maps_used = w.k.table.maps
+        for j in 0..len(maps_used) {
+            if j % 2 != 0 { continue }
+            let t = maps_used[j]
+            if types.is_open(w.k.table, t) || maps.has(scanned, t) { continue }
+            scanned[t] = true
+            for name in ["hash", "eq"] {
+                let dispatch = checker.method(w.k, t, name)
+                if dispatch.fn_id < 0 || len(dispatch.args) == 0 { continue }
+                let key = key(dispatch.fn_id, dispatch.args)
+                if !maps.has(w.out.index, key) {
+                    w.out.index[key] = len(w.out.instances)
+                    let inst = Instance { fn_id: dispatch.fn_id, args: dispatch.args }
+                    push(mut w.out.instances, inst)
+                    push(mut w.queue, inst)
+                    added = true
+                }
+            }
+        }
+        if !added { break }
     }
     k.table = w.k.table
     return w.out
@@ -195,11 +219,23 @@ fn exprs(w: mut Walk, es: [ast.Expr]) {
 fn expr(w: mut Walk, e: ast.Expr) {
     sub(mut w, w.k.ty[e.id])
     local_ref(mut w, e.id)
-    match w.k.refs[e.id] {
+    let mut target = w.k.refs[e.id]
+    let mut call_args = w.k.targs[e.id]
+    match target {
+        checker.Ref.Method(t, name) => {
+            let dispatch = checker.method(w.k, sub(mut w, t), name)
+            if dispatch.fn_id >= 0 {
+                target = checker.Ref.Function(dispatch.fn_id)
+                if len(call_args) != len(w.k.fns[dispatch.fn_id].type_params) { call_args = dispatch.args }
+            }
+        }
+        _ => {}
+    }
+    match target {
         checker.Ref.Function(id) => {
             if len(w.k.fns[id].type_params) > 0 {
                 let mut args: [Int] = []
-                for t in w.k.targs[e.id] {
+                for t in call_args {
                     push(mut args, sub(mut w, t))
                 }
                 let mut deepest = 0
