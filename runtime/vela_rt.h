@@ -198,6 +198,8 @@ vela_str vela_str_concat(vela_str a, vela_str b);
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc);
 uint8_t vela_str_at(vela_str s, int64_t i, const char *loc);
 bool vela_str_eq(vela_str a, vela_str b);
+bool vela_str_eq_ptr(const vela_str *a, const vela_str *b);
+int vela_str_cmp_ptr(const vela_str *a, const vela_str *b);
 
 // s[i] for generated C, inline (M16b).
 static inline uint8_t vela_byte_at(vela_str s, int64_t i, const char *loc) {
@@ -651,6 +653,8 @@ void vela_coverage_begin(int argc, char **argv, int64_t count);
 void vela_coverage_hit(int64_t id);
 void vela_native_rc_inc(int64_t *rc);
 bool vela_native_rc_dec(int64_t *rc);
+void *vela_native_box_alloc(int64_t size);
+void vela_native_box_free(void *p, int64_t size);
 
 #include "vela_int.h"
 

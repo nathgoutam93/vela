@@ -58,9 +58,20 @@ pub type Op = enum {
     FMul
     FDiv
     FNeg
+    FSqrt
     FTo32  // double register to raw binary32 low bits (C ABI)
     FFrom32  // raw binary32 low bits to a double register
     IntToFloat
+    And
+    Or
+    Xor
+    Inv
+    Shl
+    Shr
+    Sar
+    Extend  // canonical low imm bits; imm2: signed
+    Div  // proved nonzero positive divisor
+    Rem
     Sext32  // dst = the low 32 bits of a, sign-extended: a C int argument
     Jump  // to label imm
     Branch  // to label imm if a != 0, else to label imm2
@@ -224,6 +235,14 @@ fn reads_b(op: Op) -> Bool {
         Op.Store => true
         Op.FStore => true
         Op.Copy => true
+        Op.And => true
+        Op.Or => true
+        Op.Xor => true
+        Op.Shl => true
+        Op.Shr => true
+        Op.Sar => true
+        Op.Div => true
+        Op.Rem => true
         Op.Add => true
         Op.Sub => true
         Op.Mul => true
@@ -282,7 +301,18 @@ pub fn op_name(op: Op) -> Str {
         Op.FTo32 => "fto32"
         Op.FFrom32 => "ffrom32"
         Op.FNeg => "fneg"
+        Op.FSqrt => "fsqrt"
         Op.IntToFloat => "itof"
+        Op.And => "and"
+        Op.Or => "or"
+        Op.Xor => "xor"
+        Op.Inv => "inv"
+        Op.Shl => "shl"
+        Op.Shr => "shr"
+        Op.Sar => "sar"
+        Op.Extend => "extend"
+        Op.Div => "div"
+        Op.Rem => "rem"
         Op.Sext32 => "sext32"
         Op.Jump => "jump"
         Op.Branch => "branch"

@@ -28,8 +28,10 @@ import errors
 import integers
 import ir
 import layout
+import loops
 import maps
 import mono
+import ranges
 import strings
 import types
 
@@ -87,6 +89,7 @@ type Shape = struct {
 }
 
 // What is being written now: a function, or a closure inside one.
+type Cached = struct { data: Int, length: Int }
 type Fn = struct {
     f: ir.Func
     filename: Str
@@ -101,6 +104,9 @@ type Fn = struct {
     frames: [Frame]
     dead: Bool  // right after a return, break or continue
     sret: Int  // the register with where the result goes, when it is in memory; -1 otherwise
+    env: ranges.Env
+    hoisted: Map[Int, Bool]
+    cached: Map[Int, Cached]
     taken: Map[Int, Bool]  // locals whose address is taken: they live in memory
 }
 
@@ -117,12 +123,14 @@ type Low = struct {
     made: Map[Str, Bool]  // functions written on demand (wrappers, thunks), by symbol
     descs: Map[Int, Str]  // descriptors written, by type
     coverage: Bool
+    param_ranges: [[ranges.Range]]
+    envs: Map[Int, ranges.Env]
 }
 
 fn new_fn(name: Str, result: Int) -> Fn {
     return Fn {
         f: ir.new_func(name, result), filename: "", current_fn: -1, params: [], args: [], cname: name, locals: [:],
-        captures: [:], closure_result: -2, closures: 0, frames: [], dead: false, sret: -1, taken: [:],
+        captures: [:], closure_result: -2, closures: 0, frames: [], dead: false, sret: -1, taken: [:], env: ranges.new_env([]), hoisted: [:], cached: [:],
     }
 }
 
@@ -170,7 +178,7 @@ fn lower_mode(checked: checker.Checked, for_tests: Bool, coverage: Bool) -> Resu
     let l = layout.new_layout(k.table, user_types, elements)
     let mut g = Low {
         k: k, l: l, shapes: [:], instance_names: [:], fs: new_fn("", -1), funcs: [], data: [], strs: [:], cstrs: [:],
-        made: [:], descs: [:], coverage: coverage,
+        made: [:], descs: [:], coverage: coverage, param_ranges: ranges.analyze(k), envs: [:],
     }
     // The copies of generic functions are named as codegen.vl names them.
     let mut taken: Map[Str, Bool] = [:]
@@ -658,8 +666,7 @@ fn scalar(g: mut Low, v: Val) -> Int {
     }
     let r = load(mut g, v.reg, v.off, scalar_size(v.ty))
     if v.ty >= 8 && v.ty <= 12 {
-        return ccall(mut g, "vela_fixed_load", [r, konst(mut g, types.integer_width(v.ty)), konst(mut g, fixed_sign(v.ty))],
-            [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+        return normalize(mut g, r, v.ty)
     }
     return r
 }
@@ -1121,7 +1128,16 @@ fn memory_functions(g: mut Low) {
         let size = size_of(mut g, t)
         // new: a box holding a copy of the value at the pointer.
         let v = helper(mut g, b + "_new", 1, ir.INT())[0]
-        let box = ccall(mut g, "vela_alloc", [konst(mut g, 8 + size)], [ir.KIND_INT()], ir.RET_INT(), -1)
+        let ti = types.get(g.k.table, t)
+        if ti.tag == types.Tag.Enum {
+            for vi in 0..len(ti.variants) { if len(ti.variants[vi].payload) == 0 {
+                let next = label(mut g); branch_cmp(mut g, "ne", load(mut g, v, 0, 4), konst(mut g, vi), next)
+                let name = ".Lempty_" + b + "_" + strings.from_int(vi)
+                push(mut g.data, ir.Data { label: name, lines: [".quad 0", ".long " + strings.from_int(vi), ".zero " + strings.from_int(size - 4)], relocated: false })
+                ret(mut g, sym_addr(mut g, name)); place_label(mut g, next)
+            } }
+        }
+        let box = ccall(mut g, "vela_native_box_alloc", [konst(mut g, 8 + size)], [ir.KIND_INT()], ir.RET_INT(), -1)
         store(mut g, box, 0, 8, konst(mut g, 1))
         copy_mem(mut g, add_imm(mut g, box, 8), v, size)
         ret(mut g, box)
@@ -1133,7 +1149,7 @@ fn memory_functions(g: mut Low) {
         let done = label(mut g)
         branch_cmp(mut g, "eq", last, konst(mut g, 0), done)
         release(mut g, t, mem_val(r, 8, t))
-        ccall(mut g, "free", [r], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        ccall(mut g, "vela_native_box_free", [r, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
         place_label(mut g, done)
         ret(mut g, -1)
         finish(mut g)
@@ -1350,6 +1366,8 @@ fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
     g.fs = new_fn(name, -1)
     g.fs.filename = g.k.modules[f.module].path
     g.fs.current_fn = id
+    if !maps.has(g.envs, id) { g.envs[id] = ranges.native_env(g.k, g.param_ranges, id) }
+    g.fs.env = g.envs[id]
     g.fs.params = params
     g.fs.args = args
     let mut taken: Map[Int, Bool] = [:]
@@ -1482,13 +1500,18 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
         ast.StmtKind.ExprStmt(e) => {
             expr(mut g, e)
         }
-        ast.StmtKind.Let(_, _, _, v) => {
+        ast.StmtKind.Let(_, mutable, _, v) => {
+            let id = local_of(g, s.id)
+            if !mutable && in_memory(g, ty(g, v)) && stable_path(g, v) && !maps.has(g.fs.taken, id) {
+                bind_borrowed(mut g, id, borrowed_path(mut g, v)); return
+            }
             let c = consume(mut g, expr(mut g, v))
-            declare(mut g, local_of(g, s.id), c)
+            declare(mut g, id, c)
         }
         ast.StmtKind.Assign(target, v) => assign(mut g, target, v)
         ast.StmtKind.If(cond, then, otherwise) => if_stmt(mut g, cond, then, otherwise)
         ast.StmtKind.For(cond, body) => {
+            let hoisted = g.fs.hoisted; let cached = g.fs.cached; hoist_unique(mut g, s)
             let head = label(mut g)
             let exit = label(mut g)
             place_label(mut g, head)
@@ -1520,6 +1543,7 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
             }
             place_label(mut g, exit)
             g.fs.dead = false
+            g.fs.hoisted = hoisted; g.fs.cached = cached
             // `for { ... }` with no break ends only by return: no code after it.
             match cond {
                 None => g.fs.dead = !g.k.breaks[s.id]
@@ -1530,6 +1554,7 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
             let from = scalar(mut g, expr(mut g, start))
             // The range is fixed when the loop starts.
             let to = fresh(mut g, reg_val(scalar(mut g, expr(mut g, end)), types.INT())).reg
+            let hoisted = g.fs.hoisted; let cached = g.fs.cached; hoist_unique(mut g, s)
             let i = reg(mut g, ir.INT())
             emit(mut g, ir.inst(ir.Op.Move, i, from, -1, 0))
             let head = label(mut g)
@@ -1548,6 +1573,7 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
             jump(mut g, head)
             place_label(mut g, exit)
             g.fs.dead = false
+            g.fs.hoisted = hoisted; g.fs.cached = cached
         }
         ast.StmtKind.ForEach(_, iterable, body) => for_each(mut g, s, iterable, body)
         ast.StmtKind.Break => {
@@ -1663,6 +1689,7 @@ fn if_stmt(g: mut Low, cond: ast.Expr, then: ast.Block, otherwise: ast.Else) {
 
 // `for x in xs`: the loop keeps its own reference to xs.
 fn for_each(g: mut Low, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
+    let hoisted = g.fs.hoisted; let cached = g.fs.cached; hoist_unique(mut g, s)
     let t = ty(g, iterable)
     let c = consume(mut g, expr(mut g, iterable))
     let it = own(mut g, fresh(mut g, c))  // released when the for statement ends
@@ -1671,29 +1698,27 @@ fn for_each(g: mut Low, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
     let head = label(mut g)
     let latch = label(mut g)
     let exit = label(mut g)
-    place_label(mut g, head)
-    let mut length = -1
+    let mut length = -1; let mut data = -1
     if types.is_fixed(g.k.table, t) {
-        length = konst(mut g, types.get(g.k.table, t).length)
+        length = konst(mut g, types.get(g.k.table, t).length); data = address(mut g, it)
     } else if t == types.STR() {
-        length = load(mut g, it.reg, it.off + 16, 8)
+        length = load(mut g, it.reg, it.off + 16, 8); data = load(mut g, it.reg, it.off + 8, 8)
     } else {
-        length = load(mut g, scalar(mut g, it), 8, 8)
+        let array = scalar(mut g, it); length = load(mut g, array, 8, 8); data = load(mut g, array, 32, 8)
     }
+    place_label(mut g, head)
     branch_cmp(mut g, "ge", i, length, exit)
     push_loop(mut g, exit, latch)
     let lid = local_of(g, s.id)
     if t == types.STR() {
-        let data = load(mut g, it.reg, it.off + 8, 8)
         let b = load(mut g, op2(mut g, ir.Op.Add, data, i), 0, 1)
         declare(mut g, lid, reg_val(b, types.BYTE()))
     } else {
         let et = local_ty(g, lid)
-        let mut data = -1
-        if types.is_fixed(g.k.table, t) { data = address(mut g, it) } else { data = load(mut g, scalar(mut g, it), 32, 8) }
         let at = op2(mut g, ir.Op.Add, data, mul_imm(mut g, i, size_of(mut g, et)))
-        let p = declare(mut g, lid, mem_val(at, 0, et))
-        retain(mut g, et, p)
+        // The iterator owns its immutable snapshot throughout the body. The
+        // element borrows from that anchor; only consumers that keep it retain.
+        if !maps.has(g.fs.taken, lid) { bind_borrowed(mut g, lid, mem_val(at, 0, et)) } else { let p = declare(mut g, lid, mem_val(at, 0, et)); retain(mut g, et, p) }
     }
     for inner in body.stmts {
         stmt(mut g, inner)
@@ -1704,6 +1729,7 @@ fn for_each(g: mut Low, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
     jump(mut g, head)
     place_label(mut g, exit)
     g.fs.dead = false
+    g.fs.hoisted = hoisted; g.fs.cached = cached
 }
 
 fn mul_imm(g: mut Low, a: Int, n: Int) -> Int {
@@ -1761,9 +1787,9 @@ fn assign(g: mut Low, target: ast.Expr, v: ast.Expr) {
                     ir.RET_NONE(), -1)
             } else {
                 let index = scalar(mut g, expr(mut g, i))
-                let va = element_copy(mut g, c)
-                ccall(mut g, "vela_array_set", [scalar(mut g, container), index, va, loc_of(mut g, target)],
-                    [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+                let member = mem_val(element_at(mut g, scalar(mut g, container), index, ty(g, target), target), 0, ty(g, target))
+                release(mut g, member.ty, member)
+                put_place(mut g, member, c)
             }
         }
         _ => {}
@@ -1788,6 +1814,16 @@ fn element_copy(g: mut Low, v: Val) -> Int {
     return s.reg
 }
 
+// The C backend's known-size push fast path. Freeze the element before
+// growth: a mut parameter can alias an element of the array being grown.
+fn array_push(g: mut Low, array: Int, value: Val) {
+    let at = element_copy(mut g, value); let length = load(mut g, array, 8, 8); let room = label(mut g)
+    branch_cmp(mut g, "ne", length, load(mut g, array, 16, 8), room)
+    ccall(mut g, "vela_array_grow", [array], [ir.KIND_INT()], ir.RET_NONE(), -1); place_label(mut g, room)
+    let element = op2(mut g, ir.Op.Add, load(mut g, array, 32, 8), mul_imm(mut g, length, size_of(mut g, value.ty)))
+    copy_mem(mut g, element, at, size_of(mut g, value.ty)); store(mut g, array, 8, 8, add_imm(mut g, length, 1))
+}
+
 // A field of the value at `base`: the field itself, or the value in its box.
 fn field_place(g: mut Low, base: Val, owner: Int, field: Str) -> Val {
     let fi = types.field_index(g.k.table, owner, field)
@@ -1804,10 +1840,33 @@ fn field_value(g: mut Low, base: Val, owner: Int, field: Str) -> Val {
     return member
 }
 
+fn hoist_unique(g: mut Low, loop: ast.Stmt) {
+    let u = loops.analyze(g.k, loop); let mut grows: Map[Int, Bool] = [:]; for id in u.grows { grows[id] = true }
+    for id in u.writes {
+        if id < 0 || maps.has(u.shared, id) || !maps.has(g.fs.locals, id) || maps.has(g.fs.captures, id) || maps.has(g.fs.hoisted, id) { continue }
+        let t = local_ty(g, id)
+        if !is_array_like(g, t) && !types.is_map(g.k.table, t) { continue }
+        let p = g.fs.locals[id]
+        let mut kind = "array"; if types.is_map(g.k.table, t) { kind = "map" }
+        let pointer = address(mut g, in_memory_copy(mut g, p))
+        // For a scalar local, uniqueness writes through a temporary and is
+        // copied back. Mut parameters already reside at their caller's place.
+        ccall(mut g, "vela_" + kind + "_unique", [pointer], [ir.KIND_INT()], ir.RET_NONE(), -1)
+        if !p.mem { emit(mut g, ir.inst(ir.Op.Move, p.reg, load(mut g, pointer, 0, 8), -1, 0)) }
+        g.fs.hoisted[id] = true
+        if types.is_array(g.k.table, t) && !maps.has(grows, id) { let a = scalar(mut g, p); g.fs.cached[id] = Cached { data: load(mut g, a, 32, 8), length: load(mut g, a, 8, 8) } }
+    }
+}
+fn array_parts(g: mut Low, a: Int, e: ast.Expr) -> Cached {
+    match e.kind { ast.ExprKind.Index(obj, _) => { let id = local_of(g, obj.id); match maps.get(g.fs.cached, id) { Some(c) => return c, None => {} } }, _ => {} }
+    return Cached { data: load(mut g, a, 32, 8), length: load(mut g, a, 8, 8) }
+}
+
 // An array or map about to change, made unique first (copy-on-write).
 fn writable(g: mut Low, e: ast.Expr) -> Val {
     let p = place(mut g, e)
     if types.is_fixed(g.k.table, ty(g, e)) { return p }
+    let id = local_of(g, e.id); if id >= 0 && maps.has(g.fs.hoisted, id) { return p }
     let mut kind = "array"
     if types.is_map(g.k.table, ty(g, e)) {
         kind = "map"
@@ -1864,11 +1923,14 @@ fn place(g: mut Low, e: ast.Expr) -> Val {
 // The address of element `i` of the array `a`, after checking the index:
 // out of range, vela_array_at panics as it does for C.
 fn element_at(g: mut Low, a: Int, i: Int, et: Int, e: ast.Expr) -> Int {
+    let parts = array_parts(mut g, a, e)
     let ok = label(mut g)
-    branch_cmp(mut g, "ult", i, load(mut g, a, 8, 8), ok)
-    noreturn(mut g, "vela_array_at", [a, i, loc_of(mut g, e)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()])
-    place_label(mut g, ok)
-    let data = load(mut g, a, 32, 8)
+    if !access_safe(g, e) {
+        branch_cmp(mut g, "ult", i, parts.length, ok)
+        noreturn(mut g, "vela_array_at", [a, i, loc_of(mut g, e)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()])
+        place_label(mut g, ok)
+    }
+    let data = parts.data
     return op2(mut g, ir.Op.Add, data, mul_imm(mut g, i, size_of(mut g, et)))
 }
 
@@ -1880,6 +1942,7 @@ fn element_at(g: mut Low, a: Int, i: Int, et: Int, e: ast.Expr) -> Int {
 fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
     let v = expr(mut g, scrutinee)
     let t = ty(g, scrutinee)
+    let borrowed = unchanging(g, scrutinee)
     let end = label(mut g)
     let mut all_end = true  // every arm returns, breaks or continues
     for i in 0..len(arms) {
@@ -1893,9 +1956,15 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
         }
         push_frame(mut g, "arm")
         for bound in bindings(mut g, a.pattern, v, t) {
-            // A binding is a copy of part of the value: it gets a reference of its own.
-            let p = declare(mut g, bound.local, bound.path)
-            retain(mut g, local_ty(g, bound.local), p)
+            if borrowed && !maps.has(g.fs.taken, bound.local) {
+                // Immutable scrutinees stay alive throughout the arm. A
+                // binding only needs a new reference when something keeps it.
+                let bt = local_ty(g, bound.local)
+                if in_memory(g, bt) { g.fs.locals[bound.local] = bound.path } else { let p = local_place(mut g, bound.local); put_place(mut g, p, bound.path) }
+            } else {
+                let p = declare(mut g, bound.local, bound.path)
+                retain(mut g, local_ty(g, bound.local), p)
+            }
         }
         if result.reg < 0 {
             match a.body {
@@ -1936,6 +2005,47 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
     g.fs.dead = all_end
 }
 
+fn unchanging(g: Low, e: ast.Expr) -> Bool {
+    match e.kind { ast.ExprKind.Name(_) => {
+        let id = local_of(g, e.id); if id < 0 || maps.has(g.k.escaped, id) { return false }
+        let kind = g.k.locals[id].kind
+        return kind == "parameter" || kind == "let" || kind == "loop variable" || kind == "match binding"
+    }, _ => return false }
+}
+
+fn stable_path(g: Low, e: ast.Expr) -> Bool {
+    if loops.escaped(g.k, e) { return false }
+    match g.k.refs[e.id] { checker.Ref.Function(_) => return false, checker.Ref.Variant(_, _) => return false, _ => {} }
+    match e.kind {
+        ast.ExprKind.Name(_) => return unchanging(g, e)
+        ast.ExprKind.Field(x, _) => return stable_path(g, x)
+        ast.ExprKind.Index(x, _) => return stable_path(g, x)
+        _ => return false
+    }
+}
+
+fn bind_borrowed(g: mut Low, id: Int, value: Val) {
+    let mut v = value; v.temp = false; v.owned = false
+    if in_memory(g, v.ty) { g.fs.locals[id] = v } else { let p = local_place(mut g, id); put_place(mut g, p, v) }
+}
+
+fn borrowed_path(g: mut Low, e: ast.Expr) -> Val {
+    match e.kind {
+        ast.ExprKind.Name(_) => return local(mut g, local_of(g, e.id))
+        ast.ExprKind.Field(obj, name) => return field_value(mut g, borrowed_path(mut g, obj), ty(g, obj), name)
+        ast.ExprKind.Index(obj, i) => {
+            let o = borrowed_path(mut g, obj); let t = ty(g, obj); let et = ty(g, e); let index = expr(mut g, i)
+            if types.is_map(g.k.table, t) {
+                let at = ccall(mut g, "vela_map_at", [scalar(mut g, o), element_copy(mut g, index), loc_of(mut g, e)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+                return mem_val(at, 0, et)
+            }
+            if types.is_fixed(g.k.table, t) { return mem_val(fixed_at(mut g, o, scalar(mut g, index), t, e), 0, et) }
+            return mem_val(element_at(mut g, scalar(mut g, o), scalar(mut g, index), et, e), 0, et)
+        }
+        _ => return expr(mut g, e)
+    }
+}
+
 // The value at payload `i` of variant `vi`, inside the enum at `path`.
 fn payload(g: mut Low, path: Val, enum: Int, vi: Int, i: Int) -> Val {
     let v = types.get(g.k.table, enum).variants[vi]
@@ -1973,10 +2083,11 @@ fn tests(g: mut Low, p: ast.Pattern, path: Val, t: Int, fail: Int) {
                     }
                 }
                 ast.ExprKind.StrLit(s) => {
-                    let lit = sym_addr(mut g, str_literal(mut g, s))
-                    let eq = ccall(mut g, "vela_str_eq", [address(mut g, path), lit], [ir.KIND_STR(), ir.KIND_STR()],
-                        ir.RET_BOOL(), -1)
-                    fail_unless(mut g, eq, fail)
+                    if !literal_test(mut g, path, s, fail) {
+                        let lit = sym_addr(mut g, str_literal(mut g, s))
+                        let eq = ccall(mut g, "vela_str_eq_ptr", [address(mut g, path), lit], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+                        fail_unless(mut g, eq, fail)
+                    }
                 }
                 ast.ExprKind.IntLit(n) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
                 ast.ExprKind.FixedIntLit(n, _, _) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
@@ -2153,11 +2264,9 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
             let a = ccall(mut g, "vela_array_new", [descriptor(mut g, elem_t), konst(mut g, len(elems))],
                 [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
             let array = own(mut g, reg_val(a, t))
-            for x in elems {
-                let c = consume(mut g, expr(mut g, x))
-                let at = element_copy(mut g, c)
-                ccall(mut g, "vela_array_push", [array.reg, at], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
-            }
+            let data = load(mut g, array.reg, 32, 8); let size = size_of(mut g, elem_t)
+            for i in 0..len(elems) { let c = consume(mut g, expr(mut g, elems[i])); put(mut g, data, i*size, elem_t, c) }
+            store(mut g, array.reg, 8, 8, konst(mut g, len(elems)))
             return array
         }
         ast.ExprKind.MapLit(entries) => {
@@ -2284,7 +2393,11 @@ fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
     for i in 0..len(args) {
         match args[i].kind {
             ast.ExprKind.MutArg(p) => push(mut regs, address(mut g, place(mut g, p)))
-            _ => push(mut regs, argument(mut g, vals[i], vals[i].ty))
+            _ => {
+                // With no mutable argument, this call only borrows the
+                // original memory value. The callee cannot change it.
+                if !protect && !loops.escaped(g.k, args[i]) && in_memory(g, vals[i].ty) { push(mut regs, address(mut g, vals[i])) } else { push(mut regs, argument(mut g, vals[i], vals[i].ty)) }
+            }
         }
     }
     let t = ty(g, e)
@@ -2609,9 +2722,11 @@ fn index(g: mut Low, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Val {
     if t == types.STR() {
         let ix = scalar(mut g, expr(mut g, i))
         let ok = label(mut g)
-        branch_cmp(mut g, "ult", ix, load(mut g, o.reg, o.off + 16, 8), ok)
-        noreturn(mut g, "vela_str_at", [address(mut g, o), ix, loc_of(mut g, e)], [ir.KIND_STR(), ir.KIND_INT(), ir.KIND_INT()])
-        place_label(mut g, ok)
+        if !access_safe(g, e) {
+            branch_cmp(mut g, "ult", ix, load(mut g, o.reg, o.off + 16, 8), ok)
+            noreturn(mut g, "vela_str_at", [address(mut g, o), ix, loc_of(mut g, e)], [ir.KIND_STR(), ir.KIND_INT(), ir.KIND_INT()])
+            place_label(mut g, ok)
+        }
         let data = load(mut g, o.reg, o.off + 8, 8)
         let mut out = reg_val(load(mut g, op2(mut g, ir.Op.Add, data, ix), 0, 1), types.BYTE())
         out.temp = true
@@ -2738,12 +2853,19 @@ fn binary(g: mut Low, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Val {
         g.fs.dead = false
         return result
     }
+    let left = binary_left(mut g, l, r)
+    let right = expr(mut g, r)
+    return operation(mut g, e, op, left, right, ty(g, l))
+}
+
+fn binary_left(g: mut Low, l: ast.Expr, r: ast.Expr) -> Val {
     let mut left = expr(mut g, l)
     if cffi.pointer(left.ty) || types.is_integer(left.ty) || left.ty == types.FLOAT() || left.ty == types.BOOL() || left.ty == types.UNIT() {
         left = fresh(mut g, left)  // load before the right side can mutate its source
+    } else if (ast.has_mut(r) || loops.escaped(g.k, l)) && !left.owned && !left.is_static {
+        if managed(mut g, left.ty) { left = own(mut g, consume(mut g, left)) } else { left = fresh(mut g, left) }
     }
-    let right = expr(mut g, r)
-    return operation(mut g, e, op, left, right, ty(g, l))
+    return left
 }
 
 fn arith_op(op: Str) -> ir.Op {
@@ -2776,9 +2898,28 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
         return fixed_operation(mut g, e, operand, left, right, code, 0)
     }
     if operand == 13 {
-        let r = ccall(mut g, "vela_fixed_compare", [scalar(mut g, left), scalar(mut g, right), konst(mut g, cond_code(op))],
-            [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
-        return reg_val(r, types.BOOL())
+        // Flipping the sign bit maps unsigned ordering to signed ordering.
+        let sign = konst(mut g, ranges.min_int())
+        let a = op2(mut g, ir.Op.Xor, scalar(mut g, left), sign)
+        let b = op2(mut g, ir.Op.Xor, scalar(mut g, right), sign)
+        return reg_val(cmp(mut g, cond_code(op), a, b), types.BOOL())
+    }
+    if types.is_integer(operand) && (op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">=") {
+        match e.kind { ast.ExprKind.Binary(_, l, r) => {
+            let a = point(g, l); let b = point(g, r); let mut answer = -1
+            if a.lo <= a.hi && b.lo <= b.hi {
+                if op == "<" { if a.hi < b.lo { answer = 1 } else if a.lo >= b.hi { answer = 0 } }
+                if op == "<=" { if a.hi <= b.lo { answer = 1 } else if a.lo > b.hi { answer = 0 } }
+                if op == ">" { if a.lo > b.hi { answer = 1 } else if a.hi <= b.lo { answer = 0 } }
+                if op == ">=" { if a.lo >= b.hi { answer = 1 } else if a.hi < b.lo { answer = 0 } }
+                if op == "==" || op == "!=" {
+                    if a.hi < b.lo || a.lo > b.hi { answer = 0 }
+                    if a.lo == a.hi && b.lo == b.hi && a.lo == b.lo { answer = 1 }
+                    if answer >= 0 && op == "!=" { answer = 1-answer }
+                }
+            }
+            if answer >= 0 { return reg_val(konst(mut g, answer), types.BOOL()) }
+        }, _ => {} }
     }
     if op == "+" || op == "-" || op == "*" || op == "/" || op == "%" {
         if operand == types.FLOAT() {
@@ -2808,11 +2949,27 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
             }
             return reg_val(checked_op(mut g, ir.Op.ByteChk, wide, -1, at), t)
         }
+        if ranges.cannot_fail(g.k, g.fs.env, e) {
+            let code = match op { "+" => ir.Op.Add, "-" => ir.Op.Sub, "*" => ir.Op.Mul, "/" => ir.Op.Div, _ => ir.Op.Rem }
+            return reg_val(op2(mut g, code, a, b), t)
+        }
         return reg_val(checked_op(mut g, arith_op(op), a, b, at), t)
     }
     if operand == types.STR() {
         if op == "==" || op == "!=" {
-            let eq = ccall(mut g, "vela_str_eq", [address(mut g, left), address(mut g, right)], [ir.KIND_STR(), ir.KIND_STR()],
+            let mut literal = ""; let mut path = left; let mut found = false
+            match e.kind { ast.ExprKind.Binary(_, l, r) => {
+                match r.kind { ast.ExprKind.StrLit(s) => { literal = s; found = true }, _ => {} }
+                if !found { match l.kind { ast.ExprKind.StrLit(s) => { literal = s; path = right; found = true }, _ => {} } }
+            }, _ => {} }
+            if found && len(literal) <= 16 {
+                let result = temp_reg(mut g, types.BOOL()); emit(mut g, ir.inst(ir.Op.Const, result.reg, -1, -1, 0)); let done = label(mut g)
+                literal_test(mut g, path, literal, done)
+                emit(mut g, ir.inst(ir.Op.Const, result.reg, -1, -1, 1)); place_label(mut g, done)
+                if op == "==" { return result }
+                let r = reg(mut g, ir.INT()); emit(mut g, ir.inst(ir.Op.Not, r, result.reg, -1, 0)); return reg_val(r, types.BOOL())
+            }
+            let eq = ccall(mut g, "vela_str_eq_ptr", [address(mut g, left), address(mut g, right)], [ir.KIND_INT(), ir.KIND_INT()],
                 ir.RET_BOOL(), -1)
             if op == "!=" {
                 let r = reg(mut g, ir.INT())
@@ -2821,7 +2978,7 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
             }
             return reg_val(eq, types.BOOL())
         }
-        let c = ccall(mut g, "vela_str_cmp", [address(mut g, left), address(mut g, right)], [ir.KIND_STR(), ir.KIND_STR()],
+        let c = ccall(mut g, "vela_str_cmp_ptr", [address(mut g, left), address(mut g, right)], [ir.KIND_INT(), ir.KIND_INT()],
             ir.RET_INT(), -1)
         let wide = reg(mut g, ir.INT())
         emit(mut g, ir.inst(ir.Op.Sext32, wide, c, -1, 0))
@@ -2836,6 +2993,25 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
         return reg_val(r, types.BOOL())
     }
     return reg_val(cmp(mut g, cond_code(op), scalar(mut g, left), scalar(mut g, right)), types.BOOL())
+}
+
+// A short literal comparison reads only bytes proved present by the length
+// test. Exact chunks also cover unaligned slices and embedded zero bytes.
+fn literal_test(g: mut Low, path: Val, text: Str, fail: Int) -> Bool {
+    let n = len(text); if n > 16 { return false }
+    branch_cmp(mut g, "ne", load(mut g, path.reg, path.off+16, 8), konst(mut g, n), fail)
+    if n == 0 { return true }
+    let data = load(mut g, path.reg, path.off+8, 8); let mut at = 0
+    for at < n {
+        let mut width = 1; let remaining = n-at
+        if remaining >= 8 { width = 8 } else if remaining >= 4 { width = 4 } else if remaining >= 2 { width = 2 }
+        let mut word = 0
+        for j in 0..width { word = word | (int(text[at+j]) << (j*8)) }
+        if width == 4 && word >= 2147483648 { word = word - 4294967296 }
+        branch_cmp(mut g, "ne", load(mut g, data, at, width), konst(mut g, word), fail)
+        at = at + width
+    }
+    return true
 }
 
 fn print_function(t: Int) -> Str {
@@ -2871,7 +3047,7 @@ fn assert_code(g: mut Low, e: ast.Expr, cond: ast.Expr, kind: Str) {
             let printable = types.is_integer(t) || t == types.BOOL() || t == types.STR() ||
                 t == types.FLOAT()
             if comparison && printable {
-                let left = expr(mut g, l)
+                let left = binary_left(mut g, l, r)
                 let right = expr(mut g, r)
                 let ok = operation(mut g, cond, op, left, right, t).reg
                 let good = label(mut g)
@@ -2949,7 +3125,7 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     }
     if name == "math.sqrt" {
         let x = scalar(mut g, expr(mut g, args[0]))
-        return reg_val(ccall(mut g, "vela_math_sqrt", [x], [ir.KIND_FLOAT()], ir.RET_FLOAT(), -1), types.FLOAT())
+        let r = reg(mut g, ir.FLOAT()); emit(mut g, ir.inst(ir.Op.FSqrt, r, x, -1, 0)); return reg_val(r, types.FLOAT())
     }
     if name == "assert" {
         assert_code(mut g, e, args[0], "assertion")
@@ -3015,8 +3191,7 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
         let v = expr(mut g, args[1])  // the value first, then the place, as for any mut argument
         let b = scalar(mut g, writable(mut g, mut_place(args[0])))
         if name == "strings.add_byte" {
-            let a = element_copy(mut g, v)
-            ccall(mut g, "vela_array_push", [b, a], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+            array_push(mut g, b, v)
         } else if name == "strings.add" {
             ccall(mut g, "vela_builder_add", [b, address(mut g, v)], [ir.KIND_INT(), ir.KIND_STR()], ir.RET_NONE(), -1)
         } else {
@@ -3087,8 +3262,7 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     if name == "push" {
         let v = consume(mut g, expr(mut g, args[1]))
         let array = scalar(mut g, writable(mut g, mut_place(args[0])))
-        let a = element_copy(mut g, v)
-        ccall(mut g, "vela_array_push", [array, a], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+        array_push(mut g, array, v)
         return no_value()
     }
     let mt = ty(g, args[0])
@@ -3198,12 +3372,49 @@ fn file_call(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     return own(mut g, result)
 }
 
+fn access_safe(g: Low, e: ast.Expr) -> Bool { return maps.has(g.fs.env.safe, e.id) && g.fs.env.safe[e.id] }
+fn point(g: Low, e: ast.Expr) -> ranges.Range {
+    // A positive literal mask bounds even u64 values, whose unrestricted
+    // domain cannot be represented by the signed interval analysis.
+    match e.kind { ast.ExprKind.Binary(op, _, rhs) => { if op == "&" {
+        let mut mask = -1
+        match rhs.kind { ast.ExprKind.IntLit(n) => mask = n, ast.ExprKind.FixedIntLit(n, _, neg) => { if !neg { mask = n } }, _ => {} }
+        if mask >= 0 { return ranges.Range { lo: 0, hi: mask } }
+    } }, _ => {} }
+    match maps.get(g.fs.env.values, e.id) { Some(r) => return r, None => return ranges.of(g.k, g.fs.env, e) }
+}
+fn normalize(g: mut Low, value: Int, t: Int) -> Int {
+    let width = types.integer_width(t); if width == 64 { return value }
+    let r = reg(mut g, ir.INT()); let mut i = ir.inst(ir.Op.Extend, r, value, -1, width); i.imm2 = fixed_sign(t); emit(mut g, i); return r
+}
 fn fixed_sign(t: Int) -> Int {
     if types.integer_signed(t) { return 1 }
     return 0
 }
 
 fn fixed_operation(g: mut Low, e: ast.Expr, t: Int, a: Val, b: Val, op: Int, mode: Int) -> Val {
+    let av = scalar(mut g, a); let bv = scalar(mut g, b)
+    if op >= 6 && op <= 9 {
+        let code = match op { 6 => ir.Op.And, 7 => ir.Op.Or, 8 => ir.Op.Xor, _ => ir.Op.Inv }
+        let mut value = op2(mut g, code, av, bv); if op == 9 && !types.integer_signed(t) { value = normalize(mut g, value, t) }; return reg_val(value, t)
+    }
+    if op == 10 || op == 11 {
+        let width = types.integer_width(t); let ok = label(mut g)
+        let mut bound = ranges.full(); match e.kind { ast.ExprKind.Binary(_, _, rhs) => bound = point(g, rhs), _ => {} }
+        if bound.lo < 0 || bound.hi >= width {
+            branch_cmp(mut g, "ult", bv, konst(mut g, width), ok)
+            noreturn(mut g, "vela_fixed_op", [av, bv, konst(mut g, width), konst(mut g, fixed_sign(t)), konst(mut g, op), konst(mut g, mode), loc_of(mut g, e)],
+                [ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT()]); place_label(mut g, ok)
+        }
+        let mut code = ir.Op.Shl; if op == 11 { code = ir.Op.Shr; if types.integer_signed(t) { code = ir.Op.Sar } }
+        let mut value = op2(mut g, code, av, bv); if op == 10 { value = normalize(mut g, value, t) }; return reg_val(value, t)
+    }
+    if (mode == 2 || (mode == 0 && ranges.cannot_fail(g.k, g.fs.env, e))) && (op <= 2 || op == 5) {
+        let code = match op { 0 => ir.Op.Add, 1 => ir.Op.Sub, _ => ir.Op.Mul }
+        let mut value = -1
+        if op == 5 { value = op2(mut g, ir.Op.Sub, konst(mut g, 0), av) } else { value = op2(mut g, code, av, bv) }
+        return reg_val(normalize(mut g, value, t), t)
+    }
     let r = ccall(mut g, "vela_fixed_op", [scalar(mut g, a), scalar(mut g, b), konst(mut g, types.integer_width(t)),
         konst(mut g, fixed_sign(t)), konst(mut g, op), konst(mut g, mode), loc_of(mut g, e)],
         [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
@@ -3211,6 +3422,15 @@ fn fixed_operation(g: mut Low, e: ast.Expr, t: Int, a: Val, b: Val, op: Int, mod
 }
 
 fn integer_cast(g: mut Low, e: ast.Expr, source: Val, t: Int) -> Val {
+    if source.ty == t { return reg_val(scalar(mut g, source), t) }
+    let sw = types.integer_width(source.ty); let tw = types.integer_width(t)
+    let ss = types.integer_signed(source.ty); let ts = types.integer_signed(t)
+    let widening = (ss == ts && tw >= sw) || (!ss && ts && tw > sw)
+    let mut bound = ranges.full(); match e.kind { ast.ExprKind.Call(_, args) => { if len(args) > 0 { bound = point(g, args[0]) } }, _ => {} }
+    let mut proven = (source.ty != 13 || bound.lo >= 0) && bound.lo >= integers.min(t) && bound.hi <= integers.max(t)
+    if t == 13 { proven = bound.lo >= 0 }
+    if widening { return reg_val(scalar(mut g, source), t) }
+    if proven { return reg_val(normalize(mut g, scalar(mut g, source), t), t) }
     let r = ccall(mut g, "vela_fixed_cast", [scalar(mut g, source), konst(mut g, types.integer_width(source.ty)),
         konst(mut g, fixed_sign(source.ty)), konst(mut g, types.integer_width(t)), konst(mut g, fixed_sign(t)), loc_of(mut g, e)],
         [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)

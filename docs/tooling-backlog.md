@@ -71,6 +71,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   Resource contention is a suspected cause, not an established diagnosis.
 - **Impact:** timeout-only failures need extra investigation and can obscure
   real regressions.
+- **M25 recurrence:** redirecting the full suite to a log with ordinary
+  `python3 build/run_m26a_supported.py ...` leaves the log empty while tests
+  run, because stdout is buffered and nested scripts report on completion.
+  Use `python3 -u` for subsequent broad runs; this does not add per-test
+  progress or improve timeout evidence in the checked-in harness.
 - **Workaround:** avoid overlapping broad validation jobs and cap outer test
   concurrency at four on this host. M17 used a temporary Python wrapper around
   the runner's executor; there is no checked-in jobs option yet.
@@ -654,11 +659,243 @@ the same entry. Close it with a commit or validation result; keep its history.
   The full native suite passes all 303 checks and the 124-check native UBSan
   selection passes; systems/policy integrations also pass with VELA_OPT=0.
 
+### TL-030: Benchmark summary omits native acceptance
+
+- **Status:** resolved during M25; observed in the M25 baseline.
+- **Evidence:** python3 bench/run.py --runs 3 --languages c vela-native
+  --json bench/before-m25.json prints vela/c - for every row and no geometric
+  mean, because the summary only looks for the vela (C backend) key. Native
+  samples exist in JSON, but compiler/native acceptance is not evaluated.
+- **Impact:** the natural native-only benchmark command cannot establish M25
+  acceptance without an external calculation and completeness check.
+- **Workaround:** calculate ratios from the recorded JSON without changing
+  workloads; retain all twelve baseline rows.
+- **Proposed resolution:** report native ratios/geometric mean, retain timing
+  samples and explicit full-suite/paired-compiler acceptance metadata.
+- **Acceptance:** the native matrix has all twelve matching outputs, a stated
+  1.5 geometric-mean gate and same-source compiler comparison; incomplete
+  selections cannot be reported as the full milestone pass.
+- **Resolution/validation:** bench/run.py reports native ratios and gates
+  fresh paired compiler images, full-size completeness, matching outputs,
+  source fingerprints (including the compiler's JSON package/manifests),
+  raw samples and both compiler operations. Focused M25 tests reject quick,
+  partial and missing-native acceptance commands. bench/after-m25.json
+  passes the complete gate at 1.4603; bench/m25-spill-rejected.json retains
+  a genuine failed full gate. Final broader local M25 validation also passes;
+  commands and result fingerprints are in bench/m25-validation.json.
+
+### TL-031: Native lowering omits existing enum memory optimizations
+
+- **Status:** resolved in M25; observed during M25 full-size native benchmarking.
+- **Evidence:** `build/vela-m25 ir bench/binarytrees/main.vl` initially emits
+  retains/releases for both match bindings in check(), while codegen.match_code
+  borrows bindings of immutable scrutinees. lower.memory_functions allocates
+  every empty enum box with vela_alloc and releases with free; layout.helpers
+  reuses empty enum boxes and the runtime's size-class box pool. The full-size
+  ARM64 binarytrees workload measured 2.94 times C after the first IR passes.
+- **Impact:** native tree walking/creation performs avoidable reference-count
+  traffic and allocations, preventing the current performance acceptance.
+- **Workaround:** retain the C backend while measuring the native correction.
+- **Proposed resolution:** borrow immutable match bindings conservatively,
+  emit immortal empty enum boxes and use the existing thread-local box pool.
+  Keep mutable/escaped scrutinees and address-taken bindings owned.
+- **Source inspection:** x64 RcInc/RcDec branch zero counts into their shared
+  negative-count path. Add the required zero bypass before introducing native
+  immortal boxes. This is an observed emitted-instruction mismatch with the
+  runtime rules; Linux execution of the correction is not yet claimed.
+- **Acceptance:** snapshot/lifetime/closure/task and recursive-enum cases pass
+  optimized/unoptimized native execution and UBSan; benchmark all unchanged
+  workloads again. Linux x86 execution remains separate validation.
+- **Pause checkpoint:** implementation and focused C/native opt=1/0 checks
+  pass; the final full matrix measures binarytrees at 0.80 times C. Final
+  broad/UBSan validation is pending, with Linux execution in VAL-001.
+- **Resolution/validation:** immutable match borrowing, immortal empty boxes
+  and the runtime box pool are implemented. Final C/native suites pass 304
+  checks each, UBSan passes 125, and binarytrees measures 0.80 times C. The
+  x64 correction cross-assembles; Linux execution remains VAL-001. See
+  [M25 validation](../bench/m25-validation.json).
+
+
+### TL-032: Native pushes miss the existing known-size fast path
+
+- **Status:** resolved in M25; discovered during M25.
+- **Evidence:** lower's push/array-literal paths call vela_array_push, whose
+  runtime body loads the element descriptor and calls variable-sized memcpy.
+  codegen uses header-inline vela_push with a constant element size. The
+  unchanged full-size native arena_trees workload still measured 2.56 times C
+  after scalar replacement. This identifies an emitted-code gap; it does not
+  attribute the whole measured ratio to one call.
+- **Impact:** container-building loops, including compiler token/AST arrays,
+  retain avoidable dispatch/copy overhead.
+- **Workaround:** use the C backend's existing fast path.
+- **Proposed resolution:** lower the capacity guard, cold grow call,
+  constant-sized element transfer and length update into shared native IR.
+  Freeze elements before growth, including aliased mut-parameter values.
+- **Acceptance:** growth/snapshot/managed-element/alias cases pass both
+  native optimization modes; existing memory/ABI/runtime checks and the full
+  unchanged benchmark matrix pass. Keep C-backend preservation thresholds.
+- **Pause checkpoint:** implemented; focused C/native opt=1/0 and final
+  full-size outputs pass, including preserved C-backend thresholds. Final
+  broad/UBSan validation remains pending.
+- **Resolution/validation:** native pushes and array literals use guarded
+  known-size transfers with values frozen before growth. Final C/native
+  suites (304 each), UBSan (125) and all full-size benchmark outputs pass,
+  including preserved C thresholds. See [M25 validation](../bench/m25-validation.json).
+
+
+### TL-033: Binary string operands are reread after a mutable right side
+
+- **Status:** resolved in M25; reproduced in both backends during M25 string
+  optimization review.
+- **Evidence:** build/m25-string-eval.vl defines change(s: mut Str) to keep
+  and return the previous heap string while replacing s. Starting at "old",
+  `s == change(mut s)` prints false and `s + change(mut s)` prints newold
+  through both C and native. Left-to-right evaluation requires true/oldold.
+  Both binary generators freeze scalar operands but leave borrowed Str paths
+  referring to their mutable source until after evaluating the right side.
+- **Impact:** a valid expression observes the wrong left operand; an
+  unretained old value can also lose its lifetime during a replacement.
+- **Workaround:** explicitly bind the left value before evaluating the right.
+- **Proposed resolution:** snapshot/retain borrowed memory values before a
+  mutable right operand, and conservatively protect escaped source places.
+  Preserve temporary/static borrowing and release the snapshot once.
+- **Assertion recurrence:** assert's printable-comparison path separately
+  evaluated operands and bypassed binary's scalar snapshot too. Share the
+  operand-evaluation helper so assertion values and diagnostics obey the same
+  order; cover mutable integer comparisons as well as strings.
+- **Acceptance:** comparison, concatenation, ordering, heap replacement and
+  enum-tag cases agree with independent expected results in C/native opt=1/0;
+  existing lifetime tests and UBSan pass. Keep the regression in M25 tests.
+- **Pause checkpoint:** shared binary_left handling fixes both generators
+  and assertions; independent C/native opt=1/0 regressions pass. Final
+  broad lifetime/UBSan validation remains pending.
+- **Resolution/validation:** binary_left snapshots the left operand before
+  a mutable right side in both generators and assertion comparisons. The
+  independent C/native opt=1/0 regressions, both complete 304-check suites and
+  the 125-check UBSan selection pass. See [M25 validation](../bench/m25-validation.json).
+
+
+### TL-034: Native immutable projections copy whole aggregates
+
+- **Status:** resolved in M25; discovered during M25 profiling and research experiments.
+- **Evidence:** `stage1/checker.vl` method lookup binds an immutable function
+  record from an array; native let/foreach lowering previously materialized
+  whole aggregate values and retained their managed fields. Four-second
+  `/usr/bin/sample` profiles of compiler C emission observed 320 native
+  memmove self samples versus 254 for C. Attribution is a hypothesis, not a
+  measurement of how much time those specific projections consume.
+- **Impact:** read-only compiler traversals perform avoidable copies and RC
+  operations. The same-source A/B experiment in `bench/m25-borrow-ab.json`
+  reduces native emission time by 8.4% and checking by 2.5%.
+- **Workaround:** use the C backend or retain the existing owned copies.
+- **Proposed resolution:** borrow immutable projections from an unescaped,
+  stable owner and foreach values from the iterator's owned snapshot. Keep
+  mutable/escaped roots and address-taken bindings owned; escaping consumers
+  acquire ownership. Hoist immutable iterator metadata.
+- **Verification:** `python3 tests/m25_test.py "$PWD/build/vela"` covers
+  returned/captured fields, closures outliving iteration, source replacement
+  and snapshots in both backends and optimization modes. Focused and quick
+  benchmark checks pass; final bootstrap, full suite and UBSan remain pending.
+  See [the experiment log](m25-experiments.md) for the research, profiling
+  method, source/image fingerprints and limits of the A/B result.
+- **Pause checkpoint:** retain the borrowing change; focused C/native modes
+  and the selected final performance gate pass. Final bootstrap, full suite
+  and UBSan remain pending.
+- **Resolution/validation:** stable, unescaped projections and iterator
+  elements borrow from their live owner; escaping consumers retain. Both
+  bootstrap fixed points, C/native suites (304 each), UBSan (125), and the
+  native-built compiler selection (238) pass. The A/B evidence is retained;
+  see [final M25 validation](../bench/m25-validation.json).
+
+
+### TL-035: ARM allocation spills a frequently used loop state pointer
+
+- **Status:** resolved in M25; discovered during M25 performance acceptance.
+- **Evidence:** `build/vela-m25 asm stage1/main.vl`, lexer_identifier, reloads
+  its Lexer pointer from a stack spill before several loads/stores in the
+  character loop. regalloc.allocate chooses the farthest-ending active
+  interval without considering use frequency. The 1.461-times-C program
+  matrix passes, but native compiler checking still measures 0.177 s versus
+  C 0.174 s. That gap is observed; its exact attribution is not established.
+- **Impact:** hot loop state can be evicted for cold short-lived values.
+- **Workaround:** retain C compilation while measuring native allocation.
+- **Proposed resolution:** test read/write spill costs weighted in back-edge
+  regions and normalized for interval occupation, keeping end position as a
+  tie breaker. Raw weighted totals improve the compiler but regress SHA-256
+  to 3.06 times C and fail the matrix (bench/m25-spill-rejected.json); reject
+  that policy. The refined same-source A/B improves checking by 6.0% and
+  emission by 4.1% (bench/m25-density-ab.json). This changes placement only,
+  retaining ABI restrictions, conservative live intervals and spill semantics.
+- **Verification:** focused pressure/ABI/lifetime/arithmetic checks pass in
+  both native modes. Emission now keeps the state pointer in x19; the same-source
+  interleaved compiler A/B, full workloads, bootstrap and broad suite remain
+  required. See [the experiment log](m25-experiments.md).
+- **Pause checkpoint:** select squared weighted uses divided by lifetime.
+  bench/after-m25.json passes all performance gates at 1.4603 times C;
+  native check is 5.2% faster and C emission 8.9% faster than C-built.
+  The raw-cost regression remains recorded and rejected. Final bootstrap,
+  broad correctness and UBSan validation remain pending; do not close this
+  entry or the milestone from performance alone.
+- **Resolution/validation:** retain lifetime-normalized weighted costs and
+  reject raw weighted totals. Both bootstrap fixed points, complete C/native
+  suites (304 each), UBSan (125), native-built compiler checks (238), and the
+  full performance gate pass. No further allocation experiment was needed.
+  See [M25 validation](../bench/m25-validation.json); platform limits remain
+  separate in VAL-001/VAL-004.
+
+
+### TL-036: Result-returning calls can silently discard failures
+
+- **Status:** deferred to M28 under the accepted M30 baseline; discovered
+  during the M25 pause's design review on 2026-10-25. This does not expand M25.
+- **Evidence:** the reproducible program in
+  [the baseline](design-baseline-to-m30.md#current-behavior-evidence), saved as
+  build/design-review-m30.vl, passes `build/vela-m25 check --json
+  build/design-review-m30.vl` with exit zero, no stderr, and ok=true/errors=[].
+  Both outcome() returning Err and `let _ = outcome()` are accepted without
+  diagnostics. checker.stmt explicitly permits ignored call results.
+- **Impact:** an agent can omit propagation or handling of a failure without
+  receiving compiler feedback. No erroneous program execution is inferred
+  from this static check.
+- **Workaround:** propagate, match or bind outcomes; use an explicit discard
+  only when ignoring the outcome is intentional.
+- **Proposed improvement:** use existing warning/JSON/editor infrastructure
+  for discarded Result calls, including indirect/generic/method forms. Existing
+  explicit discard syntax acknowledges intent; add no new ownership types,
+  attributes or runtime instructions. Do not auto-fix by silencing the warning.
+- **Verification:** cover all call forms, ?, return, matches and bindings;
+  verify stable codes/locations and ordinary warning compatibility. Confirm
+  unchanged program code generation and measure normal check latency in M29.
+
+### TL-037: Guide contract purity exceeds the implemented check
+
+- **Status:** deferred to M28 under the accepted M30 baseline; discovered
+  during the M25 pause's design review on 2026-10-25. This does not expand M25.
+- **Evidence:** the same
+  [baseline program](design-baseline-to-m30.md#current-behavior-evidence)
+  passes check with a requires predicate that prints. stage1/guide.vl says
+  clauses are pure Bool; checker.function checks them as Bool in the enclosing
+  effect context. Printing is intentionally effect-free. The M10b walkthrough
+  already describes calls in contracts and propagation of their effects.
+- **Impact:** the guide overstates the accepted purity restriction. A future
+  verifier treating an empty effect set as proof of purity could remove
+  observable work. Such unsound elimination has not been observed here.
+- **Workaround:** treat contract calls as ordinary evaluated code and retain
+  runtime evaluation unless its full behavior is proved safe to eliminate.
+- **Proposed improvement:** correct the guide to match existing semantics;
+  restrict M28 proof-based removal to a sound subset accounting for observable
+  effects, definedness and termination. Preserve currently accepted contracts;
+  introduce no new general effect calculus or syntax in this work.
+- **Verification:** guide/checker fixtures agree; contracts containing printing
+  and other effects retain behavior; unknown/failing/nonterminating cases are
+  not certified from a true result or empty effect set alone. Test pure proven
+  and unproven cases separately on both backends as part of M28.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
 
-- **Status:** open; carried from M17 and extended during M19–M24.
+- **Status:** open; carried from M17 and extended through M25/M26a.
 - **Evidence:** the C bootstrap, supported C suite, UBSan runtime tests, and
   benchmark output checks passed. Native `os.executable` lowering assembles
   for Linux x86-64, but was not executed there. This macOS ARM64 host has no
@@ -712,6 +949,17 @@ the same entry. Close it with a commit or validation result; keep its history.
   ARM64-built compiler additionally passes 236 runtime/negative fixtures and
   the independent Apple ABI/target suite, and emits byte-identical C/ARM64
   assembly to the C-built compiler for its own source.
+- **M25 evidence:** the refreshed C seed reaches a 139,189-line fixed point,
+  and native bootstrap reaches a 2,205,617-line ARM64 assembly fixed point.
+  Both complete C/native suites pass 304 checks each. Native runtime plus
+  M19–M26a integrations (including M25) pass 125 UBSan checks; emitted assembly
+  is not sanitizer-instrumented. The native-built compiler passes 238 runtime,
+  negative and M25/M26a checks and emits identical C/ARM64 assembly to C-built.
+  Additional M23/M24 opt=0 runs pass both backends. Five benchmarks cross-assemble
+  for x86 with opt=1/0 and the compiler with opt=1 (eleven objects); strict
+  runtime C compiles on Darwin and as a Linux x86 object. These are local Mac
+  execution and cross-compilation proofs, not Linux execution or ASan/TSan.
+  Source/image hashes and commands are in bench/m25-validation.json.
 - **Workaround:** retain the host-supported results and these explicit limits.
 - **Required work:** on Linux x86-64, run both bootstrap fixed points and the
   applicable C/native suites under ASan and TSan. See
@@ -734,6 +982,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   invalidation under the applicable sanitizers.
   Run tests/m24_test.py on Linux x86-64 with VELA_OPT=1 and VELA_OPT=0
   to execute both C/native capability and measured-coverage cases.
+  For M25 Linux follow-up, execute tests/m25_test.py and both complete suites,
+  repeat C/native bootstrap and compiler-emission parity, and measure the
+  unchanged native benchmark matrix on that host. Mac performance does not
+  establish Linux performance; carry this validation into platform work.
 - **Acceptance:** record host, compiler/toolchain, commit, commands, and actual
   results. Keep any failures open instead of inferring a pass from C or UBSan.
 
@@ -752,6 +1004,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M26a evidence:** eval/m26a-static.json retains 373/373 coded diagnostics
   and 21 with edits; the guide stays within its estimate gate. No new agent
   trial was performed.
+- **M25 evidence:** eval/m25-static.json retains 373/373 coded diagnostics
+  and 21 with edits. The guide remains within its estimate budget. No new
+  model-driven agent trial was performed.
 - **Workaround:** use the static metrics and seeded repair checks as
   implementation evidence; do not claim measured agent improvements.
 - **Required work:** compare the guide and prior documentation conditions on
@@ -781,6 +1036,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   7,997 tokens under the estimate.
 - **M26a measurement:** the target/native guide is 31,988 bytes, or 7,997
   tokens under the estimate; executable and installed guide checks pass.
+- **M25 measurement:** guide output remains 31,988 bytes (7,997 tokens by
+  bytes/4); complete suites and static evaluation pass. The model-specific
+  tokenizer measurement is still outstanding.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.

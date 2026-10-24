@@ -1,6 +1,7 @@
-// Darwin ARM64 from the common IR. Stable stack homes make the initial
-// implementation independent of x86 register allocation; M25 optimizes it.
+// Darwin ARM64 from the common IR, with loop-aware physical allocation.
 import ir
+import bits
+import regalloc
 import maps
 import strings
 import text
@@ -8,8 +9,8 @@ import text
 type Pass = struct { bank: Int, at: Int, size: Int, copy: Int }
 type Plan = struct { args: [Pass], bytes: Int }
 type Out = struct {
-    lines: [Str], f: ir.Func, fid: Int, homes: [Int], slots: [Int], labels: Int,
-    stubs: [Str], doubles: Map[Str, Str], locals: Map[Str, Bool]
+    lines: [Str], f: ir.Func, fid: Int, homes: [Int], slots: [Int], locs: [regalloc.Loc], labels: Int,
+    stubs: [Str], doubles: Map[Str, Str], locals: Map[Str, Bool], frameless: Bool
 }
 fn num(n: Int) -> Str { return strings.from_int(n) }
 fn align(n: Int, a: Int) -> Int { return (n + a - 1) / a * a }
@@ -27,8 +28,28 @@ fn address(o: mut Out, r: Str, base: Str, off: Int) {
     let mut op = "add"; let mut n = off; if off < 0 { op = "sub"; n = 0 - off }
     if n <= 4095 { emit(mut o, op + " " + r + ", " + base + ", #" + num(n)) } else { constant(mut o, "x17", n); emit(mut o, op + " " + r + ", " + base + ", x17") }
 }
-fn get(o: mut Out, v: Int, r: Str) { address(mut o, "x15", "x29", 0 - o.homes[v]); emit(mut o, "ldr " + r + ", [x15]") }
-fn put(o: mut Out, v: Int, r: Str) { if v < 0 { return }; address(mut o, "x15", "x29", 0 - o.homes[v]); emit(mut o, "str " + r + ", [x15]") }
+fn get(o: mut Out, v: Int, r: Str) {
+    let l = o.locs[v]
+    if l.kind == 0 { if r != l.reg { let mut op = "mov"; if o.f.classes[v] == ir.FLOAT() { op = "fmov" }; emit(mut o, op + " " + r + ", " + l.reg) }; return }
+    if l.kind == 2 { constant(mut o, r, l.off); return }
+    if l.kind == 3 { address(mut o, r, "x29", 0 - o.slots[l.off]); return }
+    if l.kind == 4 { sym_addr(mut o, r, l.sym); return }
+    assert(l.kind == 1); address(mut o, "x15", "x29", 0 - o.homes[v]); emit(mut o, "ldr " + r + ", [x15]")
+}
+fn put(o: mut Out, v: Int, r: Str) {
+    if v < 0 { return }; let l = o.locs[v]
+    if l.kind == 0 { if r != l.reg { let mut op = "mov"; if o.f.classes[v] == ir.FLOAT() { op = "fmov" }; emit(mut o, op + " " + l.reg + ", " + r) }; return }
+    if l.kind != 1 { return }; address(mut o, "x15", "x29", 0 - o.homes[v]); emit(mut o, "str " + r + ", [x15]")
+}
+fn source(o: mut Out, v: Int, scratch: Str) -> Str {
+    if o.locs[v].kind == 0 { return o.locs[v].reg }; get(mut o, v, scratch); return scratch
+}
+fn result(o: Out, v: Int, scratch: Str) -> Str { if v >= 0 && o.locs[v].kind == 0 { return o.locs[v].reg }; return scratch }
+fn memory(o: mut Out, v: Int, off: Int, size: Int) -> Str {
+    let base = source(mut o, v, "x10")
+    if off >= 0 && off % size == 0 && off / size <= 4095 { return "[" + base + ", #" + num(off) + "]" }
+    address(mut o, "x10", base, off); return "[x10]"
+}
 fn sym_addr(o: mut Out, r: Str, s: Str) {
     let name = symbol(s)
     if text.starts_with(s, ".L") || maps.has(o.locals, s) {
@@ -48,6 +69,10 @@ fn condition(code: Int, floating: Bool) -> Str {
     return match code { 0 => "eq", 1 => "ne", 2 => "lt", 3 => "le", 4 => "gt", _ => "ge" }
 }
 fn branch_condition(s: Str) -> Str { return match s { "ult" => "lo", "ule" => "ls", "ugt" => "hi", "uge" => "hs", _ => s } }
+fn inverse(s: Str) -> Str { return match s { "eq" => "ne", "ne" => "eq", "lt" => "ge", "ge" => "lt", "le" => "gt", "gt" => "le", "mi" => "pl", "ls" => "hi", "hi" => "ls", "lo" => "hs", _ => "lo" } }
+fn jumps(o: mut Out, cond: Str, yes: Int, no: Int, next: Int) {
+    if next == yes { emit(mut o, "b." + inverse(cond) + " " + ir_label(o, no)) } else { emit(mut o, "b." + cond + " " + ir_label(o, yes)); if next != no { emit(mut o, "b " + ir_label(o, no)) } }
+}
 fn width_reg(r: Str, size: Int) -> Str { if size < 8 { return "w" + r[1..len(r)] }; return r }
 fn load_name(size: Int) -> Str { return match size { 1 => "ldrb", 2 => "ldrh", 4 => "ldrsw", _ => "ldr" } }
 fn store_name(size: Int) -> Str { return match size { 1 => "strb", 2 => "strh", _ => "str" } }
@@ -77,6 +102,7 @@ fn copy(o: mut Out, dst: Int, src: Int, size: Int) {
     if size > 256 { get(mut o, dst, "x0"); get(mut o, src, "x1"); constant(mut o, "x2", size); emit(mut o, "bl _memmove"); return }
     get(mut o, dst, "x10"); get(mut o, src, "x11")
     let mut off = 0
+    for off + 16 <= size { emit(mut o, "ldp x9, x12, [x11, #" + num(off) + "]"); emit(mut o, "stp x9, x12, [x10, #" + num(off) + "]"); off = off + 16 }
     for off + 8 <= size { emit(mut o, "ldr x9, [x11, #" + num(off) + "]"); emit(mut o, "str x9, [x10, #" + num(off) + "]"); off = off + 8 }
     for off < size { emit(mut o, "ldrb w9, [x11, #" + num(off) + "]"); emit(mut o, "strb w9, [x10, #" + num(off) + "]"); off = off + 1 }
 }
@@ -87,7 +113,6 @@ fn call(o: mut Out, i: ir.Inst) {
         get(mut o, i.args[k], "x10")
         for w in 0..3 { emit(mut o, "ldr x9, [x10, #" + num(w * 8) + "]"); address(mut o, "x15", "sp", p.copy + w * 8); emit(mut o, "str x9, [x15]") }
     } }
-    if i.op == ir.Op.CCall && i.imm == ir.RET_STR() { get(mut o, i.a, "x8") }
     for k in 0..len(i.args) {
         let p = layout.args[k]; let v = i.args[k]; let mut kind = ir.KIND_INT()
         if i.op == ir.Op.CCall { kind = i.kinds[k] } else if o.f.classes[v] == ir.FLOAT() { kind = ir.KIND_FLOAT() }
@@ -106,6 +131,7 @@ fn call(o: mut Out, i: ir.Inst) {
             }
         }
     }
+    if i.op == ir.Op.CCall && i.imm == ir.RET_STR() { get(mut o, i.a, "x8") }
     if i.op == ir.Op.CallInd { get(mut o, i.a, "x16"); emit(mut o, "blr x16") } else { emit(mut o, "bl " + symbol(i.sym)) }
     if i.dst >= 0 {
         if o.f.classes[i.dst] == ir.FLOAT() {
@@ -116,76 +142,151 @@ fn call(o: mut Out, i: ir.Inst) {
 fn instruction(o: mut Out, i: ir.Inst) {
     let op = i.op
     if op == ir.Op.Label { push(mut o.lines, ir_label(o, i.imm) + ":"); return }
-    if op == ir.Op.Const { constant(mut o, "x9", i.imm); put(mut o, i.dst, "x9"); return }
+    if op == ir.Op.Const { if o.locs[i.dst].kind >= 2 { return }; let r = result(o, i.dst, "x9"); constant(mut o, r, i.imm); put(mut o, i.dst, r); return }
     if op == ir.Op.SlotAddr || op == ir.Op.SymAddr {
+        if o.locs[i.dst].kind >= 2 { return }
         if op == ir.Op.SlotAddr { address(mut o, "x9", "x29", 0 - o.slots[i.imm]) } else { sym_addr(mut o, "x9", i.sym) }; put(mut o, i.dst, "x9"); return
     }
     if op == ir.Op.FConst {
         let mut name = ""; match maps.get(o.doubles, i.sym) { Some(s) => name = s, None => { name = ".LD" + num(len(maps.keys(o.doubles))); o.doubles[i.sym] = name } }
-        sym_addr(mut o, "x9", name); emit(mut o, "ldr d16, [x9]"); put(mut o, i.dst, "d16"); return
+        sym_addr(mut o, "x9", name); let r = result(o, i.dst, "d16"); emit(mut o, "ldr " + r + ", [x9]"); put(mut o, i.dst, r); return
     }
-    if op == ir.Op.Move { let mut r = "x9"; if o.f.classes[i.dst] == ir.FLOAT() { r = "d16" }; get(mut o, i.a, r); put(mut o, i.dst, r); return }
+    if op == ir.Op.Move { let mut r = "x9"; if o.f.classes[i.dst] == ir.FLOAT() { r = "d16" }; r = source(mut o, i.a, r); put(mut o, i.dst, r); return }
     if op == ir.Op.Load || op == ir.Op.FLoad {
-        get(mut o, i.a, "x10"); address(mut o, "x10", "x10", i.imm)
-        if op == ir.Op.FLoad { emit(mut o, "ldr d16, [x10]"); put(mut o, i.dst, "d16") } else { let mut r = width_reg("x9", i.imm2); if i.imm2 == 4 { r = "x9" }; emit(mut o, load_name(i.imm2) + " " + r + ", [x10]"); put(mut o, i.dst, "x9") }; return
+        let mut size = i.imm2; if op == ir.Op.FLoad { size = 8 }; let at = memory(mut o, i.a, i.imm, size)
+        if op == ir.Op.FLoad { let r = result(o, i.dst, "d16"); emit(mut o, "ldr " + r + ", " + at); put(mut o, i.dst, r) } else { let r = result(o, i.dst, "x9"); let mut narrow = width_reg(r, size); if size == 4 { narrow = r }; emit(mut o, load_name(size) + " " + narrow + ", " + at); put(mut o, i.dst, r) }; return
     }
     if op == ir.Op.Store || op == ir.Op.FStore {
-        get(mut o, i.a, "x10"); address(mut o, "x10", "x10", i.imm)
-        if op == ir.Op.FStore { get(mut o, i.b, "d16"); emit(mut o, "str d16, [x10]") } else { get(mut o, i.b, "x9"); emit(mut o, store_name(i.imm2) + " " + width_reg("x9", i.imm2) + ", [x10]") }; return
+        let mut size = i.imm2; if op == ir.Op.FStore { size = 8 }; let at = memory(mut o, i.a, i.imm, size)
+        if op == ir.Op.FStore { let r = source(mut o, i.b, "d16"); emit(mut o, "str " + r + ", " + at) } else { let r = source(mut o, i.b, "x9"); emit(mut o, store_name(size) + " " + width_reg(r, size) + ", " + at) }; return
     }
     if op == ir.Op.Copy { copy(mut o, i.a, i.b, i.imm); return }
     if op == ir.Op.Call || op == ir.Op.CallInd || op == ir.Op.CCall { call(mut o, i); return }
     if op == ir.Op.Jump { emit(mut o, "b " + ir_label(o, i.imm)); return }
     if op == ir.Op.Branch { get(mut o, i.a, "x9"); emit(mut o, "cbnz x9, " + ir_label(o, i.imm)); emit(mut o, "b " + ir_label(o, i.imm2)); return }
-    if op == ir.Op.Ret { if i.a >= 0 { let mut r = "x0"; if o.f.classes[i.a] == ir.FLOAT() { r = "d0" }; get(mut o, i.a, r) }; emit(mut o, "b LR" + num(o.fid)); return }
+    if op == ir.Op.Ret { if i.a >= 0 { let mut r = "x0"; if o.f.classes[i.a] == ir.FLOAT() { r = "d0" }; get(mut o, i.a, r) }; if o.frameless { emit(mut o, "ret") } else { emit(mut o, "b LR" + num(o.fid)) }; return }
     if op == ir.Op.Unreachable { emit(mut o, "brk #1"); return }
     if op == ir.Op.RcInc || op == ir.Op.RcDec {
-        get(mut o, i.a, "x0"); let mut name = "_vela_native_rc_inc"; if op == ir.Op.RcDec { name = "_vela_native_rc_dec" }; emit(mut o, "bl " + name); if op == ir.Op.RcDec { emit(mut o, "and x0, x0, #255"); put(mut o, i.dst, "x0") }; return
+        get(mut o, i.a, "x10"); let shared = label(mut o); let again = label(mut o); let done = label(mut o)
+        emit(mut o, "mov x11, #0"); emit(mut o, "ldr x9, [x10]"); emit(mut o, "cmp x9, #0"); emit(mut o, "b.eq " + done); emit(mut o, "b.lt " + shared)
+        if op == ir.Op.RcInc { emit(mut o, "add x9, x9, #1") } else { emit(mut o, "subs x9, x9, #1"); emit(mut o, "cset x11, eq") }
+        emit(mut o, "str x9, [x10]"); emit(mut o, "b " + done); push(mut o.lines, shared + ":"); push(mut o.lines, again + ":")
+        if op == ir.Op.RcInc { emit(mut o, "ldxr x9, [x10]"); emit(mut o, "sub x13, x9, #1"); emit(mut o, "stxr w12, x13, [x10]") } else { emit(mut o, "ldaxr x9, [x10]"); emit(mut o, "add x13, x9, #1"); emit(mut o, "stlxr w12, x13, [x10]") }
+        emit(mut o, "cbnz w12, " + again)
+        if op == ir.Op.RcDec { emit(mut o, "cmp x13, #0"); emit(mut o, "cset x11, eq") }; push(mut o.lines, done + ":"); if op == ir.Op.RcDec { put(mut o, i.dst, "x11") }; return
     }
     if op == ir.Op.FAdd || op == ir.Op.FSub || op == ir.Op.FMul || op == ir.Op.FDiv || op == ir.Op.FCmp {
-        get(mut o, i.a, "d16"); get(mut o, i.b, "d17")
-        if op == ir.Op.FCmp { emit(mut o, "fcmp d16, d17"); emit(mut o, "cset x9, " + condition(i.imm, true)); put(mut o, i.dst, "x9") } else { let name = match op { ir.Op.FAdd => "fadd", ir.Op.FSub => "fsub", ir.Op.FMul => "fmul", _ => "fdiv" }; emit(mut o, name + " d18, d16, d17"); put(mut o, i.dst, "d18") }; return
+        let a = source(mut o, i.a, "d16"); let b = source(mut o, i.b, "d17")
+        if op == ir.Op.FCmp { emit(mut o, "fcmp " + a + ", " + b); let r = result(o, i.dst, "x9"); emit(mut o, "cset " + r + ", " + condition(i.imm, true)); put(mut o, i.dst, r) } else { let name = match op { ir.Op.FAdd => "fadd", ir.Op.FSub => "fsub", ir.Op.FMul => "fmul", _ => "fdiv" }; let r = result(o, i.dst, "d18"); emit(mut o, name + " " + r + ", " + a + ", " + b); put(mut o, i.dst, r) }; return
     }
-    if op == ir.Op.FNeg || op == ir.Op.FTo32 || op == ir.Op.FFrom32 {
-        get(mut o, i.a, "d16"); let inst = match op { ir.Op.FNeg => "fneg d18, d16", ir.Op.FTo32 => "fcvt s18, d16", _ => "fcvt d18, s16" }; emit(mut o, inst); put(mut o, i.dst, "d18"); return
+    if op == ir.Op.FNeg || op == ir.Op.FTo32 || op == ir.Op.FFrom32 || op == ir.Op.FSqrt {
+        let a = source(mut o, i.a, "d16"); let r = result(o, i.dst, "d18"); let narrow_a = "s" + a[1..len(a)]; let narrow_r = "s" + r[1..len(r)]
+        let inst = match op { ir.Op.FNeg => "fneg " + r + ", " + a, ir.Op.FTo32 => "fcvt " + narrow_r + ", " + a, ir.Op.FSqrt => "fsqrt " + r + ", " + a, _ => "fcvt " + r + ", " + narrow_a }; emit(mut o, inst); put(mut o, i.dst, r); return
     }
-    if op == ir.Op.IntToFloat { get(mut o, i.a, "x9"); emit(mut o, "scvtf d16, x9"); put(mut o, i.dst, "d16"); return }
-    get(mut o, i.a, "x9")
-    if op == ir.Op.Sext32 { emit(mut o, "sxtw x9, w9"); put(mut o, i.dst, "x9"); return }
-    if op == ir.Op.Not { emit(mut o, "eor x9, x9, #1"); put(mut o, i.dst, "x9"); return }
-    if op == ir.Op.NegChk { emit(mut o, "negs x9, x9"); emit(mut o, "b.vs " + panic(mut o, i.sym, ".Lmsg_overflow")); put(mut o, i.dst, "x9"); return }
-    if op == ir.Op.ByteChk || op == ir.Op.ToByte {
-        emit(mut o, "cmp x9, #255"); let mut message = ".Lmsg_byte"; if op == ir.Op.ToByte { message = ".Lmsg_tobyte" }; emit(mut o, "b.hi " + panic(mut o, i.sym, message)); put(mut o, i.dst, "x9"); return
+    if op == ir.Op.IntToFloat { let a = source(mut o, i.a, "x9"); let r = result(o, i.dst, "d16"); emit(mut o, "scvtf " + r + ", " + a); put(mut o, i.dst, r); return }
+    if op == ir.Op.Not || op == ir.Op.Sext32 || op == ir.Op.NegChk || op == ir.Op.ByteChk || op == ir.Op.ToByte {
+        let a = source(mut o, i.a, "x9"); let r = result(o, i.dst, "x11")
+        if op == ir.Op.Not { emit(mut o, "eor " + r + ", " + a + ", #1") } else if op == ir.Op.Sext32 { emit(mut o, "sxtw " + r + ", " + width_reg(a, 4)) } else if op == ir.Op.NegChk { emit(mut o, "negs " + r + ", " + a); emit(mut o, "b.vs " + panic(mut o, i.sym, ".Lmsg_overflow")) } else {
+            emit(mut o, "cmp " + a + ", #255"); let mut message = ".Lmsg_byte"; if op == ir.Op.ToByte { message = ".Lmsg_tobyte" }; emit(mut o, "b.hi " + panic(mut o, i.sym, message)); if r != a { emit(mut o, "mov " + r + ", " + a) }
+        }; put(mut o, i.dst, r); return
     }
-    if op == ir.Op.AddImm || op == ir.Op.MulImm || op == ir.Op.CmpImm { constant(mut o, "x10", i.imm); if op == ir.Op.CmpImm { constant(mut o, "x10", i.imm2) } } else { get(mut o, i.b, "x10") }
-    if op == ir.Op.BranchCmp { emit(mut o, "cmp x9, x10"); emit(mut o, "b." + branch_condition(i.sym) + " " + ir_label(o, i.imm)); return }
-    if op == ir.Op.Cmp || op == ir.Op.CmpImm { emit(mut o, "cmp x9, x10"); emit(mut o, "cset x11, " + condition(i.imm, false)); put(mut o, i.dst, "x11"); return }
-    if op == ir.Op.DivChk || op == ir.Op.RemChk {
-        emit(mut o, "cmp x10, #0"); emit(mut o, "b.eq " + panic(mut o, i.sym, ".Lmsg_div0"))
-        if op == ir.Op.DivChk { let ok = label(mut o); constant(mut o, "x12", -1); emit(mut o, "cmp x10, x12"); emit(mut o, "b.ne " + ok); constant(mut o, "x12", -9223372036854775808); emit(mut o, "cmp x9, x12"); emit(mut o, "b.eq " + panic(mut o, i.sym, ".Lmsg_overflow")); push(mut o.lines, ok + ":") }
-        emit(mut o, "sdiv x11, x9, x10"); if op == ir.Op.RemChk { emit(mut o, "msub x11, x11, x10, x9") }; put(mut o, i.dst, "x11"); return
+    if op == ir.Op.AddChk || op == ir.Op.SubChk || op == ir.Op.MulChk {
+        let a = source(mut o, i.a, "x9"); let b = source(mut o, i.b, "x10"); let r = result(o, i.dst, "x12")
+        if op == ir.Op.MulChk { emit(mut o, "smulh x11, " + a + ", " + b); emit(mut o, "mul " + r + ", " + a + ", " + b); emit(mut o, "cmp x11, " + r + ", asr #63"); emit(mut o, "b.ne " + panic(mut o, i.sym, ".Lmsg_overflow")) } else { let mut name = "adds"; if op == ir.Op.SubChk { name = "subs" }; emit(mut o, name + " " + r + ", " + a + ", " + b); emit(mut o, "b.vs " + panic(mut o, i.sym, ".Lmsg_overflow")) }; put(mut o, i.dst, r); return
     }
-    let name = match op { ir.Op.Add => "add", ir.Op.AddImm => "add", ir.Op.AddChk => "adds", ir.Op.Sub => "sub", ir.Op.SubChk => "subs", ir.Op.Mul => "mul", ir.Op.MulImm => "mul", ir.Op.MulChk => "mul", _ => "" }
-    assert(name != ""); emit(mut o, name + " x11, x9, x10")
-    if op == ir.Op.AddChk || op == ir.Op.SubChk { emit(mut o, "b.vs " + panic(mut o, i.sym, ".Lmsg_overflow")) }
-    if op == ir.Op.MulChk { emit(mut o, "smulh x12, x9, x10"); emit(mut o, "cmp x12, x11, asr #63"); emit(mut o, "b.ne " + panic(mut o, i.sym, ".Lmsg_overflow")) }
-    put(mut o, i.dst, "x11")
+    if op == ir.Op.Extend || op == ir.Op.Inv {
+        let a = source(mut o, i.a, "x9"); let r = result(o, i.dst, "x11")
+        if op == ir.Op.Inv { emit(mut o, "mvn " + r + ", " + a) } else if i.imm == 64 { if r != a { emit(mut o, "mov " + r + ", " + a) } } else if i.imm2 != 0 { let name = match i.imm { 8 => "sxtb", 16 => "sxth", _ => "sxtw" }; emit(mut o, name + " " + r + ", " + width_reg(a, 4)) } else { emit(mut o, "ubfx " + r + ", " + a + ", #0, #" + num(i.imm)) }; put(mut o, i.dst, r); return
+    }
+    if op == ir.Op.Cmp || op == ir.Op.CmpImm || op == ir.Op.BranchCmp {
+        let a = source(mut o, i.a, "x9"); let mut b = "x10"; let mut n = -1
+        if op == ir.Op.CmpImm { n = i.imm2 } else if o.locs[i.b].kind == 2 { n = o.locs[i.b].off }
+        if n >= 0 && n <= 4095 { b = "#" + num(n) } else if op == ir.Op.CmpImm { constant(mut o, b, i.imm2) } else { b = source(mut o, i.b, b) }
+        emit(mut o, "cmp " + a + ", " + b)
+        if op == ir.Op.BranchCmp { emit(mut o, "b." + branch_condition(i.sym) + " " + ir_label(o, i.imm)) } else { let r = result(o, i.dst, "x11"); emit(mut o, "cset " + r + ", " + condition(i.imm, false)); put(mut o, i.dst, r) }; return
+    }
+    if op == ir.Op.Add || op == ir.Op.Sub || op == ir.Op.Mul || op == ir.Op.And || op == ir.Op.Or || op == ir.Op.Xor || op == ir.Op.Shl || op == ir.Op.Shr || op == ir.Op.Sar || op == ir.Op.AddImm || op == ir.Op.MulImm || op == ir.Op.Div || op == ir.Op.Rem {
+        let a = source(mut o, i.a, "x9"); let r = result(o, i.dst, "x11"); let mut n = 0; let mut known = op == ir.Op.AddImm || op == ir.Op.MulImm
+        if known { n = i.imm } else if o.locs[i.b].kind == 2 { known = true; n = o.locs[i.b].off }
+        if known {
+            let mut name = ""; let mut immediate = n
+            if (op == ir.Op.Div || op == ir.Op.Rem) && n > 0 && (n & (n-1)) == 0 {
+                let mut shift = 0; let mut x = n; for x > 1 { x = x >> 1; shift = shift + 1 }
+                if shift == 0 { if op == ir.Op.Rem { constant(mut o, r, 0) } else if r != a { emit(mut o, "mov " + r + ", " + a) } } else {
+                    if shift == 1 { emit(mut o, "lsr x10, " + a + ", #63") } else { emit(mut o, "asr x10, " + a + ", #63"); emit(mut o, "lsr x10, x10, #" + num(64-shift)) }
+                    emit(mut o, "add x11, " + a + ", x10"); emit(mut o, "asr x11, x11, #" + num(shift))
+                    if op == ir.Op.Rem { emit(mut o, "sub " + r + ", " + a + ", x11, lsl #" + num(shift)) } else if r != "x11" { emit(mut o, "mov " + r + ", x11") }
+                }; put(mut o, i.dst, r); return
+            }
+            if op == ir.Op.Xor && n == -9223372036854775808 { emit(mut o, "eor " + r + ", " + a + ", #0x8000000000000000"); put(mut o, i.dst, r); return }
+            if (op == ir.Op.Add || op == ir.Op.AddImm || op == ir.Op.Sub) && n >= -4095 && n <= 4095 {
+                name = "add"; if op == ir.Op.Sub { name = "sub" }; if n < 0 { immediate = 0-n; if name == "add" { name = "sub" } else { name = "add" } }
+            }
+            if (op == ir.Op.Shl || op == ir.Op.Shr || op == ir.Op.Sar) && n >= 0 && n < 64 { name = match op { ir.Op.Shl => "lsl", ir.Op.Shr => "lsr", _ => "asr" } }
+            if (op == ir.Op.And || op == ir.Op.Or || op == ir.Op.Xor) && n > 0 && n < 9223372036854775807 && (n & (n+1)) == 0 { name = match op { ir.Op.And => "and", ir.Op.Or => "orr", _ => "eor" } }
+            if (op == ir.Op.Mul || op == ir.Op.MulImm) && n > 0 && (n & (n-1)) == 0 { name = "lsl"; immediate = 0; let mut x = n; for x > 1 { x = x >> 1; immediate = immediate + 1 } }
+            if name != "" { emit(mut o, name + " " + r + ", " + a + ", #" + num(immediate)); put(mut o, i.dst, r); return }
+        }
+        let mut b = "x10"
+        if op == ir.Op.AddImm || op == ir.Op.MulImm { constant(mut o, b, i.imm) } else { b = source(mut o, i.b, "x10") }
+        let name = match op { ir.Op.Add => "add", ir.Op.AddImm => "add", ir.Op.Sub => "sub", ir.Op.Mul => "mul", ir.Op.MulImm => "mul", ir.Op.And => "and", ir.Op.Or => "orr", ir.Op.Xor => "eor", ir.Op.Shl => "lsl", ir.Op.Shr => "lsr", ir.Op.Sar => "asr", _ => "sdiv" }
+        if op == ir.Op.Rem { emit(mut o, "sdiv x11, " + a + ", " + b); emit(mut o, "msub " + r + ", x11, " + b + ", " + a) } else { emit(mut o, name + " " + r + ", " + a + ", " + b) }; put(mut o, i.dst, r); return
+    }
+    assert(op == ir.Op.DivChk || op == ir.Op.RemChk)
+    get(mut o, i.a, "x9"); get(mut o, i.b, "x10")
+    emit(mut o, "cmp x10, #0"); emit(mut o, "b.eq " + panic(mut o, i.sym, ".Lmsg_div0"))
+    if op == ir.Op.DivChk { let ok = label(mut o); constant(mut o, "x12", -1); emit(mut o, "cmp x10, x12"); emit(mut o, "b.ne " + ok); constant(mut o, "x12", -9223372036854775808); emit(mut o, "cmp x9, x12"); emit(mut o, "b.eq " + panic(mut o, i.sym, ".Lmsg_overflow")); push(mut o.lines, ok + ":") }
+    emit(mut o, "sdiv x11, x9, x10"); if op == ir.Op.RemChk { emit(mut o, "msub x11, x11, x10, x9") }; put(mut o, i.dst, "x11")
+
+}
+
+// A single-use truncation after a wrapping word operation can be performed
+// by a W-register instruction, which also clears the upper half of X.
+fn narrow(o: mut Out, i: ir.Inst, e: ir.Inst) -> Bool {
+    if e.op != ir.Op.Extend || e.a != i.dst || e.imm != 32 || e.imm2 != 0 { return false }
+    let op = i.op; let mut name = match op { ir.Op.Add => "add", ir.Op.Sub => "sub", ir.Op.Mul => "mul", ir.Op.And => "and", ir.Op.Or => "orr", ir.Op.Xor => "eor", ir.Op.Inv => "mvn", _ => "" }
+    if op == ir.Op.Shl && o.locs[i.b].kind == 2 && o.locs[i.b].off >= 0 && o.locs[i.b].off < 32 { name = "lsl" }
+    if name == "" { return false }
+    let a = source(mut o, i.a, "x9"); let r = result(o, e.dst, "x11"); let wa = width_reg(a, 4); let wr = width_reg(r, 4)
+    if op == ir.Op.Inv { emit(mut o, name + " " + wr + ", " + wa) } else if op == ir.Op.Shl { emit(mut o, name + " " + wr + ", " + wa + ", #" + num(o.locs[i.b].off)) } else { let b = source(mut o, i.b, "x10"); emit(mut o, name + " " + wr + ", " + wa + ", " + width_reg(b, 4)) }
+    put(mut o, e.dst, r); return true
+}
+
+fn rotate(o: mut Out, at: Int, counts: [Int], known: [Bool]) -> Int {
+    let i = o.f.insts[at]
+    if i.op != ir.Op.Shr || !known[i.a] || o.locs[i.b].kind != 2 || counts[i.dst] != 1 { return 0 }
+    let n = o.locs[i.b].off; if n < 1 || n > 31 { return 0 }
+    let mut k = at + 1
+    for k < len(o.f.insts) && o.f.insts[k].op == ir.Op.Const && o.locs[o.f.insts[k].dst].kind == 2 { k = k + 1 }
+    if k + 2 >= len(o.f.insts) { return 0 }
+    let l = o.f.insts[k]; let e = o.f.insts[k+1]; let r = o.f.insts[k+2]
+    if l.op != ir.Op.Shl || l.a != i.a || o.locs[l.b].kind != 2 || o.locs[l.b].off != 32-n || counts[l.dst] != 1 { return 0 }
+    if e.op != ir.Op.Extend || e.a != l.dst || e.imm != 32 || e.imm2 != 0 || counts[e.dst] != 1 { return 0 }
+    if r.op != ir.Op.Or || !((r.a == i.dst && r.b == e.dst) || (r.b == i.dst && r.a == e.dst)) { return 0 }
+    let a = source(mut o, i.a, "x9"); let dst = result(o, r.dst, "x11")
+    emit(mut o, "ror " + width_reg(dst, 4) + ", " + width_reg(a, 4) + ", #" + num(n)); put(mut o, r.dst, dst); return k + 3 - at
 }
 fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], locals: Map[Str, Bool]) -> [Str] {
-    let mut homes: [Int] = []; let mut slots: [Int] = []; let mut at = 0
-    for _ in f.classes { at = at + 8; push(mut homes, at) }
+    let locs = regalloc.allocate(f); let mut saved: [Str] = []
+    for l in locs { if l.kind == 0 && regalloc.callee(l.reg) { let mut found = false; for r in saved { if r == l.reg { found = true } }; if !found { push(mut saved, l.reg) } } }
+    let mut homes: [Int] = []; let mut slots: [Int] = []; let mut at = len(saved) * 8
+    for l in locs { if l.kind == 1 { at = at + 8; push(mut homes, at) } else { push(mut homes, 0) } }
     for s in 0..len(f.slot_sizes) { at = align(at + f.slot_sizes[s], f.slot_aligns[s]); push(mut slots, at) }
     let mut outgoing = 0
     for i in f.insts { if i.op == ir.Op.Call || i.op == ir.Op.CallInd || i.op == ir.Op.CCall { let p = call_plan(f, i); if p.bytes > outgoing { outgoing = p.bytes } } }
     let total = align(at + outgoing, 16)
-    let mut o = Out { lines: [], f: f, fid: fid, homes: homes, slots: slots, labels: 0, stubs: [], doubles: doubles, locals: locals }
+    let mut returning_call = false
+    for k in 0..len(f.insts) { let i = f.insts[k]; if (i.op == ir.Op.Call || i.op == ir.Op.CallInd || i.op == ir.Op.CCall || (i.op == ir.Op.Copy && i.imm > 256)) && !(k + 1 < len(f.insts) && f.insts[k+1].op == ir.Op.Unreachable) { returning_call = true } }
+    let frameless = total == 0 && len(saved) == 0 && len(f.params) <= 8 && !returning_call
+    let mut o = Out { lines: [], f: f, fid: fid, homes: homes, slots: slots, locs: locs, labels: 0, stubs: [], doubles: doubles, locals: locals, frameless: frameless }
     emit(mut o, ".p2align 2"); if f.public { emit(mut o, ".globl " + symbol(f.name)) }; push(mut o.lines, symbol(f.name) + ":")
-    emit(mut o, "stp x29, x30, [sp, #-16]!"); emit(mut o, "mov x29, sp")
-    if total > 0 {
+    if !frameless { emit(mut o, "stp x29, x30, [sp, #-16]!"); emit(mut o, "mov x29, sp") }
+    if total > 0 && total <= 4095 { emit(mut o, "sub sp, sp, #" + num(total)) } else if total > 0 {
         constant(mut o, "x14", total)
         if total > 4096 { let again = label(mut o); let last = label(mut o); push(mut o.lines, again + ":"); emit(mut o, "cmp x14, #1, lsl #12"); emit(mut o, "b.ls " + last); emit(mut o, "sub sp, sp, #1, lsl #12"); emit(mut o, "str xzr, [sp]"); emit(mut o, "sub x14, x14, #1, lsl #12"); emit(mut o, "b " + again); push(mut o.lines, last + ":") }
         emit(mut o, "sub sp, sp, x14"); emit(mut o, "str xzr, [sp]")
     }
+    for k in 0..len(saved) { emit(mut o, "stur " + saved[k] + ", [x29, #-" + num((k+1)*8) + "]") }
     let mut kinds: [Int] = []; for p in f.params { let mut k = ir.KIND_INT(); if f.classes[p] == ir.FLOAT() { k = ir.KIND_FLOAT() }; push(mut kinds, k) }
     let inputs = plan(kinds, f.abi, -1, len(f.abi) == 0)
     for k in 0..len(f.params) {
@@ -195,8 +296,27 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], locals: Map[Str, B
             if f.classes[v] == ir.FLOAT() { let mut r = "d16"; if p.size == 4 { r = "s16" }; emit(mut o, "ldr " + r + ", [x10]"); put(mut o, v, "d16") } else { let mut r = width_reg("x9", p.size); if p.size == 4 { r = "x9" }; emit(mut o, load_name(p.size) + " " + r + ", [x10]"); put(mut o, v, "x9") }
         }
     }
-    for i in f.insts { instruction(mut o, i) }
-    push(mut o.lines, "LR" + num(fid) + ":"); emit(mut o, "mov sp, x29"); emit(mut o, "ldp x29, x30, [sp], #16"); emit(mut o, "ret")
+    let mut counts: [Int] = []; for _ in f.classes { push(mut counts, 0) }; for i in f.insts { for r in ir.reads(i) { counts[r] = counts[r] + 1 } }
+    let known = bits.u32(f)
+    let mut k = 0
+    for k < len(f.insts) {
+        let i = f.insts[k]; let mut next = -1; if k + 1 < len(f.insts) && f.insts[k+1].op == ir.Op.Label { next = f.insts[k+1].imm }
+        let rotating = rotate(mut o, k, counts, known); if rotating > 0 { k = k + rotating; continue }
+        if i.dst >= 0 && counts[i.dst] == 1 && k + 1 < len(f.insts) && narrow(mut o, i, f.insts[k+1]) { k = k + 2; continue }
+        if i.op == ir.Op.FCmp && counts[i.dst] == 1 && k + 1 < len(f.insts) && f.insts[k+1].op == ir.Op.Branch && f.insts[k+1].a == i.dst {
+            let b = f.insts[k+1]; next = -1; if k + 2 < len(f.insts) && f.insts[k+2].op == ir.Op.Label { next = f.insts[k+2].imm }
+            let a = source(mut o, i.a, "d16"); let rhs = source(mut o, i.b, "d17"); emit(mut o, "fcmp " + a + ", " + rhs); jumps(mut o, condition(i.imm, true), b.imm, b.imm2, next); k = k + 2; continue
+        }
+        if i.op == ir.Op.Branch {
+            let a = source(mut o, i.a, "x9")
+            if next == i.imm { emit(mut o, "cbz " + a + ", " + ir_label(o, i.imm2)) } else { emit(mut o, "cbnz " + a + ", " + ir_label(o, i.imm)); if next != i.imm2 { emit(mut o, "b " + ir_label(o, i.imm2)) } }; k = k + 1; continue
+        }
+        if i.op == ir.Op.BranchCmp && k + 2 < len(f.insts) && f.insts[k+1].op == ir.Op.Jump && f.insts[k+2].op == ir.Op.Label && f.insts[k+2].imm == i.imm {
+            let mut flipped = i; flipped.sym = inverse(branch_condition(i.sym)); flipped.imm = f.insts[k+1].imm; instruction(mut o, flipped); k = k + 2; continue
+        }
+        instruction(mut o, i); k = k + 1
+    }
+    if !frameless { push(mut o.lines, "LR" + num(fid) + ":"); for k in 0..len(saved) { emit(mut o, "ldur " + saved[k] + ", [x29, #-" + num((k+1)*8) + "]") }; emit(mut o, "mov sp, x29"); emit(mut o, "ldp x29, x30, [sp], #16"); emit(mut o, "ret") }
     for s in o.stubs { push(mut o.lines, s) }; for key in maps.keys(o.doubles) { doubles[key] = o.doubles[key] }; return o.lines
 }
 fn data(b: mut strings.Builder, d: ir.Data) {

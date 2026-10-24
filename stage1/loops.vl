@@ -1,0 +1,208 @@
+// Shared conservative loop sharing analysis for C and native generation.
+import ast
+import checker
+import maps
+// An escaped source place can change through a foreign pointer as well as
+// through a syntactic mut argument.
+pub fn escaped(k: checker.Checked, e: ast.Expr) -> Bool {
+    match e.kind {
+        ast.ExprKind.Name(_) => { match k.refs[e.id] { checker.Ref.Local(id) => return maps.has(k.escaped, id), _ => return false } }
+        ast.ExprKind.Field(x, _) => return escaped(k, x)
+        ast.ExprKind.Index(x, _) => return escaped(k, x)
+        _ => return false
+    }
+}
+pub type Uses = struct {
+    k: checker.Checked  // here, not passed beside `mut u`, which would copy it at every call
+    writes: [Int]  // locals written: an element, a push
+    grows: [Int]  // locals pushed to, whose elements may move
+    shared: Map[Int, Bool]  // locals used in a way that could share them
+}
+
+fn shares(u: mut Uses, e: ast.Expr) {
+    let l = ref_local(u.k, e.id)
+    if l >= 0 {
+        u.shared[l] = true
+    }
+}
+
+fn ref_local(k: checker.Checked, id: Int) -> Int {
+    return match k.refs[id] {
+        checker.Ref.Local(l) => l
+        _ => -1
+    }
+}
+
+fn is_name(e: ast.Expr) -> Bool {
+    return match e.kind {
+        ast.ExprKind.Name(_) => true
+        _ => false
+    }
+}
+
+fn uses_expr(u: mut Uses, e: ast.Expr, in_closure: Bool) {
+    match e.kind {
+        ast.ExprKind.Name(_) => shares(mut u, e)
+        ast.ExprKind.Unary(_, x) => uses_expr(mut u, x, in_closure)
+        ast.ExprKind.Binary(_, l, r) => {
+            uses_expr(mut u, l, in_closure)
+            uses_expr(mut u, r, in_closure)
+        }
+        ast.ExprKind.Call(f, args) => {
+            let mut name = ""
+            match u.k.refs[e.id] {
+                checker.Ref.Builtin(n) => name = n
+                _ => {}
+            }
+            let reads = name == "len" || name == "maps.get" || name == "maps.has" || name == "maps.keys"
+            let pushes = name == "push" || name == "strings.add" || name == "strings.add_byte" || name == "strings.add_int" ||
+                name == "maps.remove"
+            uses_expr(mut u, f, in_closure)
+            for i in 0..len(args) {
+                let a = args[i]
+                if i == 0 && reads && is_name(a) && !in_closure {
+                    continue  // read where it is, never retained
+                }
+                match a.kind {
+                    ast.ExprKind.MutArg(x) => {
+                        if i == 0 && pushes && is_name(x) && !in_closure {
+                            push(mut u.writes, ref_local(u.k, x.id))
+                            push(mut u.grows, ref_local(u.k, x.id))
+                        } else {
+                            uses_expr(mut u, x, in_closure)
+                        }
+                    }
+                    _ => uses_expr(mut u, a, in_closure)
+                }
+            }
+        }
+        ast.ExprKind.Field(x, _) => uses_expr(mut u, x, in_closure)
+        ast.ExprKind.Index(x, i) => {
+            if !is_name(x) || in_closure {
+                uses_expr(mut u, x, in_closure)
+            }
+            uses_expr(mut u, i, in_closure)
+        }
+        ast.ExprKind.Try(x) => uses_expr(mut u, x, in_closure)
+        ast.ExprKind.MutArg(x) => uses_expr(mut u, x, in_closure)
+        ast.ExprKind.Slice(x, a, b) => {
+            uses_expr(mut u, x, in_closure)
+            uses_expr(mut u, a, in_closure)
+            uses_expr(mut u, b, in_closure)
+        }
+        ast.ExprKind.ArrayLit(xs) => {
+            for x in xs {
+                uses_expr(mut u, x, in_closure)
+            }
+        }
+        ast.ExprKind.MapLit(entries) => {
+            for m in entries {
+                uses_expr(mut u, m.key, in_closure)
+                uses_expr(mut u, m.value, in_closure)
+            }
+        }
+        ast.ExprKind.StructLit(_, _, fields) => {
+            for f in fields {
+                uses_expr(mut u, f.value, in_closure)
+            }
+        }
+        ast.ExprKind.Match(x, arms) => {
+            uses_expr(mut u, x, in_closure)
+            uses_arms(mut u, arms, in_closure)
+        }
+        ast.ExprKind.Closure(_, _, body, _) => uses_block(mut u, body, true)
+        _ => {}
+    }
+}
+
+fn uses_arms(u: mut Uses, arms: [ast.Arm], in_closure: Bool) {
+    for a in arms {
+        match a.body {
+            ast.ArmBody.Value(v) => uses_expr(mut u, v, in_closure)
+            ast.ArmBody.Do(st) => uses_stmt(mut u, st, in_closure)
+        }
+    }
+}
+
+// The place an assignment writes: an element of a variable is a write of
+// it; a variable itself gets a new value.
+fn uses_target(u: mut Uses, e: ast.Expr, in_closure: Bool) {
+    match e.kind {
+        ast.ExprKind.Index(x, i) => {
+            uses_expr(mut u, i, in_closure)
+            if is_name(x) && !in_closure {
+                push(mut u.writes, ref_local(u.k, x.id))
+            } else {
+                uses_target(mut u, x, in_closure)
+            }
+        }
+        ast.ExprKind.Field(x, _) => uses_target(mut u, x, in_closure)
+        _ => uses_expr(mut u, e, in_closure)
+    }
+}
+
+fn uses_block(u: mut Uses, b: ast.Block, in_closure: Bool) {
+    for st in b.stmts {
+        uses_stmt(mut u, st, in_closure)
+    }
+}
+
+fn uses_stmt(u: mut Uses, st: ast.Stmt, in_closure: Bool) {
+    match st.kind {
+        ast.StmtKind.Block(b) => uses_block(mut u, b, in_closure)
+        ast.StmtKind.ExprStmt(e) => uses_expr(mut u, e, in_closure)
+        ast.StmtKind.Let(_, _, _, v) => uses_expr(mut u, v, in_closure)
+        ast.StmtKind.Assign(target, v) => {
+            uses_expr(mut u, v, in_closure)
+            uses_target(mut u, target, in_closure)
+        }
+        ast.StmtKind.If(cond, then, otherwise) => {
+            uses_expr(mut u, cond, in_closure)
+            uses_block(mut u, then, in_closure)
+            match otherwise {
+                ast.Else.ElseBlock(b) => uses_block(mut u, b, in_closure)
+                ast.Else.ElseIf(inner) => uses_stmt(mut u, inner, in_closure)
+                ast.Else.NoElse => {}
+            }
+        }
+        ast.StmtKind.For(cond, body) => {
+            match cond {
+                Some(c) => uses_expr(mut u, c, in_closure)
+                None => {}
+            }
+            uses_block(mut u, body, in_closure)
+        }
+        ast.StmtKind.ForRange(_, a, b, body) => {
+            uses_expr(mut u, a, in_closure)
+            uses_expr(mut u, b, in_closure)
+            uses_block(mut u, body, in_closure)
+        }
+        ast.StmtKind.ForEach(_, it, body) => {
+            uses_expr(mut u, it, in_closure)
+            uses_block(mut u, body, in_closure)
+        }
+        ast.StmtKind.Return(v) => {
+            match v {
+                Some(e) => uses_expr(mut u, e, in_closure)
+                None => {}
+            }
+        }
+        ast.StmtKind.MatchStmt(x, arms) => {
+            uses_expr(mut u, x, in_closure)
+            uses_arms(mut u, arms, in_closure)
+        }
+        ast.StmtKind.Unsafe(b) => uses_block(mut u, b, in_closure)
+        ast.StmtKind.With(items, b) => {
+            for w in items {
+                uses_expr(mut u, w.value, in_closure)
+            }
+            uses_block(mut u, b, in_closure)
+        }
+        _ => {}
+    }
+}
+
+
+pub fn analyze(k: checker.Checked, loop: ast.Stmt) -> Uses {
+    let mut u = Uses { k: k, writes: [], grows: [], shared: [:] }; uses_stmt(mut u, loop, false); return u
+}

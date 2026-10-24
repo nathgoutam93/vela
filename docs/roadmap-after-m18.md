@@ -19,6 +19,21 @@ in [the tooling backlog](tooling-backlog.md), with evidence, workarounds, and
 acceptance checks. Review it at milestone boundaries; it also tracks the
 remaining M17 validation.
 
+## Design baseline through M30
+
+The [2026-10-25 scope decision](design-baseline-to-m30.md) accepts three
+bounded additions: discarded-Result diagnostics in M28, verification soundness
+and cost boundaries in M28/M29, and specification of agent-facing JSON
+contracts in M30. They are planned work, not claims of implementation.
+
+After this decision, freeze further language architectural scope until M30
+is achieved. Complete the existing milestones, these accepted details,
+correctness fixes and optimizations preserving the agreed semantics. Retain
+value semantics with RC/copy-on-write and the current type/effect architecture.
+New ownership/linear/typestate/refinement type systems and runtime reflection
+are outside this delivery scope; proposals wait until after M30. This does
+not defer existing platform, verification, debugging or validation work.
+
 ## Order and what each needs
 
 ```
@@ -139,8 +154,12 @@ still outstanding. See [the walkthrough](m24-agent-safety.md) and VAL-004 in
 
 ## M25: Native backend parity
 
-**Status:** not started; M26a now provides local ARM64 native execution and
-measured compiler baselines. Performance acceptance remains open.
+**Status:** implemented and locally validated on macOS ARM64. Performance
+acceptance passes (1.460 times C; native compiler faster on checking and C
+emission), both bootstrap fixed points pass, and the C/native suites and
+available UBSan checks pass. Linux execution and ASan/TSan remain VAL-001;
+broader platform delivery stays in M26. See the
+[walkthrough](m25-native-parity.md) and [experiments](m25-experiments.md).
 
 **Needs:** the existing IR; M26a enables measurements on the available Mac.
 
@@ -196,15 +215,35 @@ WASI, general cross-linking and remaining platform validation are still open.
 
 **What gets built:** Verification for agents: contracts proved at compile time where the range analysis or an SMT solver can, the rest checked at run time as now; property tests generated from requires and ensures (vela test --properties); counterexamples as JSON.
 
+**Accepted details:** compiler-only warnings for discarded Result calls,
+with explicit discard through existing syntax; bounded, opt-in expensive
+solver work; source/target-bound proof evidence; and distinct proved,
+refuted and unknown outcomes. Check removal requires sound purity,
+definedness and termination reasoning. Existing effectful contract behavior
+is preserved; an empty uses set is not a purity proof. See the
+[baseline](design-baseline-to-m30.md#m28-verification-boundaries-and-cost),
+[TL-036](tooling-backlog.md#tl-036-result-returning-calls-can-silently-discard-failures)
+and [TL-037](tooling-backlog.md#tl-037-guide-contract-purity-exceeds-the-implemented-check).
+
 **Concepts:** Static verification, SMT solving, property-based testing, shrinking counterexamples.
 
 **Done when:** The compiler's own contracts are proved or property-tested; in eval runs, agents fix contract violations from the counterexamples alone.
+
+Discarded-error diagnostics cover direct/indirect/generic/method calls and
+explicit acknowledgement. Proof reports reject stale inputs, preserve unknown
+runtime checks and observable contract calls, and add no runtime proof data.
+Property-test success remains separate from formal proof.
 
 ## M29: Scale
 
 **Needs:** M21 and M23 (real programs call C and use std) and M25 (both backends measured).
 
 **What gets built:** Scale: a benchmark suite of real programs (a JSON service, a compressor, the compiler itself), incremental compilation, and a compile-time budget the suite enforces.
+
+**Accepted measurement detail:** record normal check/build/query latency and
+code size alongside runtime benchmarks; report requested verification cost
+separately. Retain existing thresholds and match sources, targets and
+toolchains. See the [baseline](design-baseline-to-m30.md#m29-measure-all-relevant-costs).
 
 **Concepts:** Benchmarking real workloads, incremental compilation and caching, performance budgets in CI.
 
@@ -216,9 +255,18 @@ WASI, general cross-linking and remaining platform validation are still open.
 
 **What gets built:** Vela 1.0: a written specification checked against the compiler, a stability policy (programs written for 1.0 build on every 1.x), and vela guide and the specification kept in step by tests.
 
+**Accepted specification detail:** document schema/version and compatibility
+rules for JSON diagnostics, existing semantic queries and M28 proof reports.
+Specify source-scoped identities and distinguish potential reachability,
+measured coverage and proof. No new runtime reflection or complete type-graph
+SDK is required. See the [baseline](design-baseline-to-m30.md#m30-specify-the-agent-facing-interfaces).
+
 **Concepts:** Language specification, compatibility and editions, release engineering.
 
 **Done when:** Every construct is in the specification with a test; the 1.0 programs in the suite build unchanged on later releases.
+
+Fixtures also check the documented agent-facing JSON contracts and generated
+guide. The architecture freeze remains in force throughout delivery to M30.
 
 ## What is not in it yet
 

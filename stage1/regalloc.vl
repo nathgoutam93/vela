@@ -1,0 +1,64 @@
+// ARM64 linear scan. Argument/scratch registers are reserved by the emitter.
+// Intervals include loops and returning backend helper calls. Constants and
+// immutable addresses are reconstructed at uses instead of occupying frames.
+import ir
+import live
+import lists
+pub type Loc = struct { kind: Int, reg: Str, off: Int, sym: Str }
+// 0 physical register, 1 spill, 2 constant, 3 slot address, 4 symbol, 5 dead.
+fn empty(kind: Int) -> Loc { return Loc { kind: kind, reg: "", off: 0, sym: "" } }
+pub fn callee(r: Str) -> Bool { return r != "" && (r == "x19" || (len(r) == 3 && r[0] == 'x' && r[1] == '2' && r[2] <= '8') || r == "d8" || r == "d9" || r == "d10" || r == "d11" || r == "d12" || r == "d13" || r == "d14" || r == "d15") }
+pub fn allocate(f: ir.Func) -> [Loc] {
+    let iv = live.intervals(f, true); let mut out: [Loc] = []; let mut candidates: [Int] = []; let mut starts: [Int] = []
+    for v in 0..len(f.classes) {
+        let mut l = empty(5)
+        if iv.end[v] >= 0 {
+            l.kind = 1
+            if iv.defs[v] == 1 && iv.def_at[v] >= 0 {
+                let i = f.insts[iv.def_at[v]]
+                if i.op == ir.Op.Const { l.kind = 2; l.off = i.imm }
+                if i.op == ir.Op.SlotAddr { l.kind = 3; l.off = i.imm }
+                if i.op == ir.Op.SymAddr { l.kind = 4; l.sym = i.sym }
+            }
+            if l.kind == 1 { push(mut candidates, v); push(mut starts, iv.start[v]) }
+        }
+        push(mut out, l)
+    }
+    let mut gp = ["x28","x27","x26","x25","x24","x23","x22","x21","x20","x19"]
+    let mut gp_caller = ["x16","x14","x8"]
+    let mut fp = ["d15","d14","d13","d12","d11","d10","d9","d8"]
+    let mut caller = ["d31","d30","d29","d28","d27","d26","d25","d24","d23","d22","d21","d20","d19"]
+    let mut active: [Int] = []
+    for k in lists.order(starts) {
+        let v = candidates[k]; let cross = live.crosses(iv, v); let floating = f.classes[v] == ir.FLOAT()
+        let mut kept: [Int] = []
+        for a in active {
+            if iv.end[a] < iv.start[v] {
+                let r = out[a].reg
+                if f.classes[a] != ir.FLOAT() { if callee(r) { push(mut gp, r) } else { push(mut gp_caller, r) } } else if callee(r) { push(mut fp, r) } else { push(mut caller, r) }
+            } else { push(mut kept, a) }
+        }; active = kept
+        let mut r = ""
+        let fd = iv.first_def[v]
+        if fd == iv.start[v] && fd >= 1 {
+            let d = f.insts[fd - 1]; let a = d.a
+            if a >= 0 && out[a].kind == 0 && iv.end[a] == fd && f.classes[a] == f.classes[v] && (!cross || callee(out[a].reg)) {
+                r = out[a].reg; kept = []; for x in active { if x != a { push(mut kept, x) } }; active = kept
+            }
+        }
+        if r == "" && !floating && !cross && len(gp_caller) > 0 { r = gp_caller[len(gp_caller)-1]; gp_caller = gp_caller[0..len(gp_caller)-1] }
+        if !floating && r == "" && len(gp) > 0 { r = gp[len(gp)-1]; gp = gp[0..len(gp)-1] }
+        if r == "" && floating && !cross && len(caller) > 0 { r = caller[len(caller)-1]; caller = caller[0..len(caller)-1] }
+        if floating && r == "" && len(fp) > 0 { r = fp[len(fp)-1]; fp = fp[0..len(fp)-1] }
+        if r == "" {
+            let mut victim = -1
+            for a in active { if f.classes[a] == f.classes[v] && (!cross || callee(out[a].reg)) && (victim < 0 || iv.cost[a] < iv.cost[victim] || iv.cost[a] == iv.cost[victim] && iv.end[a] > iv.end[victim]) { victim = a } }
+            if victim >= 0 && (iv.cost[victim] < iv.cost[v] || iv.cost[victim] == iv.cost[v] && iv.end[victim] > iv.end[v]) {
+                r = out[victim].reg; out[victim] = empty(1); kept = []
+                for a in active { if a != victim { push(mut kept, a) } }; active = kept
+            }
+        }
+        if r != "" { out[v].kind = 0; out[v].reg = r; push(mut active, v) }
+    }
+    return out
+}

@@ -23,6 +23,7 @@
 // and the spilled values, then the arguments of calls that go on the
 // stack, with rsp a multiple of 16 at every call.
 import ir
+import live
 import lists
 import maps
 import strings
@@ -96,144 +97,7 @@ fn data(b: mut strings.Builder, d: ir.Data) {
 
 // ---- Intervals ----
 
-type Intervals = struct {
-    start: [Int]
-    end: [Int]
-    defs: [Int]
-    def_at: [Int]  // the instruction setting it, when there is one
-    first_def: [Int]  // the position it is first set at
-    calls: [Int]  // calls[p]: how many calls are at positions before p
-}
-
-fn big() -> Int {
-    return 1000000000
-}
-
-fn is_call(op: ir.Op) -> Bool {
-    return op == ir.Op.Call || op == ir.Op.CallInd || op == ir.Op.CCall
-}
-
-// Positions: 0 is the entry, where the parameters arrive; instruction i
-// is at i + 1.
-fn intervals(f: ir.Func) -> Intervals {
-    let n = len(f.classes)
-    let mut start: [Int] = []
-    let mut end: [Int] = []
-    let mut defs: [Int] = []
-    let mut def_at: [Int] = []
-    let mut first_def: [Int] = []
-    let mut first_use: [Int] = []
-    for _ in 0..n {
-        push(mut start, big())
-        push(mut end, -1)
-        push(mut defs, 0)
-        push(mut def_at, -1)
-        push(mut first_def, big())
-        push(mut first_use, big())
-    }
-    for r in f.params {
-        start[r] = 0
-        end[r] = 0
-        first_def[r] = 0
-        defs[r] = 2  // never a constant
-    }
-    let mut label_at: Map[Int, Int] = [:]
-    for i in 0..len(f.insts) {
-        if f.insts[i].op == ir.Op.Label {
-            label_at[f.insts[i].imm] = i + 1
-        }
-    }
-    let mut edges: [[Int]] = []  // back edges: [the loop's start, the jump back]
-    let mut calls: [Int] = [0]
-    let mut count = 0
-    for i in 0..len(f.insts) {
-        let inst = f.insts[i]
-        let p = i + 1
-        push(mut calls, count)  // calls[p]: the calls before position p
-        for u in ir.reads(inst) {
-            if p < start[u] {
-                start[u] = p
-            }
-            if p > end[u] {
-                end[u] = p
-            }
-            if p < first_use[u] {
-                first_use[u] = p
-            }
-        }
-        if inst.dst >= 0 {
-            let d = inst.dst
-            if p < start[d] {
-                start[d] = p
-            }
-            if p > end[d] {
-                end[d] = p
-            }
-            if p < first_def[d] {
-                first_def[d] = p
-            }
-            defs[d] = defs[d] + 1
-            def_at[d] = i
-        }
-        if inst.op == ir.Op.Jump || inst.op == ir.Op.Branch || inst.op == ir.Op.BranchCmp {
-            let h = label_at[inst.imm]
-            if h <= p {
-                push(mut edges, [h, p])
-            }
-            if inst.op == ir.Op.Branch {
-                let h2 = label_at[inst.imm2]
-                if h2 <= p {
-                    push(mut edges, [h2, p])
-                }
-            }
-        }
-        if is_call(inst.op) {
-            count = count + 1
-        }
-    }
-    push(mut calls, count)
-    push(mut calls, count)
-    // Over loops: a value live into a loop, out of it, or from one turn to
-    // the next must live through the whole loop.
-    let mut changed = len(edges) > 0
-    for changed {
-        changed = false
-        for edge in edges {
-            let h = edge[0]
-            let p = edge[1]
-            for v in 0..n {
-                let s = start[v]
-                let e = end[v]
-                if e < 0 || e < h || s > p {
-                    continue
-                }
-                let carried = first_use[v] < first_def[v] && first_use[v] >= h
-                if s < h && e < p || s >= h && e > p && s > h || carried && (s > h || e < p) {
-                    if s > h && (e > p || carried) {
-                        start[v] = h
-                    }
-                    if e < p && (s < h || carried) {
-                        end[v] = p
-                    }
-                    if start[v] != s || end[v] != e {
-                        changed = true
-                    }
-                }
-            }
-        }
-    }
-    return Intervals { start: start, end: end, defs: defs, def_at: def_at, first_def: first_def, calls: calls }
-}
-
-// Whether a call is strictly inside the interval of v.
-fn crosses(iv: Intervals, v: Int) -> Bool {
-    let s = iv.start[v]
-    let e = iv.end[v]
-    if e <= s + 1 {
-        return false
-    }
-    return iv.calls[e] - iv.calls[s + 1] > 0
-}
+fn is_call(op: ir.Op) -> Bool { return op == ir.Op.Call || op == ir.Op.CallInd || op == ir.Op.CCall }
 
 // ---- Allocation ----
 
@@ -277,7 +141,7 @@ fn is_callee_saved(r: Str) -> Bool {
 
 fn allocate(f: ir.Func) -> [Loc] {
     let n = len(f.classes)
-    let iv = intervals(f)
+    let iv = live.intervals(f, false)
     let mut locs: [Loc] = []
     for _ in 0..n {
         push(mut locs, nowhere())
@@ -333,7 +197,7 @@ fn allocate(f: ir.Func) -> [Loc] {
             }
         }
         active = still
-        let cross = crosses(iv, v)
+        let cross = live.crosses(iv, v)
         let mut got = ""
         // The register of the operand the instruction setting v reads,
         // when the operand's interval ends there: no move is needed.
@@ -1106,6 +970,7 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         fset(mut o, i.dst, "xmm15")
         return
     }
+    if op == ir.Op.FSqrt { emit(mut o, "sqrtsd xmm15, " + fsrc(o, i.a)); fset(mut o, i.dst, "xmm15"); return }
     if op == ir.Op.FNeg {
         emit(mut o, "movq rax, " + fin_reg(mut o, i.a, "xmm15"))
         emit(mut o, "btc rax, 63")
@@ -1118,6 +983,23 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         emit(mut o, "cvtsi2sd xmm15, " + in_reg(mut o, i.a, "rax"))
         fset(mut o, i.dst, "xmm15")
         return
+    }
+    if op == ir.Op.Extend {
+        let a = in_reg(mut o, i.a, "rax"); if a != "rax" { emit(mut o, "mov rax, " + a) }
+        if i.imm < 64 {
+            let mut name = "movzx"; if i.imm2 != 0 { name = "movsx" }; if i.imm == 32 && i.imm2 != 0 { name = "movsxd" }
+            if i.imm == 32 && i.imm2 == 0 { emit(mut o, "mov eax, eax") } else { let mut dst = "rax"; if i.imm2 == 0 { dst = "eax" }; emit(mut o, name + " " + dst + ", " + sized("rax", i.imm / 8)) }
+        }; set(mut o, i.dst, "rax"); return
+    }
+    if op == ir.Op.Inv { emit(mut o, "mov rax, " + src(mut o, i.a, "rax")); emit(mut o, "not rax"); set(mut o, i.dst, "rax"); return }
+    if op == ir.Op.And || op == ir.Op.Or || op == ir.Op.Xor {
+        emit(mut o, "mov rax, " + src(mut o, i.a, "rax")); let name = match op { ir.Op.And => "and", ir.Op.Or => "or", _ => "xor" }; emit(mut o, name + " rax, " + src(mut o, i.b, "r11")); set(mut o, i.dst, "rax"); return
+    }
+    if op == ir.Op.Shl || op == ir.Op.Shr || op == ir.Op.Sar {
+        emit(mut o, "mov rcx, " + src(mut o, i.b, "rcx")); emit(mut o, "mov rax, " + src(mut o, i.a, "rax")); let name = match op { ir.Op.Shl => "shl", ir.Op.Shr => "shr", _ => "sar" }; emit(mut o, name + " rax, cl"); set(mut o, i.dst, "rax"); return
+    }
+    if op == ir.Op.Div || op == ir.Op.Rem {
+        let b = in_reg(mut o, i.b, "r11"); if b != "r11" { emit(mut o, "mov r11, " + b) }; emit(mut o, "mov rax, " + src(mut o, i.a, "rax")); emit(mut o, "cqo"); emit(mut o, "idiv r11"); if op == ir.Op.Rem { emit(mut o, "mov rax, rdx") }; set(mut o, i.dst, "rax"); return
     }
     if op == ir.Op.Sext32 {
         let a = in_reg(mut o, i.a, "rax")
@@ -1188,7 +1070,8 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         let done = local_label(mut o)
         emit(mut o, "mov rax, qword ptr [" + r + "]")
         emit(mut o, "test rax, rax")
-        emit(mut o, "jle " + slow)
+        emit(mut o, "je " + done)  // immortal zero counts stay unchanged
+        emit(mut o, "jl " + slow)
         emit(mut o, "inc rax")
         emit(mut o, "mov qword ptr [" + r + "], rax")
         emit(mut o, "jmp " + done)
@@ -1204,7 +1087,8 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         let done = local_label(mut o)
         emit(mut o, "mov rax, qword ptr [" + r + "]")
         emit(mut o, "test rax, rax")
-        emit(mut o, "jle " + slow)
+        emit(mut o, "je " + done)  // immortal zero counts stay unchanged
+        emit(mut o, "jl " + slow)
         emit(mut o, "dec rax")
         emit(mut o, "mov qword ptr [" + r + "], rax")
         emit(mut o, "sete al")

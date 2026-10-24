@@ -168,10 +168,21 @@ Apple scalar C/callback/variadic ABI, explicit build/asm targets and local
 native bootstrap. Builds still default to C; run/test select the native host.
 `vela asm --target x86_64-unknown-linux-gnu FILE` retains Linux assembly output;
 `vela build --target aarch64-apple-darwin FILE` selects native Mac code.
-Performance parity and remaining platforms stay open. See
+M26a left performance parity to M25 and remaining platforms to M26. See
 [`docs/m26a-macos-arm64.md`](docs/m26a-macos-arm64.md).
+M25 brings the native backend within its 1.5-times-C target on the local Mac:
+the twelve-workload geometric mean is 1.460, and the native-built compiler
+takes less time than the C-built compiler for checking and C emission.
+Shared range proofs, borrowing/copy optimizations and ARM64 register allocation
+preserve existing semantics. Both bootstrap fixed points, all 304 C and 304
+native checks, and 125 UBSan checks pass. Linux execution and unrun sanitizer
+coverage remain tracked separately. See [`docs/m25-native-parity.md`](docs/m25-native-parity.md)
+for reproducible measurements, validation and limits.
 What comes next, toward a systems language that is also agent-first, is in
 [`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
+The [design baseline through M30](docs/design-baseline-to-m30.md) records the
+accepted remaining scope and freezes further language architectural changes
+until M30 is achieved.
 See `docs/` for a walkthrough of each milestone.
 Tooling discoveries and outstanding validation are tracked in
 [`docs/tooling-backlog.md`](docs/tooling-backlog.md) throughout milestone work.

@@ -19,9 +19,12 @@
 //   goes, and so does code no jump can reach.
 import ir
 import maps
+import strings
+import ints
+import promote
 
 fn inline_limit() -> Int {
-    return 12
+    return 80
 }
 
 pub fn optimize(p: ir.Program) -> ir.Program {
@@ -47,6 +50,7 @@ pub fn optimize_with(p: ir.Program, limit: Int, rounds: Int) -> ir.Program {
             funcs[i] = simplify(inline_calls(funcs[i], before, index, small))
         }
     }
+    for i in 0..len(funcs) { funcs[i] = compact_slots(forward_destinations(hoist_floats(funcs[i]))) }
     return ir.Program { funcs: funcs, data: p.data }
 }
 
@@ -158,7 +162,18 @@ fn pure(op: ir.Op) -> Bool {
         ir.Op.FTo32 => true
         ir.Op.FFrom32 => true
         ir.Op.FNeg => true
+        ir.Op.FSqrt => true
         ir.Op.IntToFloat => true
+        ir.Op.And => true
+        ir.Op.Or => true
+        ir.Op.Xor => true
+        ir.Op.Inv => true
+        ir.Op.Shl => true
+        ir.Op.Shr => true
+        ir.Op.Sar => true
+        ir.Op.Extend => true
+        ir.Op.Div => true
+        ir.Op.Rem => true
         ir.Op.Sext32 => true
         _ => false
     }
@@ -195,13 +210,167 @@ fn simplify(f: ir.Func) -> ir.Func {
     for _ in 0..4 {
         let before = len(out.insts)
         out = propagate(out)
+        out = local_copies(out)
+        out = scalar_copy(out)
+        out = promote.function(out)
+        out = reuse(out)
         out = fold(out)
+        out = fuse_branches(out)
         out = drop_dead(out)
         out = thread_jumps(out)
         out = drop_unreachable(out)
         if len(out.insts) == before {
             break
         }
+    }
+    return out
+}
+
+// Compute directly into a following move's destination when the private
+// result has no other readers. This removes false overlap with loop-carried
+// variables before allocation. Keep it after simplification: value numbering
+// must still see the original single-definition results while it runs.
+fn forward_destinations(f: ir.Func) -> ir.Func {
+    let defs = def_counts(f); let mut readers: [Int] = []
+    for _ in f.classes { push(mut readers, 0) }
+    for i in f.insts { for r in ir.reads(i) { readers[r] = readers[r] + 1 } }
+    let mut out = f; out.insts = []; let mut at = 0
+    for at < len(f.insts) {
+        let mut i = f.insts[at]
+        if i.dst >= 0 && defs[i.dst] == 1 && readers[i.dst] == 1 && at + 1 < len(f.insts) && (pure(i.op) || i.op == ir.Op.AddChk || i.op == ir.Op.SubChk || i.op == ir.Op.MulChk || i.op == ir.Op.DivChk || i.op == ir.Op.RemChk) {
+            let next = f.insts[at+1]
+            if next.op == ir.Op.Move && next.a == i.dst && next.dst != i.dst && f.classes[next.dst] == f.classes[i.dst] {
+                i.dst = next.dst; push(mut out.insts, i); at = at + 2; continue
+            }
+        }
+        push(mut out.insts, i); at = at + 1
+    }
+    return out
+}
+
+// A private temporary copied only to read one field need not materialize
+// the rest of the aggregate. Keep the read at the copy's original point:
+// there can be no intervening store, call, or change to the source address.
+fn scalar_copy(f: ir.Func) -> ir.Func {
+    let defs = def_counts(f); let mut counts: [Int] = []; let mut addresses: [Int] = []
+    let mut slots: Map[Int, Int] = [:]
+    for _ in f.classes { push(mut counts, 0) }
+    for _ in f.slot_sizes { push(mut addresses, 0) }
+    for i in f.insts {
+        for r in ir.reads(i) { counts[r] = counts[r] + 1 }
+        if i.op == ir.Op.SlotAddr { slots[i.dst] = i.imm; addresses[i.imm] = addresses[i.imm] + 1 }
+    }
+    let mut out = f; out.insts = []; let mut at = 0
+    for at < len(f.insts) {
+        let i = f.insts[at]
+        if i.op == ir.Op.Copy && maps.has(slots, i.a) && defs[i.a] == 1 && counts[i.a] == 2 && addresses[slots[i.a]] == 1 && at + 1 < len(f.insts) {
+            let mut after = at + 1
+            for after < len(f.insts) && (f.insts[after].op == ir.Op.SlotAddr || f.insts[after].op == ir.Op.SymAddr || f.insts[after].op == ir.Op.Const || f.insts[after].op == ir.Op.FConst) {
+                if f.insts[after].dst == i.b { break }; after = after + 1
+            }
+            if after >= len(f.insts) { push(mut out.insts, i); at = at + 1; continue }
+            let mut next = f.insts[after]; let mut size = next.imm2; if next.op == ir.Op.FLoad { size = 8 }
+            if next.op == ir.Op.Copy && next.b == i.a && next.imm == i.imm {
+                for between in at+1..after { push(mut out.insts, f.insts[between]) }
+                next.b = i.b; push(mut out.insts, next); at = after + 1; continue
+            }
+            if (next.op == ir.Op.Load || next.op == ir.Op.FLoad) && next.a == i.a && next.imm >= 0 && size > 0 && next.imm <= i.imm - size {
+                for between in at+1..after { push(mut out.insts, f.insts[between]) }
+                next.a = i.b; push(mut out.insts, next); at = after + 1; continue
+            }
+        }
+        push(mut out.insts, i); at = at + 1
+    }
+    return out
+}
+
+// A snapshot can use its source register until that source is assigned.
+// Keep the original move: later reads after an assignment or a control-flow
+// boundary still need the frozen value. Dead-code removal drops it only when
+// every read was safely replaced. Representatives always point one hop to a
+// register that currently represents itself.
+fn local_copies(f: ir.Func) -> ir.Func {
+    let mut rep: [Int] = []; for r in 0..len(f.classes) { push(mut rep, r) }
+    let mut active: [Int] = []; let mut out = f; out.insts = []
+    for original in f.insts {
+        if original.op == ir.Op.Label { for r in active { rep[r] = r }; active = [] }
+        let i = renamed(original, rep)
+        if i.op == ir.Op.Move && i.dst == i.a { continue }
+        if i.dst >= 0 {
+            let d = i.dst; let mut kept: [Int] = []
+            for r in active {
+                if rep[r] == d || r == d { rep[r] = r } else { push(mut kept, r) }
+            }; active = kept; rep[d] = d
+            if i.op == ir.Op.Move && i.a != d { rep[d] = i.a; push(mut active, d) }
+        }
+        push(mut out.insts, i)
+        if ir.ends_block(i.op) || i.op == ir.Op.BranchCmp { for r in active { rep[r] = r }; active = [] }
+    }
+    return out
+}
+
+// Value numbering within a basic block. Immutable register expressions can
+// survive writes; memory reads cannot. Clear both tables at control-flow
+// boundaries, and all load facts at every possible memory mutation.
+fn reuse(f: ir.Func) -> ir.Func {
+    let defs = def_counts(f); let mut values: Map[Str, Int] = [:]; let mut loads: Map[Str, Int] = [:]
+    let mut rep: [Int] = []; for r in 0..len(f.classes) { push(mut rep, r) }
+    let mut out = f; out.insts = []
+    for original in f.insts {
+        let i = renamed(original, rep)
+        if i.op == ir.Op.Label || ir.ends_block(i.op) || i.op == ir.Op.BranchCmp { values = [:]; loads = [:] }
+        let reading = i.op == ir.Op.Load || i.op == ir.Op.FLoad
+        if i.op == ir.Op.Call || i.op == ir.Op.CallInd || i.op == ir.Op.CCall || i.op == ir.Op.Store || i.op == ir.Op.FStore || i.op == ir.Op.Copy || i.op == ir.Op.RcInc || i.op == ir.Op.RcDec { loads = [:] }
+        let mut candidate = i.dst >= 0 && pure(i.op)
+        if candidate { candidate = defs[i.dst] == 1; for r in ir.reads(i) { if defs[r] != 1 { candidate = false } } }
+        if candidate {
+            let key = ir.op_name(i.op) + ":" + strings.from_int(i.a) + ":" + strings.from_int(i.b) + ":" + strings.from_int(i.imm) + ":" + strings.from_int(i.imm2) + ":" + i.sym
+            let mut previous = -1
+            if reading { match maps.get(loads, key) { Some(v) => previous = v, None => {} } } else { match maps.get(values, key) { Some(v) => previous = v, None => {} } }
+            if previous >= 0 { rep[i.dst] = previous; continue }
+            if reading { loads[key] = i.dst } else { values[key] = i.dst }
+        }
+        push(mut out.insts, i)
+    }
+    return out
+}
+
+fn compact_slots(f: ir.Func) -> ir.Func {
+    let mut used: Map[Int, Bool] = [:]; for i in f.insts { if i.op == ir.Op.SlotAddr { used[i.imm] = true } }
+    let mut slots: Map[Int, Int] = [:]; let mut out = f; out.slot_sizes = []; out.slot_aligns = []
+    for s in 0..len(f.slot_sizes) { if maps.has(used, s) { slots[s] = len(out.slot_sizes); push(mut out.slot_sizes, f.slot_sizes[s]); push(mut out.slot_aligns, f.slot_aligns[s]) } }
+    out.insts = []; for original in f.insts { let mut i = original; if i.op == ir.Op.SlotAddr { i.imm = slots[i.imm] }; push(mut out.insts, i) }
+    return out
+}
+
+fn hoist_floats(f: ir.Func) -> ir.Func {
+    let defs = def_counts(f); let mut constants: Map[Str, Int] = [:]; let mut rep: [Int] = []
+    for r in 0..len(f.classes) { push(mut rep, r) }
+    let mut out = f; out.insts = []
+    for i in f.insts { if i.op == ir.Op.FConst && defs[i.dst] == 1 {
+        match maps.get(constants, i.sym) { Some(v) => rep[i.dst] = v, None => { constants[i.sym] = i.dst; push(mut out.insts, i) } }
+    } }
+    for i in f.insts { if i.op != ir.Op.FConst || defs[i.dst] != 1 { push(mut out.insts, renamed(i, rep)) } }
+    return out
+}
+
+fn fuse_branches(f: ir.Func) -> ir.Func {
+    let mut counts: [Int] = []; for _ in f.classes { push(mut counts, 0) }
+    for i in f.insts { for r in ir.reads(i) { counts[r] = counts[r] + 1 } }
+    let mut out = f; out.insts = []; let mut at = 0
+    for at < len(f.insts) {
+        let i = f.insts[at]
+        if (i.op == ir.Op.Cmp || i.op == ir.Op.CmpImm) && counts[i.dst] == 1 && at + 1 < len(f.insts) {
+            let next = f.insts[at + 1]
+            if next.op == ir.Op.Branch && next.a == i.dst {
+                let mut b = i.b
+                if i.op == ir.Op.CmpImm { b = ir.reg(mut out, ir.INT()); push(mut out.insts, ir.inst(ir.Op.Const, b, -1, -1, i.imm2)) }
+                let mut branch = ir.inst(ir.Op.BranchCmp, -1, i.a, b, next.imm)
+                branch.sym = match i.imm { 0 => "eq", 1 => "ne", 2 => "lt", 3 => "le", 4 => "gt", _ => "ge" }
+                push(mut out.insts, branch); push(mut out.insts, ir.inst(ir.Op.Jump, -1, -1, -1, next.imm2)); at = at + 2; continue
+            }
+        }
+        push(mut out.insts, i); at = at + 1
     }
     return out
 }
@@ -291,6 +460,30 @@ fn fold(f: ir.Func) -> ir.Func {
     out.insts = []
     for i in f.insts {
         let mut o = i
+        let ak = maps.has(known, i.a); let bk = maps.has(known, i.b)
+        let mut a = 2; let mut b = 2; if ak { a = known[i.a] }; if bk { b = known[i.b] }
+        let add = i.op == ir.Op.Add || i.op == ir.Op.AddChk
+        let sub = i.op == ir.Op.Sub || i.op == ir.Op.SubChk
+        let mul = i.op == ir.Op.Mul || i.op == ir.Op.MulChk
+        let div = i.op == ir.Op.Div || i.op == ir.Op.DivChk
+        let rem = i.op == ir.Op.Rem || i.op == ir.Op.RemChk
+        if (sub && i.a == i.b) || (mul && ((ak && a == 0) || (bk && b == 0))) || (rem && bk && b == 1) || (i.op == ir.Op.And && ((ak && a == 0) || (bk && b == 0))) {
+            o = ir.inst(ir.Op.Const, i.dst, -1, -1, 0)
+        } else if ((add || sub || i.op == ir.Op.Or || i.op == ir.Op.Xor || i.op == ir.Op.Shl || i.op == ir.Op.Shr || i.op == ir.Op.Sar) && bk && b == 0) || ((mul || div) && bk && b == 1) || (i.op == ir.Op.And && bk && b == -1) {
+            o = ir.inst(ir.Op.Move, i.dst, i.a, -1, 0)
+        } else if (add && ak && a == 0) || (mul && ak && a == 1) || (i.op == ir.Op.And && ak && a == -1) {
+            o = ir.inst(ir.Op.Move, i.dst, i.b, -1, 0)
+        }
+        if i.dst >= 0 && defs[i.dst] == 1 && maps.has(known, i.a) {
+            let a = known[i.a]; let mut n = a; let mut folded = true
+            if i.op == ir.Op.AddImm { n = ints.wrapping_add(a, i.imm) } else if i.op == ir.Op.MulImm { n = ints.wrapping_mul(a, i.imm) } else if i.op == ir.Op.Inv { n = ~a } else if i.op == ir.Op.Extend {
+                if i.imm < 64 { let mask = (1 << i.imm) - 1; n = a & mask; if i.imm2 != 0 { let sign = 1 << (i.imm-1); n = (n ^ sign) - sign } }
+            } else if maps.has(known, i.b) {
+                let b = known[i.b]
+                if i.op == ir.Op.Add { n = ints.wrapping_add(a, b) } else if i.op == ir.Op.Sub { n = ints.wrapping_sub(a, b) } else if i.op == ir.Op.Mul { n = ints.wrapping_mul(a, b) } else if i.op == ir.Op.And { n = a & b } else if i.op == ir.Op.Or { n = a | b } else if i.op == ir.Op.Xor { n = a ^ b } else if i.op == ir.Op.Shl && b >= 0 && b < 64 { n = a << b } else if i.op == ir.Op.Sar && b >= 0 && b < 64 { n = a >> b } else { folded = false }
+            } else { folded = false }
+            if folded { o = ir.inst(ir.Op.Const, i.dst, -1, -1, n); known[i.dst] = n }
+        }
         if i.op == ir.Op.Cmp && maps.has(known, i.a) && maps.has(known, i.b) {
             o = ir.inst(ir.Op.Const, i.dst, -1, -1, bool_int(holds(i.imm, known[i.a], known[i.b])))
         } else if i.op == ir.Op.CmpImm && maps.has(known, i.a) {

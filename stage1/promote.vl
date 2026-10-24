@@ -1,0 +1,69 @@
+// Scalar replacement of private, integer-word stack aggregates. Every address
+// alias must be known, and no address may escape. Floats/narrow or overlapping
+// field accesses retain their original memory representation.
+import ir
+import maps
+
+type Address = struct { slot: Int, offset: Int }
+fn inside(a: Address, bytes: Int, sizes: [Int]) -> Bool {
+    return bytes > 0 && bytes % 8 == 0 && a.offset >= 0 && a.offset % 8 == 0 && a.offset <= sizes[a.slot] - bytes
+}
+
+pub fn function(f: ir.Func) -> ir.Func {
+    let mut defs: [Int] = []; for _ in f.classes { push(mut defs, 0) }
+    for p in f.params { defs[p] = defs[p] + 1 }
+    for i in f.insts { if i.dst >= 0 { defs[i.dst] = defs[i.dst] + 1 } }
+    let mut addresses: Map[Int, Address] = [:]
+    for i in f.insts {
+        if i.dst < 0 || defs[i.dst] != 1 { continue }
+        if i.op == ir.Op.SlotAddr { addresses[i.dst] = Address { slot: i.imm, offset: 0 } } else if (i.op == ir.Op.AddImm || i.op == ir.Op.Move) && maps.has(addresses, i.a) {
+            let mut a = addresses[i.a]; if i.op == ir.Op.AddImm { a.offset = a.offset + i.imm }; addresses[i.dst] = a
+        }
+    }
+    let mut eligible: [Bool] = []
+    for _ in f.slot_sizes { push(mut eligible, false) }
+    for r in maps.keys(addresses) { let s = addresses[r].slot; let n = f.slot_sizes[s]; eligible[s] = n > 0 && n <= 256 && n % 8 == 0 }
+    for i in f.insts {
+        for r in ir.reads(i) {
+            if !maps.has(addresses, r) { continue }
+            let a = addresses[r]; let mut ok = false
+            if (i.op == ir.Op.Move || i.op == ir.Op.AddImm) && r == i.a && maps.has(addresses, i.dst) { ok = true }
+            if i.op == ir.Op.Load && r == i.a { let mut field = a; field.offset = field.offset + i.imm; ok = i.imm2 == 8 && inside(field, 8, f.slot_sizes) }
+            if i.op == ir.Op.Store && r == i.a && i.b != r { let mut field = a; field.offset = field.offset + i.imm; ok = i.imm2 == 8 && inside(field, 8, f.slot_sizes) }
+            if i.op == ir.Op.Copy { ok = inside(a, i.imm, f.slot_sizes) }
+            if !ok { eligible[a.slot] = false }
+        }
+    }
+    let mut out = f; out.insts = []; let mut words: [[Int]] = []; let mut any = false
+    for s in 0..len(f.slot_sizes) {
+        let mut registers: [Int] = []
+        if eligible[s] { any = true; for _ in 0..f.slot_sizes[s]/8 { push(mut registers, ir.reg(mut out, ir.INT())) } }
+        push(mut words, registers)
+    }
+    if !any { return f }
+    let mut selected: Map[Int, Address] = [:]
+    for r in maps.keys(addresses) { let a = addresses[r]; if eligible[a.slot] { selected[r] = a } }
+    for i in f.insts {
+        if (i.op == ir.Op.SlotAddr || i.op == ir.Op.AddImm || i.op == ir.Op.Move) && maps.has(selected, i.dst) { continue }
+        if i.op == ir.Op.Load && maps.has(selected, i.a) {
+            let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, i.dst, words[a.slot][(a.offset+i.imm)/8], -1, 0)); continue
+        }
+        if i.op == ir.Op.Store && maps.has(selected, i.a) {
+            let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, words[a.slot][(a.offset+i.imm)/8], i.b, -1, 0)); continue
+        }
+        if i.op == ir.Op.Copy && (maps.has(selected, i.a) || maps.has(selected, i.b)) {
+            let mut sources: [Int] = []
+            // Freeze every source word before writing, including overlapping
+            // copies within one promoted aggregate.
+            for offset in 0..i.imm/8 {
+                let r = ir.reg(mut out, ir.INT()); push(mut sources, r)
+                if maps.has(selected, i.b) { let a = selected[i.b]; push(mut out.insts, ir.inst(ir.Op.Move, r, words[a.slot][a.offset/8+offset], -1, 0)) } else { let mut load = ir.inst(ir.Op.Load, r, i.b, -1, offset*8); load.imm2 = 8; push(mut out.insts, load) }
+            }
+            for offset in 0..i.imm/8 {
+                if maps.has(selected, i.a) { let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, words[a.slot][a.offset/8+offset], sources[offset], -1, 0)) } else { let mut store = ir.inst(ir.Op.Store, -1, i.a, sources[offset], offset*8); store.imm2 = 8; push(mut out.insts, store) }
+            }; continue
+        }
+        push(mut out.insts, i)
+    }
+    return out
+}

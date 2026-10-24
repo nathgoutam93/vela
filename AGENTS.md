@@ -3,6 +3,12 @@
 Read `docs/roadmap-after-m18.md` and `docs/tooling-backlog.md` before starting
 a milestone.
 
+Through M30, follow the accepted scope and architecture freeze in
+`docs/design-baseline-to-m30.md`. Deliver the existing roadmap and its
+accepted details; defer further unplanned architectural changes until after
+M30. Correctness fixes and optimizations preserving agreed semantics remain
+in scope. Recording a proposal does not authorize implementing it.
+
 During milestone work, record observed compiler, diagnostic, guide, editor,
 evaluation, and test-harness friction in `docs/tooling-backlog.md` as it is
 discovered. Include the discovery milestone, a reproducible command or source

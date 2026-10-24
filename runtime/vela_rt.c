@@ -244,6 +244,11 @@ int vela_str_cmp(vela_str a, vela_str b) {
     return (a.len > b.len) - (a.len < b.len);
 }
 
+// Native code already holds Str values by address. Read-only comparisons
+// can borrow those values instead of constructing C aggregate argument copies.
+bool vela_str_eq_ptr(const vela_str *a, const vela_str *b) { return str_eq(*a, *b); }
+int vela_str_cmp_ptr(const vela_str *a, const vela_str *b) { return vela_str_cmp(*a, *b); }
+
 // ---- Arrays ----
 
 // An array starts as one allocation (M18): its elements right after it,
@@ -1772,3 +1777,5 @@ int64_t vela_memory_signed(uint64_t bits, int64_t width, const char *loc) {
 // Native backends share the runtime's immortal/shared reference-count rules.
 void vela_native_rc_inc(int64_t *rc) { vela_rc_inc(rc); }
 bool vela_native_rc_dec(int64_t *rc) { return vela_rc_dec(rc); }
+void *vela_native_box_alloc(int64_t size) { return vela_box_alloc((size_t)size); }
+void vela_native_box_free(void *p, int64_t size) { vela_box_free(p, (size_t)size); }

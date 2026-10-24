@@ -1,0 +1,413 @@
+{
+  "method": "Repeat original main command 40 times; sample each process for four seconds at 1ms. Exclude dyld startup when comparing application attribution. Counts rank hypotheses, not exact elapsed time; C/native inlining differs.",
+  "host": "macOS 26.6.2 (25G83), ARM64",
+  "command": "/usr/bin/sample PID 4 1 -mayDie -file REPORT",
+  "target_command": "COMPILER check|c stage1/main.vl",
+  "instrumentation": "Copy stage1 into build/m25-profile-src; rename main to once with fs/os effects; append fn main() { for _ in 0..40 { once() } }; preserve relative packages/json imports.",
+  "instrumented_source_sha256": {
+    "agent_queries.vl": "9a717de947f1ea4fbf4ad677fa9b6ca731cb15351fb13e59d61ebee84e503bc6",
+    "arm64.vl": "9fcdd8ac9426367efd01778edc737e7984848a67cbd12db1aa5c19520d230564",
+    "ast.vl": "71be5595bf344c9ed88c60276e59789cda435bccc8d19b753b46d68a4fa8b45a",
+    "bits.vl": "8e14141f4f203c1850984ff0355df3d69092ac62327602eeed4fef93314f0b96",
+    "call_graph.vl": "07cf773d2aa93e647983787bfcfcbde08a6aed430e8296d4d8aa7017d2ffd18a",
+    "capabilities.vl": "e2b5001268db73d9ecd5275428d25752e63ae2765404c6bed18adcc1e8dfebad",
+    "cffi.vl": "ea32c52b095d3b7af33fa03d9b89dea78887a9bcf98b90a68f81288669df059f",
+    "chars.vl": "c42a95f8a5cb41d535981094761ccd447db7eb643ba40a8449b3504e7e7652d9",
+    "checker.vl": "419169f6522c818012932a7b885246ac53f6eeb8ca68422e24322d1cf365f072",
+    "codegen.vl": "691facc52ffd05c189c5899c0e00cd710e8acbe634eda274ddbd8038886c2147",
+    "complete.vl": "9be671eabb5bf04851362dcd26ff8ca88c630199dfc7dd5e26df9959aab543f9",
+    "diagnostics.vl": "49c10e8e6c75c0e356aa454946f101007ea117380edee91f320dea01f0b8b94c",
+    "errors.vl": "2a31eea563f9ea1b591e700955c82c1ee887bd24b4797bb7c9eb3d5d733a8e27",
+    "fixer.vl": "7370240f796cc19c3e6b38f0e03dc66061d0e6343154f29b31e7a7d9ac87a2a8",
+    "format.vl": "d8a7a58a851aa909e1e7818a8850888c11998c25c8eee56915cad77c93b5baf0",
+    "guide.vl": "0e758eec90ba014c49f1e7053881d016d9f280f021176a5a85f706baec642349",
+    "index.vl": "a20818022208522a8e3b6816269d33fe7540f5c799e992f6ec7727cba9886566",
+    "integers.vl": "8a580cd712b592475ea30bb4fd06ce61dc033c1183ebb77cad55a7b5b9865012",
+    "interfaces.vl": "990c820ed20895079cc23b0a926d935f32844d30919da49fb91d8f8875af110f",
+    "ir.vl": "99adb457d981941a3ff6ab26d814252edf1bc0ba19b29f0c605e07d496cc4fae",
+    "layout.vl": "2556147fbf66b348ec4b5b00926fdabc0c32b4030f4bd88598ce7eaee5e16b24",
+    "lexer.vl": "b253ef64ffe1a5e5f8466e666c8379010eba177c28d2a619d7a6d666ebfcc2e3",
+    "live.vl": "95586fc710af8b78650f762751f3d1304bf3bdd515e19c0b7d5e8e15b7bc444a",
+    "loops.vl": "b0286f5dd7d9edf08d9a6b0a63f97a4638d4f3a00a8a48447c6f436057859a59",
+    "lower.vl": "3ae7eac290dfd180d609e5cc705dc50093a678c618ae045f83b1f1b4cd34b7b7",
+    "lsp.vl": "4c5d880e580b92557dfffcd9eabf6fccc7c3d78130b83148e58c42ef1b1d5ead",
+    "main.vl": "0472e45e31c2d1727a910325c2340ccbdeb5930ce8d7122d8f5cb027afc615a8",
+    "match_check.vl": "e91be1b1bf88c868bba3b5c986d66834688dc1f626922357d594d781ba4bc8b5",
+    "memops.vl": "938eae0dd685ef057699207b39b259d9ea74604b248e0bbff70e2c69eb1c97ad",
+    "modules.vl": "309c848045975d0d8fa0626ff460416e6625e6436c1aefd341c35b911d787056",
+    "mono.vl": "be0e0e52218cdf2bf99abc8677c39657992b491cd3d036e90de3894d3bd54265",
+    "opt.vl": "e12187e681e302e22e98b77160a93dd836c1b18ebe052eeb45cd2cff2377210d",
+    "packages.vl": "de2a8e6e42c907b3bbb3a69d9ddef328dfdacdd4c544cd2033f06cf0505ae1f2",
+    "parser.vl": "e714ee9ed7889b9ba33b4878d56e2a6cd432597d904d603e00e1c3ec6bd9f3c7",
+    "promote.vl": "1488e4852cbdbdb5026580d46496930d5514433bc19ad7ec4478d92a40a2992a",
+    "query.vl": "9500415ec2af12c43021b1a959b11e580f1c5e47c95585ff7c73df23df140dae",
+    "ranges.vl": "eb56edd99320ad3e237b7e3e40abc0ffd10d9ef854d610a4f05ba68507c247fc",
+    "regalloc.vl": "8c62c57feb1fb5d6d2e3a81a72fd115b4fdc61b2a7e8f387f1cb480017c15108",
+    "rename.vl": "c419d39210d1939fcf8185054890100c14562d3c38b41b0438304290a8d3dfe8",
+    "repairs.vl": "0583b8d36f2795b67e581d504264f6ee15cf2ab19847fa180217190192ee7050",
+    "sysops.vl": "20146b0bc85754a714d3b38a15fa0bd1bce05543b9567c0399a64d2e07a7270d",
+    "targets.vl": "b6be1eb886925ad9beca2c68e7ee5404405e7ba0c98d80e15248392051d50d43",
+    "types.vl": "9c05be4ca1308fe027dff7ac5577e93a964fd2e8f9ff307b3a058266cb6a54fa",
+    "unsafe_query.vl": "08450ad03a8d7f7e6acd5e8e93e52e6156e70bbd50cfa2886e7d0c78c0a9007f",
+    "vela.mod": "078addafcbb27518f09b00e0b758b1e6833d13e88ed740226543812cc5aecbba",
+    "x64.vl": "b9a5cedb175b281f72185fb223bb6e1715df1ae59152fb3dcf4fae6e9d4fcf01"
+  },
+  "images_sha256": {
+    "c": "c84e3390b2f1c335fd213bdfae690f3dec3ab4477f99baf6179cf5f176938455",
+    "native": "d7cc0dcaeca26e3161e10eb79f73545f9f21c2c13d0f492dcbca7859c11dc35b"
+  },
+  "results": {
+    "c-check": {
+      "program_exit": 0,
+      "sampler_exit": 0,
+      "report_sha256": "2310a85907fa7ab8c55f867b9a7cb8b3e6d77d4bcdd89cdf97e934f8272a3a22",
+      "date": "2026-10-24 22:37:22.393 +0530",
+      "top_self_samples": [
+        [
+          "vela_str_release",
+          240
+        ],
+        [
+          "vela_str_eq",
+          224
+        ],
+        [
+          "vela_array_release",
+          157
+        ],
+        [
+          "_platform_memmove",
+          136
+        ],
+        [
+          "_xzm_free",
+          125
+        ],
+        [
+          "f_6parser_peek",
+          125
+        ],
+        [
+          "f_6parser_advance",
+          69
+        ],
+        [
+          "_xzm_xzone_malloc",
+          55
+        ],
+        [
+          "map_lookup",
+          50
+        ],
+        [
+          "vela_array_new",
+          49
+        ],
+        [
+          "__open_nocancel",
+          48
+        ],
+        [
+          "_free",
+          48
+        ],
+        [
+          "f_5lexer_run",
+          48
+        ],
+        [
+          "rc_release_t_3ast_ExprKind",
+          45
+        ],
+        [
+          "f_5lexer_identifier",
+          43
+        ],
+        [
+          "f_5lexer_add",
+          42
+        ],
+        [
+          "_malloc_zone_malloc",
+          37
+        ],
+        [
+          "<deduplicated_symbol>",
+          35
+        ],
+        [
+          "__read_nocancel",
+          31
+        ],
+        [
+          "f_5lexer_operator1",
+          28
+        ]
+      ]
+    },
+    "c-c": {
+      "program_exit": 0,
+      "sampler_exit": 0,
+      "report_sha256": "012a414f6e071590b7c445d4aa2926b83d6c3c364063c02acb6e5c45cdd9d238",
+      "date": "2026-10-24 22:37:30.087 +0530",
+      "top_self_samples": [
+        [
+          "_platform_memmove",
+          254
+        ],
+        [
+          "vela_array_release",
+          253
+        ],
+        [
+          "vela_str_release",
+          214
+        ],
+        [
+          "_xzm_free",
+          197
+        ],
+        [
+          "vela_str_eq",
+          166
+        ],
+        [
+          "_xzm_xzone_malloc",
+          106
+        ],
+        [
+          "rc_release_t_3ast_Expr",
+          84
+        ],
+        [
+          "f_7checker_lookup_method",
+          83
+        ],
+        [
+          "f_5types_get",
+          77
+        ],
+        [
+          "_free",
+          75
+        ],
+        [
+          "map_lookup",
+          70
+        ],
+        [
+          "_malloc_zone_malloc",
+          66
+        ],
+        [
+          "_platform_memset",
+          66
+        ],
+        [
+          "f_3ast_has_mut",
+          59
+        ],
+        [
+          "__vfprintf",
+          57
+        ],
+        [
+          "vela_str_concat",
+          49
+        ],
+        [
+          "<deduplicated_symbol>",
+          46
+        ],
+        [
+          "vela_array_new",
+          45
+        ],
+        [
+          "rc_retain_t_3ast_FnDecl",
+          41
+        ],
+        [
+          "f_6parser_peek",
+          37
+        ]
+      ]
+    },
+    "native-check": {
+      "program_exit": 0,
+      "sampler_exit": 0,
+      "report_sha256": "aef00d379d8ded0fe043dc0ddd3f98f8d4deaa81c919489b269d054a32a05270",
+      "date": "2026-10-24 22:37:47.199 +0530",
+      "top_self_samples": [
+        [
+          "vela_array_release",
+          166
+        ],
+        [
+          "_xzm_free",
+          128
+        ],
+        [
+          "_platform_memmove",
+          107
+        ],
+        [
+          "f_5lexer_identifier",
+          106
+        ],
+        [
+          "f_5lexer_run",
+          94
+        ],
+        [
+          "f_6parser_advance",
+          76
+        ],
+        [
+          "f_5lexer_operator",
+          62
+        ],
+        [
+          "map_lookup",
+          52
+        ],
+        [
+          "f_6parser_prefix",
+          47
+        ],
+        [
+          "f_6parser_expression",
+          44
+        ],
+        [
+          "_malloc_zone_malloc",
+          41
+        ],
+        [
+          "rc_release_t_3ast_ExprKind",
+          41
+        ],
+        [
+          "f_7checker_infer_type",
+          40
+        ],
+        [
+          "__open_nocancel",
+          37
+        ],
+        [
+          "f_5lexer_operator1",
+          37
+        ],
+        [
+          "_xzm_xzone_malloc",
+          36
+        ],
+        [
+          "<deduplicated_symbol>",
+          31
+        ],
+        [
+          "_free",
+          30
+        ],
+        [
+          "f_7checker_check_expr",
+          30
+        ],
+        [
+          "f_7checker_known_call",
+          29
+        ]
+      ]
+    },
+    "native-c": {
+      "program_exit": 0,
+      "sampler_exit": 0,
+      "report_sha256": "2579b0b693a262dbc278ec0f86bf3033072af3e3c71f788ee39ef7c2b355b1f3",
+      "date": "2026-10-24 22:37:55.614 +0530",
+      "top_self_samples": [
+        [
+          "_platform_memmove",
+          320
+        ],
+        [
+          "vela_array_release",
+          279
+        ],
+        [
+          "_xzm_free",
+          188
+        ],
+        [
+          "f_7checker_lookup_method",
+          159
+        ],
+        [
+          "_xzm_xzone_malloc",
+          101
+        ],
+        [
+          "_free",
+          63
+        ],
+        [
+          "map_lookup",
+          63
+        ],
+        [
+          "f_3ast_has_mut",
+          62
+        ],
+        [
+          "<deduplicated_symbol>",
+          59
+        ],
+        [
+          "_malloc_zone_malloc",
+          54
+        ],
+        [
+          "vela_str_concat",
+          54
+        ],
+        [
+          "f_5lexer_run",
+          52
+        ],
+        [
+          "_platform_memset",
+          48
+        ],
+        [
+          "__vfprintf",
+          47
+        ],
+        [
+          "f_5lexer_identifier",
+          44
+        ],
+        [
+          "f_6parser_prefix",
+          43
+        ],
+        [
+          "f_6ranges_walk_expr",
+          43
+        ],
+        [
+          "vela_array_new",
+          39
+        ],
+        [
+          "f_6ranges_of_inner",
+          37
+        ],
+        [
+          "f_6ranges_parameter_expr",
+          36
+        ]
+      ]
+    }
+  }
+}

@@ -10,18 +10,18 @@ f_count:
     sub rsp, 8
     mov r10, rdi
     cmp r10, 0
-    jg .L0_1
+    jle .L0_0
+    jmp .L0_1
 .L0_0:
     mov rax, 0
     jmp .LR0
 .L0_1:
     sub r10, 1
-    jo .LP0_1
     mov rdi, r10
     call f_count
     mov rbx, rax
     add rbx, 1
-    jo .LP0_2
+    jo .LP0_1
     mov rax, rbx
     jmp .LR0
 .LR0:
@@ -30,10 +30,6 @@ f_count:
     pop rbp
     ret
 .LP0_1:
-    lea rdi, [rip + .Lc0]
-    lea rsi, [rip + .Lmsg_overflow]
-    call vela_panic@PLT
-.LP0_2:
     lea rdi, [rip + .Lc1]
     lea rsi, [rip + .Lmsg_overflow]
     call vela_panic@PLT

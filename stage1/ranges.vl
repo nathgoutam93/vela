@@ -157,10 +157,11 @@ pub type Env = struct {
     proven: Map[Int, Bool]  // operations proved safe by flow analysis
     safe: Map[Int, Bool]  // proven element accesses
     limits: Map[Int, Limit]
+    values: Map[Int, Range]  // point-specific facts, optionally collected for native lowering
 }
 
 pub fn new_env(params: [[Range]]) -> Env {
-    return Env { locals: [:], params: params, proven: [:], safe: [:], limits: [:] }
+    return Env { locals: [:], params: params, proven: [:], safe: [:], limits: [:], values: [:] }
 }
 
 fn is_int(k: checker.Checked, e: ast.Expr) -> Bool {
@@ -350,6 +351,8 @@ type Walk = struct {
     edges: [Env]
     last: Range
     fn_id: Int
+    values: Map[Int, Range]
+    collect_values: Bool
 }
 
 // A call passing an Int in the range r as parameter i of function callee.
@@ -384,7 +387,7 @@ pub fn analyze(k: checker.Checked) -> [[Range]] {
     let mut as_value: Map[Int, Bool] = [:]
     let mut settled = false
     for round in 0..64 {
-        let mut w = Walk { k: k, env: new_env(known), passed: [], as_value: as_value, proven: [:], safe: [:], record: false, detailed: false, dead: false, edges: [], last: full(), fn_id: -1 }
+        let mut w = Walk { k: k, env: new_env(known), passed: [], as_value: as_value, proven: [:], safe: [:], record: false, detailed: false, dead: false, edges: [], last: full(), fn_id: -1, values: [:], collect_values: false }
         for id in 0..len(k.fns) {
             if dirty[id] {
                 w.passed = []
@@ -1194,12 +1197,15 @@ fn walk_arms(w: mut Walk, arms: [ast.Arm]) {
 }
 
 // Point-specific facts for one function, shared by all generic copies.
-pub fn function_env(k: checker.Checked, params: [[Range]], id: Int) -> Env {
-    let mut w = Walk { k: k, env: new_env(params), passed: [], as_value: [:], proven: [:], safe: [:], record: true, detailed: true, dead: false, edges: [], last: full(), fn_id: -1 }
+pub fn function_env(k: checker.Checked, params: [[Range]], id: Int) -> Env { return function_env_mode(k, params, id, false) }
+pub fn native_env(k: checker.Checked, params: [[Range]], id: Int) -> Env { return function_env_mode(k, params, id, true) }
+fn function_env_mode(k: checker.Checked, params: [[Range]], id: Int, values: Bool) -> Env {
+    let mut w = Walk { k: k, env: new_env(params), passed: [], as_value: [:], proven: [:], safe: [:], record: true, detailed: true, dead: false, edges: [], last: full(), fn_id: -1, values: [:], collect_values: values }
     walk_fn(mut w, id)
     let mut env = new_env(params)
     env.proven = w.proven
     env.safe = w.safe
+    env.values = w.values
     return env
 }
 
@@ -1469,6 +1475,9 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
         _ => {}
     }
     if is_int(w.k, e) { result = clip(result, w.k.ty[e.id]) }
+    if w.record && w.collect_values && is_int(w.k, e) {
+        if maps.has(w.values, e.id) { w.values[e.id] = join(w.values[e.id], result) } else { w.values[e.id] = result }
+    }
     w.last = result
 }
 

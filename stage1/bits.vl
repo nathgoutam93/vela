@@ -1,0 +1,30 @@
+// Prove unsigned 32-bit virtual values, including loop-carried values whose
+// definitions all preserve that domain. Unknown entries/calls stay unknown.
+import ir
+pub fn u32(f: ir.Func) -> [Bool] {
+    let mut known: [Bool] = []; let mut defs: [Int] = []
+    for _ in f.classes { push(mut known, true); push(mut defs, 0) }
+    for p in f.params { known[p] = false }
+    for i in f.insts { if i.dst >= 0 { defs[i.dst] = defs[i.dst] + 1 } }
+    for r in 0..len(known) { if defs[r] == 0 { known[r] = false } }
+    let mut settled = false
+    for _ in 0..16 {
+        let mut changed = false
+        for i in f.insts { if i.dst >= 0 && known[i.dst] && !preserves(i, known) { known[i.dst] = false; changed = true } }
+        if !changed { settled = true; break }
+    }
+    if !settled { for r in 0..len(known) { known[r] = false } }
+    return known
+}
+fn preserves(i: ir.Inst, known: [Bool]) -> Bool {
+    let op = i.op
+    if op == ir.Op.Const { return i.imm >= 0 && i.imm <= 4294967295 }
+    if op == ir.Op.Extend { return i.imm <= 32 && i.imm2 == 0 }
+    if op == ir.Op.Cmp || op == ir.Op.CmpImm || op == ir.Op.Not || op == ir.Op.RcDec { return true }
+    if op == ir.Op.Load { return i.imm2 == 1 || i.imm2 == 2 }
+    if op == ir.Op.CCall { return i.imm == ir.RET_BOOL() }
+    if op == ir.Op.Move || op == ir.Op.Shr || op == ir.Op.Sar || op == ir.Op.Div || op == ir.Op.Rem { return known[i.a] }
+    if op == ir.Op.And { return known[i.a] || known[i.b] }
+    if op == ir.Op.Or || op == ir.Op.Xor { return known[i.a] && known[i.b] }
+    return false
+}
