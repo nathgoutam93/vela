@@ -141,7 +141,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-008: Snapshot scalar operands before a later mutable call
 
-- **Status:** resolved in M19; native execution validation remains in VAL-001.
+- **Status:** resolved in M19, extended in M21; native execution remains in VAL-001.
 - **Evidence:** `fn next(x: mut u32) -> u32 { let old = x; x = x + 1;
   return old }`, called by `x + next(mut x)` with x = 1, printed 3 instead
   of 2 through C. The left operand was still a reference to the local when
@@ -155,6 +155,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   snapshot the first integer-builtin argument before evaluating the second.
   C regressions pass for all eight widths and all three builtin overflow
   modes; the same native cases are conditional on Linux x86-64 in the test.
+- **M21 recurrence:** the first FFI compiler's raw pointer comparison
+  `p == next(mut p)`, with p initially null and next returning the old p while
+  changing p, printed false instead of true. Extend the scalar snapshot rule
+  to c.Ptr/c.Fn in both backends; retain a pointer regression in M21.
 - **Acceptance:** regression cases cover every integer width, memory-backed
   mutable locals, and optimized/unoptimized native execution when supported.
   Composite-value evaluation should receive a separate audit if similar
@@ -162,7 +166,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-009: New declarations need semantic editor metadata
 
-- **Status:** resolved in M20; native execution remains in VAL-001.
+- **Status:** resolved in M20, extended in M21; native execution remains in VAL-001.
 - **Evidence:** `vela-m20-maps query symbols build/m20-probe.vl` reported
   `type Show = interface { ... }` as an enum with no method children.
   The index and completion paths only distinguished structs and enums.
@@ -183,10 +187,22 @@ the same entry. Close it with a commit or validation result; keep its history.
   completion and include the new rules in the generated guide. Read method
   spans from tokens, diagnose interface construction with E3190, and mark
   prelude reference declarations as text while retaining executable examples.
+- **M21 recurrence:** extern signatures, contextual unsafe blocks, the c
+  type namespace, and the new unsafe query need corresponding editor/guide
+  metadata. Retain the M20 behavior while extending those surfaces in M21.
+  The old import-cycle fixture also used c.vl, now shadowed by the builtin c
+  namespace; its self-import diagnostic disappeared in the first broad run.
+  Rename that fixture selfcycle.vl to retain its intended cycle coverage.
+  A pure-typed closure containing c.alloc also exposed legacy fs/os-only
+  mismatch/help text (E3093/E3036). Extend that text to unsafe and explicitly
+  document main/test handling; keep the deferred-closure rejection regression.
 - **Validation:** all 288 supported checks pass, including M17 and M20
   integrations. The editor fixture checks its source before queries, then
   verifies spaced method rename, type rename through a static call, and
   rejection of a rename that breaks an interface obligation.
+- **M21 validation:** all 290 supported checks pass, including the M21
+  unsafe query, C type completion/hover, extern signature/rename and effect
+  repair cases. M17 compiles and tests the new guide example.
 - **Acceptance:** query/LSP regressions report interfaces and method children,
   resolve generic and concrete method calls, and offer applicable methods.
   Rename must retain its existing semantic validation and reject broken edits.
@@ -230,11 +246,86 @@ the same entry. Close it with a commit or validation result; keep its history.
   effect mismatches each identify the failing obligation; valid custom keys
   stay accepted and the multi-error/JSON diagnostic suites remain useful.
 
+### TL-012: Escaped scalar addresses must not retain range proofs
+
+- **Status:** resolved in M21; Linux execution remains in VAL-001.
+- **Evidence:** code inspection found that range tracking models mutable
+  arguments at each call. c.addr permits an address to survive that call;
+  a later ordinary wrapper with a c.Ptr argument can mutate the scalar even
+  when it exposes no unsafe effect. Reassigning the local meanwhile must not
+  restore a stale constant proof. This is a new aliasing path, not evidence
+  of a failing pre-M21 program.
+- **Impact:** stale proofs could remove overflow or index checks after a
+  C pointer write. Callback inputs also must not inherit ranges inferred
+  only from ordinary Vela callers.
+- **Additional native evidence:** unoptimized IR for the escaped-address
+  probe initially passed the scalar value 0 as the pointer to poke, without
+  allocating a stack slot. Native address-taken analysis only recognized mut
+  arguments to user functions. Include c.addr in that analysis so its scalar
+  place lives in memory. This was an IR inspection, not Linux execution.
+- **Resolution:** record address-escaped locals in checked
+  metadata, keep their value/limit ranges conservative throughout the
+  function, and treat extern/callback parameters as unrestricted inputs.
+- **Validation:** C integrations retain overflow/index checks after writes
+  through a wrapper and after reassignment, and retain callback overflow
+  checks. Unoptimized IR now allocates and reads the escaped local stack slot.
+- **Workaround:** retain conservative checks for the FFI alias path.
+- **Acceptance:** c.store through an escaped address followed by overflow or
+  indexing must panic correctly, including through a wrapper and after a
+  later assignment. A C callback receiving a boundary value must keep its
+  checks. Run both optimized and unoptimized native cases on Linux.
+
+### TL-013: Nominal C pointer names must form valid generated identifiers
+
+- **Status:** resolved in M21; Linux execution remains in VAL-001.
+- **Evidence:** the C qsort callback in `tests/m21_test.py` generated the
+  closure typedef `fn_c.Ptr_c.Ptr__i32`, which cc rejects at the dot.
+  Primitive representation names were embedded directly in composite names.
+- **Impact:** callback/function/container types mentioning raw pointers fail
+  during C compilation although the checker accepts them.
+- **Workaround:** use sanitized internal names for c.Ptr and c.Fn.
+- **Resolution:** preserve public type names and use c_ptr/c_fn
+  in generated type identifiers on both backends.
+- **Validation:** qsort and pointer/function-pointer container regressions
+  pass through C; the callback ABI fixture cross-assembles in both modes.
+- **Acceptance:** qsort callbacks and pointer/function-pointer containers
+  compile, run through C, and cross-assemble; existing names remain stable.
+
+### TL-014: Missing C symbols and libraries are user link errors
+
+- **Status:** resolved in M21.
+- **Evidence:** the initial FFI compiler exits 70/E6002 for
+  `extern fn missing_m21_symbol() uses unsafe` called inside main's unsafe
+  block, claiming the C compiler rejected generated code. The linker actually
+  reports an undefined symbol. A missing library has the same old path.
+- **Impact:** an incorrect extern name or omitted link entry looks like a
+  compiler defect, obscuring the action the programmer can take.
+- **Workaround:** read the linker output for undefined symbols/libraries.
+- **Resolution:** distinguish link failures from C/assembly generation errors
+  in both drivers; exit 1/E6001 and suggest checking extern symbols and
+  vela.mod link entries, preserving toolchain output and the command.
+- **Acceptance:** missing-symbol and missing-library integrations produce
+  user errors; generated-code failures retain the internal-error path.
+
+### TL-015: Shared prototype parsing must keep variadics out of interfaces
+
+- **Status:** resolved in M21.
+- **Evidence:** `type Call = interface { fn call(value: Self, ...) }`
+  initially passed check after adding extern varargs. Interface and extern
+  declarations share prototype parsing; the interface checker ignored ... .
+- **Impact:** an invalid interface declaration was accepted with a discarded
+  variadic marker, although only extern calls implement C varargs.
+- **Workaround:** use a fixed interface signature around an extern wrapper.
+- **Resolution:** reject variadic interface signatures with E3200, retaining
+  the shared parser and valid C extern variadics.
+- **Acceptance:** the interface rejection joins M21's negative integration;
+  valid interface and extern/variadic acceptance continues to pass.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
 
-- **Status:** open; carried from M17 and extended during M19/M20.
+- **Status:** open; carried from M17 and extended during M19/M20/M21.
 - **Evidence:** the C bootstrap, supported C suite, UBSan runtime tests, and
   benchmark output checks passed. Native `os.executable` lowering assembles
   for Linux x86-64, but was not executed there. This macOS ARM64 host has no
@@ -251,6 +342,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   Linux x86-64. Generic dispatch, managed key callbacks, and the native
   bootstrap have not been executed on Linux for M20. All 119 selected
   runtime/M19/M20 checks pass under UBSan through C.
+- **M21 evidence:** the C bootstrap reaches a 118,525-line fixed point, all
+  290 supported checks pass, and UBSan passes 120 runtime/M19/M20/M21 checks.
+  C extern/scalar/pointer/callback acceptance and zlib/SQLite examples pass. The independent ABI fixture cross-assembles for Linux x86-64
+  with optimization on/off. IR inspection verifies native escaped scalars live
+  in stack slots. These checks do not establish native execution correctness.
 - **Workaround:** retain the host-supported results and these explicit limits.
 - **Required work:** on Linux x86-64, run both bootstrap fixed points and the
   applicable C/native suites under ASan and TSan. See
@@ -260,6 +356,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   run the full u64 pattern and runtime header-cache regressions there too.
   Also run `tests/m20_test.py build/vela` and the interface fixture on Linux
   to cover optimized/unoptimized dispatch and key callback ABI behavior.
+  Run `tests/m21_test.py build/vela` there too, covering narrow returns, mixed
+  and spilled C arguments, binary32, variadic calls, callback entry ranges,
+  pointer aliasing and both external-library examples in both native modes.
 - **Acceptance:** record host, compiler/toolchain, commit, commands, and actual
   results. Keep any failures open instead of inferring a pass from C or UBSan.
 
@@ -288,6 +387,8 @@ the same entry. Close it with a commit or validation result; keep its history.
   5,784 tokens under the same estimate.
 - **M20 measurement:** the interface guide is 24,475 bytes, approximately
   6,118 tokens under the same estimate.
+- **M21 measurement:** the C interop guide is 30,819 bytes, approximately
+  7,704 tokens under the estimate, within its 8,000-token estimate gate.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.

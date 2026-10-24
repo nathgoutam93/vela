@@ -130,6 +130,8 @@ pub fn new_table() -> Table {
     for name in ["i8", "i16", "i32", "u16", "u32", "u64"] {
         push(mut t.types, info(Tag.Prim, name))
     }
+    push(mut t.types, info(Tag.Prim, "c.Ptr"))
+    push(mut t.types, info(Tag.Prim, "c.Fn"))
     return t
 }
 
@@ -905,3 +907,6 @@ pub fn used_as_key(table: Table, t: Int) -> Bool {
     for i in 0..len(table.maps) { if i % 2 == 0 && table.maps[i] == t { return true } }
     return false
 }
+
+// Concrete effects, shared by declarations and function/interface signatures.
+pub fn concrete_effect(name: Str) -> Bool { return name == "fs" || name == "os" || name == "unsafe" }

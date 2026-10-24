@@ -206,6 +206,7 @@ fn of_inner(k: checker.Checked, env: Env, e: ast.Expr) -> Range {
         ast.ExprKind.Name(_) => {
             match k.refs[e.id] {
                 checker.Ref.Local(id) => {
+                    if maps.has(k.escaped, id) { return full() }
                     match maps.get(env.locals, id) {
                         Some(r) => return r
                         None => return full()
@@ -465,7 +466,7 @@ pub fn analyze(k: checker.Checked) -> [[Range]] {
 // arguments; a function used as a value has unrestricted inputs.
 fn tracked(k: checker.Checked, as_value: Map[Int, Bool], id: Int, i: Int) -> Bool {
     let f = k.fns[id]
-    return !maps.has(as_value, id) && ranged_type(f.params[i])
+    return f.decl.foreign == "" && !maps.has(as_value, id) && ranged_type(f.params[i])
 }
 
 fn walk_fn(w: mut Walk, id: Int) {
@@ -528,7 +529,11 @@ fn limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
         return None
     }
     match e.kind {
-        ast.ExprKind.Name(_) => return maps.get(env.limits, local_of(k, e.id))
+        ast.ExprKind.Name(_) => {
+            let local = local_of(k, e.id)
+            if maps.has(k.escaped, local) { return None }
+            return maps.get(env.limits, local)
+        }
         ast.ExprKind.Call(_, args) => {
             match k.refs[e.id] {
                 checker.Ref.Builtin(name) => {
@@ -999,6 +1004,7 @@ fn changed_stmt(k: checker.Checked, st: ast.Stmt, out: mut Map[Int, Bool]) {
             changed_expr(k, x, mut out)
             changed_arms(k, arms, mut out)
         }
+        ast.StmtKind.Unsafe(b) => changed_block(k, b, mut out)
         ast.StmtKind.With(items, b) => {
             for item in items {
                 changed_expr(k, item.value, mut out)
@@ -1153,6 +1159,7 @@ fn walk_stmt(w: mut Walk, s: ast.Stmt) {
             walk_expr(mut w, x)
             walk_arms(mut w, arms)
         }
+        ast.StmtKind.Unsafe(b) => walk_block(mut w, b)
         ast.StmtKind.With(items, b) => {
             for it in items {
                 walk_expr(mut w, it.value)

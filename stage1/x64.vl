@@ -263,6 +263,8 @@ fn shares_operand(op: ir.Op) -> Bool {
         ir.Op.FSub => true
         ir.Op.FMul => true
         ir.Op.FDiv => true
+        ir.Op.FTo32 => true
+        ir.Op.FFrom32 => true
         ir.Op.FNeg => true
         ir.Op.Sext32 => true
         _ => false
@@ -634,7 +636,7 @@ fn stack_bytes(f: ir.Func, i: ir.Inst) -> Int {
         }
         if kind == ir.KIND_STR() {
             bytes = bytes + 24
-        } else if kind == ir.KIND_FLOAT() {
+        } else if kind == ir.KIND_FLOAT() || kind == ir.KIND_FLOAT32() {
             if nf < 8 {
                 nf = nf + 1
             } else {
@@ -1095,6 +1097,15 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         fset(mut o, i.dst, d)
         return
     }
+    if op == ir.Op.FTo32 || op == ir.Op.FFrom32 {
+        let mut instruction = "cvtsd2ss"
+        if op == ir.Op.FFrom32 { instruction = "cvtss2sd" }
+        let mut source = fsrc(o, i.a)
+        if op == ir.Op.FFrom32 && len(source) >= 9 && source[0..9] == "qword ptr" { source = "dword ptr" + source[9..len(source)] }
+        emit(mut o, instruction + " xmm15, " + source)
+        fset(mut o, i.dst, "xmm15")
+        return
+    }
     if op == ir.Op.FNeg {
         emit(mut o, "movq rax, " + fin_reg(mut o, i.a, "xmm15"))
         emit(mut o, "btc rax, 63")
@@ -1348,14 +1359,19 @@ fn call(o: mut Out, f: ir.Func, i: ir.Inst) {
                 emit(mut o, "mov qword ptr [rsp + " + num(stack + 8 * w) + "], rax")
             }
             stack = stack + 24
-        } else if kind == ir.KIND_FLOAT() {
+        } else if kind == ir.KIND_FLOAT() || kind == ir.KIND_FLOAT32() {
             if nf < 8 {
                 let s = fsrc(o, v)
-                emit(mut o, "movsd xmm" + num(nf) + ", " + s)
+                if kind == ir.KIND_FLOAT32() { emit(mut o, "cvtsd2ss xmm" + num(nf) + ", " + s) } else { emit(mut o, "movsd xmm" + num(nf) + ", " + s) }
                 nf = nf + 1
             } else {
-                emit(mut o, "movsd xmm15, " + fsrc(o, v))
-                emit(mut o, "movsd qword ptr [rsp + " + num(stack) + "], xmm15")
+                if kind == ir.KIND_FLOAT32() {
+                    emit(mut o, "cvtsd2ss xmm15, " + fsrc(o, v))
+                    emit(mut o, "movss dword ptr [rsp + " + num(stack) + "], xmm15")
+                } else {
+                    emit(mut o, "movsd xmm15, " + fsrc(o, v))
+                    emit(mut o, "movsd qword ptr [rsp + " + num(stack) + "], xmm15")
+                }
                 stack = stack + 8
             }
         } else if ni < 6 {
@@ -1375,6 +1391,7 @@ fn call(o: mut Out, f: ir.Func, i: ir.Inst) {
         emit(mut o, "mov r11, " + src(mut o, i.a, "r11"))
         emit(mut o, "call r11")
     } else if ccall {
+        emit(mut o, "mov eax, " + num(nf))  // SysV variadic vector-register count
         emit(mut o, "call " + i.sym + "@PLT")
     } else {
         emit(mut o, "call " + i.sym)
@@ -1383,6 +1400,7 @@ fn call(o: mut Out, f: ir.Func, i: ir.Inst) {
         return
     }
     if o.classes[i.dst] == ir.FLOAT() {
+        if ccall && i.imm == ir.RET_FLOAT32() { emit(mut o, "cvtss2sd xmm0, xmm0") }
         fset(mut o, i.dst, "xmm0")
         return
     }

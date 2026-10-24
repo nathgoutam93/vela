@@ -83,6 +83,9 @@ dispatch, custom-key acceptance, and remaining platform validation.
 
 ## M21: Calling C under `uses unsafe`
 
+**Status:** implemented; see [the walkthrough](m21-c-interop.md) for the LP64
+ABI, zlib/SQLite examples, audit query, and remaining Linux native validation.
+
 **Needs:** M19 (C's integer types).
 
 **What gets built:** Calling C: extern fn declarations with C types (c.Int, c.Ptr and the rest), libraries named in vela.mod, every call under the uses unsafe effect, propagated like fs and os, and safe wrappers that end it.

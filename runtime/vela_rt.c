@@ -1624,3 +1624,83 @@ void vela_eprint_uint(uint64_t n) {
 uint64_t vela_hash_value(const vela_type *type, const void *value) {
     return type->hash(value);
 }
+
+// Raw C storage (M21): ownership and bounds are the unsafe caller's contract.
+_Static_assert(sizeof(void *) == 8 && sizeof(long) == 8 && sizeof(size_t) == 8,
+               "Vela C interop currently requires the LP64 ABI");
+_Static_assert(sizeof(vela_c_fn) == 8 && sizeof(float) == 4 && sizeof(double) == 8,
+               "Vela C interop requires 64-bit function pointers and IEEE float widths");
+static void vela_c_nonnull(const void *p, const char *loc) {
+    if (!p) vela_panic(loc, "null C pointer");
+}
+void *vela_c_alloc(int64_t n, const char *loc) {
+    if (n < 0) vela_panic(loc, "negative C allocation size");
+    return vela_alloc(n ? (size_t)n : 1);
+}
+void vela_c_free(void *p) { free(p); }
+void *vela_c_data(vela_str s) { return (void *)(uintptr_t)s.data; }
+void *vela_c_cstr(vela_str s, const char *loc) {
+    if (s.len && memchr(s.data, 0, (size_t)s.len)) vela_panic(loc, "embedded NUL in C string");
+    uint8_t *p = vela_alloc((size_t)s.len + 1);
+    if (s.len) memcpy(p, s.data, (size_t)s.len);
+    p[s.len] = 0;
+    return p;
+}
+vela_str vela_c_string(const void *p, const char *loc) {
+    vela_c_nonnull(p, loc);
+    return str_from(p, strlen(p));
+}
+vela_str vela_c_bytes(const void *p, int64_t n, const char *loc) {
+    if (n < 0) vela_panic(loc, "negative C byte count");
+    if (!n) return VELA_STR("", 0);
+    vela_c_nonnull(p, loc);
+    return str_from(p, (size_t)n);
+}
+uint64_t vela_c_load(const void *p, int64_t size, const char *loc) {
+    vela_c_nonnull(p, loc);
+    if (size != 1 && size != 2 && size != 4 && size != 8) vela_panic(loc, "invalid C scalar size");
+    uint64_t bits = 0;
+    memcpy(&bits, p, (size_t)size);
+    return bits;
+}
+void vela_c_store(void *p, uint64_t bits, int64_t size, const char *loc) {
+    vela_c_nonnull(p, loc);
+    if (size != 1 && size != 2 && size != 4 && size != 8) vela_panic(loc, "invalid C scalar size");
+    memcpy(p, &bits, (size_t)size);
+}
+double vela_c_load_double(const void *p, const char *loc) {
+    vela_c_nonnull(p, loc);
+    double value;
+    memcpy(&value, p, sizeof value);
+    return value;
+}
+void vela_c_store_double(void *p, double value, const char *loc) {
+    vela_c_nonnull(p, loc);
+    memcpy(p, &value, sizeof value);
+}
+double vela_c_load_float32(const void *p, const char *loc) {
+    vela_c_nonnull(p, loc);
+    float value;
+    memcpy(&value, p, sizeof value);
+    return value;
+}
+void vela_c_store_float32(void *p, double value, const char *loc) {
+    vela_c_nonnull(p, loc);
+    float narrowed = (float)value;
+    memcpy(p, &narrowed, sizeof narrowed);
+}
+double vela_c_float32(double value) { return (float)value; }
+void *vela_c_offset(void *p, int64_t offset) { return (void *)((uintptr_t)p + (uint64_t)offset); }
+uint64_t vela_c_fn_bits(vela_c_fn fn) {
+    uint64_t bits;
+    memcpy(&bits, &fn, sizeof bits);
+    return bits;
+}
+vela_c_fn vela_c_fn_from_bits(uint64_t bits) {
+    vela_c_fn fn;
+    memcpy(&fn, &bits, sizeof fn);
+    return fn;
+}
+
+const vela_type vela_type_c_ptr = {sizeof(void *), NULL, NULL, NULL, NULL, NULL};
+const vela_type vela_type_c_fn = {sizeof(vela_c_fn), NULL, NULL, NULL, NULL, NULL};

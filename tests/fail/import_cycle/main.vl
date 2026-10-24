@@ -2,9 +2,9 @@
 // cannot import itself either. Each cycle is reported once, at the import
 // that closes it.
 // err: b.vl:1:8: error: import cycle: a -> b -> a; modules cannot import each other, directly or through others [E4005]
-// err: c.vl:1:8: error: module 'c' imports itself [E4004]
+// err: selfcycle.vl:1:8: error: module 'selfcycle' imports itself [E4004]
 import a
-import c
+import selfcycle
 
 fn main() {
     print(a.fa())

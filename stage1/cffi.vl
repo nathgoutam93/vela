@@ -1,0 +1,51 @@
+// The current C ABI profile: LP64 POSIX (macOS ARM64 and Linux x86-64).
+// Pointer types are nominal; numeric aliases keep their Vela representation.
+pub fn PTR() -> Int { return 14 }
+pub fn FN() -> Int { return 15 }
+pub fn pointer(t: Int) -> Bool { return t == PTR() || t == FN() }
+pub fn type_names() -> [Str] {
+    return ["Int", "UInt", "Short", "UShort", "Long", "ULong", "LongLong", "ULongLong", "Size", "SSize", "Char", "SChar", "UChar", "Bool", "Float", "Double", "Ptr", "Fn"]
+}
+pub fn type_id(name: Str) -> Int {
+    return match name {
+        "Int" => 10, "UInt" => 12, "Short" => 9, "UShort" => 11,
+        "Long" => 1, "ULong" => 13, "LongLong" => 1, "ULongLong" => 13,
+        "Size" => 13, "SSize" => 1, "Char" => 8, "SChar" => 8, "UChar" => 2,
+        "Bool" => 3, "Float" => 7, "Double" => 7, "Ptr" => PTR(), "Fn" => FN(), _ => -1,
+    }
+}
+pub fn functions() -> [Str] {
+    return ["null", "null_fn", "is_null", "alloc", "free", "addr", "data", "cstr", "string", "bytes", "load", "store", "offset", "address", "from_address", "float32", "load_float32", "store_float32", "callback"]
+}
+pub fn hazardous(name: Str) -> Bool {
+    return name != "null" && name != "null_fn" && name != "is_null" && name != "float32"
+}
+pub fn symbol(name: Str) -> Bool {
+    if len(name) == 0 { return false }
+    for i in 0..len(name) {
+        let b = name[i]
+        if !(b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b == '_' || i > 0 && b >= '0' && b <= '9') { return false }
+    }
+    return true
+}
+
+pub fn signature(name: Str) -> Str {
+    return match name {
+        "null" => "c.null() -> c.Ptr", "null_fn" => "c.null_fn() -> c.Fn",
+        "is_null" => "c.is_null(pointer: c.Ptr or c.Fn) -> Bool",
+        "alloc" => "c.alloc(bytes: Int) -> c.Ptr uses unsafe", "free" => "c.free(pointer: c.Ptr) uses unsafe",
+        "addr" => "c.addr(mut scalar) -> c.Ptr uses unsafe", "data" => "c.data(bytes: Str) -> c.Ptr uses unsafe",
+        "cstr" => "c.cstr(text: Str) -> c.Ptr uses unsafe", "string" => "c.string(pointer: c.Ptr) -> Str uses unsafe",
+        "bytes" => "c.bytes(pointer: c.Ptr, size: Int) -> Str uses unsafe",
+        "load" => "c.load(pointer: c.Ptr) -> T uses unsafe (scalar T from context)",
+        "store" => "c.store(pointer: c.Ptr, value: T) uses unsafe (scalar T)",
+        "offset" => "c.offset(pointer: c.Ptr, bytes: Int) -> c.Ptr uses unsafe",
+        "address" => "c.address(pointer: c.Ptr or c.Fn) -> u64 uses unsafe",
+        "from_address" => "c.from_address(address: u64) -> c.Ptr uses unsafe",
+        "float32" => "c.float32(value: Float) -> Float",
+        "load_float32" => "c.load_float32(pointer: c.Ptr) -> Float uses unsafe",
+        "store_float32" => "c.store_float32(pointer: c.Ptr, value: Float) uses unsafe",
+        "callback" => "c.callback(top_level_function) -> c.Fn uses unsafe",
+        _ => "",
+    }
+}

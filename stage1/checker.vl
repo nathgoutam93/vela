@@ -11,6 +11,7 @@
 import ast
 import errors
 import integers
+import cffi
 import interfaces
 import lexer
 import maps
@@ -83,6 +84,7 @@ pub type Checked = struct {
     targs: [[Int]]  // by node id: the type arguments of a call to a generic function
     closures: Map[Int, ClosureInfo]  // by node id
     completion: Completion
+    escaped: Map[Int, Bool]
 }
 
 // What is in scope where the name being completed is (M12b, complete.vl):
@@ -110,6 +112,8 @@ type KeyUse = struct { module: Int, line: Int, col: Int, actual: Int }
 
 type Checker = struct {
     library: Bool
+    unsafe_depth: Int
+    escaped: Map[Int, Bool]
     signatures_done: Bool
     bound_uses: [BoundUse]
     key_uses: [KeyUse]
@@ -166,7 +170,7 @@ pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> C
         push(mut targs, [])
     }
     let mut c = Checker {
-        library: for_tests, signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
+        library: for_tests, unsafe_depth: 0, escaped: [:], signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
         undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
@@ -192,7 +196,7 @@ pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> C
     return Checked {
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
         locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
-        completion: c.completion,
+        completion: c.completion, escaped: c.escaped,
     }
 }
 
@@ -522,10 +526,10 @@ fn signatures(c: mut Checker) {
         for i in 0..len(f.effects) {
             let u = f.effects[i]
             let pi = param_named(f, u)
-            if u == "fs" || u == "os" {
+            if types.concrete_effect(u) {
             } else if pi < 0 {
-                report(mut c, f.effects_line, f.effects_col, "E3015", "unknown effect '" + u + "'; the effects are fs (the files module) " +
-                    "and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), or the name of a " +
+                report(mut c, f.effects_line, f.effects_col, "E3015", "unknown effect '" + u + "'; the effects are fs (the files module), " +
+                    "os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), or the name of a " +
                         "parameter that is a function, for whatever that function uses")
             } else if !types.is_func(c.table, params[pi]) {
                 if params[pi] != types.ERROR() {
@@ -555,6 +559,7 @@ fn signatures(c: mut Checker) {
             type_params: type_params, is_test: false, result_local: -1,
         })
         let id = len(c.fns) - 1
+        validate_foreign(mut c, id)
         if f.public {
             for p in f.params {
                 exposes(mut c, p.ty, "function '" + f.name + "'")
@@ -588,7 +593,7 @@ fn signatures(c: mut Checker) {
             }
         }
         let f = ast.FnDecl {
-            name: "test " + ast.quote(t.name), type_params: [], params: [], result: None, effects: [], effects_line: 0,
+            name: "test " + ast.quote(t.name), foreign: "", variadic: false, type_params: [], params: [], result: None, effects: [], effects_line: 0,
             effects_col: 0, requires: [], ensures: [], body: t.body, line: t.line, col: t.col, public: false,
         }
         push(mut c.fns, FnInfo {
@@ -610,6 +615,13 @@ fn param_named(f: ast.FnDecl, name: Str) -> Int {
 
 // The type a TypeName in the source stands for (ERROR if unknown).
 fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
+    if t.module == "c" {
+        let module = module_in_type(mut c, t.line, t.col, "c")
+        if module < 0 { return types.ERROR() }
+        let id = cffi.type_id(t.name)
+        if id < 0 || len(t.args) != 0 { report(mut c, t.line, t.col, "E3202", "unknown or parameterized C type c." + t.name); return types.ERROR() }
+        return id
+    }
     if t.module == "" {
         completing(mut c, t.name, [])
     }
@@ -630,10 +642,10 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
         }
         let mut effects: [Str] = []
         for u in t.effects {
-            if u == "fs" || u == "os" {
+            if types.concrete_effect(u) {
                 effects = types.union_effects(effects, [u])
             } else {
-                report(mut c, t.line, t.col, "E3023", "unknown effect '" + u + "' in a function type; its effects can be fs and os. " +
+                report(mut c, t.line, t.col, "E3023", "unknown effect '" + u + "' in a function type; its effects can be fs, os and unsafe. " +
                     "For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to")
             }
         }
@@ -802,6 +814,8 @@ fn new_local(c: mut Checker, name: Str, ty: Int, kind: Str, line: Int, col: Int)
 }
 
 fn function(c: mut Checker, id: Int) {
+    if c.fns[id].decl.foreign != "" { return }
+    c.unsafe_depth = 0
     c.current_fn = id
     c.undefined = []
     let f = c.fns[id].decl
@@ -852,7 +866,7 @@ fn function(c: mut Checker, id: Int) {
     }
     c.type_scope = [:]
     for u in f.effects {
-        let known = u == "fs" || u == "os"
+        let known = types.concrete_effect(u)
         let mut message = ""
         if known && !maps.has(c.effects_used, u) && !c.fns[id].is_test && !is_main(c, id) {
             message = "'" + f.name + "' says `uses " + u + "` but uses nothing of it"
@@ -908,8 +922,9 @@ fn effect_of(name: Str) -> Str {
 // `through`. Inside a closure the closure uses it instead: its type says
 // so, and code that calls it uses it then (M15).
 fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
+    if effect == "unsafe" && c.unsafe_depth > 0 { return }
     let var = types.is_effect_var(effect)
-    if effect != "fs" && effect != "os" && !var {
+    if !types.concrete_effect(effect) && !var {
         return  // none, or an unknown one, already reported where it is declared
     }
     let n = len(c.in_closures)
@@ -919,7 +934,7 @@ fn use_effect(c: mut Checker, e: ast.Expr, effect: Str, through: Str) {
     }
     c.effects_used[effect] = true
     let f = c.fns[c.current_fn]
-    if f.is_test || is_main(c, c.current_fn) || maps.has(c.effects_reported, effect) {
+    if (effect != "unsafe" && (f.is_test || is_main(c, c.current_fn))) || maps.has(c.effects_reported, effect) {
         return
     }
     let mut name = effect
@@ -970,7 +985,7 @@ fn effect_hint(c: Checker, found: Int, want: Int) -> Str {
         types.plain(c.table, found) != types.plain(c.table, want) {
         return ""
     }
-    return "; a function that uses fs or os goes only where its type says so, or to a parameter its function " +
+    return "; a function that uses fs, os or unsafe goes only where its type says so, or to a parameter its function " +
         "names in `uses`"
 }
 
@@ -987,7 +1002,7 @@ fn use_effects_of(c: mut Checker, e: ast.Expr, t: Int, through: Str) {
 fn use_call_effects(c: mut Checker, e: ast.Expr, f: FnInfo, args: [ast.Expr], name: Str) {
     for u in f.decl.effects {
         let pi = param_named(f.decl, u)
-        if u == "fs" || u == "os" {
+        if types.concrete_effect(u) {
             use_effect(mut c, e, u, "'" + name + "'")
         } else if pi >= 0 && pi < len(args) && pi < len(f.params) &&
             types.effects_within([types.effect_var(u)], types.effects_of(c.table, f.params[pi])) {
@@ -1291,6 +1306,11 @@ fn stmt(c: mut Checker, s: ast.Stmt) {
         ast.StmtKind.Continue => jump(mut c, s, "continue")
         ast.StmtKind.Return(v) => return_stmt(mut c, s, v)
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut c, scrutinee, arms, s.line, s.col, MatchBody.Statements)
+        ast.StmtKind.Unsafe(body) => {
+            c.unsafe_depth = c.unsafe_depth + 1
+            block(mut c, body)
+            c.unsafe_depth = c.unsafe_depth - 1
+        }
         ast.StmtKind.With(items, body) => with_stmt(mut c, s, items, body)
     }
 }
@@ -3467,6 +3487,8 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
         Some(tn) => res = resolve_type(mut c, tn)
         None => {}
     }
+    let saved_unsafe = c.unsafe_depth
+    c.unsafe_depth = 0
     push(mut c.in_closures, ClosureCtx { id: e.id, boundary: len(c.scopes), captures: [], result: res, effects: [] })
     push_scope(mut c, scope)
     let saved_loops = c.loops
@@ -3475,6 +3497,7 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
         stmt(mut c, s)
     }
     c.loops = saved_loops
+    c.unsafe_depth = saved_unsafe
     pop_scope(mut c)
     let ctx = c.in_closures[len(c.in_closures) - 1]
     c.in_closures = c.in_closures[0..len(c.in_closures) - 1]
@@ -3586,6 +3609,7 @@ fn tasks_call(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr]) -> Int {
 // takes its type arguments from the function type the context wants.
 fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> Int {
     let f = c.fns[id]
+    if f.decl.foreign != "" { report_at(mut c, e, "E3205", "an extern function is not a Vela function value; wrap the call in a Vela function"); return types.ERROR() }
     for m in f.mutable {
         if m {
             report_at(mut c, e, "E3166", "'" + name + "' has a mut parameter, so it cannot be used as a value")
@@ -3595,7 +3619,7 @@ fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> I
     // Its type says what it uses (M15).
     let mut effects: [Str] = []
     for u in f.decl.effects {
-        if u == "fs" || u == "os" {
+        if types.concrete_effect(u) {
             effects = types.union_effects(effects, [u])
         } else if param_named(f.decl, u) >= 0 {
             report_at(mut c, e, "E3167", "'" + name + "' uses whatever its parameter " + u + " uses, so it cannot be used as a " +
@@ -3763,6 +3787,7 @@ fn integer_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], exp
 // A call to a built-in function, written as `written`: one of the
 // prelude's (`len`) or of a built-in module's (`maps.get`, named by `name`).
 fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: Str, expected: Int) -> Int {
+    if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut c, e, name[2..len(name)], args, expected) }
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
         return integer_builtin(mut c, e, name, args, expected)
     }
@@ -3994,6 +4019,7 @@ fn terminates(c: Checker, s: ast.Stmt) -> Bool {
             }
             return true
         }
+        ast.StmtKind.Unsafe(body) => return terminates_block(c, body)
         ast.StmtKind.With(_, body) => return terminates_block(c, body)
         _ => return false
     }
@@ -4084,6 +4110,7 @@ fn define_interface(c: mut Checker, id: Int, d: ast.TypeDecl) {
     for parent in d.parents { push(mut c.table.types[id].bounds, resolve_bound(mut c, parent, d.line, d.col)) }
     let self = types.get(c.table, id).params[0]
     for method in d.methods {
+        if method.variadic { report(mut c, method.line, method.col, "E3200", "only extern declarations may be variadic") }
         if len(method.type_params) > 0 || len(method.requires) > 0 || len(method.ensures) > 0 {
             report(mut c, method.line, method.col, "E3191", "interface signatures cannot have type parameters, bodies or contracts")
         }
@@ -4099,7 +4126,7 @@ fn define_interface(c: mut Checker, id: Int, d: ast.TypeDecl) {
         let mut result = types.NOTHING()
         match method.result { Some(t) => { result = resolve_type(mut c, t); if d.public { exposes(mut c, t, "interface '" + d.name + "'") } }, None => {} }
         for effect in method.effects {
-            if effect != "fs" && effect != "os" { report(mut c, method.line, method.col, "E3191", "interface effects must be fs or os") }
+            if !types.concrete_effect(effect) { report(mut c, method.line, method.col, "E3191", "interface effects must be fs, os or unsafe") }
         }
         if types.field_index(c.table, id, method.name) >= 0 {
             report(mut c, method.line, method.col, "E3192", "duplicate interface method '" + method.name + "'")
@@ -4296,12 +4323,15 @@ fn known_call(c: mut Checker, e: ast.Expr, id: Int, name: Str, args: [ast.Expr],
         use_call_effects(mut c, e, f, args, name)
         return t
     }
-    arity(mut c, e, name, len(f.params), len(args))
+    if f.decl.variadic {
+        if len(args) < len(f.params) { arity(mut c, e, name, len(f.params), len(args)) }
+    } else { arity(mut c, e, name, len(f.params), len(args)) }
     for i in 0..len(args) {
         let arg = args[i]
         let n = strings.from_int(i + 1)
         if i >= len(f.params) {
-            infer(mut c, arg)
+            let actual = value(mut c, arg)
+            if f.decl.variadic && !c_scalar(actual) { report_at(mut c, arg, "E3203", "a C variadic argument must be a C-compatible scalar") }
             continue
         }
         let want = f.params[i]
@@ -4423,4 +4453,121 @@ fn public_bounds(c: mut Checker, params: [Int], line: Int, col: Int) {
             if id >= 0 && !types.get(c.table, id).public { report(mut c, line, col, "E3195", "a public declaration cannot require a private interface") }
         }
     }
+}
+
+// ---- C ABI declarations and raw operations (M21) ----
+pub fn c_scalar(t: Int) -> Bool {
+    return types.is_integer(t) || t == types.FLOAT() || t == types.BOOL() || cffi.pointer(t)
+}
+
+fn validate_foreign(c: mut Checker, id: Int) {
+    let f = c.fns[id]
+    if f.decl.foreign == "" {
+        if f.decl.variadic { report(mut c, f.decl.line, f.decl.col, "E3200", "only extern declarations may be variadic") }
+        return
+    }
+    let d = f.decl
+    if !cffi.symbol(d.foreign) || d.name == "main" || len(d.type_params) > 0 || len(d.requires) > 0 || len(d.ensures) > 0 {
+        report(mut c, d.line, d.col, "E3200", "an extern needs a C symbol and a monomorphic signature without contracts; use a Vela wrapper")
+    }
+    let mut unsafe = false
+    for effect in d.effects { if effect == "unsafe" { unsafe = true } }
+    if !unsafe {
+        report(mut c, d.line, d.col, "E3201", "every extern declaration must say uses unsafe")
+        last_fix(mut c, repairs.effect(c.modules[c.current].source, c.modules[c.current].path, d, "unsafe"))
+    }
+    for i in 0..len(f.params) {
+        if !c_scalar(f.params[i]) && f.params[i] != types.ERROR() {
+            report(mut c, d.params[i].line, d.params[i].col, "E3203", "a C parameter must be a scalar or raw pointer; pass aggregates through c.Ptr")
+        }
+    }
+    if f.result != types.NOTHING() && f.result != types.ERROR() && !c_scalar(f.result) {
+        report(mut c, d.line, d.col, "E3203", "a C result must be a scalar or raw pointer; return aggregates through a pointer")
+    }
+    if d.variadic && len(d.params) == 0 { report(mut c, d.line, d.col, "E3200", "a C variadic declaration needs a fixed parameter before ...") }
+}
+
+fn c_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], expected: Int) -> Int {
+    if cffi.hazardous(name) { use_effect(mut c, e, "unsafe", "c." + name) }
+    let ptr = cffi.PTR()
+    let mut count = 1
+    if name == "null" || name == "null_fn" { count = 0 }
+    if name == "bytes" || name == "store" || name == "offset" || name == "store_float32" { count = 2 }
+    if !arity(mut c, e, "c." + name, count, len(args)) {
+        for arg in args { infer(mut c, arg) }
+        return types.ERROR()
+    }
+    if name == "null" { return ptr }
+    if name == "null_fn" { return cffi.FN() }
+    if name == "addr" {
+        match args[0].kind {
+            ast.ExprKind.MutArg(place) => {
+                let t = infer(mut c, place)
+                if !c_scalar(t) { report_at(mut c, place, "E3203", "c.addr needs a mutable scalar place") }
+                mut_argument(mut c, args[0], t, "c.addr")
+                match path_of(c, place) { Some(path) => c.escaped[path.local] = true, None => {} }
+            }
+            _ => { infer(mut c, args[0]); report_at(mut c, args[0], "E3204", "write c.addr(mut value) for a scalar address") }
+        }
+        return ptr
+    }
+    if name == "callback" {
+        match call_target(mut c, args[0]) {
+            Ref.Function(id) => {
+                let f = c.fns[id]
+                if len(f.type_params) > 0 || f.decl.variadic || f.result != types.NOTHING() && !c_scalar(f.result) {
+                    report_at(mut c, args[0], "E3205", "c.callback needs a monomorphic C-compatible top-level function")
+                }
+                for i in 0..len(f.params) {
+                    if !c_scalar(f.params[i]) || f.mutable[i] { report_at(mut c, args[0], "E3205", "a callback parameter must be an immutable C-compatible scalar") }
+                }
+                let mut effects: [Str] = []
+                for effect in f.decl.effects { if types.concrete_effect(effect) { push(mut effects, effect); use_effect(mut c, e, effect, "callback '" + f.decl.name + "'") } }
+                c.refs[args[0].id] = Ref.Function(id)
+                c.ty[args[0].id] = types.func_with(mut c.table, f.params, f.result, effects)
+            }
+            _ => report_at(mut c, args[0], "E3205", "c.callback accepts a top-level function, not a closure or function variable")
+        }
+        return cffi.FN()
+    }
+    if name == "is_null" || name == "address" {
+        let t = value(mut c, args[0])
+        if !cffi.pointer(t) && t != types.ERROR() { report_at(mut c, args[0], "E3203", "c." + name + " needs c.Ptr or c.Fn") }
+        if name == "is_null" { return types.BOOL() }
+        return 13
+    }
+    if name == "from_address" {
+        check_expr(mut c, args[0], 13, msg("c.from_address needs u64, found ", ""))
+        return ptr
+    }
+    if name == "float32" {
+        check_expr(mut c, args[0], types.FLOAT(), msg("c.float32 needs Float, found ", ""))
+        return types.FLOAT()
+    }
+    if name == "data" || name == "cstr" {
+        check_expr(mut c, args[0], types.STR(), msg("c." + name + " needs Str, found ", ""))
+        return ptr
+    }
+    if name == "alloc" {
+        check_expr(mut c, args[0], types.INT(), msg("c.alloc needs an Int size, found ", ""))
+        return ptr
+    }
+    check_expr(mut c, args[0], ptr, msg("c." + name + " needs c.Ptr, found ", ""))
+    if name == "bytes" || name == "offset" {
+        check_expr(mut c, args[1], types.INT(), msg("c." + name + " needs an Int count, found ", ""))
+        if name == "bytes" { return types.STR() }
+        return ptr
+    }
+    if name == "string" { return types.STR() }
+    if name == "load_float32" { return types.FLOAT() }
+    if name == "load" {
+        if !c_scalar(expected) { report_at(mut c, e, "E3204", "give c.load a scalar result type, as in let n: c.Int = c.load(ptr)"); return types.ERROR() }
+        return expected
+    }
+    if name == "store_float32" { check_expr(mut c, args[1], types.FLOAT(), msg("c.store_float32 needs Float, found ", "")); return types.NOTHING() }
+    if name == "store" {
+        let t = value(mut c, args[1])
+        if !c_scalar(t) && t != types.ERROR() { report_at(mut c, args[1], "E3203", "c.store needs a C-compatible scalar value") }
+    }
+    return types.NOTHING()
 }

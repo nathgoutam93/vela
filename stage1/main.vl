@@ -426,10 +426,10 @@ fn split_flags(flags: Str) -> [Str] {
 fn build(path: Str, exe: Str, root: Str, quick: Bool) uses fs, os {
     if native(quick) {
         let p = lowered(path, native_program(path, checked(path, root), false))
-        assemble(x64.program(p), modules.stem(path), exe, root, "-O2")
+        assemble(x64.program(p), modules.stem(path), exe, root, "-O2", link_flags(path))
         return
     }
-    compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root, "-O2")
+    compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root, "-O2", link_flags(path))
 }
 
 // VELA_BACKEND=c or VELA_BACKEND=native picks the backend. Otherwise `vela
@@ -489,7 +489,7 @@ fn lowered(path: Str, made: Result[ir.Program, [errors.CompileError]]) -> ir.Pro
 
 // Assembly into a scratch directory, assembled by the C compiler at the
 // same time as it compiles the runtime (optimizing at `opt`), then linked.
-fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
+fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
@@ -534,6 +534,7 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
         }
     })
     let mut failed: [Str] = []
+    let mut linking_failed = false
     for i in 0..len(codes) {
         if codes[i] < 0 {
             driver_error("C compiler '" + cc + "' could not be run; install gcc or clang, or set VELA_CC")
@@ -556,10 +557,12 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
         for word in [program_o, runtime_o, "-lm", "-o", exe] {
             push(mut link, word)
         }
+        for library in libraries { push(mut link, library) }
         match os.run(link) {
             Ok(c) => {
                 if c != 0 {
                     failed = link
+                    linking_failed = true
                 }
             }
             Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + e + ")")
@@ -572,6 +575,7 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
     }
     files.remove(tmp)
     if len(failed) > 0 {
+        if linking_failed { driver_error("linker rejected the program; check extern symbols and link entries in vela.mod\ncommand: " + join_words(failed)) }
         internal_error("the assembler or linker rejected the generated code\ncommand: " + join_words(failed))
     }
 }
@@ -592,7 +596,7 @@ fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str uses 
 // where the C may be cut, and every part starts with what all of them
 // need (types, memory functions, prototypes). Building the compiler takes
 // a third of the time on four cores.
-fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os {
+fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
@@ -652,6 +656,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
         }
     })
     let mut failed: [Str] = []
+    let mut linking_failed = false
     for i in 0..len(codes) {
         if codes[i] < 0 {
             driver_error("C compiler '" + cc + "' could not be run; install gcc or clang, or set VELA_CC")
@@ -667,6 +672,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
     for o in objects {
         push(mut link, o)
     }
+    for library in libraries { push(mut link, library) }
     push(mut link, "-lm")  // math.sqrt
     push(mut link, "-o")
     push(mut link, exe)
@@ -678,6 +684,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
         }
         if code != 0 {
             failed = link
+            linking_failed = true
         }
     }
     if len(failed) == 0 && cached != "" && !have {
@@ -694,6 +701,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str) uses fs, os 
     }
     files.remove(tmp)
     if len(failed) > 0 {
+        if linking_failed { driver_error("linker rejected the program; check extern symbols and link entries in vela.mod\ncommand: " + join_words(failed)) }
         internal_error("the C compiler rejected the generated code\ncommand: " + join_words(failed))
     }
 }
@@ -1068,9 +1076,9 @@ fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
     // Tests are built often and run briefly, so the C compiler does not
     // optimize: building the compiler's own tests takes 3 s instead of 20.
     if native(true) {
-        assemble(x64.program(lowered(path, native_program(path, k, true))), modules.stem(path) + "_tests", exe, root, "-O0")
+        assemble(x64.program(lowered(path, native_program(path, k, true))), modules.stem(path) + "_tests", exe, root, "-O0", link_flags(path))
     } else {
-        compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root, "-O0")
+        compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root, "-O0", link_flags(path))
     }
     let mut failed = 0
     for i in chosen {
@@ -1156,4 +1164,9 @@ fn edits_json(edits: [errors.Edit]) -> Str {
     }
     strings.add(mut b, "]")
     return strings.build(b)
+}
+
+fn link_flags(path: Str) -> [Str] uses fs, os {
+    match packages.link_flags(path) { Ok(flags) => return flags, Err(e) => driver_error(e) }
+    return []
 }

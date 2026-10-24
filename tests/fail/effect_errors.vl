@@ -2,7 +2,7 @@
 // err: effect_errors.vl:20:18: error: 'read' uses fs, through files.read, but does not say so; add `uses fs` after its signature [E3036]
 // err: effect_errors.vl:23:28: warning: 'first' says `uses fs` but uses nothing of it [E7008]
 // err: effect_errors.vl:30:12: error: effect 'os' is listed twice [E3019]
-// err: effect_errors.vl:30:12: error: unknown effect 'net'; the effects are fs (the files module) and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), or the name of a parameter that is a function, for whatever that function uses [E3015]
+// err: effect_errors.vl:30:12: error: unknown effect 'net'; the effects are fs (the files module), os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), or the name of a parameter that is a function, for whatever that function uses [E3015]
 // err: effect_errors.vl:35:5: error: 'caller' uses os, through 'leave', but does not say so; add `uses os` after its signature [E3036]
 // err: effect_errors.vl:38:11: warning: 'tidy' says `uses os` but uses nothing of it [E7008]
 // err: effect_errors.vl:43:14: error: a requires clause must be Bool, found Int [E3093]

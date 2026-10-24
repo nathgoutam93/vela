@@ -19,6 +19,7 @@
 // types, and the keywords. Only names starting with what is typed already
 // are given.
 import ast
+import cffi
 import integers
 import checker
 import files
@@ -228,7 +229,7 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
         push(mut out, Item { name: v[0], kind: "variant", detail: of + "." + v[1], doc: "A built-in variant, of " + of + "." })
     }
     for w in ["let", "mut", "if", "else", "match", "for", "in", "return", "break", "continue", "fn", "type", "import", "pub",
-        "test", "uses", "with", "requires", "ensures", "true", "false"] {
+        "test", "extern", "unsafe", "uses", "with", "requires", "ensures", "true", "false"] {
         push(mut out, Item { name: w, kind: "keyword", detail: w, doc: "" })
     }
     return out
@@ -261,6 +262,9 @@ fn local_item(k: checker.Checked, l: Int, mi: Int) -> Item {
 fn module_items(k: checker.Checked, target: Int) -> [Item] {
     let m = k.modules[target]
     let mut out: [Item] = []
+    if m.name == "c" {
+        for name in cffi.type_names() { push(mut out, Item { name: name, kind: "type", detail: "c." + name, doc: "LP64 C ABI type." }) }
+    }
     if m.is_std {
         for f in m.std {
             push(mut out, builtin_item(f, m.name + "." + f))

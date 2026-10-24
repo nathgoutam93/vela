@@ -178,6 +178,7 @@ fn stmt(w: mut Walk, s: ast.Stmt) {
             }
         }
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut w, scrutinee, arms)
+        ast.StmtKind.Unsafe(body) => block(mut w, body)
         ast.StmtKind.With(items, body) => {
             for item in items {
                 expr(mut w, item.value)

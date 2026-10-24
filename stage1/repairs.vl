@@ -49,6 +49,11 @@ pub fn effect(source: Str, file: Str, f: ast.FnDecl, name: Str) -> [errors.Edit]
     let mut depth = 0
     let mut previous = -1
     for t in toks {
+        if f.foreign != "" && previous >= 0 && (t.kind == lexer.Kind.Semi || t.kind == lexer.Kind.Eq || t.kind == lexer.Kind.Eof) {
+            let mut text = " uses " + name
+            if f.effects_line > 0 { text = ", " + name }
+            return edit(source, file, previous, previous, text)
+        }
         if t.line < start_line || t.line == start_line && t.col < start_col || t.kind == lexer.Kind.Semi {
             continue
         }

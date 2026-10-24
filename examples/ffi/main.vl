@@ -1,0 +1,14 @@
+// C libraries through ordinary extern declarations and audited safe wrappers.
+import zlib
+import sqlite
+fn main() {
+    let input = "Vela calls zlib and SQLite."
+    match zlib.compress(input, 6) {
+        Ok(data) => match zlib.decompress(data, len(input)) { Ok(decoded) => print(decoded), Err(code) => print(code) }
+        Err(code) => print(code)
+    }
+    match sqlite.query("select 'SQLite', 6 * 7;") {
+        Ok(rows) => { print(rows[0][0]); print(rows[0][1]) }
+        Err(error) => print(error)
+    }
+}

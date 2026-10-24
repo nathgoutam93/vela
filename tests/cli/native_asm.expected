@@ -48,6 +48,7 @@ f_main:
     call f_count
     mov r10, rax
     mov rdi, r10
+    mov eax, 0
     call vela_print_int@PLT
     jmp .LR1
 .LR1:
@@ -68,11 +69,13 @@ main:
     mov rbx, rsi
     mov rdi, r10
     mov rsi, rbx
+    mov eax, 0
     call vela_init@PLT
     mov rdi, 3
     call f_count
     mov r10, rax
     mov rdi, r10
+    mov eax, 0
     call vela_print_int@PLT
     mov rax, 0
     jmp .LR2

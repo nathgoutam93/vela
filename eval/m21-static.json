@@ -1,0 +1,87 @@
+{
+  "diagnostics": {
+    "diagnostics": 373,
+    "with_code": 373,
+    "with_fix": 21
+  },
+  "reading": {
+    "README": {
+      "bytes": 9381,
+      "tokens": 2345
+    },
+    "README and walkthroughs": {
+      "bytes": 513311,
+      "tokens": 128327
+    },
+    "std": {
+      "bytes": 14460,
+      "tokens": 3615
+    },
+    "vela guide": {
+      "bytes": 30819,
+      "tokens": 7704
+    }
+  },
+  "questions": [
+    {
+      "question": "What is the type of this name?",
+      "answered": "yes",
+      "how": "vela query type"
+    },
+    {
+      "question": "Where is it defined?",
+      "answered": "yes",
+      "how": "vela query def"
+    },
+    {
+      "question": "Where is it used?",
+      "answered": "yes",
+      "how": "vela query refs"
+    },
+    {
+      "question": "What can go here?",
+      "answered": "yes",
+      "how": "vela query complete"
+    },
+    {
+      "question": "Rename it without changing what any other name means",
+      "answered": "yes",
+      "how": "vela query rename"
+    },
+    {
+      "question": "What is declared in this file?",
+      "answered": "yes",
+      "how": "vela query symbols"
+    },
+    {
+      "question": "What does this function touch and promise?",
+      "answered": "yes",
+      "how": "vela query type: signature with uses, requires, ensures"
+    },
+    {
+      "question": "Who calls this function?",
+      "answered": "partly",
+      "how": "refs lists the uses, not the functions they are in"
+    },
+    {
+      "question": "What is this module's public API?",
+      "answered": "partly",
+      "how": "symbols lists one file, private names too"
+    },
+    {
+      "question": "Which tests cover this function?",
+      "answered": "no",
+      "how": ""
+    },
+    {
+      "question": "What breaks if I change this signature?",
+      "answered": "no",
+      "how": ""
+    },
+    {
+      "question": "What does this error mean, and how do I fix it?",
+      "answered": "yes",
+      "how": "vela explain CODE; vela check --json includes edits; vela fix applies them"
+    }
+  ]
+}

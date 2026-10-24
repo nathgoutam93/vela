@@ -14,6 +14,7 @@
 // the whole starts. The parts are found in the file's tokens: a qualified
 // name is a name, a dot, a name, and so on.
 import ast
+import cffi
 import integers
 import checker
 import lexer
@@ -271,6 +272,7 @@ fn word_def(b: mut Builder, name: Str) -> Int {
             "files.remove, files.temp_dir), or calls a function that does."
         "os" => "An effect: the function uses the process's surroundings (os.args, os.exit, os.env, os.run, " +
             "os.output, os.read_line, os.read), or calls a function that does."
+        "unsafe" => "An effect: the function may call C or access raw memory. An unsafe block acknowledges and contains that effect; wrappers remain visible to vela query unsafe."
         "Eq" => "A bound: values of the type can be compared with == and !=."
         "Ord" => "A bound: values of the type can be compared with ==, !=, <, <=, > and >=."
         "Key" => "A bound: the type can be the key type of a Map."
@@ -287,7 +289,7 @@ fn word_def(b: mut Builder, name: Str) -> Int {
     let mut kind = "effect"
     if name == "Eq" || name == "Ord" || name == "Key" {
         kind = "bound"
-    } else if name != "fs" && name != "os" {
+    } else if !types.concrete_effect(name) {
         kind = "fake"
     }
     let d = add_def(mut b, def_at(name, kind, "", 0, 0, name, doc))
@@ -316,6 +318,13 @@ fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
 // for a name that is not one. The checker has the rules (checker.builtin);
 // this is how hover and completion show them.
 pub fn builtin_info(name: Str) -> [Str] {
+    if len(name) > 2 && name[0..2] == "c." {
+        let short = name[2..len(name)]
+        let t = cffi.type_id(short)
+        if t >= 0 { return [name + " = " + types.get(types.new_table(), t).name + " (LP64 C ABI)", "A C scalar alias or nominal raw pointer. c.Float uses binary32 at extern boundaries and Float storage in Vela."] }
+        let signature = cffi.signature(short)
+        if signature != "" { return [signature, "Raw C interop. Unsafe operations require uses unsafe or an audited unsafe block; callers own pointer lifetime, bounds, and C signature correctness."] }
+    }
     if integers.type_id(name) >= 0 { return ["fn " + name + "(value: integer) -> " + name, "Checked integer conversion; panics if the value does not fit."] }
     if len(name) > 5 && name[0..5] == "ints." {
         let short = name[5..len(name)]
@@ -379,6 +388,7 @@ pub fn signature(f: ast.FnDecl) -> Str {
     if f.public {
         strings.add(mut s, "pub ")
     }
+    if f.foreign != "" { strings.add(mut s, "extern ") }
     strings.add(mut s, "fn " + f.name + type_params_text(f.type_params) + "(")
     for i in 0..len(f.params) {
         let p = f.params[i]
@@ -391,6 +401,7 @@ pub fn signature(f: ast.FnDecl) -> Str {
         }
         strings.add(mut s, ast.type_text(p.ty))
     }
+    if f.variadic { if len(f.params) > 0 { strings.add(mut s, ", ") }; strings.add(mut s, "...") }
     strings.add_byte(mut s, ')')
     match f.result {
         Some(t) => strings.add(mut s, " -> " + ast.type_text(t))
@@ -404,6 +415,7 @@ pub fn signature(f: ast.FnDecl) -> Str {
         }
         strings.add(mut s, f.effects[i])
     }
+    if f.foreign != "" && f.foreign != f.name { strings.add(mut s, " = " + ast.quote(f.foreign)) }
     return strings.build(s)
 }
 
@@ -926,6 +938,7 @@ fn stmt(b: mut Builder, s: ast.Stmt) {
             }
         }
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut b, scrutinee, arms)
+        ast.StmtKind.Unsafe(body) => block(mut b, body)
         ast.StmtKind.With(items, body) => {
             for item in items {
                 add_use(mut b, item.line, item.col, item.name, word_def(mut b, item.name), "")

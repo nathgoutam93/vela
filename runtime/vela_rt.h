@@ -16,6 +16,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Explicit C ABI entry points use assembler labels to avoid conflicts with
+// libc prototypes already included by the runtime (e.g. strlen/memcpy).
+#if defined(__APPLE__)
+#define VELA_C_SYMBOL(name) "_" name
+#else
+#define VELA_C_SYMBOL(name) name
+#endif
+typedef void (*vela_c_fn)(void);
+
 // Generated helper functions (retain, release, descriptors) are only used by
 // some programs. This keeps clang from warning about the others.
 #define VELA_UNUSED __attribute__((unused))
@@ -541,6 +550,25 @@ static inline uint8_t vela_to_byte(int64_t n, const char *loc) {
 }
 
 uint64_t vela_hash_value(const vela_type *type, const void *value);
+
+extern const vela_type vela_type_c_ptr;
+extern const vela_type vela_type_c_fn;
+void *vela_c_alloc(int64_t n, const char *loc);
+void vela_c_free(void *p);
+void *vela_c_data(vela_str s);
+void *vela_c_cstr(vela_str s, const char *loc);
+vela_str vela_c_string(const void *p, const char *loc);
+vela_str vela_c_bytes(const void *p, int64_t n, const char *loc);
+uint64_t vela_c_load(const void *p, int64_t size, const char *loc);
+void vela_c_store(void *p, uint64_t bits, int64_t size, const char *loc);
+double vela_c_load_double(const void *p, const char *loc);
+void vela_c_store_double(void *p, double value, const char *loc);
+double vela_c_load_float32(const void *p, const char *loc);
+void vela_c_store_float32(void *p, double value, const char *loc);
+double vela_c_float32(double value);
+void *vela_c_offset(void *p, int64_t offset);
+uint64_t vela_c_fn_bits(vela_c_fn fn);
+vela_c_fn vela_c_fn_from_bits(uint64_t bits);
 
 #include "vela_int.h"
 

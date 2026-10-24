@@ -81,6 +81,7 @@ CACHE_TEST = TESTS / "cache_test.py"
 M17_TEST = TESTS / "m17_test.py"
 M19_TEST = TESTS / "m19_test.py"
 M20_TEST = TESTS / "m20_test.py"
+M21_TEST = TESTS / "m21_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -169,6 +170,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(CACHE_TEST, compiler, env)
     if path == M17_TEST:
         return run_script(M17_TEST, compiler, env)
+    if path == M21_TEST:
+        return run_script(M21_TEST, compiler, env)
     if path == M20_TEST:
         return run_script(M20_TEST, compiler, env)
     if path == M19_TEST:
@@ -335,6 +338,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(M17_TEST)
     tests.append(M19_TEST)
     tests.append(M20_TEST)
+    tests.append(M21_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

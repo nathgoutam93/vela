@@ -20,6 +20,7 @@
 //   argument points. The runtime is called with C's convention (CCall).
 // - The functions C generated from layout.vl: retain, release and share
 //   for each type, boxes, and the descriptors arrays and maps use.
+import cffi
 import ast
 import checker
 import codegen
@@ -132,7 +133,7 @@ pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [e
     let mut k = checker.erased(checked)
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
-        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test {
+        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && k.fns[id].decl.foreign == "" {
             push(mut roots, id)
         }
     }
@@ -399,7 +400,7 @@ fn ccall(g: mut Low, sym: Str, args: [Int], kinds: [Int], how: Int, sret: Int) -
     let mut dst = -1
     if how == ir.RET_INT() || how == ir.RET_BOOL() {
         dst = reg(mut g, ir.INT())
-    } else if how == ir.RET_FLOAT() {
+    } else if how == ir.RET_FLOAT() || how == ir.RET_FLOAT32() {
         dst = reg(mut g, ir.FLOAT())
     }
     let mut i = ir.inst(ir.Op.CCall, dst, sret, -1, how)
@@ -511,7 +512,7 @@ fn in_memory(g: Low, t: Int) -> Bool {
     if t == types.STR() {
         return true
     }
-    if t == types.NOTHING() || types.is_integer(t) || t == types.BOOL() || t == types.UNIT() ||
+    if cffi.pointer(t) || t == types.NOTHING() || types.is_integer(t) || t == types.BOOL() || t == types.UNIT() ||
         t == types.FLOAT() || is_array_like(g, t) || types.is_map(g.k.table, t) {
         return false
     }
@@ -972,6 +973,8 @@ fn share(g: mut Low, t: Int, v: Val) {
 // The vela_type describing `t` to arrays and maps: the runtime's, or one
 // written here.
 fn descriptor(g: mut Low, t: Int) -> Int {
+    if t == cffi.PTR() { return sym_addr(mut g, "vela_type_c_ptr") }
+    if t == cffi.FN() { return sym_addr(mut g, "vela_type_c_fn") }
     if t >= 8 && t <= 13 { return sym_addr(mut g, "vela_type_" + types.get(g.k.table, t).name) }
     let builtin = match t {
         1 => "vela_type_int"
@@ -1227,6 +1230,7 @@ fn taken_in_stmt(g: Low, s: ast.Stmt, out: mut Map[Int, Bool]) {
             taken_in_expr(g, e, mut out)
             taken_in_arms(g, arms, mut out)
         }
+        ast.StmtKind.Unsafe(body) => taken_in_block(g, body, mut out)
         ast.StmtKind.With(items, body) => {
             for w in items {
                 match w.value.kind {
@@ -1275,15 +1279,16 @@ fn taken_in_expr(g: Low, e: ast.Expr, out: mut Map[Int, Bool]) {
             taken_in_expr(g, b, mut out)
         }
         ast.ExprKind.Call(callee, args) => {
-            let user = match g.k.refs[e.id] {
+            let address_args = match g.k.refs[e.id] {
                 checker.Ref.Function(_) => true
+                checker.Ref.Builtin(name) => name == "c.addr"
                 _ => false
             }
             taken_in_expr(g, callee, mut out)
             for a in args {
                 match a.kind {
                     ast.ExprKind.MutArg(p) => {
-                        if user {
+                        if address_args {
                             taken_place(g, p, mut out)
                         } else {
                             taken_in_expr(g, p, mut out)
@@ -1573,6 +1578,7 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
             g.fs.dead = true
         }
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_code(mut g, scrutinee, arms, no_value())
+        ast.StmtKind.Unsafe(body) => block(mut g, body, "block")
         ast.StmtKind.With(items, body) => with_code(mut g, items, body)
         ast.StmtKind.Block(_) => {}  // handled in stmt
     }
@@ -2223,6 +2229,7 @@ fn call_result(g: mut Low, t: Int, args: mut [Int]) -> Val {
 // change a variable another argument was read from, so then each is a copy
 // with a reference of its own, kept until the statement ends.
 fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
+    if g.k.fns[id].decl.foreign != "" { return foreign_call(mut g, e, id, args) }
     let mut protect = false
     for a in args {
         if ast.has_mut(a) {
@@ -2702,7 +2709,7 @@ fn binary(g: mut Low, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Val {
         return result
     }
     let mut left = expr(mut g, l)
-    if types.is_integer(left.ty) || left.ty == types.FLOAT() || left.ty == types.BOOL() || left.ty == types.UNIT() {
+    if cffi.pointer(left.ty) || types.is_integer(left.ty) || left.ty == types.FLOAT() || left.ty == types.BOOL() || left.ty == types.UNIT() {
         left = fresh(mut g, left)  // load before the right side can mutate its source
     }
     let right = expr(mut g, r)
@@ -2897,6 +2904,7 @@ fn shown(g: mut Low, t: Int, v: Val) -> Int {
 // ---- Built-in functions ----
 
 fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut g, e, name[2..len(name)], args) }
     let t = ty(g, e)
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
         return integer_builtin(mut g, e, name, args)
@@ -3264,4 +3272,159 @@ fn method_value(g: mut Low, e: ast.Expr, args: [ast.Expr], t: Int, name: Str) ->
     jump(mut g, done)
     place_label(mut g, done)
     return reg_val(r, types.INT())
+}
+
+// ---- The scalar C ABI ----
+fn foreign_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
+    let f = g.k.fns[id]
+    let at = loc_of(mut g, e)
+    let mut values: [Val] = []
+    let mut regs: [Int] = []
+    let mut kinds: [Int] = []
+    let mut copy_to: [Val] = []
+    let mut copy_from: [Val] = []
+    for arg in args {
+        match arg.kind { ast.ExprKind.MutArg(_) => push(mut values, no_value()), _ => push(mut values, fresh(mut g, expr(mut g, arg))) }
+    }
+    for i in 0..len(args) {
+        match args[i].kind {
+            ast.ExprKind.MutArg(p) => {
+                let target = place(mut g, p)
+                let mut pointer = address(mut g, target)
+                if codegen.abi_float32(f.decl.params[i].ty) {
+                    let slot = slot_val(mut g, types.FLOAT())
+                    ccall(mut g, "vela_c_store_float32", [slot.reg, scalar(mut g, target), at], [ir.KIND_INT(), ir.KIND_FLOAT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+                    pointer = slot.reg
+                    push(mut copy_to, target)
+                    push(mut copy_from, slot)
+                }
+                push(mut regs, pointer)
+                push(mut kinds, ir.KIND_INT())
+            }
+            _ => {
+                push(mut regs, scalar(mut g, values[i]))
+                let mut kind = ir.KIND_INT()
+                if values[i].ty == types.FLOAT() { kind = ir.KIND_FLOAT() }
+                if i < len(f.params) && codegen.abi_float32(f.decl.params[i].ty) { kind = ir.KIND_FLOAT32() }
+                push(mut kinds, kind)
+            }
+        }
+    }
+    let mut ret_kind = ir.RET_INT()
+    if f.result == types.NOTHING() { ret_kind = ir.RET_NONE() }
+    if f.result == types.FLOAT() { ret_kind = ir.RET_FLOAT() }
+    if f.result == types.BOOL() { ret_kind = ir.RET_BOOL() }
+    match f.decl.result { Some(t) => { if codegen.abi_float32(t) { ret_kind = ir.RET_FLOAT32() } }, None => {} }
+    let mut result = ccall(mut g, f.decl.foreign, regs, kinds, ret_kind, -1)
+    if types.is_integer(f.result) {
+        result = ccall(mut g, "vela_fixed_load", [result, konst(mut g, types.integer_width(f.result)), konst(mut g, fixed_sign(f.result))],
+            [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    }
+    for i in 0..len(copy_to) {
+        let value = ccall(mut g, "vela_c_load_float32", [copy_from[i].reg, at], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_FLOAT(), -1)
+        put_place(mut g, copy_to[i], reg_val(value, types.FLOAT()))
+    }
+    if f.result == types.NOTHING() { return no_value() }
+    return reg_val(result, f.result)
+}
+
+fn callback(g: mut Low, id: Int) -> Val {
+    let f = g.k.fns[id]
+    if f.decl.foreign != "" { return reg_val(sym_addr(mut g, f.decl.foreign), cffi.FN()) }
+    let name = "vcabi_" + strings.from_int(id)
+    if !maps.has(g.made, name) {
+        g.made[name] = true
+        let saved = g.fs
+        let mut result_class = -1
+        if f.result >= 0 { result_class = class_of(f.result) }
+        g.fs = new_fn(name, result_class)
+        let mut regs: [Int] = []
+        for i in 0..len(f.params) {
+            let mut parameter = ir.param(mut g.fs.f, class_of(f.params[i]))
+            if types.is_integer(f.params[i]) {
+                parameter = ccall(mut g, "vela_fixed_load", [parameter, konst(mut g, types.integer_width(f.params[i])), konst(mut g, fixed_sign(f.params[i]))],
+                    [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+            }
+            if f.params[i] == types.BOOL() {
+                parameter = ccall(mut g, "vela_fixed_load", [parameter, konst(mut g, 8), konst(mut g, 0)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+            }
+            if codegen.abi_float32(f.decl.params[i].ty) {
+                let decoded = reg(mut g, ir.FLOAT())
+                emit(mut g, ir.inst(ir.Op.FFrom32, decoded, parameter, -1, 0))
+                parameter = decoded
+            }
+            push(mut regs, parameter)
+        }
+        let mut result = call(mut g, fn_name(g.k, id), regs, result_class)
+        match f.decl.result {
+            Some(t) => {
+                if codegen.abi_float32(t) {
+                    let encoded = reg(mut g, ir.FLOAT())
+                    emit(mut g, ir.inst(ir.Op.FTo32, encoded, result, -1, 0))
+                    result = encoded
+                }
+            }
+            None => {}
+        }
+        ret(mut g, result)
+        finish(mut g)
+        g.fs = saved
+    }
+    return reg_val(sym_addr(mut g, name), cffi.FN())
+}
+
+fn c_builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    let t = ty(g, e)
+    if name == "null" || name == "null_fn" { return reg_val(konst(mut g, 0), t) }
+    if name == "callback" {
+        match g.k.refs[args[0].id] { checker.Ref.Function(id) => return callback(mut g, id), _ => return no_value() }
+    }
+    if name == "addr" { return reg_val(address(mut g, place(mut g, mut_place(args[0]))), t) }
+    let first = fresh(mut g, expr(mut g, args[0]))
+    let mut a = -1
+    let mut ak = ir.KIND_INT()
+    if first.ty == types.STR() { a = address(mut g, first); ak = ir.KIND_STR() } else { a = scalar(mut g, first) }
+    if first.ty == types.FLOAT() { ak = ir.KIND_FLOAT() }
+    let mut second = no_value()
+    if len(args) > 1 { second = fresh(mut g, expr(mut g, args[1])) }
+    if name == "is_null" { return reg_val(cmp_imm(mut g, cond_code("=="), a, 0), t) }
+    if name == "address" || name == "from_address" { return reg_val(a, t) }
+    let at = loc_of(mut g, e)
+    if name == "load" {
+        if t == types.FLOAT() {
+            return reg_val(ccall(mut g, "vela_c_load_double", [a, at], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_FLOAT(), -1), t)
+        }
+        let mut size = 8
+        if types.is_integer(t) { size = types.integer_width(t) / 8 }
+        if t == types.BOOL() { size = 1 }
+        let mut raw = ccall(mut g, "vela_c_load", [a, konst(mut g, size), at], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+        if types.is_integer(t) { raw = ccall(mut g, "vela_fixed_load", [raw, konst(mut g, types.integer_width(t)), konst(mut g, fixed_sign(t))], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1) }
+        if t == types.BOOL() { raw = cmp_imm(mut g, cond_code("!="), raw, 0) }
+        return reg_val(raw, t)
+    }
+    if name == "store" {
+        let mut size = 8
+        let vt = second.ty
+        if vt == types.FLOAT() {
+            ccall(mut g, "vela_c_store_double", [a, scalar(mut g, second), at], [ir.KIND_INT(), ir.KIND_FLOAT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+        } else {
+            if types.is_integer(vt) { size = types.integer_width(vt) / 8 }
+            if vt == types.BOOL() { size = 1 }
+            ccall(mut g, "vela_c_store", [a, scalar(mut g, second), konst(mut g, size), at], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+        }
+        return no_value()
+    }
+    let mut regs = [a]
+    let mut kinds = [ak]
+    if len(args) > 1 { push(mut regs, scalar(mut g, second)); let mut kind = ir.KIND_INT(); if second.ty == types.FLOAT() { kind = ir.KIND_FLOAT() }; push(mut kinds, kind) }
+    if name == "alloc" || name == "cstr" || name == "string" || name == "bytes" || name == "load_float32" || name == "store_float32" { push(mut regs, at); push(mut kinds, ir.KIND_INT()) }
+    let mut ret_kind = ir.RET_INT()
+    let mut slot = -1
+    if t == types.NOTHING() { ret_kind = ir.RET_NONE() }
+    if t == types.FLOAT() { ret_kind = ir.RET_FLOAT() }
+    if t == types.STR() { ret_kind = ir.RET_STR(); slot = slot_val(mut g, t).reg }
+    let result = ccall(mut g, "vela_c_" + name, regs, kinds, ret_kind, slot)
+    if t == types.NOTHING() { return no_value() }
+    if t == types.STR() { return own(mut g, mem_val(slot, 0, t)) }
+    return reg_val(result, t)
 }

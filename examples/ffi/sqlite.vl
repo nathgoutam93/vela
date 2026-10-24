@@ -1,0 +1,90 @@
+// A small SQLite binding, using the official C interface contracts:
+// https://sqlite.org/c3ref/prepare.html and https://sqlite.org/c3ref/column_blob.html.
+import c
+extern fn sqlite3_open(path: c.Ptr, db: mut c.Ptr) -> c.Int uses unsafe, fs
+extern fn sqlite3_close(db: c.Ptr) -> c.Int uses unsafe
+extern fn sqlite3_prepare_v2(db: c.Ptr, sql: c.Ptr, size: c.Int, statement: mut c.Ptr, tail: mut c.Ptr) -> c.Int uses unsafe, fs
+extern fn sqlite3_step(statement: c.Ptr) -> c.Int uses unsafe, fs
+extern fn sqlite3_finalize(statement: c.Ptr) -> c.Int uses unsafe
+extern fn sqlite3_column_count(statement: c.Ptr) -> c.Int uses unsafe
+extern fn sqlite3_column_text(statement: c.Ptr, column: c.Int) -> c.Ptr uses unsafe
+extern fn sqlite3_column_bytes(statement: c.Ptr, column: c.Int) -> c.Int uses unsafe
+extern fn sqlite3_errmsg(db: c.Ptr) -> c.Ptr uses unsafe
+
+fn message(db: c.Ptr) -> Str uses unsafe {
+    if c.is_null(db) { return "SQLite could not allocate a connection" }
+    let p = sqlite3_errmsg(db)
+    if c.is_null(p) { return "SQLite error" }
+    return c.string(p)
+}
+
+// Execute SQL in a fresh in-memory database and copy each result value to Str.
+// SQL NULL maps to "" in this example. Arbitrary SQL can ATTACH files, so the
+// wrapper honestly keeps fs even though its own database starts in memory.
+pub fn query(sql: Str) -> Result[[[Str]], Str] uses fs {
+    for i in 0..len(sql) { if sql[i] == 0 { return Err("SQL contains NUL") } }
+    unsafe {
+        let path = c.cstr(":memory:")
+        let mut db = c.null()
+        let opened = sqlite3_open(path, mut db)
+        c.free(path)
+        if opened != 0 {
+            let error = message(db)
+            if !c.is_null(db) { sqlite3_close(db) }
+            return Err(error)
+        }
+        let source = c.cstr(sql)
+        let mut rest = source
+        let mut rows: [[Str]] = []
+        let mut error = ""
+        for {
+            let byte: u8 = c.load(rest)
+            if byte == 0 { break }
+            let mut statement = c.null()
+            let mut tail = c.null()
+            let prepared = sqlite3_prepare_v2(db, rest, -1, mut statement, mut tail)
+            if prepared != 0 {
+                error = message(db)
+                if !c.is_null(statement) { sqlite3_finalize(statement) }
+                break
+            }
+            if !c.is_null(statement) {
+                let mut step = sqlite3_step(statement)
+                for step == 100 {
+                    let count = int(sqlite3_column_count(statement))
+                    let mut row: [Str] = []
+                    for i in 0..count {
+                        let text = sqlite3_column_text(statement, i32(i))
+                        let n = int(sqlite3_column_bytes(statement, i32(i)))
+                        if c.is_null(text) { push(mut row, "") } else { push(mut row, c.bytes(text, n)) }
+                    }
+                    push(mut rows, row)
+                    step = sqlite3_step(statement)
+                }
+                if step != 101 { error = message(db) }
+                let finalized = sqlite3_finalize(statement)
+                if finalized != 0 && error == "" { error = message(db) }
+            }
+            if error != "" || c.is_null(tail) || tail == rest { break }
+            rest = tail
+        }
+        c.free(source)
+        let closed = sqlite3_close(db)
+        if closed != 0 && error == "" { error = "SQLite connection did not close" }
+        if error != "" { return Err(error) }
+        return Ok(rows)
+    }
+}
+
+test "SQLite schema, UTF-8, binary text, null and errors" {
+    match query("create table items(n integer, name text); insert into items values(2, 'café'), (1, 'first'); select n, name from items order by n;") {
+        Ok(rows) => assert(len(rows) == 2 && rows[0][0] == "1" && rows[1][1] == "café")
+        Err(_) => assert(false)
+    }
+    match query("select char(65,0,66), null, ''; -- trailing comment") {
+        Ok(rows) => assert(rows[0][0] == "A\0B" && rows[0][1] == "" && rows[0][2] == "")
+        Err(_) => assert(false)
+    }
+    match query("select * from missing;") { Err(error) => assert(len(error) > 0), Ok(_) => assert(false) }
+    match query("select 1;\0select 2") { Err(_) => {}, Ok(_) => assert(false) }
+}

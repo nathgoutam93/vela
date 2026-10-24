@@ -254,7 +254,22 @@ fn declaration(p: mut Parser, imports: mut [ast.Import], types: mut [ast.TypeDec
         advance(mut p)
         tok = peek(p, 0)
     }
-    if tok.kind == lexer.Kind.Fn {
+    if tok.kind == lexer.Kind.Ident && tok.text == "extern" {
+        advance(mut p)
+        if peek(p, 0).kind != lexer.Kind.Fn { return Err(error(peek(p, 0), "E2001", "expected fn after extern")) }
+        let mut f = fn_decl_in(mut p, false)?
+        f.public = public
+        f.foreign = f.name
+        if peek(p, 0).kind == lexer.Kind.Eq {
+            advance(mut p)
+            let symbol = expect(mut p, lexer.Kind.Str, "for the C symbol after '='")?
+            if symbol.value == "" { return Err(error(symbol, "E3200", "a C symbol cannot be empty")) }
+            f.foreign = symbol.value
+        }
+        f.body.end_line = peek(p, 0).line
+        f.body.end_col = peek(p, 0).col
+        push(mut fns, f)
+    } else if tok.kind == lexer.Kind.Fn {
         let mut f = fn_decl(mut p)?
         f.public = public
         push(mut fns, f)
@@ -280,7 +295,7 @@ fn skip_declaration(p: mut Parser, start: Int) {
     for peek(p, 0).kind != lexer.Kind.Eof {
         let k = peek(p, 0).kind
         let starts = k == lexer.Kind.Fn || k == lexer.Kind.Type || k == lexer.Kind.Pub || k == lexer.Kind.Import ||
-            k == lexer.Kind.Test
+            k == lexer.Kind.Test || k == lexer.Kind.Ident && peek(p, 0).text == "extern"
         if starts && braces == 0 && p.i > start {
             return
         }
@@ -318,7 +333,14 @@ fn fn_decl_in(p: mut Parser, with_body: Bool) -> Result[ast.FnDecl, errors.Compi
     let type_params = type_params(mut p, name.text)?
     expect(mut p, lexer.Kind.LParen, "after the function name")?
     let mut params: [ast.Param] = []
+    let mut variadic = false
     for peek(p, 0).kind != lexer.Kind.RParen {
+        if !with_body && peek(p, 0).kind == lexer.Kind.DotDot {
+            advance(mut p)
+            expect(mut p, lexer.Kind.Dot, "to complete ...")?
+            variadic = true
+            break
+        }
         let pname = expect_name(mut p, "for a parameter")?
         expect(mut p, lexer.Kind.Colon, "and a type after parameter '" + pname.text + "'")?
         let mutable = peek(p, 0).kind == lexer.Kind.Mut
@@ -380,7 +402,7 @@ fn fn_decl_in(p: mut Parser, with_body: Bool) -> Result[ast.FnDecl, errors.Compi
     let mut body = ast.Block { stmts: [], end_line: name.line, end_col: name.col }
     if with_body { body = block(mut p, "to start the body of '" + name.text + "'")? }
     return Ok(ast.FnDecl {
-        name: name.text, type_params: type_params, params: params, result: result, effects: effects, effects_line: effects_line,
+        name: name.text, foreign: "", variadic: variadic, type_params: type_params, params: params, result: result, effects: effects, effects_line: effects_line,
         effects_col: effects_col, requires: requires, ensures: ensures, body: body, line: name.line, col: name.col,
         public: false,
     })
@@ -688,6 +710,10 @@ fn skip_statement(p: mut Parser) {
 fn statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
     let tok = peek(p, 0)
     let k = tok.kind
+    if k == lexer.Kind.Ident && tok.text == "unsafe" && peek(p, 1).kind == lexer.Kind.LBrace {
+        advance(mut p)
+        return Ok(stmt(mut p, ast.StmtKind.Unsafe(block(mut p, "after unsafe")?), tok.line, tok.col))
+    }
     if k == lexer.Kind.Let {
         return let_stmt(mut p)
     }

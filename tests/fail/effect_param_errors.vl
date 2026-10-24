@@ -1,21 +1,21 @@
 // M15: function values with effects go only where a type allows them, and
 // `uses f` names a parameter whose effects each call takes on.
-// err: effect_param_errors.vl:49:19: error: argument 1 of 'apply' must be fn(Str) -> Int, found fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses` [E3093]
-// err: effect_param_errors.vl:50:29: error: 'g' is declared as fn(Str) -> Int, but its value is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses` [E3093]
-// err: effect_param_errors.vl:51:24: error: field 'f' of 'Plain' is fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses` [E3093]
-// err: effect_param_errors.vl:52:24: error: argument 2 of 'first' must be fn(Str) -> Int, found fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses` [E3093]
-// err: effect_param_errors.vl:57:12: error: 'hand_out' returns fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses` [E3093]
+// err: effect_param_errors.vl:49:19: error: argument 1 of 'apply' must be fn(Str) -> Int, found fn(Str) -> Int uses fs; a function that uses fs, os or unsafe goes only where its type says so, or to a parameter its function names in `uses` [E3093]
+// err: effect_param_errors.vl:50:29: error: 'g' is declared as fn(Str) -> Int, but its value is fn(Str) -> Int uses fs; a function that uses fs, os or unsafe goes only where its type says so, or to a parameter its function names in `uses` [E3093]
+// err: effect_param_errors.vl:51:24: error: field 'f' of 'Plain' is fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs, os or unsafe goes only where its type says so, or to a parameter its function names in `uses` [E3093]
+// err: effect_param_errors.vl:52:24: error: argument 2 of 'first' must be fn(Str) -> Int, found fn(Str) -> Int uses fs; a function that uses fs, os or unsafe goes only where its type says so, or to a parameter its function names in `uses` [E3093]
+// err: effect_param_errors.vl:57:12: error: 'hand_out' returns fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs, os or unsafe goes only where its type says so, or to a parameter its function names in `uses` [E3093]
 // err: effect_param_errors.vl:62:12: error: 'undeclared' uses fs, through the function passed to 'apply_any', but does not say so; add `uses fs` after its signature [E3036]
 // err: effect_param_errors.vl:70:29: error: `uses a` lets 'a' use anything, but its type says what it uses; write one or the other [E3018]
 // err: effect_param_errors.vl:71:5: error: 'bounded' uses fs, through 'a', but does not say so; add `uses fs` after its signature [E3036]
-// err: effect_param_errors.vl:81:34: error: unknown effect 'f' in a function type; its effects can be fs and os. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to [E3023]
+// err: effect_param_errors.vl:81:34: error: unknown effect 'f' in a function type; its effects can be fs, os and unsafe. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to [E3023]
 // err: effect_param_errors.vl:81:47: error: `uses f` names a mut parameter; the function could put a function that uses anything in it [E3017]
 // err: effect_param_errors.vl:81:47: error: `uses n` names parameter 'n', which is Int, not a function [E3016]
-// err: effect_param_errors.vl:81:47: error: unknown effect 'bogus'; the effects are fs (the files module) and os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), or the name of a parameter that is a function, for whatever that function uses [E3015]
+// err: effect_param_errors.vl:81:47: error: unknown effect 'bogus'; the effects are fs (the files module), os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), or the name of a parameter that is a function, for whatever that function uses [E3015]
 // err: effect_param_errors.vl:84:19: warning: 'never' says `uses f` but never calls f, nor passes it on [E7008]
-// err: effect_param_errors.vl:88:16: error: unknown effect 'net' in a function type; its effects can be fs and os. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to [E3023]
+// err: effect_param_errors.vl:88:16: error: unknown effect 'net' in a function type; its effects can be fs, os and unsafe. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to [E3023]
 // err: effect_param_errors.vl:92:13: error: 'apply_any' uses whatever its parameter f uses, so it cannot be used as a value; call it from a closure instead [E3167]
-// err: effect_param_errors.vl:96:24: error: the elements of an array must all be fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs or os goes only where its type says so, or to a parameter its function names in `uses` [E3093]
+// err: effect_param_errors.vl:96:24: error: the elements of an array must all be fn(Str) -> Int, but this is fn(Str) -> Int uses fs; a function that uses fs, os or unsafe goes only where its type says so, or to a parameter its function names in `uses` [E3093]
 import files
 import lists
 import os

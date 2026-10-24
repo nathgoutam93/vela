@@ -1,6 +1,7 @@
 // The C code generator. The scheme: one C statement per operation, owned
 // and borrowed values, cleanup frames, copy-on-write, and since M18 the
 // checks that ranges.vl proves cannot fail left out.
+import cffi
 import ast
 import checker
 import errors
@@ -135,7 +136,7 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
     // as the copies they are called as. Tests only for `vela test`.
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
-        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test {
+        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && k.fns[id].decl.foreign == "" {
             push(mut roots, id)
         }
     }
@@ -207,6 +208,9 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
             push(mut out, line)
         }
         push(mut out, "")
+    }
+    for id in 0..len(k.fns) {
+        if k.fns[id].decl.foreign != "" { push(mut out, foreign_prototype(k, l, id) + ";") }
     }
     // Declare every function first, so each can call any other, in any order.
     let none: [Str] = []
@@ -846,6 +850,7 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
             g.dead = true
         }
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_code(mut g, scrutinee, arms, ArmCode.Statements)
+        ast.StmtKind.Unsafe(body) => block(mut g, body, "block")
         ast.StmtKind.With(items, body) => with_code(mut g, items, body)
         ast.StmtKind.Block(_) => {}  // handled in stmt
     }
@@ -973,6 +978,7 @@ fn call_value(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
         }
         checker.Ref.Builtin(name) => return builtin(mut g, e, name, args)
         checker.Ref.Function(id) => {
+            if g.k.fns[id].decl.foreign != "" { return foreign_call(mut g, e, id, args) }
             // The function borrows its arguments (M11b): they stay
             // the caller's, temporaries released when the statement
             // ends. Unless an argument has a `mut` in it, which can
@@ -1397,6 +1403,7 @@ fn uses_stmt(u: mut LoopUses, st: ast.Stmt, in_closure: Bool) {
             uses_expr(mut u, x, in_closure)
             uses_arms(mut u, arms, in_closure)
         }
+        ast.StmtKind.Unsafe(b) => uses_block(mut u, b, in_closure)
         ast.StmtKind.With(items, b) => {
             for w in items {
                 uses_expr(mut u, w.value, in_closure)
@@ -2265,7 +2272,7 @@ fn binary(g: mut Gen, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Value {
     }
     let first = expr(mut g, l)
     let mut left = first.c
-    if types.is_integer(first.ty) || first.ty == types.FLOAT() || first.ty == types.BOOL() || first.ty == types.UNIT() {
+    if cffi.pointer(first.ty) || types.is_integer(first.ty) || first.ty == types.FLOAT() || first.ty == types.BOOL() || first.ty == types.UNIT() {
         left = scalar(mut g, first.ty, left)  // snapshot before the right side can mutate a local
     }
     let right = expr(mut g, r).c
@@ -2388,6 +2395,7 @@ fn shown(t: Int, c: Str) -> Str {
 }
 
 fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
+    if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut g, e, name[2..len(name)], args) }
     let t = ty(g, e)
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
         return integer_builtin(mut g, e, name, args)
@@ -2705,4 +2713,131 @@ fn method_value(g: mut Gen, e: ast.Expr, args: [ast.Expr], t: Int, name: Str) ->
 fn dispatch_name(k: checker.Checked, names: Map[Str, Str], dispatch: checker.Dispatch) -> Str {
     if len(dispatch.args) == 0 { return fn_name(k, dispatch.fn_id) }
     return names[mono.key(dispatch.fn_id, dispatch.args)]
+}
+
+// ---- The C ABI ----
+pub fn foreign_name(k: checker.Checked, id: Int) -> Str {
+    return "vf_" + strings.from_int(id) + "_" + layout.mangle(k.modules[k.fns[id].module].name, k.fns[id].decl.name)
+}
+pub fn abi_float32(t: ast.TypeName) -> Bool { return t.module == "c" && t.name == "Float" }
+fn foreign_type(l: layout.Layout, t: Int, written: Option[ast.TypeName]) -> Str {
+    match written { Some(tn) => { if abi_float32(tn) { return "float" } }, None => {} }
+    return layout.c_type(l, t)
+}
+fn foreign_prototype(k: checker.Checked, l: layout.Layout, id: Int) -> Str {
+    let f = k.fns[id]
+    let mut params = ""
+    for i in 0..len(f.params) {
+        if i > 0 { params = params + ", " }
+        params = params + foreign_type(l, f.params[i], Some(f.decl.params[i].ty))
+        if f.mutable[i] { params = params + " *" }
+    }
+    if f.decl.variadic { params = params + ", ..." }
+    if params == "" { params = "void" }
+    return "extern " + foreign_type(l, f.result, f.decl.result) + " " + foreign_name(k, id) + "(" + params + ") __asm__(VELA_C_SYMBOL(" + c_string(f.decl.foreign) + "))"
+}
+
+fn foreign_call(g: mut Gen, e: ast.Expr, id: Int, args: [ast.Expr]) -> Value {
+    let f = g.k.fns[id]
+    let mut values: [Str] = []
+    let mut after: [Str] = []
+    for arg in args {
+        match arg.kind {
+            ast.ExprKind.MutArg(_) => push(mut values, "")
+            _ => { let v = expr(mut g, arg); push(mut values, scalar(mut g, v.ty, v.c)) }
+        }
+    }
+    for i in 0..len(args) {
+        match args[i].kind {
+            ast.ExprKind.MutArg(p) => {
+                let address = new_temp(mut g)
+                emit(mut g, c_type(g, ty(g, p)) + " *" + address + " = &(" + place(mut g, p) + ");")
+                if abi_float32(f.decl.params[i].ty) {
+                    let temporary = new_temp(mut g)
+                    emit(mut g, "float " + temporary + " = (float)*" + address + ";")
+                    values[i] = "&" + temporary
+                    push(mut after, "*" + address + " = (double)" + temporary + ";")
+                } else { values[i] = address }
+            }
+            _ => {}
+        }
+    }
+    let mut call = foreign_name(g.k, id) + "("
+    for i in 0..len(values) { if i > 0 { call = call + ", " }; call = call + values[i] }
+    call = call + ")"
+    let mut result = no_value()
+    if f.result == types.NOTHING() { emit(mut g, call + ";") } else { result = store(mut g, ty(g, e), call) }
+    for statement in after { emit(mut g, statement) }
+    g.unique = []
+    g.found = []
+    return result
+}
+
+fn callback(g: mut Gen, id: Int) -> Value {
+    let f = g.k.fns[id]
+    if f.decl.foreign != "" { return value(scalar(mut g, cffi.FN(), "(vela_c_fn)&" + foreign_name(g.k, id)), cffi.FN()) }
+    let name = "vcabi_" + strings.from_int(id)
+    if !maps.has(g.wrappers, name) {
+        let mut params = ""
+        let mut args = ""
+        for i in 0..len(f.params) {
+            if i > 0 { params = params + ", "; args = args + ", " }
+            let arg = "a" + strings.from_int(i)
+            params = params + foreign_type(g.l, f.params[i], Some(f.decl.params[i].ty)) + " " + arg
+            args = args + arg
+        }
+        if params == "" { params = "void" }
+        let mut statement = fn_name(g.k, id) + "(" + args + ");"
+        if f.result >= 0 { statement = "return " + statement }
+        g.wrappers[name] = "static " + foreign_type(g.l, f.result, f.decl.result) + " " + name + "(" + params + ") { " + statement + " }"
+    }
+    return value(scalar(mut g, cffi.FN(), "(vela_c_fn)&" + name), cffi.FN())
+}
+
+fn c_builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
+    let t = ty(g, e)
+    if name == "null" { return value("NULL", cffi.PTR()) }
+    if name == "null_fn" { return value("(vela_c_fn)0", cffi.FN()) }
+    if name == "callback" {
+        match g.k.refs[args[0].id] { checker.Ref.Function(id) => return callback(mut g, id), _ => return no_value() }
+    }
+    if name == "addr" { return value(scalar(mut g, t, "(void *)&(" + place(mut g, mut_place(args[0])) + ")"), t) }
+    let first = expr(mut g, args[0])
+    let a = scalar(mut g, first.ty, first.c)
+    let mut b = ""
+    if len(args) > 1 { let v = expr(mut g, args[1]); b = scalar(mut g, v.ty, v.c) }
+    let loc = loc_of(g, e)
+    if name == "is_null" { return value(scalar(mut g, t, "(" + a + " == 0)"), t) }
+    if name == "address" {
+        let mut code = "(uint64_t)(uintptr_t)" + a
+        if first.ty == cffi.FN() { code = "vela_c_fn_bits(" + a + ")" }
+        return value(scalar(mut g, t, code), t)
+    }
+    if name == "from_address" { return value(scalar(mut g, t, "(void *)(uintptr_t)" + a), t) }
+    let mut call = "vela_c_" + name + "(" + a
+    if name == "load" {
+        if t == types.FLOAT() { call = "vela_c_load_double(" + a + ", " + loc + ")" } else {
+            let mut size = 8
+            if types.is_integer(t) { size = types.integer_width(t) / 8 }
+            if t == types.BOOL() { size = 1 }
+            let raw = "vela_c_load(" + a + ", " + strings.from_int(size) + ", " + loc + ")"
+            if t == cffi.PTR() { call = "(void *)(uintptr_t)" + raw } else if t == cffi.FN() { call = "vela_c_fn_from_bits(" + raw + ")" } else if t == types.BOOL() { call = "(" + raw + " != 0)" } else { call = fixed_decoded(g, t, raw) }
+        }
+    } else if name == "store" {
+        let value_type = ty(g, args[1])
+        if value_type == types.FLOAT() { call = "vela_c_store_double(" + a + ", " + b + ", " + loc + ")" } else {
+            let mut size = 8
+            let mut raw = "(uint64_t)(uintptr_t)" + b
+            if types.is_integer(value_type) { size = types.integer_width(value_type) / 8 }
+            if value_type == types.BOOL() { size = 1 }
+            if value_type == cffi.FN() { raw = "vela_c_fn_bits(" + b + ")" }
+            call = "vela_c_store(" + a + ", " + raw + ", " + strings.from_int(size) + ", " + loc + ")"
+        }
+    } else {
+        if b != "" { call = call + ", " + b }
+        if name == "alloc" || name == "cstr" || name == "string" || name == "bytes" || name == "load_float32" || name == "store_float32" { call = call + ", " + loc }
+        call = call + ")"
+    }
+    if t == types.NOTHING() { emit(mut g, call + ";"); return no_value() }
+    return store(mut g, t, call)
 }

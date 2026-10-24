@@ -4,6 +4,7 @@
 //     vela query type FILE:LINE:COL   what the name there is, and its type
 //     vela query def FILE:LINE:COL    where it is declared
 //     vela query refs FILE:LINE:COL   everywhere it is used, its declaration first
+//     vela query unsafe FILE          every function that may reach unsafe
 //     vela query symbols FILE         the file's types, functions and tests
 //     vela query rename FILE:LINE:COL NEW
 //                                     what renaming the name there would change
@@ -22,6 +23,7 @@
 // A question with no answer (no name at that position, or a file that
 // does not parse) prints {"error": "..."} and exits with 1.
 import ast
+import unsafe_query
 import checker
 import errors
 import files
@@ -116,6 +118,10 @@ pub fn command(args: [Str], std_dir: Str) uses fs, os {
         usage()
     }
     let what = args[0]
+    if what == "unsafe" {
+        print(json.pretty(unsafe_query.report(checked(load(args[1], std_dir)))))
+        return
+    }
     if what == "symbols" {
         let path = args[1]
         match files.read(path) {
@@ -174,7 +180,7 @@ pub fn command(args: [Str], std_dir: Str) uses fs, os {
 
 fn usage() uses os {
     os.eprint("usage: vela query (type | def | refs | complete) FILE:LINE:COL, vela query rename FILE:LINE:COL NEW, " +
-        "or vela query symbols FILE")
+        "or vela query (symbols | unsafe) FILE")
     os.exit(2)
 }
 

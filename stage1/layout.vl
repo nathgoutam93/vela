@@ -4,6 +4,7 @@
 // functions, share functions for threads (M13), names for packages'
 // modules (M14) and compact boxes for enums with one empty variant
 // (M18).
+import cffi
 import maps
 import strings
 import types
@@ -68,6 +69,8 @@ test "C names of a module's things" {
 }
 
 fn primitive_c(t: Int) -> Str {
+    if t == cffi.PTR() { return "void *" }
+    if t == cffi.FN() { return "vela_c_fn" }
     if types.is_integer(t) {
         let mut prefix = "uint"
         if types.integer_signed(t) { prefix = "int" }
@@ -85,6 +88,8 @@ fn primitive_c(t: Int) -> Str {
 }
 
 fn runtime_descriptor(t: Int) -> Str {
+    if t == cffi.PTR() { return "&vela_type_c_ptr" }
+    if t == cffi.FN() { return "&vela_type_c_fn" }
     if t >= 8 && t <= 13 {
         return "&vela_type_" + types.get(types.new_table(), t).name
     }
@@ -213,6 +218,8 @@ fn base_name(l: Layout, t: Int) -> Str {
 pub fn suffix(l: Layout, t: Int) -> Str {
     let ti = types.get(l.table, t)
     if primitive_c(t) != "" {
+        if t == cffi.PTR() { return "c_ptr" }
+        if t == cffi.FN() { return "c_fn" }
         return ti.name
     }
     if types.is_array(l.table, t) {

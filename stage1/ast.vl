@@ -126,6 +126,7 @@ pub type StmtKind = enum {
     Continue
     Return(Option[Expr])
     MatchStmt(Expr, [Arm])
+    Unsafe(Block)
     With([WithItem], Block)  // in a test: fakes for the block
 }
 
@@ -167,6 +168,8 @@ pub type TypeParam = struct {
 
 pub type FnDecl = struct {
     name: Str
+    foreign: Str  // C symbol, or empty for a Vela function
+    variadic: Bool
     type_params: [TypeParam]
     params: [Param]
     result: Option[TypeName]
@@ -466,9 +469,11 @@ fn sx_fn(f: FnDecl) -> Sx {
     if f.public {
         push(mut items, atom("pub"))
     }
+    if f.foreign != "" { push(mut items, atom("extern")) }
     push(mut items, atom("fn"))
     push(mut items, atom(f.name))
     add_type_params(mut items, f.type_params)
+    if f.variadic { push(mut params, atom("...")) }
     push(mut items, list(params))
     match f.result {
         Some(t) => push(mut items, atom(type_text(t)))
@@ -487,7 +492,7 @@ fn sx_fn(f: FnDecl) -> Sx {
     for r in f.ensures {
         push(mut items, list([atom("ensures"), sx_expr(r)]))
     }
-    push(mut items, sx_block(f.body))
+    if f.foreign == "" { push(mut items, sx_block(f.body)) } else { push(mut items, list([atom("symbol"), atom(quote(f.foreign))])) }
     return list(items)
 }
 
@@ -549,6 +554,7 @@ fn sx_stmt(s: Stmt) -> Sx {
             }
         }
         StmtKind.MatchStmt(scrutinee, arms) => return sx_match(scrutinee, arms)
+        StmtKind.Unsafe(body) => return list([atom("unsafe"), sx_block(body)])
         StmtKind.With(items, body) => {
             let mut out = [atom("with")]
             for w in items {

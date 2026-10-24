@@ -57,6 +57,18 @@ pub fn why_not(a: query.Analysis, ix: index.Index, u: index.Use) -> Str uses os 
         if m.file != d.file {
             continue
         }
+        for f in m.program.fns {
+            if f.foreign == "" || f.line != d.line || f.col != d.col { continue }
+            let tokens = lexer.tokenize(m.source).tokens
+            let mut active = false
+            let mut alias = false
+            for token in tokens {
+                if token.line == f.line && token.col == f.col { active = true }
+                if active && token.kind == lexer.Kind.Semi { break }
+                if active && token.kind == lexer.Kind.Eq { alias = true }
+            }
+            if !alias { return "this extern name is its C symbol; pin it with an explicit C symbol alias before renaming its Vela name" }
+        }
         if m.package == "std" {
             return "'" + d.name + "' is declared in the standard library, " + m.path
         }

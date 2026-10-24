@@ -1,0 +1,45 @@
+// LP64 zlib binding. Sizes and return codes follow https://zlib.net/manual.html.
+import c
+extern fn compressBound(source_len: c.ULong) -> c.ULong uses unsafe
+extern fn compress2(dest: c.Ptr, dest_len: mut c.ULong, source: c.Ptr, source_len: c.ULong, level: c.Int) -> c.Int uses unsafe
+extern fn uncompress(dest: c.Ptr, dest_len: mut c.ULong, source: c.Ptr, source_len: c.ULong) -> c.Int uses unsafe
+
+// The result owns a copy; no C pointer or unsafe effect escapes this wrapper.
+pub fn compress(data: Str, level: c.Int) -> Result[Str, Int] {
+    unsafe {
+        let mut size = compressBound(u64(len(data)))
+        let dest = c.alloc(int(size))
+        let code = compress2(dest, mut size, c.data(data), u64(len(data)), level)
+        let mut result: Result[Str, Int] = Err(int(code))
+        if code == 0 { result = Ok(c.bytes(dest, int(size))) }
+        c.free(dest)
+        return result
+    }
+}
+
+pub fn decompress(data: Str, expected_size: Int) -> Result[Str, Int] {
+    if expected_size < 0 { return Err(-2) }
+    unsafe {
+        let dest = c.alloc(expected_size)
+        let mut size = u64(expected_size)
+        let code = uncompress(dest, mut size, c.data(data), u64(len(data)))
+        let mut result: Result[Str, Int] = Err(int(code))
+        if code == 0 { result = Ok(c.bytes(dest, int(size))) }
+        c.free(dest)
+        return result
+    }
+}
+
+test "zlib binary round trip and failures" {
+    let input = "hello\0hello\nÿ"
+    match compress(input, 6) {
+        Ok(data) => match decompress(data, len(input)) { Ok(decoded) => assert(decoded == input), Err(_) => assert(false) }
+        Err(_) => assert(false)
+    }
+    match compress("", -1) {
+        Ok(data) => match decompress(data, 0) { Ok(decoded) => assert(len(decoded) == 0), Err(_) => assert(false) }
+        Err(_) => assert(false)
+    }
+    match compress("bad level", -2) { Err(code) => assert(code == -2), Ok(_) => assert(false) }
+    match decompress("not zlib", 20) { Err(code) => assert(code == -3), Ok(_) => assert(false) }
+}
