@@ -1,0 +1,31 @@
+// Packed protobuf uint64 varints. No input or payload bytes are copied.
+import ints
+pub type Parsed = struct { count: Int, checksum: u64, last: Str }
+pub fn parse(data: Str) -> Result[Parsed, Str] {
+    let mut position = 0
+    let mut count = 0u64
+    let mut checksum = 0u64
+    let mut last_start = 0
+    for position < len(data) {
+        last_start = position
+        let mut value = 0u64
+        let mut complete = false
+        for group in 0..10 {
+            if position < 0 || position >= len(data) { return Err("truncated varint") }
+            let b = data[position]
+            position = position + 1
+            if group == 9 && b > 1 { return Err("varint exceeds uint64") }
+            value = value | (u64(b & 127u8) << (group * 7))
+            if b < 128u8 { complete = true; break }
+        }
+        if !complete { return Err("varint exceeds uint64") }
+        checksum = ints.wrapping_add(checksum, value)
+        count = ints.wrapping_add(count, 1u64)
+    }
+    return Ok(Parsed { count: int(count), checksum: checksum, last: data[last_start..position] })
+}
+
+test "protobuf varints and empty input" {
+    match parse("\0AB") { Ok(p) => assert(p.count == 3 && p.checksum == 131u64 && p.last == "B"), Err(_) => assert(false) }
+    match parse("") { Ok(p) => assert(p.count == 0 && p.last == ""), Err(_) => assert(false) }
+}

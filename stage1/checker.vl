@@ -193,6 +193,7 @@ pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> C
     c.order = order
     push(mut c.modules, prelude)
     program(mut c, for_tests)
+    validate_fixed(mut c)
     return Checked {
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
         locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
@@ -625,6 +626,7 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
     if t.module == "" {
         completing(mut c, t.name, [])
     }
+    if t.name == "[;]" { return types.fixed(mut c.table, resolve_type(mut c, t.args[0]), t.length) }
     if t.name == "[]" {
         let elem = resolve_type(mut c, t.args[0])
         return types.array(mut c.table, elem)
@@ -1283,7 +1285,7 @@ fn stmt(c: mut Checker, s: ast.Stmt) {
         ast.StmtKind.ForEach(name, iterable, body) => {
             let t = value(mut c, iterable)
             let mut elem = types.ERROR()
-            if types.is_array(c.table, t) {
+            if types.sequence(c.table, t) {
                 elem = types.get(c.table, t).args[0]
             } else if t == types.STR() {
                 elem = types.BYTE()
@@ -1971,8 +1973,9 @@ fn check_expr(c: mut Checker, e: ast.Expr, want: Int, m: Msg) {
             }
         }
         ast.ExprKind.ArrayLit(elems) => {
-            if types.is_array(c.table, want) || len(elems) == 0 {
-                if types.is_array(c.table, want) {
+            if types.sequence(c.table, want) || len(elems) == 0 {
+                if types.sequence(c.table, want) {
+                    if types.is_fixed(c.table, want) && len(elems) != types.get(c.table, want).length { report_at(mut c, e, "E3211", "fixed array literal has the wrong number of elements") }
                     set_ty(mut c, e, want)
                     let elem = types.get(c.table, want).args[0]
                     for x in elems {
@@ -2266,7 +2269,7 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr, expect
 
 fn index(c: mut Checker, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Int {
     let t = value(mut c, obj)
-    if types.is_array(c.table, t) || t == types.STR() {
+    if types.sequence(c.table, t) || t == types.STR() {
         check_expr(mut c, i, types.INT(), msg("an index must be Int, found ", ""))
         if t == types.STR() {
             return types.BYTE()
@@ -2467,6 +2470,7 @@ fn field(c: mut Checker, e: ast.Expr, obj: ast.Expr, name: Str, expected: Int) -
     if t == types.ERROR() {
         return types.ERROR()
     }
+    if types.is_fixed(c.table, t) { report_at(mut c, e, "E3212", "fixed arrays expose elements through indexing"); return types.ERROR() }
     if !types.is_struct(c.table, t) {
         let mut hint = ""
         if types.is_enum(c.table, t) {
@@ -3787,6 +3791,7 @@ fn integer_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], exp
 // A call to a built-in function, written as `written`: one of the
 // prelude's (`len`) or of a built-in module's (`maps.get`, named by `name`).
 fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: Str, expected: Int) -> Int {
+    if len(name) > 7 && name[0..7] == "memory." { return memory_builtin(mut c, e, name[7..len(name)], args, expected) }
     if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut c, e, name[2..len(name)], args, expected) }
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
         return integer_builtin(mut c, e, name, args, expected)
@@ -3830,7 +3835,7 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
     }
     if name == "len" {
         let t = value(mut c, args[0])
-        if !(t == types.STR() || types.is_array(c.table, t) || types.is_map(c.table, t) || t == types.ERROR()) {
+        if !(t == types.STR() || types.sequence(c.table, t) || types.is_map(c.table, t) || t == types.ERROR()) {
             report_at(mut c, args[0], "E3171", "len takes a Str, an array or a map, not " + show(c, t))
         }
         return types.INT()
@@ -4544,7 +4549,12 @@ fn c_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], expected:
         check_expr(mut c, args[0], types.FLOAT(), msg("c.float32 needs Float, found ", ""))
         return types.FLOAT()
     }
-    if name == "data" || name == "cstr" {
+    if name == "data" {
+        let t = value(mut c, args[0])
+        if t != types.STR() && !types.is_array(c.table, t) && t != types.ERROR() { report_at(mut c, args[0], "E3203", "c.data needs Str or a growable array") }
+        return ptr
+    }
+    if name == "cstr" {
         check_expr(mut c, args[0], types.STR(), msg("c." + name + " needs Str, found ", ""))
         return ptr
     }
@@ -4570,4 +4580,69 @@ fn c_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], expected:
         if !c_scalar(t) && t != types.ERROR() { report_at(mut c, args[1], "E3203", "c.store needs a C-compatible scalar value") }
     }
     return types.NOTHING()
+}
+
+fn memory_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], expected: Int) -> Int {
+    let mut count = 1
+    if name == "fill" || name == "truncate" || name == "signed" { count = 2 }
+    if name == "read" { count = 4 }
+    if name == "write" { count = 5 }
+    if !arity(mut c, e, "memory." + name, count, len(args)) { for arg in args { infer(mut c, arg) }; return types.ERROR() }
+    if name == "reserve" || name == "fill" {
+        check_expr(mut c, args[0], types.INT(), msg("capacity must be Int, found ", ""))
+        if name == "reserve" {
+            if !types.is_array(c.table, expected) { report_at(mut c, e, "E3213", "give memory.reserve a growable array result type"); return types.ERROR() }
+            return expected
+        }
+        let mut elem = types.ERROR()
+        if types.is_array(c.table, expected) { elem = types.get(c.table, expected).args[0]; check_expr(mut c, args[1], elem, msg("fill element type mismatch: ", "")) } else { elem = value(mut c, args[1]) }
+        return types.array(mut c.table, elem)
+    }
+    if name == "bits" { check_expr(mut c, args[0], types.INT(), msg("memory.bits needs Int, found ", "")); return 13 }
+    if name == "signed" { check_expr(mut c, args[0], 13, msg("memory.signed needs u64, found ", "")); check_expr(mut c, args[1], types.INT(), msg("bit width must be Int, found ", "")); return types.INT() }
+    if name == "from_str" { check_expr(mut c, args[0], types.STR(), msg("memory.from_str needs Str, found ", "")); return types.array(mut c.table, types.BYTE()) }
+    let mut place = args[0]
+    if name == "truncate" || name == "write" { match place.kind { ast.ExprKind.MutArg(p) => place = p, _ => {} } }
+    let actual = value(mut c, place)
+    let mut elem = types.ERROR()
+    if types.is_array(c.table, actual) { elem = types.get(c.table, actual).args[0] }
+    if name == "truncate" || name == "write" { mut_argument(mut c, args[0], actual, "memory." + name) }
+    if name == "truncate" {
+        if !types.is_array(c.table, actual) && actual != types.ERROR() { report_at(mut c, args[0], "E3213", "memory.truncate needs a growable array") }
+        check_expr(mut c, args[1], types.INT(), msg("new length must be Int, found ", ""))
+        return types.NOTHING()
+    }
+    if elem != types.BYTE() && !(name == "read" && actual == types.STR()) && actual != types.ERROR() { report_at(mut c, args[0], "E3213", "byte storage must be [u8], or Str for a read") }
+    if name == "to_str" { return types.STR() }
+    check_expr(mut c, args[1], types.INT(), msg("byte offset must be Int, found ", ""))
+    check_expr(mut c, args[2], types.INT(), msg("byte width must be Int, found ", ""))
+    check_expr(mut c, args[3], types.BOOL(), msg("byte order must be Bool, found ", ""))
+    if name == "write" { check_expr(mut c, args[4], 13, msg("stored bits must be u64, found ", "")); return types.NOTHING() }
+    return 13
+}
+
+fn validate_fixed(c: mut Checker) {
+    for id in c.table.instances {
+        if !types.is_fixed(c.table, id) || types.is_open(c.table, id) || types.get(c.table, id).length == 0 { continue }
+        let elem = types.get(c.table, id).args[0]
+        let mut queue = [elem]
+        let mut seen: Map[Int, Bool] = [:]
+        let mut i = 0
+        for i < len(queue) {
+            let t = queue[i]; i = i + 1
+            if t == id {
+                let info = types.get(c.table, elem)
+                let mut module = 0
+                for m in 0..len(c.modules) { if c.modules[m].name == info.module { module = m } }
+                c.current = module
+                report(mut c, info.line, info.col, "E3212", "a fixed array cannot participate in a recursive by-value layout")
+                break
+            }
+            if maps.has(seen, t) { continue }
+            seen[t] = true
+            let info = types.get(c.table, t)
+            if info.tag == types.Tag.Struct { for field in info.fields { push(mut queue, field.ty) } }
+            if info.tag == types.Tag.Enum { for variant in info.variants { for value in variant.payload { push(mut queue, value) } } }
+        }
+    }
 }

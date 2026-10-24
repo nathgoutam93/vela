@@ -1664,7 +1664,9 @@ fn for_each(g: mut Low, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
     let exit = label(mut g)
     place_label(mut g, head)
     let mut length = -1
-    if t == types.STR() {
+    if types.is_fixed(g.k.table, t) {
+        length = konst(mut g, types.get(g.k.table, t).length)
+    } else if t == types.STR() {
         length = load(mut g, it.reg, it.off + 16, 8)
     } else {
         length = load(mut g, scalar(mut g, it), 8, 8)
@@ -1678,7 +1680,8 @@ fn for_each(g: mut Low, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
         declare(mut g, lid, reg_val(b, types.BYTE()))
     } else {
         let et = local_ty(g, lid)
-        let data = load(mut g, scalar(mut g, it), 32, 8)
+        let mut data = -1
+        if types.is_fixed(g.k.table, t) { data = address(mut g, it) } else { data = load(mut g, scalar(mut g, it), 32, 8) }
         let at = op2(mut g, ir.Op.Add, data, mul_imm(mut g, i, size_of(mut g, et)))
         let p = declare(mut g, lid, mem_val(at, 0, et))
         retain(mut g, et, p)
@@ -1788,6 +1791,7 @@ fn field_value(g: mut Low, base: Val, owner: Int, field: Str) -> Val {
 // An array or map about to change, made unique first (copy-on-write).
 fn writable(g: mut Low, e: ast.Expr) -> Val {
     let p = place(mut g, e)
+    if types.is_fixed(g.k.table, ty(g, e)) { return p }
     let mut kind = "array"
     if types.is_map(g.k.table, ty(g, e)) {
         kind = "map"
@@ -1834,6 +1838,7 @@ fn place(g: mut Low, e: ast.Expr) -> Val {
                 return mem_val(at, 0, ty(g, e))
             }
             let index = scalar(mut g, expr(mut g, i))
+            if types.is_fixed(g.k.table, ot) { return mem_val(fixed_at(mut g, container, index, ot, e), 0, ty(g, e)) }
             return mem_val(element_at(mut g, scalar(mut g, container), index, ty(g, e), e), 0, ty(g, e))
         }
         _ => return no_value()
@@ -2120,6 +2125,14 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
             return own(mut g, reg_val(r, t))
         }
         ast.ExprKind.ArrayLit(elems) => {
+            if types.is_fixed(g.k.table, t) {
+                let out = slot_val(mut g, t)
+                let element = types.get(g.k.table, t).args[0]
+                let size = size_of(mut g, element)
+                if len(elems) == 0 { store(mut g, out.reg, 0, 1, konst(mut g, 0)) }
+                for i in 0..len(elems) { put(mut g, out.reg, i * size, element, consume(mut g, expr(mut g, elems[i]))) }
+                return own(mut g, out)
+            }
             let elem_t = types.get(g.k.table, t).args[0]
             let a = ccall(mut g, "vela_array_new", [descriptor(mut g, elem_t), konst(mut g, len(elems))],
                 [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
@@ -2597,6 +2610,7 @@ fn index(g: mut Low, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Val {
         return fresh(mut g, mem_val(at, 0, et))
     }
     let ix = scalar(mut g, expr(mut g, i))
+    if types.is_fixed(g.k.table, t) { return fresh(mut g, mem_val(fixed_at(mut g, o, ix, t, e), 0, et)) }
     return fresh(mut g, mem_val(element_at(mut g, scalar(mut g, o), ix, et, e), 0, et))
 }
 
@@ -2904,6 +2918,7 @@ fn shown(g: mut Low, t: Int, v: Val) -> Int {
 // ---- Built-in functions ----
 
 fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    if len(name) > 7 && name[0..7] == "memory." { return memory_builtin(mut g, e, name[7..len(name)], args) }
     if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut g, e, name[2..len(name)], args) }
     let t = ty(g, e)
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
@@ -3023,6 +3038,7 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     }
     if name == "len" {
         let arg = expr(mut g, args[0])
+        if types.is_fixed(g.k.table, arg.ty) { return reg_val(konst(mut g, types.get(g.k.table, arg.ty).length), types.INT()) }
         if arg.ty == types.STR() {
             return reg_val(load(mut g, arg.reg, arg.off + 16, 8), types.INT())
         }
@@ -3385,6 +3401,7 @@ fn c_builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     let mut ak = ir.KIND_INT()
     if first.ty == types.STR() { a = address(mut g, first); ak = ir.KIND_STR() } else { a = scalar(mut g, first) }
     if first.ty == types.FLOAT() { ak = ir.KIND_FLOAT() }
+    if name == "data" && types.is_array(g.k.table, first.ty) { return reg_val(load(mut g, a, 32, 8), t) }
     let mut second = no_value()
     if len(args) > 1 { second = fresh(mut g, expr(mut g, args[1])) }
     if name == "is_null" { return reg_val(cmp_imm(mut g, cond_code("=="), a, 0), t) }
@@ -3427,4 +3444,68 @@ fn c_builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     if t == types.NOTHING() { return no_value() }
     if t == types.STR() { return own(mut g, mem_val(slot, 0, t)) }
     return reg_val(result, t)
+}
+
+fn fixed_at(g: mut Low, v: Val, i: Int, t: Int, e: ast.Expr) -> Int {
+    let length = types.get(g.k.table, t).length
+    let elem = types.get(g.k.table, t).args[0]
+    let size = size_of(mut g, elem)
+    let base = address(mut g, v)
+    let ok = label(mut g)
+    branch_cmp(mut g, "ult", i, konst(mut g, length), ok)
+    noreturn(mut g, "vela_fixed_array_at", [base, i, konst(mut g, length), konst(mut g, size), loc_of(mut g, e)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()])
+    place_label(mut g, ok)
+    return op2(mut g, ir.Op.Add, base, mul_imm(mut g, i, size))
+}
+
+fn memory_builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    let t = ty(g, e)
+    let loc = loc_of(mut g, e)
+    if name == "reserve" || name == "fill" {
+        let elem = types.get(g.k.table, t).args[0]
+        let size = scalar(mut g, fresh(mut g, expr(mut g, args[0])))
+        let mut regs = [descriptor(mut g, elem), size]
+        let mut kinds = [ir.KIND_INT(), ir.KIND_INT()]
+        if name == "fill" {
+            let value = expr(mut g, args[1])
+            push(mut regs, element_copy(mut g, value))
+            push(mut kinds, ir.KIND_INT())
+        }
+        push(mut regs, loc); push(mut kinds, ir.KIND_INT())
+        return own(mut g, reg_val(ccall(mut g, "vela_memory_" + name, regs, kinds, ir.RET_INT(), -1), t))
+    }
+    if name == "truncate" || name == "write" {
+        let mut values: [Int] = []
+        for i in 1..len(args) { push(mut values, scalar(mut g, fresh(mut g, expr(mut g, args[i])))) }
+        let array = writable(mut g, mut_place(args[0]))
+        let mut regs = [scalar(mut g, array)]
+        let mut kinds = [ir.KIND_INT()]
+        for value in values { push(mut regs, value); push(mut kinds, ir.KIND_INT()) }
+        push(mut regs, loc); push(mut kinds, ir.KIND_INT())
+        let mut target = "vela_memory_" + name
+        if name == "write" { target = target + "_native" }
+        ccall(mut g, target, regs, kinds, ir.RET_NONE(), -1)
+        return no_value()
+    }
+    let first = expr(mut g, args[0])
+    if name == "bits" { return reg_val(scalar(mut g, first), t) }
+    if name == "signed" {
+        let a = scalar(mut g, fresh(mut g, first))
+        let width = scalar(mut g, expr(mut g, args[1]))
+        return reg_val(ccall(mut g, "vela_memory_signed", [a, width, loc], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1), t)
+    }
+    if name == "from_str" { return own(mut g, reg_val(ccall(mut g, "vela_memory_from_str", [address(mut g, first)], [ir.KIND_STR()], ir.RET_INT(), -1), t)) }
+    if name == "to_str" {
+        let out = slot_val(mut g, t)
+        ccall(mut g, "vela_memory_to_str", [scalar(mut g, first)], [ir.KIND_INT()], ir.RET_STR(), out.reg)
+        return own(mut g, out)
+    }
+    let data = own(mut g, fresh(mut g, consume(mut g, first)))
+    let mut regs: [Int] = []
+    let mut kinds = [ir.KIND_INT()]
+    let mut target = "vela_memory_read_native"
+    if first.ty == types.STR() { push(mut regs, address(mut g, data)); kinds[0] = ir.KIND_STR(); target = "vela_memory_read_str_native" } else { push(mut regs, scalar(mut g, data)) }
+    for i in 1..len(args) { push(mut regs, scalar(mut g, fresh(mut g, expr(mut g, args[i])))); push(mut kinds, ir.KIND_INT()) }
+    push(mut regs, loc); push(mut kinds, ir.KIND_INT())
+    return reg_val(ccall(mut g, target, regs, kinds, ir.RET_INT(), -1), t)
 }

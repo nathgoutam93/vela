@@ -321,6 +321,7 @@ fn declared(k: checker.Checked, t: Int) -> Declared {
 }
 
 fn fields(k: checker.Checked, t: Int, mi: Int) -> [Item] {
+    if types.is_fixed(k.table, t) { return [] }
     let info = types.get(k.table, t)
     let d = declared(k, t)
     let mut out: [Item] = []

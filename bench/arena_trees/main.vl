@@ -1,0 +1,39 @@
+import arenas
+import os
+import strings
+import ints
+
+type Node = struct { left: arenas.Slot[Node], right: arenas.Slot[Node] }
+fn leaf(generation: Int) -> arenas.Slot[Node] { return arenas.Slot { index: -1, generation: generation } }
+fn make(pool: mut arenas.Arena[Node], depth: Int) -> arenas.Slot[Node] {
+    let mut left = leaf(pool.generation)
+    let mut right = leaf(pool.generation)
+    if depth > 0 { left = make(mut pool, depth - 1); right = make(mut pool, depth - 1) }
+    return arenas.alloc(mut pool, Node { left: left, right: right })
+}
+fn check(pool: arenas.Arena[Node], slot: arenas.Slot[Node]) -> u64 {
+    if slot.index < 0 { return 0u64 }
+    let node = arenas.get(pool, slot)
+    return ints.wrapping_add(1u64, ints.wrapping_add(check(pool, node.left), check(pool, node.right)))
+}
+fn pow2(n: Int) -> Int { let mut value = 1; for _ in 0..n { value = value * 2 }; return value }
+fn main() {
+    let args = os.args(); let mut depth = 16
+    if len(args) > 1 { match strings.parse_float(args[1]) { Some(x) => depth = int(x), None => {} } }
+    assert(depth >= 0 && depth <= 20)
+    if depth < 6 { depth = 6 }
+    let mut scratch: arenas.Arena[Node] = arenas.create(pow2(depth + 2) - 1)
+    let stretch = make(mut scratch, depth + 1)
+    print(check(scratch, stretch))
+    arenas.reset(mut scratch)
+    let mut permanent: arenas.Arena[Node] = arenas.create(pow2(depth + 1) - 1)
+    let root = make(mut permanent, depth)
+    let mut d = 4
+    for d <= depth {
+        let iterations = pow2(depth - d + 4)
+        let mut sum = 0u64
+        for _ in 0..iterations { let tree = make(mut scratch, d); sum = ints.wrapping_add(sum, check(scratch, tree)); arenas.reset(mut scratch) }
+        print(sum); d = d + 2
+    }
+    print(check(permanent, root))
+}

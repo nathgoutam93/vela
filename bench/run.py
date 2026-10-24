@@ -53,6 +53,8 @@ class Bench:
 
 
 BENCHES = [
+    Bench("varints", ["262144", "32"], ["1024", "2"], "zero-copy protobuf uint64 varint parsing"),
+    Bench("arena_trees", ["16"], ["6"], "contiguous typed arenas and generation-checked tree slots"),
     Bench("nbody", ["5000000"], ["1000"], "Float arithmetic on structs in an array"),
     Bench("spectralnorm", ["2000"], ["100"], "Floats, arrays, calls"),
     Bench("fannkuch", ["10"], ["7"], "Int arrays, indexing"),
@@ -109,7 +111,7 @@ def timed(cmd: list[str], runs: int) -> tuple[float, float]:
 
 def inputs(work: Path, quick: bool, out: Path) -> dict[str, str]:
     """The generated inputs: fasta's output for knucleotide, a text for wordfreq."""
-    exe, _ = build("c", BENCHES[5], out, Path())
+    exe, _ = build("c", next(b for b in BENCHES if b.name == "fasta"), out, Path())
     fasta = work / "fasta.txt"
     with fasta.open("wb") as f:
         subprocess.run([str(exe), "1000" if quick else "250000"], stdout=f, check=True)

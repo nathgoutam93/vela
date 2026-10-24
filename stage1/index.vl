@@ -15,6 +15,7 @@
 // name is a name, a dot, a name, and so on.
 import ast
 import cffi
+import memops
 import integers
 import checker
 import lexer
@@ -318,6 +319,7 @@ fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
 // for a name that is not one. The checker has the rules (checker.builtin);
 // this is how hover and completion show them.
 pub fn builtin_info(name: Str) -> [Str] {
+    if len(name) > 7 && name[0..7] == "memory." { return [memops.signature(name[7..len(name)]), "Checked contiguous storage; views retain snapshots and writes use copy-on-write."] }
     if len(name) > 2 && name[0..2] == "c." {
         let short = name[2..len(name)]
         let t = cffi.type_id(short)
@@ -822,7 +824,7 @@ fn type_name(b: mut Builder, t: ast.TypeName) {
     for a in t.args {
         type_name(mut b, a)
     }
-    if t.name == "[]" || t.name == "fn" || t.name == "fn->" {
+    if t.name == "[;]" || t.name == "[]" || t.name == "fn" || t.name == "fn->" {
         return
     }
     let m = b.k.modules[b.module]
@@ -1272,5 +1274,5 @@ fn bound_use(b: mut Builder, name: Str, tok: lexer.Token) {
     let mut module = ""
     let mut terminal = name
     if dot >= 0 { module = name[0..dot]; terminal = name[dot + 1..len(name)] }
-    type_name(mut b, ast.TypeName { module: module, name: terminal, args: [], effects: [], line: tok.line, col: tok.col })
+    type_name(mut b, ast.TypeName { length: -1, module: module, name: terminal, args: [], effects: [], line: tok.line, col: tok.col })
 }

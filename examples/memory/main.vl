@@ -1,0 +1,26 @@
+import buffers
+import views
+import arenas
+import varints
+fn main() {
+    let fixed: [Int; 3] = [1, 2, 3]
+    let mut data = buffers.create(8)
+    buffers.write_u32_be(mut data, 1, 0x12345678u32)
+    let saved = buffers.view(data, 1, 5)
+    buffers.set(mut data, 1, 0u8)
+    assert(saved.get(0) == 0x12u8)
+    let mut arena: arenas.Arena[Str] = arenas.create(8)
+    let slot = arenas.alloc(mut arena, "arena value")
+    print(arenas.get(arena, slot))
+    arenas.reset(mut arena)
+    match varints.parse("ABC") { Ok(p) => print(p.checksum), Err(error) => print(error) }
+    for value in fixed { print(value) }
+}
+test "fixed arrays are inline values" {
+    let mut pair: [Str; 2] = ["a", "b"]
+    let saved = pair
+    pair[0] = "changed"
+    assert(saved[0] == "a" && pair[0] == "changed")
+    let items = [pair, saved]
+    assert(items[0][0] == "changed" && items[1][0] == "a")
+}

@@ -1,0 +1,55 @@
+// Checked, contiguous bytes. Copies and retained views use copy-on-write.
+import memory
+import views
+pub type Bytes = struct { storage: [u8] }
+pub fn create(size: Int) -> Bytes { return Bytes { storage: memory.fill(size, 0u8) } }
+pub fn from_array(data: [u8]) -> Bytes { return Bytes { storage: data } }
+pub fn from_str(data: Str) -> Bytes { return Bytes { storage: memory.from_str(data) } }
+pub fn to_str(data: Bytes) -> Str { return memory.to_str(data.storage) }
+pub fn length(data: Bytes) -> Int { return len(data.storage) }
+pub fn view(data: Bytes, start: Int, end: Int) -> views.Slice[u8] { return views.range(data.storage, start, end) }
+pub fn get(data: Bytes, offset: Int) -> u8 { return data.storage[offset] }
+pub fn set(data: mut Bytes, offset: Int, value: u8) { data.storage[offset] = value }
+pub fn read_u8_le(data: Bytes, offset: Int) -> u8 { return u8(memory.read(data.storage, offset, 1, false)) }
+pub fn read_i8_le(data: Bytes, offset: Int) -> i8 { return i8(memory.signed(memory.read(data.storage, offset, 1, false), 8)) }
+pub fn write_u8_le(data: mut Bytes, offset: Int, value: u8) { memory.write(mut data.storage, offset, 1, false, u64(value)) }
+pub fn write_i8_le(data: mut Bytes, offset: Int, value: i8) { memory.write(mut data.storage, offset, 1, false, memory.bits(int(value))) }
+pub fn read_u8_be(data: Bytes, offset: Int) -> u8 { return u8(memory.read(data.storage, offset, 1, true)) }
+pub fn read_i8_be(data: Bytes, offset: Int) -> i8 { return i8(memory.signed(memory.read(data.storage, offset, 1, true), 8)) }
+pub fn write_u8_be(data: mut Bytes, offset: Int, value: u8) { memory.write(mut data.storage, offset, 1, true, u64(value)) }
+pub fn write_i8_be(data: mut Bytes, offset: Int, value: i8) { memory.write(mut data.storage, offset, 1, true, memory.bits(int(value))) }
+pub fn read_u16_le(data: Bytes, offset: Int) -> u16 { return u16(memory.read(data.storage, offset, 2, false)) }
+pub fn read_i16_le(data: Bytes, offset: Int) -> i16 { return i16(memory.signed(memory.read(data.storage, offset, 2, false), 16)) }
+pub fn write_u16_le(data: mut Bytes, offset: Int, value: u16) { memory.write(mut data.storage, offset, 2, false, u64(value)) }
+pub fn write_i16_le(data: mut Bytes, offset: Int, value: i16) { memory.write(mut data.storage, offset, 2, false, memory.bits(int(value))) }
+pub fn read_u16_be(data: Bytes, offset: Int) -> u16 { return u16(memory.read(data.storage, offset, 2, true)) }
+pub fn read_i16_be(data: Bytes, offset: Int) -> i16 { return i16(memory.signed(memory.read(data.storage, offset, 2, true), 16)) }
+pub fn write_u16_be(data: mut Bytes, offset: Int, value: u16) { memory.write(mut data.storage, offset, 2, true, u64(value)) }
+pub fn write_i16_be(data: mut Bytes, offset: Int, value: i16) { memory.write(mut data.storage, offset, 2, true, memory.bits(int(value))) }
+pub fn read_u32_le(data: Bytes, offset: Int) -> u32 { return u32(memory.read(data.storage, offset, 4, false)) }
+pub fn read_i32_le(data: Bytes, offset: Int) -> i32 { return i32(memory.signed(memory.read(data.storage, offset, 4, false), 32)) }
+pub fn write_u32_le(data: mut Bytes, offset: Int, value: u32) { memory.write(mut data.storage, offset, 4, false, u64(value)) }
+pub fn write_i32_le(data: mut Bytes, offset: Int, value: i32) { memory.write(mut data.storage, offset, 4, false, memory.bits(int(value))) }
+pub fn read_u32_be(data: Bytes, offset: Int) -> u32 { return u32(memory.read(data.storage, offset, 4, true)) }
+pub fn read_i32_be(data: Bytes, offset: Int) -> i32 { return i32(memory.signed(memory.read(data.storage, offset, 4, true), 32)) }
+pub fn write_u32_be(data: mut Bytes, offset: Int, value: u32) { memory.write(mut data.storage, offset, 4, true, u64(value)) }
+pub fn write_i32_be(data: mut Bytes, offset: Int, value: i32) { memory.write(mut data.storage, offset, 4, true, memory.bits(int(value))) }
+pub fn read_u64_le(data: Bytes, offset: Int) -> u64 { return u64(memory.read(data.storage, offset, 8, false)) }
+pub fn read_i64_le(data: Bytes, offset: Int) -> i64 { return i64(memory.signed(memory.read(data.storage, offset, 8, false), 64)) }
+pub fn write_u64_le(data: mut Bytes, offset: Int, value: u64) { memory.write(mut data.storage, offset, 8, false, u64(value)) }
+pub fn write_i64_le(data: mut Bytes, offset: Int, value: i64) { memory.write(mut data.storage, offset, 8, false, memory.bits(int(value))) }
+pub fn read_u64_be(data: Bytes, offset: Int) -> u64 { return u64(memory.read(data.storage, offset, 8, true)) }
+pub fn read_i64_be(data: Bytes, offset: Int) -> i64 { return i64(memory.signed(memory.read(data.storage, offset, 8, true), 64)) }
+pub fn write_u64_be(data: mut Bytes, offset: Int, value: u64) { memory.write(mut data.storage, offset, 8, true, u64(value)) }
+pub fn write_i64_be(data: mut Bytes, offset: Int, value: i64) { memory.write(mut data.storage, offset, 8, true, memory.bits(int(value))) }
+
+test "fixed width byte access and copy-on-write views" {
+    let mut data = create(16)
+    write_u32_be(mut data, 1, 0x12345678u32)
+    let snapshot = data
+    let borrowed = view(data, 1, 5)
+    write_i64_le(mut data, 1, -9223372036854775808i64)
+    assert(read_u32_be(snapshot, 1) == 0x12345678u32 && borrowed.get(0) == 0x12u8)
+    assert(read_i64_le(data, 1) == -9223372036854775808i64)
+    assert(to_str(from_str("a\0b")) == "a\0b")
+}

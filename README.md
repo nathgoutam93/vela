@@ -149,6 +149,10 @@ libraries in vela.mod, and the unsafe effect with audited safe wrappers.
 `vela query unsafe FILE` reports conservative reachability, including safe
 wrappers. zlib and SQLite bindings ship in `examples/ffi`; see
 [`docs/m21-c-interop.md`](docs/m21-c-interop.md) for the LP64 profile and validation.
+M22 adds retained array/text views, the Bytes buffer with checked endian
+reads/writes, fixed inline arrays (`[T; N]`), and reusable typed arenas with
+snapshot semantics. Binary parsing and arena-tree benchmarks exercise the
+memory APIs; see [`docs/m22-memory-control.md`](docs/m22-memory-control.md).
 What comes next, toward a systems language that is also agent-first, is in
 [`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
 See `docs/` for a walkthrough of each milestone.

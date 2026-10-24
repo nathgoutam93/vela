@@ -34,7 +34,7 @@ pub fn signature(name: Str) -> Str {
         "null" => "c.null() -> c.Ptr", "null_fn" => "c.null_fn() -> c.Fn",
         "is_null" => "c.is_null(pointer: c.Ptr or c.Fn) -> Bool",
         "alloc" => "c.alloc(bytes: Int) -> c.Ptr uses unsafe", "free" => "c.free(pointer: c.Ptr) uses unsafe",
-        "addr" => "c.addr(mut scalar) -> c.Ptr uses unsafe", "data" => "c.data(bytes: Str) -> c.Ptr uses unsafe",
+        "addr" => "c.addr(mut scalar) -> c.Ptr uses unsafe", "data" => "c.data(bytes: Str or [T]) -> c.Ptr uses unsafe",
         "cstr" => "c.cstr(text: Str) -> c.Ptr uses unsafe", "string" => "c.string(pointer: c.Ptr) -> Str uses unsafe",
         "bytes" => "c.bytes(pointer: c.Ptr, size: Int) -> Str uses unsafe",
         "load" => "c.load(pointer: c.Ptr) -> T uses unsafe (scalar T from context)",

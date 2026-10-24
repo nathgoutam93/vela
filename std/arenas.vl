@@ -1,0 +1,38 @@
+// Slots are relative positions in an arena snapshot, never raw addresses.
+import memory
+pub type Arena[T] = struct { storage: [T], generation: Int }
+pub type Slot[T] = struct { index: Int, generation: Int }
+pub fn create[T](capacity: Int) -> Arena[T] {
+    let storage: [T] = memory.reserve(capacity)
+    return Arena { storage: storage, generation: 0 }
+}
+pub fn alloc[T](arena: mut Arena[T], value: T) -> Slot[T] {
+    let slot: Slot[T] = Slot { index: len(arena.storage), generation: arena.generation }
+    push(mut arena.storage, value)
+    return slot
+}
+pub fn get[T](arena: Arena[T], slot: Slot[T]) -> T
+    requires slot.generation == arena.generation && slot.index >= 0 && slot.index < len(arena.storage) {
+    return arena.storage[slot.index]
+}
+pub fn set[T](arena: mut Arena[T], slot: Slot[T], value: T)
+    requires slot.generation == arena.generation && slot.index >= 0 && slot.index < len(arena.storage) {
+    arena.storage[slot.index] = value
+}
+pub fn length[T](arena: Arena[T]) -> Int { return len(arena.storage) }
+pub fn reset[T](arena: mut Arena[T]) {
+    memory.truncate(mut arena.storage, 0)
+    arena.generation = arena.generation + 1
+}
+
+test "arena values, snapshots and reset" {
+    let mut arena: Arena[Str] = create(4)
+    let first = alloc(mut arena, "one")
+    let snapshot = arena
+    set(mut arena, first, "changed")
+    assert(get(snapshot, first) == "one" && get(arena, first) == "changed")
+    reset(mut arena)
+    assert(length(arena) == 0 && get(snapshot, first) == "one")
+    let next = alloc(mut arena, "two")
+    assert(next.generation != first.generation && get(arena, next) == "two")
+}

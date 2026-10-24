@@ -1,0 +1,16 @@
+// Safe memory primitives used by the Vela views/buffers/arenas libraries.
+pub fn functions() -> [Str] { return ["reserve", "fill", "truncate", "read", "write", "from_str", "to_str", "signed", "bits"] }
+pub fn signature(name: Str) -> Str {
+    return match name {
+        "reserve" => "memory.reserve(capacity: Int) -> [T] (T from context)",
+        "fill" => "memory.fill(size: Int, value: T) -> [T]",
+        "truncate" => "memory.truncate(array: mut [T], size: Int)",
+        "read" => "memory.read(bytes: [u8] or Str, offset: Int, width: Int, big_endian: Bool) -> u64",
+        "write" => "memory.write(bytes: mut [u8], offset: Int, width: Int, big_endian: Bool, value: u64)",
+        "from_str" => "memory.from_str(bytes: Str) -> [u8]",
+        "to_str" => "memory.to_str(bytes: [u8]) -> Str",
+        "signed" => "memory.signed(bits: u64, width: Int) -> Int",
+        "bits" => "memory.bits(value: Int) -> u64",
+        _ => "",
+    }
+}

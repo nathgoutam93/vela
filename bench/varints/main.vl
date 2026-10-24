@@ -1,0 +1,36 @@
+import os
+import strings
+import ints
+import memory
+import varints
+fn argument(i: Int, fallback: Int) -> Int uses os {
+    let args = os.args()
+    if i >= len(args) { return fallback }
+    match strings.parse_float(args[i]) { Some(x) => return int(x), None => return fallback }
+}
+fn encode(count: Int) -> Str {
+    let mut data: [u8] = memory.reserve(count * 10)
+    let mut state = 1u64
+    for _ in 0..count {
+        state = ints.wrapping_add(ints.wrapping_mul(state, 6364136223846793005u64), 1u64)
+        let mut value = state
+        for value >= 128u64 { push(mut data, u8(value & 127u64) | 128u8); value = value >> 7 }
+        push(mut data, u8(value))
+    }
+    return memory.to_str(data)
+}
+fn main() {
+    let count = argument(1, 262144)
+    let rounds = argument(2, 32)
+    assert(count > 0 && count <= 1048576 && rounds >= 0)
+    let data = encode(count)
+    let mut sum = 0u64
+    for round in 0..rounds {
+        let start = round % len(data)
+        match varints.parse(data[start..len(data)]) {
+            Ok(parsed) => { sum = ints.wrapping_add(sum, parsed.checksum); sum = ints.wrapping_add(sum, u64(parsed.count)); sum = ints.wrapping_add(sum, u64(len(parsed.last))) }
+            Err(_) => assert(false)
+        }
+    }
+    print(sum)
+}

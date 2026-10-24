@@ -586,13 +586,25 @@ fn type_name_in(p: mut Parser, with_uses: Bool) -> Result[ast.TypeName, errors.C
                 advance(mut p)
             }
         }
-        return Ok(ast.TypeName { name: name, args: args, line: open.line, col: open.col, module: "", effects: effects })
+        return Ok(ast.TypeName { length: -1, name: name, args: args, line: open.line, col: open.col, module: "", effects: effects })
     }
     if peek(p, 0).kind == lexer.Kind.LBracket {
         let open = advance(mut p)
         let elem = type_name(mut p)?
+        let mut length = -1
+        let mut name = "[]"
+        if peek(p, 0).kind == lexer.Kind.Semi && peek(p, 0).text == ";" {
+            advance(mut p)
+            let count = expect(mut p, lexer.Kind.Int, "for a fixed array length")?
+            let parsed = integers.literal(count.text)
+            if !parsed.valid || parsed.overflow || parsed.suffix != "" || parsed.bits < 0 || parsed.bits > 4096 {
+                return Err(error(count, "E3210", "a fixed array length must be an integer literal from 0 to 4096"))
+            }
+            length = parsed.bits
+            name = "[;]"
+        }
         expect(mut p, lexer.Kind.RBracket, "after the element type of an array type")?
-        return Ok(ast.TypeName { name: "[]", args: [elem], line: open.line, col: open.col, module: "", effects: [] })
+        return Ok(ast.TypeName { length: length, name: name, args: [elem], line: open.line, col: open.col, module: "", effects: [] })
     }
     let start = expect_name(mut p, "for a type")?
     let mut tok = start
@@ -614,7 +626,7 @@ fn type_name_in(p: mut Parser, with_uses: Bool) -> Result[ast.TypeName, errors.C
         }
         expect(mut p, lexer.Kind.RBracket, "after the type arguments of '" + tok.text + "'")?
     }
-    return Ok(ast.TypeName { name: tok.text, args: args, line: start.line, col: start.col, module: module, effects: [] })
+    return Ok(ast.TypeName { length: -1, name: tok.text, args: args, line: start.line, col: start.col, module: module, effects: [] })
 }
 
 // Whether the comma ahead goes on with a function type's effects: `uses fs,

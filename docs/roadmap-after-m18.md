@@ -96,6 +96,9 @@ ABI, zlib/SQLite examples, audit query, and remaining Linux native validation.
 
 ## M22: Memory control
 
+**Status:** implemented; see [the walkthrough](m22-memory-control.md) for
+retained views, Bytes, inline fixed arrays, typed arenas and measured C parity.
+
 **Needs:** M19 (fixed-width reads and writes).
 
 **What gets built:** Memory control: slices that view arrays and strings without copying, a Bytes buffer with fixed-width reads and writes, fixed-size and inline arrays (arrays of structs without boxes), and arenas for short-lived data.

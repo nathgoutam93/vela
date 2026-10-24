@@ -45,6 +45,7 @@ pub type FieldInfo = struct {
 
 pub type TypeInfo = struct {
     tag: Tag
+    length: Int  // fixed arrays, otherwise -1
     name: Str  // "Int", the user's name, "Option" or "Result"
     module: Str  // the module a user type is declared in; "" for the main one
     public: Bool
@@ -112,7 +113,7 @@ pub fn NOTHING() -> Int {
 
 fn info(tag: Tag, name: Str) -> TypeInfo {
     return TypeInfo {
-        tag: tag, name: name, module: "", public: true, line: 0, col: 0, args: [], fields: [], variants: [],
+        tag: tag, length: -1, name: name, module: "", public: true, line: 0, col: 0, args: [], fields: [], variants: [],
         params: [], bounds: [], origin: -1, open: false, filled: false, result: -1, effects: [], plain: -1,
     }
 }
@@ -209,6 +210,28 @@ pub fn array(table: mut Table, elem: Int) -> Int {
     let id = len(table.types) - 1
     table.index[k] = id
     push(mut table.arrays, elem)
+    return id
+}
+
+// Fixed arrays use the normal inline struct layout and ownership machinery.
+pub fn is_fixed(table: Table, t: Int) -> Bool { return t >= 0 && table.types[t].module == "@fixed" }
+pub fn sequence(table: Table, t: Int) -> Bool { return is_array(table, t) || is_fixed(table, t) }
+pub fn fixed(table: mut Table, elem: Int, length: Int) -> Int {
+    if elem == ERROR() { return ERROR() }
+    let k = key("fixed " + strings.from_int(length), [elem])
+    match maps.get(table.index, k) { Some(t) => return t, None => {} }
+    let mut t = info(Tag.Struct, "Fixed" + strings.from_int(length))
+    t.module = "@fixed"
+    t.length = length
+    t.args = [elem]
+    t.open = table.types[elem].open
+    t.filled = true
+    for i in 0..length { push(mut t.fields, FieldInfo { name: "_" + strings.from_int(i), ty: elem }) }
+    if length == 0 { push(mut t.fields, FieldInfo { name: "_empty", ty: UNIT() }) }
+    push(mut table.types, t)
+    let id = len(table.types) - 1
+    table.index[k] = id
+    push(mut table.instances, id)
     return id
 }
 
@@ -598,6 +621,7 @@ pub fn find_subst(table: Table, t: Int, params: [Int], args: [Int]) -> Int {
     for a in ti.args {
         push(mut new_args, find_subst(table, a, params, args))
     }
+    if is_fixed(table, t) { return table.index[key("fixed " + strings.from_int(ti.length), new_args)] }
     if ti.tag == Tag.Array {
         return table.index[key("[]", new_args)]
     }
@@ -629,6 +653,7 @@ pub fn subst(table: mut Table, t: Int, params: [Int], args: [Int]) -> Int {
     for a in ti.args {
         push(mut new_args, subst(mut table, a, params, args))
     }
+    if is_fixed(table, t) { return fixed(mut table, new_args[0], ti.length) }
     if ti.tag == Tag.Array {
         return array(mut table, new_args[0])
     }
@@ -738,6 +763,8 @@ fn erase(table: mut Table, memo: mut Map[Int, Int], t: Int) -> Int {
         if changed {
             if ti.tag == Tag.Func {
                 e = func(mut table, args, r)
+            } else if is_fixed(table, t) {
+                e = fixed(mut table, args[0], ti.length)
             } else if ti.tag == Tag.Array {
                 e = array(mut table, args[0])
             } else if ti.tag == Tag.Map {
@@ -779,6 +806,7 @@ pub fn c_like(table: Table, t: Int) -> Bool {
 // A type as written in the source, seen from module `viewpoint`: a type
 // from another module has that module's name in front.
 pub fn show(table: Table, t: Int, viewpoint: Str) -> Str {
+    if is_fixed(table, t) { return "[" + show(table, table.types[t].args[0], viewpoint) + "; " + strings.from_int(table.types[t].length) + "]" }
     let ti = table.types[t]
     return match ti.tag {
         Tag.Error => "<error>"

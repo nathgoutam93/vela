@@ -207,6 +207,7 @@ fn base_name(l: Layout, t: Int) -> Str {
         }
         return strings.build(b)
     }
+    if types.is_fixed(l.table, t) { return "t_" + suffix(l, t) }
     if ti.origin >= 0 {
         return "t_" + suffix(l, t)
     }
@@ -222,6 +223,7 @@ pub fn suffix(l: Layout, t: Int) -> Str {
         if t == cffi.FN() { return "c_fn" }
         return ti.name
     }
+    if types.is_fixed(l.table, t) { return "Fixed" + strings.from_int(ti.length) + "_" + suffix(l, ti.args[0]) }
     if types.is_array(l.table, t) {
         return "Array_" + suffix(l, ti.args[0])
     }
@@ -537,6 +539,7 @@ fn define(l: mut Layout, t: Int, done: mut Map[Int, Bool], out: mut [Str]) {
             push(mut out, "    " + member(l, t, f.name, 0, f.ty, "m_" + f.name) + ";")
         }
         push(mut out, "};")
+        if types.is_fixed(l.table, t) && ti.length > 0 { push(mut out, "_Static_assert(sizeof(" + name + ") == " + strings.from_int(ti.length) + " * sizeof(" + c_type(l, ti.args[0]) + "), \"fixed array layout\");") }
     } else {
         let mut tags = strings.builder()
         strings.add(mut tags, "enum { ")

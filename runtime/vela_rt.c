@@ -1704,3 +1704,45 @@ vela_c_fn vela_c_fn_from_bits(uint64_t bits) {
 
 const vela_type vela_type_c_ptr = {sizeof(void *), NULL, NULL, NULL, NULL, NULL};
 const vela_type vela_type_c_fn = {sizeof(vela_c_fn), NULL, NULL, NULL, NULL, NULL};
+
+void *vela_fixed_array_at(void *base, int64_t i, int64_t length, int64_t size, const char *loc) {
+    return vela_fixed_at(base, i, length, (size_t)size, loc);
+}
+
+vela_array *vela_memory_reserve(const vela_type *elem, int64_t count, const char *loc) {
+    if (count < 0 || (uint64_t)count > SIZE_MAX / elem->size) vela_panic(loc, "invalid array capacity");
+    return vela_array_new(elem, count);
+}
+vela_array *vela_memory_fill(const vela_type *elem, int64_t count, const void *value, const char *loc) {
+    vela_array *a = vela_memory_reserve(elem, count, loc);
+    for (int64_t i = 0; i < count; i++) {
+        void *dest = a->data + (size_t)i * elem->size;
+        memcpy(dest, value, elem->size);
+        if (elem->retain) elem->retain(dest);
+    }
+    a->len = count;
+    return a;
+}
+void vela_memory_truncate(vela_array *a, int64_t count, const char *loc) {
+    if (count < 0 || count > a->len) vela_panic(loc, "invalid truncated length");
+    if (a->elem->release) for (int64_t i = count; i < a->len; i++) a->elem->release(a->data + (size_t)i * a->elem->size);
+    a->len = count;
+}
+vela_array *vela_memory_from_str(vela_str bytes) {
+    vela_array *a = vela_array_new(&vela_type_byte, bytes.len);
+    if (bytes.len) memcpy(a->data, bytes.data, (size_t)bytes.len);
+    a->len = bytes.len;
+    return a;
+}
+vela_str vela_memory_to_str(vela_array *bytes) { return str_from((const char *)bytes->data, (size_t)bytes->len); }
+uint64_t vela_memory_read_native(vela_array *a, int64_t offset, int64_t width, bool big, const char *loc) { return vela_memory_read(a, offset, width, big, loc); }
+uint64_t vela_memory_read_str_native(vela_str a, int64_t offset, int64_t width, bool big, const char *loc) { return vela_memory_read_str(a, offset, width, big, loc); }
+void vela_memory_write_native(vela_array *a, int64_t offset, int64_t width, bool big, uint64_t bits, const char *loc) { vela_memory_write(a, offset, width, big, bits, loc); }
+
+int64_t vela_memory_signed(uint64_t bits, int64_t width, const char *loc) {
+    if (width != 8 && width != 16 && width != 32 && width != 64) vela_panic(loc, "bit width must be 8, 16, 32 or 64");
+    uint64_t raw = vela_fixed_load(bits, width, 1);
+    int64_t value;
+    memcpy(&value, &raw, sizeof value);
+    return value;
+}

@@ -5,6 +5,7 @@ import ast
 import errors
 import integers
 import cffi
+import memops
 import files
 import lexer
 import maps
@@ -76,6 +77,7 @@ type Loader = struct {
 // The built-in modules and their functions, in Stage 0's order.
 pub fn builtin_functions(name: Str) -> [Str] {
     return match name {
+        "memory" => memops.functions()
         "c" => cffi.functions()
         "ints" => integers.functions()
         "maps" => ["has", "get", "remove", "keys"]
@@ -493,5 +495,5 @@ test "paths" {
 }
 
 pub fn builtin_modules() -> [Str] {
-    return ["maps", "files", "os", "strings", "tasks", "math", "ints", "c"]
+    return ["memory", "maps", "files", "os", "strings", "tasks", "math", "ints", "c"]
 }

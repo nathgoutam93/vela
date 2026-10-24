@@ -15,6 +15,7 @@ pub type TypeName = struct {
     // function type, with its parameter types as arguments, or "fn->" when
     // it has a result type, which is the last argument
     name: Str
+    length: Int  // fixed arrays: >= 0; other types: -1
     args: [TypeName]
     line: Int
     col: Int
@@ -347,6 +348,7 @@ fn qualified(module: Str, name: Str) -> Str {
 }
 
 pub fn type_text(t: TypeName) -> Str {
+    if t.name == "[;]" { return "[" + type_text(t.args[0]) + "; " + strings.from_int(t.length) + "]" }
     if t.name == "[]" {
         return "[" + type_text(t.args[0]) + "]"
     }

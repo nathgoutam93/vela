@@ -941,6 +941,7 @@ fn for_each(g: mut Gen, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
     if t == types.STR() {
         length = it + ".len"
     }
+    if types.is_fixed(g.k.table, t) { length = strings.from_int(types.get(g.k.table, t).length) }
     let hoisted = g.hoisted
     let cached = g.cached
     hoist_unique(mut g, s)
@@ -951,7 +952,9 @@ fn for_each(g: mut Gen, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
         declare(mut g, lid, it + ".data[" + i + "]")
     } else {
         let elem = c_type(g, local_ty(g, lid))
-        let name = declare(mut g, lid, "((" + elem + " *)" + it + "->data)[" + i + "]")
+        let mut item = "((" + elem + " *)" + it + "->data)[" + i + "]"
+        if types.is_fixed(g.k.table, t) { item = "*(" + elem + " *)vela_fixed_at(&" + it + ", " + i + ", " + length + ", sizeof(" + elem + "), " + loc_of(g, iterable) + ")" }
+        let name = declare(mut g, lid, item)
         emit(mut g, retain(mut g, local_ty(g, lid), name))
     }
     for inner in body.stmts {
@@ -1182,6 +1185,7 @@ fn assign(g: mut Gen, target: ast.Expr, v: ast.Expr) {
 // An lvalue for an array or map about to change, made unique first.
 fn writable(g: mut Gen, e: ast.Expr) -> Str {
     let p = place(mut g, e)
+    if types.is_fixed(g.k.table, ty(g, e)) { return p }
     forget_found(mut g, e)
     let mut kind = "array"
     if types.is_map(g.k.table, ty(g, e)) {
@@ -1484,6 +1488,13 @@ fn hoist_unique(g: mut Gen, loop: ast.Stmt) {
 // in bounds, as a pointer to `elem`, the element's C type. The check is
 // inline, in vela_rt.h, so the C compiler can see through it (M16b).
 fn element_address(g: Gen, e: ast.Expr, elem: Str, container: Str, index: Str, loc: Str) -> Str {
+    match e.kind {
+        ast.ExprKind.Index(obj, _) => {
+            let t = ty(g, obj)
+            if types.is_fixed(g.k.table, t) { return "(" + elem + " *)vela_fixed_at(&(" + container + "), " + index + ", " + strings.from_int(types.get(g.k.table, t).length) + ", sizeof(" + elem + "), " + loc + ")" }
+        }
+        _ => {}
+    }
     let safe = maps.has(g.env.safe, e.id) && g.env.safe[e.id]
     match maps.get(g.cached, container) {
         Some(d) => {
@@ -1854,6 +1865,15 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             return store(mut g, t, f + "(" + o + ", " + a + ", " + b + ", " + loc_of(g, e) + ")")
         }
         ast.ExprKind.ArrayLit(elems) => {
+            if types.is_fixed(g.k.table, t) {
+                let mut fields = ""
+                for i in 0..len(elems) {
+                    if i > 0 { fields = fields + ", " }
+                    fields = fields + ".m__" + strings.from_int(i) + " = " + consume(mut g, expr(mut g, elems[i]))
+                }
+                if len(elems) == 0 { fields = "0" }
+                return store(mut g, t, "(" + c_type(g, t) + "){" + fields + "}")
+            }
             let elem_t = types.get(g.k.table, t).args[0]
             let array = store(mut g, t, "vela_array_new(" + layout.descriptor(g.l, elem_t) + ", " +
                 strings.from_int(len(elems)) + ")")
@@ -2395,6 +2415,7 @@ fn shown(t: Int, c: Str) -> Str {
 }
 
 fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
+    if len(name) > 7 && name[0..7] == "memory." { return memory_builtin(mut g, e, name[7..len(name)], args) }
     if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut g, e, name[2..len(name)], args) }
     let t = ty(g, e)
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
@@ -2497,6 +2518,7 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         if arg.ty == types.STR() {
             length = arg.c + ".len"
         }
+        if types.is_fixed(g.k.table, arg.ty) { length = strings.from_int(types.get(g.k.table, arg.ty).length) }
         return value(scalar(mut g, types.INT(), length), types.INT())
     }
     if name == "int" {
@@ -2804,6 +2826,7 @@ fn c_builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     if name == "addr" { return value(scalar(mut g, t, "(void *)&(" + place(mut g, mut_place(args[0])) + ")"), t) }
     let first = expr(mut g, args[0])
     let a = scalar(mut g, first.ty, first.c)
+    if name == "data" && types.is_array(g.k.table, first.ty) { return value(scalar(mut g, t, "(void *)" + a + "->data"), t) }
     let mut b = ""
     if len(args) > 1 { let v = expr(mut g, args[1]); b = scalar(mut g, v.ty, v.c) }
     let loc = loc_of(g, e)
@@ -2840,4 +2863,47 @@ fn c_builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     }
     if t == types.NOTHING() { emit(mut g, call + ";"); return no_value() }
     return store(mut g, t, call)
+}
+
+fn memory_builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
+    let t = ty(g, e)
+    let loc = loc_of(g, e)
+    if name == "reserve" || name == "fill" {
+        let elem = types.get(g.k.table, t).args[0]
+        let size = scalar(mut g, types.INT(), expr(mut g, args[0]).c)
+        let mut call = "vela_memory_reserve(" + layout.descriptor(g.l, elem) + ", " + size + ", " + loc + ")"
+        if name == "fill" {
+            let v = expr(mut g, args[1])
+            let at = addr(mut g, c_type(g, elem), v.c)
+            call = "vela_memory_fill(" + layout.descriptor(g.l, elem) + ", " + size + ", " + at + ", " + loc + ")"
+        }
+        return store(mut g, t, call)
+    }
+    if name == "truncate" || name == "write" {
+        let mut values: [Str] = []
+        for i in 1..len(args) { let v = expr(mut g, args[i]); push(mut values, scalar(mut g, v.ty, v.c)) }
+        let array = writable(mut g, mut_place(args[0]))
+        let mut call = "vela_memory_" + name + "(" + array
+        for v in values { call = call + ", " + v }
+        emit(mut g, call + ", " + loc + ");")
+        g.cached = [:]
+        g.unique = []
+        g.found = []
+        return no_value()
+    }
+    let first = expr(mut g, args[0])
+    if name == "bits" { return value(scalar(mut g, t, "(uint64_t)" + first.c), t) }
+    if name == "signed" {
+        let a = scalar(mut g, 13, first.c)
+        let width = scalar(mut g, types.INT(), expr(mut g, args[1]).c)
+        return value(scalar(mut g, t, "vela_memory_signed(" + a + ", " + width + ", " + loc + ")"), t)
+    }
+    if name == "from_str" || name == "to_str" { return store(mut g, t, "vela_memory_" + name + "(" + first.c + ")") }
+    // Pin the data before later offset/width expressions can mutate its owner.
+    let data = store(mut g, first.ty, consume(mut g, first))
+    let mut call = "vela_memory_read"
+    if first.ty == types.STR() { call = call + "_str" }
+    call = call + "(" + data.c
+    for i in 1..len(args) { let v = expr(mut g, args[i]); call = call + ", " + scalar(mut g, v.ty, v.c) }
+    return store(mut g, t, call + ", " + loc + ")")
 }

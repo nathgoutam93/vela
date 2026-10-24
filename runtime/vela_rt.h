@@ -129,6 +129,14 @@ extern const vela_type vela_type_str;
 extern const vela_type vela_type_array;
 extern const vela_type vela_type_map;
 
+// Fixed arrays are inline homogeneous structs; byte offsets address real
+// members, and generated static assertions verify the contiguous layout.
+void *vela_fixed_array_at(void *base, int64_t i, int64_t length, int64_t size, const char *loc);
+static inline void *vela_fixed_at(void *base, int64_t i, int64_t length, size_t size, const char *loc) {
+    if (__builtin_expect((uint64_t)i >= (uint64_t)length, 0)) vela_panic(loc, "index out of range");
+    return (unsigned char *)base + (size_t)i * size;
+}
+
 // ---- Str ----
 //
 // A Str is a view of `len` bytes at `data`, plus the heap object that owns
@@ -289,6 +297,37 @@ void vela_array_set(vela_array *a, int64_t i, const void *elem, const char *loc)
 vela_array *vela_array_slice(vela_array *a, int64_t lo, int64_t hi, const char *loc);
 // Room for one more element: what vela_array_push does when it is full.
 void vela_array_grow(vela_array *a);
+
+// Safe storage primitives. Snapshot ownership is the ordinary array/Str RC.
+vela_array *vela_memory_fill(const vela_type *elem, int64_t count, const void *value, const char *loc);
+vela_array *vela_memory_reserve(const vela_type *elem, int64_t count, const char *loc);
+void vela_memory_truncate(vela_array *array, int64_t count, const char *loc);
+vela_array *vela_memory_from_str(vela_str bytes);
+vela_str vela_memory_to_str(vela_array *bytes);
+int64_t vela_memory_signed(uint64_t bits, int64_t width, const char *loc);
+static inline void vela_memory_bounds(int64_t length, int64_t offset, int64_t width, const char *loc) {
+    if (width != 1 && width != 2 && width != 4 && width != 8) vela_panic(loc, "byte width must be 1, 2, 4 or 8");
+    if ((uint64_t)offset > (uint64_t)length || width > length - offset) vela_panic(loc, "byte access out of range");
+}
+static inline uint64_t vela_memory_read_data(const uint8_t *data, int64_t length, int64_t offset, int64_t width, bool big, const char *loc) {
+    vela_memory_bounds(length, offset, width, loc);
+    uint64_t bits = 0;
+    for (int64_t i = 0; i < width; i++) bits |= (uint64_t)data[offset + i] << ((big ? width - 1 - i : i) * 8);
+    return bits;
+}
+static inline uint64_t vela_memory_read(vela_array *a, int64_t offset, int64_t width, bool big, const char *loc) {
+    return vela_memory_read_data(a->data, a->len, offset, width, big, loc);
+}
+static inline uint64_t vela_memory_read_str(vela_str a, int64_t offset, int64_t width, bool big, const char *loc) {
+    return vela_memory_read_data(a.data, a.len, offset, width, big, loc);
+}
+static inline void vela_memory_write(vela_array *a, int64_t offset, int64_t width, bool big, uint64_t bits, const char *loc) {
+    vela_memory_bounds(a->len, offset, width, loc);
+    for (int64_t i = 0; i < width; i++) a->data[offset + i] = (uint8_t)(bits >> ((big ? width - 1 - i : i) * 8));
+}
+uint64_t vela_memory_read_native(vela_array *a, int64_t offset, int64_t width, bool big, const char *loc);
+uint64_t vela_memory_read_str_native(vela_str a, int64_t offset, int64_t width, bool big, const char *loc);
+void vela_memory_write_native(vela_array *a, int64_t offset, int64_t width, bool big, uint64_t bits, const char *loc);
 
 // Inline fast paths for generated C (M16b). The functions above are what
 // the native backend calls; generated C uses these, which the C compiler

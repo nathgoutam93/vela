@@ -203,6 +203,11 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M21 validation:** all 290 supported checks pass, including the M21
   unsafe query, C type completion/hover, extern signature/rename and effect
   repair cases. M17 compiles and tests the new guide example.
+- **M22 recurrence:** fixed array type spelling and new memory/library APIs
+  also need index/guide metadata; avoid exposing synthetic inline fields.
+  Fixed annotations now index their element types, hide internal fields and
+  retain source syntax in hover/signatures. M22 tooling and M17 guide checks
+  pass within the 295-check supported suite.
 - **Acceptance:** query/LSP regressions report interfaces and method children,
   resolve generic and concrete method calls, and offer applicable methods.
   Rename must retain its existing semantic validation and reject broken edits.
@@ -321,11 +326,113 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** the interface rejection joins M21's negative integration;
   valid interface and extern/variadic acceptance continues to pass.
 
+### TL-016: Testing a std module can warn that it shadows its own dependency
+
+- **Status:** deferred; discovered in M22.
+- **Evidence:** `VELA_BACKEND=c build/vela-m22 test std/buffers.vl` warns
+  that views.vl hides std/views.vl, although the imported file is that same
+  standard module. The test passes. The entry program is inside std/, so its
+  local dependency path and the installed std path resolve to the same file.
+- **Impact:** library development produces a misleading shadow warning.
+- **Workaround:** test via a program outside std/ that imports the libraries;
+  retain the direct std tests as well, with their actual warning output.
+- **Proposed work:** compare canonical file identity before issuing E7005;
+  retain the warning for a genuinely different local module.
+- **Acceptance:** direct std tests have no self-shadow warnings, and genuine
+  local shadowing still emits E7005 in the existing diagnostic tests.
+
+### TL-017: Keep the expanded memory guide within its reading budget
+
+- **Status:** resolved in M22.
+- **Evidence:** the first M22 `build/vela-m22 guide` output is 37,751 bytes,
+  exceeding the existing 32,000-byte / estimated-8,000-token integration gate.
+  New library signatures and rules add to repeated per-builtin explanation.
+- **Impact:** M17 guide acceptance fails despite valid new APIs.
+- **Workaround:** consult hover/query documentation while editing.
+- **Resolution:** retain generated signatures and the semantic
+  rule sections, removing repeated per-builtin prose already available in
+  index/hover metadata. Keep all executable examples checked and tested.
+- **Acceptance:** guide output stays under the estimate gate, contains the
+  memory/FFI/interface APIs and compiles/tests every executable example.
+  Actual model-tokenizer validation remains VAL-003.
+- **Validation:** the final guide is 28,599 bytes (about 7,149 tokens by
+  bytes/4). M17 compiles and tests all its examples in the 295-check suite.
+
+### TL-018: Select benchmark input generators by name
+
+- **Status:** resolved in M22.
+- **Evidence:** after adding M22 benchmarks, `bench/run.py varints arena_trees
+  --quick --check --languages c vela` ran binarytrees-c with argument 1000
+  and was killed. inputs() selected BENCHES[5], which was formerly fasta.
+- **Impact:** extending the benchmark table invokes an unrelated workload
+  with the FASTA input size, preventing acceptance measurements.
+- **Workaround:** append benchmarks after all previous entries.
+- **Resolution:** select the FASTA generator by its stable benchmark name.
+- **Acceptance:** the full quick output check covers generated FASTA and
+  word inputs as well as both new benchmarks, independent of table order.
+
+### TL-019: Implicit decoder loop limits retain arithmetic checks
+
+- **Status:** deferred; discovered in M22.
+- **Evidence:** the first packed-varint benchmark produced matching output
+  but measured 1.27 times C (three-run probe). Its unbounded loop increments
+  group and rejects an overflowing tenth byte; generated C still uses checked
+  group+1, group*7 and shift-count operations in the inner byte loop.
+- **Impact:** the current range analysis does not extract this format limit
+  from the early-return condition, obstructing the parser's 1.1-times-C target.
+- **Additional evidence:** with both decoders using bounded loops, the
+  probe is 1.32 times C. Assembly shows a signed truncation check followed
+  by a separate unsigned index panic check for each byte.
+- **Workaround:** express protobuf's ten-byte maximum directly as a bounded
+  `for group in 0..10` and state both index bounds in the truncation guard.
+  The existing analysis then proves the index safe, removing the duplicate
+  panic check while retaining malformed-input diagnostics. Count with u64,
+  as in the C size_t baseline, converting to public Int only at the result
+  boundary: each count consumes a byte, and Str lengths are bounded by 2^48.
+  This avoids a redundant signed-overflow branch on every decoded value.
+- **Proposed work:** consider bounded induction inference from terminating
+  guards during range/native optimization work, with sound overflow proofs.
+- **Acceptance:** valid/invalid varint oracles pass and the bounded parser
+  meets its target. Any later general inference must preserve rejection and
+  overflow behavior with native optimization on/off.
+- **M22 validation:** the final matched bounded-loop benchmark measures 1.08
+  times C (best of seven), and valid/invalid Python oracles pass under UBSan.
+
+### TL-020: Immutable memory intrinsics must reject mut argument markers
+
+- **Status:** resolved in M22.
+- **Evidence:** `memory.read(mut data, 0, 1, false)` initially passed check;
+  the shared memory argument checker unwrapped the marker for all operations.
+  The API's first parameter is immutable, and generation expects a value.
+- **Impact:** invalid source can reach code generation instead of receiving
+  the ordinary mutation-marker diagnostic.
+- **Workaround:** omit mut on read/to_str; keep it on write/truncate.
+- **Resolution:** unwrap places only for write/truncate, so immutable calls
+  use the normal E3096 validation.
+- **Acceptance:** permanent negative cases cover read/to_str markers, while
+  writable APIs still require mut and preserve snapshot behavior.
+
+### TL-021: Internal array syntax markers must not reserve user type names
+
+- **Status:** resolved in M22.
+- **Evidence:** `type fixed = struct { value: Int }` followed by an annotation
+  of that type caused a checker index panic. The initial fixed-array AST marker
+  was the ordinary identifier fixed, so resolution expected a nonexistent
+  element argument on the user's nominal type.
+- **Impact:** valid pre-M22 source can crash the compiler.
+- **Workaround:** rename the type while using the intermediate compiler.
+- **Resolution:** use the unspellable internal marker [;], as with [] for
+  growable arrays; preserve the public fixed-array syntax and length metadata.
+- **Acceptance:** a user type named fixed is in the M22 C/native fixture;
+  fixed arrays, type formatting, indexing and tooling continue to pass.
+- **Validation:** the final negative/M17/M21/M22 selection passes 122 checks;
+  the updated M22 integration also passes under UBSan.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
 
-- **Status:** open; carried from M17 and extended during M19/M20/M21.
+- **Status:** open; carried from M17 and extended during M19/M20/M21/M22.
 - **Evidence:** the C bootstrap, supported C suite, UBSan runtime tests, and
   benchmark output checks passed. Native `os.executable` lowering assembles
   for Linux x86-64, but was not executed there. This macOS ARM64 host has no
@@ -347,6 +454,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   C extern/scalar/pointer/callback acceptance and zlib/SQLite examples pass. The independent ABI fixture cross-assembles for Linux x86-64
   with optimization on/off. IR inspection verifies native escaped scalars live
   in stack slots. These checks do not establish native execution correctness.
+- **M22 evidence:** the C bootstrap reaches a 120,858-line fixed point, all
+  295 supported checks pass, and UBSan passes 121 runtime/M19/M20/M21/M22 checks.
+  Fixed values, retained views, Bytes and typed arenas have C oracle/lifetime
+  coverage. Their fixtures and the final packed-varint parser cross-assemble
+  for Linux x86-64 with optimization on/off. Native execution was not run.
 - **Workaround:** retain the host-supported results and these explicit limits.
 - **Required work:** on Linux x86-64, run both bootstrap fixed points and the
   applicable C/native suites under ASan and TSan. See
@@ -359,6 +471,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   Run `tests/m21_test.py build/vela` there too, covering narrow returns, mixed
   and spilled C arguments, binary32, variadic calls, callback entry ranges,
   pointer aliasing and both external-library examples in both native modes.
+  Run `tests/m22_test.py build/vela` with both native optimization settings,
+  including fixed managed/function values, byte order, view/task lifetimes,
+  reset/growth/snapshot behavior and the malformed-varint oracle.
 - **Acceptance:** record host, compiler/toolchain, commit, commands, and actual
   results. Keep any failures open instead of inferring a pass from C or UBSan.
 
@@ -389,6 +504,8 @@ the same entry. Close it with a commit or validation result; keep its history.
   6,118 tokens under the same estimate.
 - **M21 measurement:** the C interop guide is 30,819 bytes, approximately
   7,704 tokens under the estimate, within its 8,000-token estimate gate.
+- **M22 measurement:** the compacted memory guide is 28,599 bytes, about
+  7,149 tokens under the same estimate; generated API signatures remain.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.

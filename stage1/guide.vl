@@ -64,6 +64,11 @@ pub fn reference(root: Str) -> Str uses fs, os {
     strings.add(mut out, "\n")
     strings.add(mut out, "`vela new NAME` creates a program; `vela new --package NAME` creates a package. A `vela.mod` starts with `package NAME` and names dependencies with `use NAME SOURCE [REF]`. Sources are git repositories or local directories. `vela get` fetches and pins them in `vela.lock`; `vela get -u` updates pins. Builds never fetch. `json` is a separate package, not std: add it with vela get before `import json`.\n")
     strings.add(mut out, "\n")
+    strings.add(mut out, "## Memory control\n\n")
+    strings.add(mut out, "`[T; N]` is a fixed-size inline value (N a literal in 0..4096), initialized from exactly N elements: `let mut pair: [Int; 2] = [1, 2]`. Copying it copies its elements logically; managed fields retain their owners. Indexing, mutation, len and iteration are checked. push is only for growable arrays. Fixed arrays cannot have recursive by-value layouts. Nonrecursive structs in growable arrays are already inline. There is no implicit growable-array conversion.\n\n")
+    strings.add(mut out, "`import views` provides Slice[T] read snapshots. views.of/range retain array storage; get/length/sub/to_array access or copy them. views.text uses the existing Str view. Views can outlive a source variable and be returned or captured by tasks. Source mutation copies shared storage, preserving the view. `import buffers` provides Bytes, create/from_array/from_str/to_str, get/set/length/view, and signed/unsigned fixed-width reads/writes with le/be byte order. Width reads allow unaligned offsets and check the whole access. Raw Str-to-byte and byte-to-Str conversions copy; views do not.\n\n")
+    strings.add(mut out, "`import arenas` provides Arena[T] contiguous reusable storage and positional Slot[T] handles. create reserves capacity, alloc appends, get/set check index and generation, reset drops values and advances the generation, invalidating old slots. Arena copies keep ordinary snapshots; later writes/reset use copy-on-write. Slots are relative positions, never raw pointers: use them with the intended arena snapshot. Managed elements are released on reset/drop; there is no manual free.\n\n")
+    strings.add(mut out, "```vela\nimport buffers\nimport views\nimport arenas\nfn main() {\n    let pair: [Int; 2] = [1, 2]\n    print(pair[1])\n    let mut bytes = buffers.create(8)\n    buffers.write_u32_be(mut bytes, 1, 0x12345678u32)\n    let saved = buffers.view(bytes, 1, 5)\n    buffers.set(mut bytes, 1, 0u8)\n    assert(saved.get(0) == 0x12u8)\n    let mut arena: arenas.Arena[Str] = arenas.create(4)\n    let slot = arenas.alloc(mut arena, \"value\")\n    assert(arenas.get(arena, slot) == \"value\")\n    arenas.reset(mut arena)\n}\n```\n\n")
     strings.add(mut out, "## Calling C (LP64 POSIX)\n\n")
     strings.add(mut out, "`import c` exposes C scalars: c.Int/UInt are i32/u32, Short/UShort i16/u16, Long/LongLong/SSize i64, ULong/ULongLong/Size u64, Char/SChar i8, UChar u8, Bool Bool, Double Float. c.Float marks a binary32 ABI parameter/result on externs and callbacks; Vela Float storage stays binary64. c.Ptr and c.Fn are nominal, non-owning 8-byte object/function pointers, copied and compared by value. This profile supports the C backend on macOS ARM64/Linux x86-64 and native Linux x86-64.\n\n")
     strings.add(mut out, "Declare `extern fn name(args...) -> scalar uses unsafe`, optionally `= \"C_symbol\"`. Omit the result for C void; mut scalar parameters pass pointers. c.Float mut parameters use a binary32 temporary with copy-back. End variadic declarations with `...` after a fixed parameter; extra scalar arguments receive C default promotions. Put system libraries in vela.mod as `link z` or `link sqlite3`; `link ./libexample.a` resolves relative to the manifest. Dependencies contribute libraries too. Aggregates by value, capturing callbacks, generic externs and contracts need a wrapper.\n\n")
@@ -143,7 +148,7 @@ pub fn reference(root: Str) -> Str uses fs, os {
             builtin(mut out, module, name)
         }
     }
-    for module in ["bytes", "lists", "text"] {
+    for module in ["bytes", "lists", "text", "views", "buffers", "arenas"] {
         strings.add(mut out, "\n## import " + module + " (from std/" + module + ".vl)\n\n")
         let path = modules.join(modules.join(root, "std"), module + ".vl")
         match files.read(path) {
@@ -182,6 +187,6 @@ fn builtin(out: mut strings.Builder, module: Str, name: Str) {
     }
     let info = index.builtin_info(full)
     if len(info) == 2 {
-        strings.add(mut out, "- `" + full + "`: `" + info[0] + "`. " + info[1] + "\n")
+        strings.add(mut out, "- `" + full + "`: `" + info[0] + "`\n")
     }
 }
