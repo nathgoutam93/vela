@@ -1,0 +1,127 @@
+// Agent queries share checked declarations and conservative call dependencies.
+import ast
+import call_graph
+import checker
+import files
+import index
+import ints
+import json
+import maps
+import modules
+import strings
+import sysio
+import text
+pub fn fingerprint(source: Str) -> Str {
+    let mut h = 14695981039346656037u64; for c in source { h = ints.wrapping_mul(h ^ u64(c), 1099511628211u64) }; return ints.to_str(h)
+}
+fn names(k: checker.Checked) -> [Str] uses fs {
+    let mut out: [Str] = []; for m in k.modules { if m.file == "" { push(mut out, ""); continue }; match sysio.canonical(m.file) { Ok(p) => push(mut out, p), Err(_) => push(mut out, modules.normpath(m.file)) } }; return out
+}
+fn wanted(k: checker.Checked, path: Str, paths: [Str]) -> Int uses fs {
+    let mut canonical = modules.normpath(path); match sysio.canonical(path) { Ok(p) => canonical = p, Err(_) => {} }
+    for i in 0..len(paths) { if paths[i] == canonical { return i } }; return -1
+}
+fn words(values: [Str]) -> json.Json { let mut out: [json.Json] = []; for value in values { push(mut out, json.string(value)) }; return json.array(out) }
+fn contracts(values: [ast.Expr]) -> json.Json { let mut out: [json.Json] = []; for e in values { push(mut out, json.string(ast.expr_text(e))) }; return json.array(out) }
+pub fn function_json(k: checker.Checked, id: Int) -> json.Json {
+    let f = k.fns[id]; return json.object([
+        json.member("id", json.integer(id)), json.member("name", json.string(f.decl.name)), json.member("module", json.string(k.modules[f.module].name)),
+        json.member("file", json.string(k.modules[f.module].file)), json.member("line", json.integer(f.decl.line)), json.member("col", json.integer(f.decl.col)),
+        json.member("signature", json.string(index.signature(f.decl))), json.member("effects", words(f.decl.effects)), json.member("test", json.boolean(f.is_test)), json.member("extern", json.boolean(f.decl.foreign != "")),
+        json.member("requires", contracts(f.decl.requires)), json.member("ensures", contracts(f.decl.ensures))
+    ])
+}
+pub fn summary(k: checker.Checked, path: Str) -> Result[json.Json, Str] uses fs {
+    let paths = names(k); let target = wanted(k, path, paths); if target < 0 { return Err("module is not in this program") }
+    let g = call_graph.build(k); let mut functions: [json.Json] = []; let mut types: [json.Json] = []; let mut imports: [json.Json] = []
+    for i in 0..len(k.fns) { let f = k.fns[i]; if f.module != target || f.is_test || (!f.decl.public && f.decl.name != "main") { continue }
+        let reachable = call_graph.reach(g, [i], false); let mut effects = f.decl.effects; let mut unknown = false
+        for j in 0..len(reachable) { if reachable[j] { effects = merge(effects, g.effects[j]); unknown = unknown || g.uncertain[j] } }
+        let mut row = function_json(k, i); row = put(row, "reachable_effects", words(effects)); row = put(row, "unknown_target", json.boolean(unknown)); push(mut functions, row)
+    }
+    for t in k.modules[target].program.types { if t.public { push(mut types, json.object([json.member("name", json.string(t.name)), json.member("signature", json.string(index.full_type_detail(t))), json.member("line", json.integer(t.line)), json.member("col", json.integer(t.col))])) } }
+    for imp in k.modules[target].program.imports { push(mut imports, json.string(imp.name)) }
+    return Ok(json.object([json.member("query", json.string("summary")), json.member("file", json.string(paths[target])), json.member("module", json.string(k.modules[target].name)), json.member("functions", json.array(functions)), json.member("types", json.array(types)), json.member("imports", json.array(imports))]))
+}
+fn merge(a: [Str], b: [Str]) -> [Str] { let mut out = a; for v in b { let mut found = false; for old in out { if old == v { found = true } }; if !found { push(mut out, v) } }; return out }
+fn put(value: json.Json, key: Str, field: json.Json) -> json.Json { let mut fields = json.members(value); push(mut fields, json.member(key, field)); return json.object(fields) }
+type Selection = struct { module: Int, seeds: [Int], definition: Int, callable: Bool }
+fn select(k: checker.Checked, ix: index.Index, path: Str, line: Int, col: Int, paths: [Str]) -> Result[Selection, Str] uses fs {
+    let target = wanted(k, path, paths); if target < 0 { return Err("module is not in this program") }
+    if line == 0 { let mut seeds: [Int] = []; for i in 0..len(k.fns) { if k.fns[i].module == target && !k.fns[i].is_test { push(mut seeds, i) } }; return Ok(Selection { module: target, seeds: seeds, definition: -1, callable: true }) }
+    let at = index.find(ix, k.modules[target].file, line, col); if at < 0 { return Err("no name at the requested position") }; let d = ix.defs[ix.occurrences[at].def]
+    let mut seeds: [Int] = []; let mut callable = false
+    if d.kind == "function" || d.kind == "test" || d.kind == "interface method" {
+        for i in 0..len(k.fns) {
+            let f = k.fns[i]; let mut signature = index.signature(f.decl); if f.is_test { signature = f.decl.name }
+            if modules.normpath(k.modules[f.module].file) == modules.normpath(d.file) && f.decl.line == d.line && (d.detail == signature || text.starts_with(d.detail, signature + "\n")) { push(mut seeds, i) }
+        }
+        callable = len(seeds) > 0
+        if !callable { for m in k.modules { if modules.normpath(m.file) != modules.normpath(d.file) { continue }; for t in m.program.types { if !t.is_interface { continue }; for method in t.methods { if method.line == d.line && method.name == d.name { let parent = type_def(ix, d.file, t.name); if parent >= 0 { seeds = type_seeds(k, ix, parent) } } } } } }
+    } else if d.kind == "type" || d.kind == "field" || d.kind == "variant" {
+        seeds = type_seeds(k, ix, ix.occurrences[at].def)
+    } else { return Err("select a function, type, field or variant declaration/reference") }
+    return Ok(Selection { module: target, seeds: seeds, definition: ix.occurrences[at].def, callable: callable })
+}
+fn owner(k: checker.Checked, file: Str, line: Int, col: Int) -> Int {
+    for i in 0..len(k.fns) { let f = k.fns[i]; if modules.normpath(k.modules[f.module].file) != modules.normpath(file) { continue }
+        if line < f.decl.line || (line == f.decl.line && col < f.decl.col) { continue }; if line > f.decl.body.end_line || (line == f.decl.body.end_line && col > f.decl.body.end_col) { continue }; return i
+    }; return -1
+}
+// Follow type exposures through enclosing fields/variants/interfaces before
+// tracing function callers. A public wrapper type can outlive its leaf type.
+fn type_def(ix: index.Index, file: Str, name: Str) -> Int {
+    for i in 0..len(ix.defs) { let d = ix.defs[i]; if d.kind == "type" && d.name == name && modules.normpath(d.file) == modules.normpath(file) { return i } }; return -1
+}
+fn enclosing_type(k: checker.Checked, ix: index.Index, file: Str, line: Int) -> Int {
+    let mut chosen = -1; let mut latest = -1
+    for m in k.modules { if modules.normpath(m.file) != modules.normpath(file) { continue }; for t in m.program.types { if t.line <= line && t.line > latest { latest = t.line; chosen = type_def(ix, file, t.name) } } }; return chosen
+}
+fn type_seeds(k: checker.Checked, ix: index.Index, definition: Int) -> [Int] {
+    let mut queue = [definition]; let mut seen: Map[Int, Bool] = [:]; let mut out: [Int] = []; let d = ix.defs[definition]
+    if d.kind == "field" || d.kind == "variant" { let parent = enclosing_type(k, ix, d.file, d.line); if parent >= 0 { push(mut queue, parent) } }
+    let mut i = 0; for i < len(queue) { let at = queue[i]; i = i + 1; if maps.has(seen, at) { continue }; seen[at] = true
+        for use in index.references(ix, at) { let f = owner(k, use.file, use.line, use.col); if f >= 0 { push(mut out, f) } else { let parent = enclosing_type(k, ix, use.file, use.line); if parent >= 0 && !maps.has(seen, parent) { push(mut queue, parent) } } }
+    }; return out
+}
+pub fn impact(k: checker.Checked, path: Str, line: Int, col: Int) -> Result[json.Json, Str] uses fs {
+    let ix = index.build(k); let paths = names(k); let selected = select(k, ix, path, line, col, paths)?; let mut seeds = selected.seeds
+    if line == 0 { for t in k.modules[selected.module].program.types { if t.public { let d = type_def(ix, k.modules[selected.module].file, t.name); if d >= 0 { for seed in type_seeds(k, ix, d) { push(mut seeds, seed) } } } } }
+    let g = call_graph.build(k); let reach = call_graph.reach(g, seeds, true)
+    let mut affected: [json.Json] = []; let mut unknown: [json.Json] = []; let mut refs: [json.Json] = []
+    for i in 0..len(reach) { if reach[i] { push(mut affected, function_json(k, i)); if g.uncertain[i] { push(mut unknown, function_json(k, i)) } } }
+    if selected.definition >= 0 { for use in index.references(ix, selected.definition) { push(mut refs, json.object([json.member("file", json.string(use.file)), json.member("line", json.integer(use.line)), json.member("col", json.integer(use.col))])) } }
+    return Ok(json.object([json.member("query", json.string("impact")), json.member("conservative", json.boolean(true)), json.member("file", json.string(paths[selected.module])), json.member("affected_functions", json.array(affected)), json.member("references", json.array(refs)), json.member("unknown_targets", json.array(unknown)), json.member("note", json.string("Potential signature dependencies; a new signature must still be checked. Indirect calls and deferred closures are conservative."))]))
+}
+pub fn coverage(k: checker.Checked, path: Str, line: Int, col: Int, report: Str) -> Result[json.Json, Str] uses fs {
+    let ix = index.build(k); let paths = names(k); let selected = select(k, ix, path, line, col, paths)?
+    if !selected.callable { return Err("coverage targets functions with runtime entries; use impact for types or interfaces") }
+    if report != "" { for id in selected.seeds { if line > 0 && k.fns[id].decl.foreign != "" { return Err("measured coverage records Vela entries; query a Vela wrapper for an extern") } }; return measured(k, selected, paths, report) }
+    let g = call_graph.build(k); let reach = call_graph.reach(g, selected.seeds, true); let mut tests: [json.Json] = []
+    for i in 0..len(reach) { if reach[i] && k.fns[i].is_test { push(mut tests, function_json(k, i)) } }
+    return Ok(json.object([json.member("query", json.string("coverage")), json.member("mode", json.string("static")), json.member("conservative", json.boolean(true)), json.member("executed", json.boolean(false)), json.member("file", json.string(paths[selected.module])), json.member("tests", json.array(tests)), json.member("note", json.string("Possible test reachability, not measured execution. Use test --coverage REPORT, then query coverage TARGET --report REPORT."))]))
+}
+pub fn report(k: checker.Checked, results: [json.Json]) -> Result[json.Json, Str] uses fs {
+    let paths = names(k); let mut sources: [json.Json] = []; let mut functions: [json.Json] = []
+    for i in 0..len(k.modules) { let m = k.modules[i]; if m.file == "" { continue }; push(mut sources, json.object([json.member("file", json.string(paths[i])), json.member("hash", json.string(fingerprint(m.source)))])) }
+    for i in 0..len(k.fns) { let mut f = function_json(k, i); f = put(f, "canonical_file", json.string(paths[k.fns[i].module])); push(mut functions, f) }
+    return Ok(json.object([json.member("version", json.integer(1)), json.member("sources", json.array(sources)), json.member("functions", json.array(functions)), json.member("tests", json.array(results))]))
+}
+fn measured(k: checker.Checked, selected: Selection, paths: [Str], path: Str) -> Result[json.Json, Str] uses fs {
+    let data = json.parse(files.read(path)?)?; if json.int_or(json.get(data, "version"), 0) != 1 { return Err("unsupported coverage report version") }
+    let sources = json.items(json.get(data, "sources")); let mut source_count = 0
+    for i in 0..len(k.modules) { let m = k.modules[i]; if m.file == "" { continue }; source_count = source_count + 1; let mut found = false
+        for source in sources { if json.str_or(json.get(source, "file"), "") == paths[i] { found = true; if json.str_or(json.get(source, "hash"), "") != fingerprint(m.source) { return Err("stale coverage report: " + m.file) } } }
+        if !found { return Err("coverage report belongs to a different program") }
+    }; if source_count != len(sources) { return Err("coverage report belongs to a different program") }
+    let functions = json.items(json.get(data, "functions")); let mut ids: [Int] = []
+    for id in selected.seeds { let f = k.fns[id]; for row in functions { if json.str_or(json.get(row, "canonical_file"), "") == paths[f.module] && json.str_or(json.get(row, "name"), "") == f.decl.name && json.int_or(json.get(row, "line"), -1) == f.decl.line { push(mut ids, json.int_or(json.get(row, "id"), -1)) } } }
+    let mut tests: [json.Json] = []
+    for record in json.items(json.get(data, "tests")) { let mut found = false; for hit in json.items(json.get(record, "functions")) { let n = json.int_or(hit, -1); for id in ids { if id == n { found = true } } }; if found { push(mut tests, record) } }
+    return Ok(json.object([json.member("query", json.string("coverage")), json.member("mode", json.string("measured")), json.member("conservative", json.boolean(false)), json.member("executed", json.boolean(len(tests) > 0)), json.member("file", json.string(paths[selected.module])), json.member("tests", json.array(tests)), json.member("report", json.string(path)), json.member("instrumentation", json.string("Vela function entries; generic instances share their source declaration"))]))
+}
+pub fn hit_record(k: checker.Checked, record: Int, status: Int, events: Str) -> json.Json {
+    let mut seen: Map[Int, Bool] = [:]; let mut hits: [json.Json] = []
+    for line in text.lines(events) { match text.parse_int(line) { Some(n) => { if n >= 0 && n < len(k.fns) && !maps.has(seen, n) { seen[n] = true; push(mut hits, json.integer(n)) } }, None => {} } }
+    return json.object([json.member("name", json.string(k.fns[record].decl.name)), json.member("file", json.string(k.modules[k.fns[record].module].file)), json.member("line", json.integer(k.fns[record].decl.line)), json.member("status", json.integer(status)), json.member("functions", json.array(hits))])
+}

@@ -57,6 +57,7 @@ type Gen = struct {
     frames: [Frame]
     dead: Bool  // true right after a return, break or continue
     current_fn: Int
+    coverage: Bool
     // In a copy of a generic function, its type parameters and what they
     // are in this copy; empty otherwise.
     params: [Int]
@@ -92,7 +93,7 @@ fn new_gen(k: checker.Checked, l: layout.Layout, id: Int, params: [Int], args: [
     instance_names: Map[Str, Str], cname: Str, env: ranges.Env) -> Gen {
     return Gen {
         k: k, l: l, filename: k.modules[k.fns[id].module].path, lines: [], depth: 1, temps: 0, names: [:],
-        used: [:], frames: [], dead: false, current_fn: id, params: params, args: args,
+        used: [:], frames: [], dead: false, current_fn: id, coverage: false, params: params, args: args,
         instance_names: instance_names, cname: cname, captures: [:], closure_result: -2, closures: 0, extra: [],
         wrappers: [:], unique: [], found: [], hoisted: [], cached: [:], env: env,
     }
@@ -106,13 +107,13 @@ type ArmCode = enum {
 }
 
 pub fn generate(checked: checker.Checked) -> Result[Str, [errors.CompileError]] {
-    return program(checked, false)
+    return program(checked, false, false)
 }
 
 // The C for `vela test`: the program's tests, and a main that runs the one
 // whose number it is given (its index in test_ids).
 pub fn generate_tests(checked: checker.Checked) -> Result[Str, [errors.CompileError]] {
-    return program(checked, true)
+    return program(checked, true, false)
 }
 
 // The tests `vela test` runs: those of the main module, and of every module
@@ -130,7 +131,9 @@ pub fn test_ids(k: checker.Checked) -> [Int] {
 }
 
 // The C, or the errors only making the generic copies finds.
-fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.CompileError]] {
+pub fn generate_coverage_tests(checked: checker.Checked) -> Result[Str, [errors.CompileError]] { return program(checked, true, true) }
+
+fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool) -> Result[Str, [errors.CompileError]] {
     let mut k = checker.erased(checked)
     // The functions that are not generic are all written; generic ones only
     // as the copies they are called as. Tests only for `vela test`.
@@ -244,6 +247,7 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
             flow_envs[id] = ranges.function_env(k, param_ranges, id)
         }
         let mut g = new_gen(k, l, id, params, args, instance_names, name, flow_envs[id])
+        g.coverage = coverage
         let lines = function(mut g, id, name)
         // Where the driver may cut the C into parts compiled in parallel:
         // before each function, with the closures written for it.
@@ -274,6 +278,12 @@ fn program(checked: checker.Checked, for_tests: Bool) -> Result[Str, [errors.Com
         for line in ["", "int main(int argc, char **argv) {", "    vela_init(argc, argv);",
             "    long which = argc > 1 ? strtol(argv[1], NULL, 10) : -1;", "    switch (which) {"] {
             push(mut out, line)
+        }
+        if coverage {
+            // Must precede the switch: instrumentation writes first-hit events.
+            out = out[0..len(out) - 1]
+            push(mut out, "    vela_coverage_begin(argc, argv, " + strings.from_int(len(k.fns)) + ");")
+            push(mut out, "    switch (which) {")
         }
         for i in 0..len(tests) {
             push(mut out, "    case " + strings.from_int(i) + ": " + fn_name(k, tests[i]) + "(); return 0;")
@@ -672,6 +682,7 @@ fn release_until(g: mut Gen, stop: Str) {
 
 fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
     let f = g.k.fns[id]
+    if g.coverage { emit(mut g, "vela_coverage_hit(" + strings.from_int(id) + ");") }
     push_frame(mut g, "function")
     let mut names: [Str] = []
     for i in 0..len(f.decl.params) {

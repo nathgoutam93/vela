@@ -76,7 +76,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-004: Runtime cache omitted an included header
 
-- **Status:** resolved in M19, extended in M23; native execution remains in VAL-001.
+- **Status:** resolved in M19, extended through M24; native execution remains in VAL-001.
 - **Evidence:** `cached_runtime` in `stage1/main.vl` hashed only `vela_rt.c` and
   `vela_rt.h`. M19 adds `vela_int.h`, included by the public runtime header.
   Changes to that file alone would leave a cached native runtime object stale.
@@ -92,6 +92,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   reuse a stale runtime object. The include-only invalidation regression in
   tests/m23_test.py passes in the 298-check supported C suite, including
   unchanged-input cache reuse. Native execution remains VAL-001.
+- **M24 extension:** include vela_policy.inc in the same key. The M24
+  integration verifies unchanged-input reuse and a new object after changing
+  only that include. Rebuild the trusted compiler too when launcher policy
+  changes: its own embedded runtime installs the child policy.
 - **Acceptance:** a change to the included header creates a new cache entry;
   unchanged sources and flags reuse the previous entry on both backends.
 
@@ -171,7 +175,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-009: New declarations need semantic editor metadata
 
-- **Status:** resolved in M20, extended through M23; native execution remains in VAL-001.
+- **Status:** resolved in M20, extended through M24; native execution remains in VAL-001.
 - **Evidence:** `vela-m20-maps query symbols build/m20-probe.vl` reported
   `type Show = interface { ... }` as an enum with no method children.
   The index and completion paths only distinguished structs and enums.
@@ -224,6 +228,13 @@ the same entry. Close it with a commit or validation result; keep its history.
   run also caught the 17-rename evaluation fixture's local paths.vl shadowing
   std/paths.vl: its reference solution had zero errors but one warning. Rename
   the fixture module routes in its workspace, solution and task instructions.
+- **M24 recurrence:** summary must not inherit hover's 30-field truncation;
+  expose full type signatures. The first method-impact probe also returned
+  no affected functions: indexed names are short (show), while FnInfo names
+  are qualified (Leaf.show). Match full signature and source identity, and
+  distinguish abstract interface methods (whose index kind is interface
+  method) from instrumentable entries. The integration now covers a 40-field
+  public type, Leaf.show, Show.show and callers through generic dispatch.
 - **Acceptance:** query/LSP regressions report interfaces and method children,
   resolve generic and concrete method calls, and offer applicable methods.
   Rename must retain its existing semantic validation and reject broken edits.
@@ -362,7 +373,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-017: Keep the expanded memory guide within its reading budget
 
-- **Status:** resolved in M22, extended in M23.
+- **Status:** resolved in M22, extended through M24.
 - **Evidence:** the first M22 `build/vela-m22 guide` output is 37,751 bytes,
   exceeding the existing 32,000-byte / estimated-8,000-token integration gate.
   New library signatures and rules add to repeated per-builtin explanation.
@@ -381,6 +392,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   prose are shortened. The final guide is 31,400 bytes (7,850 tokens by the
   estimate); the M17/M23 guide and installation checks pass in the 298-check
   supported suite. Actual tokenizer validation remains VAL-003.
+- **M24 recurrence:** the first expanded guide was 32,020 bytes; shorter
+  prose preserves the new permission/query commands and generated APIs at
+  31,989 bytes (7,997 tokens by the estimate). Actual tokenizer validation
+  remains VAL-003.
 - **Validation:** the final M22 guide is 28,599 bytes (about 7,149 tokens by
   bytes/4). M17 compiles and tests all its examples in the 295-check suite.
 
@@ -493,11 +508,86 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** long literal boundary/escape/return/task cases compile under
   strict C flags and retain byte identity; native behavior still agrees.
 
+### TL-024: macOS network denial permits inert socket descriptors
+
+- **Status:** resolved for the macOS strict profile during M24; Linux
+  execution of socket denial remains VAL-004.
+- **Evidence:** a standalone C probe calling socket(AF_INET, SOCK_STREAM, 0)
+  returns fd 3 under sandbox-exec with `(deny network*)`, also with an added
+  `(deny system-socket)`. The profile restricts network use, not creation of
+  an unconnected descriptor. Codex's outer sandbox also rejects a nested
+  sandbox_apply; running the same probe outside that sandbox works.
+- **Impact:** runtime checks and Seatbelt alone cannot establish the literal
+  C socket-creation acceptance on this macOS host.
+- **Workaround:** run OS-policy probes outside the outer sandbox and distinguish
+  descriptor creation from bind/connect/send in assertions.
+- **Resolution:** deny socket creation using Linux seccomp; fail closed
+  for unsafe + deny-net on macOS rather than claim equivalent enforcement.
+  Preserve useful safe-runtime network denial and explicit platform diagnostics.
+  Disable real external processes under macOS deny-net too, so a safe Vela
+  process call cannot reintroduce native socket creation. tests/m24_test.py
+  verifies pre-launch unsafe rejection and safe network/fake behavior. Linux
+  syscall enforcement cross-compiles but is not recorded as executed.
+- **Acceptance:** denied C socket creation runs and fails under Linux; macOS
+  refuses the unsupported combination before user code/constructors execute.
+  Safe net operations and C file operations retain their own policy coverage.
+
+### TL-025: Filesystem sandbox bootstrap can abort before Vela diagnostics
+
+- **Status:** resolved during M24 for the tested macOS C profile.
+- **Evidence:** a scoped-filesystem run of build/m24-files.vl exited 134 with
+  no stdout/stderr. Its macOS crash report records SIGABRT before Vela's entry.
+  Apple's local dyld-support.sb documents additional Cryptex and root reads
+  needed to bootstrap an executable; the initial profile granted only the
+  executable and ordinary system library directories.
+- **Impact:** a policy can stop ordinary programs before runtime diagnostics,
+  making a valid filesystem grant appear to fail silently.
+- **Cause evidence:** importing Apple's absolute dyld-support.sb profile and
+  granting executable ancestor reads eliminates the pre-entry abort in the
+  reproduced scoped fixture. Relative fs checks also needed cached launch cwd
+  because restricted getcwd metadata access fails. This establishes the tested
+  bootstrap correction; it is not proof for every OS release/loader.
+- **Workaround:** retain the child's status and inspect the matching crash
+  report, rather than accepting an empty-output invocation as a pass.
+- **Resolution:** grant trusted OS loader paths, preserve filesystem
+  confinement and symlink checks, and document bootstrap exceptions. The M24
+  integration passes scoped reads/writes, outside/symlink/metadata denial,
+  inherited C child and foreign constructor confinement, and pure deny-fs
+  launch. OS-policy tests run outside Codex's incompatible outer sandbox.
+- **Sanitizer recurrence:** the first correctly configured M24 UBSan run
+  passed 122 checks and failed M24 at pure deny-fs launch: dyld explicitly
+  reported libclang_rt.ubsan_osx_dynamic.dylib under Xcode blocked by sandbox.
+  Grant read-only Clang resource directories in the standard Xcode/Command
+  Line Tools locations as trusted loader exceptions, and rerun normal/UBSan
+  policy acceptance. This is observed loader denial, not a suspected API defect.
+  Final M24 integration passes normally and under UBSan after rebuilding the
+  trusted launcher; the earlier UBSan selection passed the other 122 checks.
+- **Acceptance:** scoped file reads/writes, denied outside paths and foreign
+  constructors work; denied-all-files still launches a pure program, including
+  the instrumented UBSan build.
+
+### TL-026: Capability admission must use the generated source snapshot
+
+- **Status:** resolved during M24; adversarial concurrent-change execution is
+  not claimed from this inspection alone.
+- **Evidence:** review of the initial M24 driver found run calling checked()
+  for unsafe admission, then build() calling checked() again. Link flags were
+  also obtained separately. Those are distinct reads of mutable source files.
+- **Impact:** a concurrent edit could make admission and generation analyze
+  different code; a capability gate must not rely on that timing assumption.
+- **Workaround:** hold sources stable while developing the initial launcher.
+- **Resolution:** capture one checked program and one library vector; pass
+  those same immutable values to admission and build_from. Test compilation
+  likewise reuses its captured library vector after admission.
+- **Acceptance:** the driver has no second load between admission/generation;
+  unsafe/C-library rejection and ordinary run/test behavior remain covered by
+  the M24 integration and supported regression suite.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
 
-- **Status:** open; carried from M17 and extended during M19/M20/M21/M22/M23.
+- **Status:** open; carried from M17 and extended during M19–M24.
 - **Evidence:** the C bootstrap, supported C suite, UBSan runtime tests, and
   benchmark output checks passed. Native `os.executable` lowering assembles
   for Linux x86-64, but was not executed there. This macOS ARM64 host has no
@@ -530,6 +620,13 @@ the same entry. Close it with a commit or validation result; keep its history.
   UTF-8 and HTTP/fake oracles pass. Both examples and a managed-handle fixture
   cross-assemble for Linux x86-64 with optimization on/off. Neither native
   execution nor ASan/TSan was run for M23 on this macOS ARM64 host.
+- **M24 evidence:** the C bootstrap reaches a 127,156-line fixed point and
+  the supported selection passes 299 checks. The UBSan selection passes 122
+  other checks, and the final M24 integration passes after its loader fix,
+  giving 123 checks with UBSan passes. Instrumented generic/task/fake coverage
+  assembly cross-assembles optimized/unoptimized; the strict runtime C also
+  cross-compiles for Linux x86-64. No native execution, native bootstrap, ASan
+  or TSan is inferred from this. Kernel policy execution is separately VAL-004.
 - **Workaround:** retain the host-supported results and these explicit limits.
 - **Required work:** on Linux x86-64, run both bootstrap fixed points and the
   applicable C/native suites under ASan and TSan. See
@@ -550,6 +647,8 @@ the same entry. Close it with a commit or validation result; keep its history.
   ownership/tasks, fake restoration, full duplex, TCP/UDP, clocks, process
   pipes/limits/closed stdin, Unicode, HTTP framing and runtime include-cache
   invalidation under the applicable sanitizers.
+  Run tests/m24_test.py on Linux x86-64 with VELA_OPT=1 and VELA_OPT=0
+  to execute both C/native capability and measured-coverage cases.
 - **Acceptance:** record host, compiler/toolchain, commit, commands, and actual
   results. Keep any failures open instead of inferring a pass from C or UBSan.
 
@@ -562,6 +661,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M23 evidence:** the evaluation reference checks pass in the supported
   suite; eval/m23-static.json records 373/373 coded diagnostics and 21 with
   edits. No new model-driven agent trials were run.
+- **M24 evidence:** eval/m24-static.json retains 373/373 coded diagnostics
+  and 21 with edits; the inventory now credits API summary/measured coverage
+  and conservative impact. This is not a model-driven agent trial.
 - **Workaround:** use the static metrics and seeded repair checks as
   implementation evidence; do not claim measured agent improvements.
 - **Required work:** compare the guide and prior documentation conditions on
@@ -587,8 +689,30 @@ the same entry. Close it with a commit or validation result; keep its history.
   7,149 tokens under the same estimate; generated API signatures remain.
 - **M23 measurement:** the systems-library guide is 31,400 bytes, or about
   7,850 tokens by the same estimate, after compacting generated signatures.
+- **M24 measurement:** the permission/query guide is 31,989 bytes, or about
+  7,997 tokens under the estimate.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.
 - **Acceptance:** verify the roadmap's 8,000-token budget using that tokenizer;
   update the budget check if the estimate proves inadequate.
+
+### VAL-004: Execute M24 Linux kernel capability policies
+
+- **Status:** open; discovered in M24, separate from proposed tooling features.
+- **Evidence:** this host is macOS ARM64 and Docker has no usable daemon.
+  runtime/vela_rt.c cross-compiles to a Linux x86-64 object with strict C11,
+  Wall/Wextra/Werror, pedantic and Wshadow using Debian bookworm libc/kernel
+  headers. This verifies compilation only. The macOS C integration passes
+  policy/constructor/file confinement and rejects unsupported unsafe+deny-net.
+- **Workaround:** use the tested macOS strict profile with its explicit
+  fail-closed limitations; do not claim C socket denial was executed on Linux.
+- **Required work:** on Linux x86-64 with Landlock ABI 3+ enabled, run
+  python3 tests/m24_test.py "$PWD/build/vela" normally and with VELA_OPT=0.
+  Test both C/native, actual foreign socket() rejection before/after main,
+  inherited process restrictions, descriptor closure and file/symlink/creation
+  confinement. Verify a disabled/older Landlock kernel refuses scoped fs with
+  E6011 and never launches the target; repeat net denial without Landlock fs
+  restrictions. Exercise coverage under denied fs and the sanitizer selections.
+- **Acceptance:** retain kernel/ABI/toolchain/commit and actual commands/results.
+  A cross-compiled object or successful safe wrapper is not the C syscall proof.

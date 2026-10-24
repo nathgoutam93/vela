@@ -84,6 +84,7 @@ M20_TEST = TESTS / "m20_test.py"
 M21_TEST = TESTS / "m21_test.py"
 M22_TEST = TESTS / "m22_test.py"
 M23_TEST = TESTS / "m23_test.py"
+M24_TEST = TESTS / "m24_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -172,6 +173,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(CACHE_TEST, compiler, env)
     if path == M17_TEST:
         return run_script(M17_TEST, compiler, env)
+    if path == M24_TEST:
+        return run_script(M24_TEST, compiler, env)
     if path == M23_TEST:
         return run_script(M23_TEST, compiler, env)
     if path == M22_TEST:
@@ -294,7 +297,7 @@ def run_cli_test(compiler: list[str], path: Path, expect: Expectations,
 def run_vela_tests(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
     """`vela test` on an example or a standard module: all its tests must pass."""
     try:
-        ran = subprocess.run([*compiler, "test", str(path.relative_to(ROOT))], cwd=ROOT, env=env,
+        ran = subprocess.run([*compiler, "test", "--allow", "unsafe", str(path.relative_to(ROOT))], cwd=ROOT, env=env,
                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=VELA_TEST_TIMEOUT)
     except subprocess.TimeoutExpired:
         return [f"vela test took longer than {VELA_TEST_TIMEOUT}s"]
@@ -348,6 +351,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(M21_TEST)
     tests.append(M22_TEST)
     tests.append(M23_TEST)
+    tests.append(M24_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

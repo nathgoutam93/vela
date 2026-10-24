@@ -1,7 +1,7 @@
 // Shared systems-operation ABI metadata. Tags describe safe Vela values.
 pub fn functions(module: Str) -> [Str] {
     if module == "clock" { return ["wall_ns", "monotonic_ns", "sleep_ns"] }
-    return ["tcp_connect", "tcp_listen", "accept", "net_read", "net_write", "net_close", "net_port", "net_timeout", "udp_bind", "udp_send", "udp_receive", "process", "list", "kind", "mkdir"]
+    return ["tcp_connect", "tcp_listen", "accept", "net_read", "net_write", "net_close", "net_port", "net_timeout", "udp_bind", "udp_send", "udp_receive", "process", "list", "kind", "mkdir", "sandbox_run", "canonical"]
 }
 // 1 Int, 2 Str, 3 Bool, 4 Handle, 5 [Str], 6 Unit.
 pub fn params(name: Str) -> [Int] {
@@ -10,20 +10,20 @@ pub fn params(name: Str) -> [Int] {
         "tcp_connect" => [2, 1, 1], "tcp_listen" => [2, 1, 1], "accept" => [4],
         "net_read" => [4, 1], "net_write" => [4, 2], "net_close" => [4], "net_port" => [4], "net_timeout" => [4, 1],
         "udp_bind" => [2, 1], "udp_send" => [4, 2, 1, 2], "udp_receive" => [4, 1],
-        "process" => [5, 2, 1, 1], "list" => [2], "kind" => [2], "mkdir" => [2], _ => [],
+        "sandbox_run" => [5, 5, 5], "canonical" => [2], "process" => [5, 2, 1, 1], "list" => [2], "kind" => [2], "mkdir" => [2], _ => [],
     }
 }
 pub fn result(name: Str) -> Int {
     return match name {
         "tcp_connect" => 4, "tcp_listen" => 4, "accept" => 4, "udp_bind" => 4,
-        "net_read" => 2, "net_write" => 1, "udp_send" => 1, "net_close" => 6, "net_timeout" => 6,
+        "canonical" => 2, "net_read" => 2, "net_write" => 1, "udp_send" => 1, "net_close" => 6, "net_timeout" => 6,
         "sleep_ns" => 6, "udp_receive" => 5, "process" => 5, "list" => 5, "mkdir" => 6, _ => 1,
     }
 }
 pub fn effect(name: Str) -> Str {
     if name == "wall_ns" || name == "monotonic_ns" || name == "sleep_ns" { return "clock" }
-    if name == "process" { return "os" }
-    if name == "list" || name == "kind" || name == "mkdir" { return "fs" }
+    if name == "process" || name == "sandbox_run" { return "os" }
+    if name == "list" || name == "kind" || name == "mkdir" || name == "canonical" { return "fs" }
     return "net"
 }
 pub fn type_text(tag: Int) -> Str {

@@ -41,6 +41,10 @@
 // found in runtime/ and std/ next to the build/ directory this program is
 // in, or under VELA_ROOT if it is set.
 import ast
+import agent_queries
+import capabilities
+import json
+import sysio
 import checker
 import codegen
 import complete
@@ -143,14 +147,13 @@ fn main() {
         check_json(args[3], root)
         return
     }
-    let path = args[2]
-    if command == "run" {
-        run(path, args[3..len(args)], root)
-    }
-    if command == "test" {
-        test_command(path, args[3..len(args)], root)
+    if command == "run" || command == "test" {
+        let options = capabilities.parse(args[2..len(args)], command == "test")
+        let path = options.rest[0]
+        if command == "run" { run(path, options.rest[1..len(options.rest)], root, options) } else { test_command(path, options.rest[1..len(options.rest)], root, options) }
         return
     }
+    let path = args[2]
     if command == "build" {
         let mut out = default_output(path)
         if len(args) == 5 && (args[3] == "-o" || args[3] == "--output") {
@@ -424,12 +427,16 @@ fn split_flags(flags: Str) -> [Str] {
 
 // Compile a .vl file all the way to an executable; `quick` for `vela run`.
 fn build(path: Str, exe: Str, root: Str, quick: Bool) uses fs, os {
+    build_from(path, exe, root, quick, checked(path, root), link_flags(path))
+}
+// Admission and generation use the same immutable source/link snapshot.
+fn build_from(path: Str, exe: Str, root: Str, quick: Bool, k: checker.Checked, libraries: [Str]) uses fs, os {
     if native(quick) {
-        let p = lowered(path, native_program(path, checked(path, root), false))
-        assemble(x64.program(p), modules.stem(path), exe, root, "-O2", link_flags(path))
+        let p = lowered(path, native_program(path, k, false))
+        assemble(x64.program(p), modules.stem(path), exe, root, "-O2", libraries)
         return
     }
-    compile(c_code(path, codegen.generate(checked(path, root))), modules.stem(path), exe, root, "-O2", link_flags(path))
+    compile(c_code(path, codegen.generate(k)), modules.stem(path), exe, root, "-O2", libraries)
 }
 
 // VELA_BACKEND=c or VELA_BACKEND=native picks the backend. Otherwise `vela
@@ -766,7 +773,7 @@ fn cached_runtime(root: Str, cc: Str, opt: Str, flags: [Str]) -> Str uses fs, os
     }
     let mut b = strings.builder()
     strings.add(mut b, cc + "\n" + opt + "\n" + join_words(flags) + "\n")
-    for name in ["vela_rt.c", "vela_rt.h", "vela_int.h", "vela_sys.inc"] {
+    for name in ["vela_rt.c", "vela_rt.h", "vela_int.h", "vela_sys.inc", "vela_policy.inc"] {
         match files.read(modules.join(modules.join(root, "runtime"), name)) {
             Ok(t) => strings.add(mut b, t)
             Err(_) => return ""
@@ -864,24 +871,27 @@ fn join_words(words: [Str]) -> Str {
 }
 
 // Compile to a temporary executable, run it with `args`, and exit with its code.
-fn run(path: Str, args: [Str], root: Str) uses fs, os {
+fn run(path: Str, args: [Str], root: Str, options: capabilities.Options) uses fs, os {
+    let k = checked(path, root)
+    let libraries = link_flags(path)
+    capabilities.admit(k, options, libraries, false)
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
         Err(e) => driver_error(e)
     }
     let exe = modules.join(tmp, "program")
-    build(path, exe, root, true)
+    build_from(path, exe, root, true, k, libraries)
     let mut command = [exe]
     for a in args {
         push(mut command, a)
     }
-    let result = os.run(command)
+    let result = sysio.sandbox_run(command, options.allow, options.deny)
     files.remove(exe)
     files.remove(tmp)
     match result {
         Ok(code) => os.exit(code)
-        Err(e) => internal_error(e)
+        Err(e) => capabilities.fail(e)
     }
 }
 
@@ -1039,7 +1049,7 @@ fn hex_digit(n: Int) -> Byte {
 
 // `vela test`: build the program's tests into one executable, then run it
 // once per test, so a test that panics fails alone and the rest still run.
-fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
+fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Options) uses fs, os {
     let loaded = load(path, read(path), root)
     if len(loaded.errors) > 0 {
         fail(path, loaded.errors)
@@ -1049,6 +1059,8 @@ fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
         fail(path, errors.merged(k.errors, k.warnings))
     }
     warn(path, k.warnings)
+    let libraries = link_flags(path)
+    capabilities.admit(k, options, libraries, true)
     let ids = codegen.test_ids(k)
     let mut chosen: [Int] = []
     for i in 0..len(ids) {
@@ -1064,6 +1076,7 @@ fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
         }
     }
     if len(chosen) == 0 {
+        if options.coverage != "" { match agent_queries.report(k, []) { Ok(data) => { match files.write(options.coverage, json.pretty(data)) { Ok(_) => {}, Err(e) => driver_error(e) } }, Err(e) => driver_error(e) } }
         print("no tests to run")
         return
     }
@@ -1076,16 +1089,26 @@ fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
     // Tests are built often and run briefly, so the C compiler does not
     // optimize: building the compiler's own tests takes 3 s instead of 20.
     if native(true) {
-        assemble(x64.program(lowered(path, native_program(path, k, true))), modules.stem(path) + "_tests", exe, root, "-O0", link_flags(path))
+        let mut made = native_program(path, k, true)
+        if options.coverage != "" { made = coverage_program(k) }
+        assemble(x64.program(lowered(path, made)), modules.stem(path) + "_tests", exe, root, "-O0", libraries)
     } else {
-        compile(c_code(path, codegen.generate_tests(k)), modules.stem(path) + "_tests", exe, root, "-O0", link_flags(path))
+        let mut made = codegen.generate_tests(k)
+        if options.coverage != "" { made = codegen.generate_coverage_tests(k) }
+        compile(c_code(path, made), modules.stem(path) + "_tests", exe, root, "-O0", libraries)
     }
+    let mut results: [json.Json] = []
     let mut failed = 0
     for i in chosen {
         let f = k.fns[ids[i]]
         let label = k.modules[f.module].path + ": " + f.decl.name
-        match os.run([exe, strings.from_int(i)]) {
+        let events = modules.join(tmp, "hits")
+        let mut command = [exe, strings.from_int(i)]
+        let mut allows = options.allow
+        if options.coverage != "" { files.write(events, ""); push(mut command, events); push(mut allows, "coverage:" + events) }
+        match sysio.sandbox_run(command, allows, options.deny) {
             Ok(code) => {
+                if options.coverage != "" { let mut hits = ""; match files.read(events) { Ok(s) => hits = s, Err(_) => {} }; push(mut results, agent_queries.hit_record(k, ids[i], code, hits)) }
                 if code == 0 {
                     print("PASS  " + label)
                 } else if code == 101 {
@@ -1096,9 +1119,11 @@ fn test_command(path: Str, words: [Str], root: Str) uses fs, os {
                     failed = failed + 1
                 }
             }
-            Err(e) => internal_error(e)
+            Err(e) => { files.remove(events); files.remove(exe); files.remove(tmp); capabilities.fail(e) }
         }
     }
+    files.remove(modules.join(tmp, "hits"))
+    if options.coverage != "" { match agent_queries.report(k, results) { Ok(data) => { match files.write(options.coverage, json.pretty(data)) { Ok(_) => {}, Err(e) => driver_error(e) } }, Err(e) => driver_error(e) } }
     files.remove(exe)
     files.remove(tmp)
     let n = len(chosen)
@@ -1169,4 +1194,8 @@ fn edits_json(edits: [errors.Edit]) -> Str {
 fn link_flags(path: Str) -> [Str] uses fs, os {
     match packages.link_flags(path) { Ok(flags) => return flags, Err(e) => driver_error(e) }
     return []
+}
+
+fn coverage_program(k: checker.Checked) -> Result[ir.Program, [errors.CompileError]] uses os {
+    match lower.lower_coverage(k) { Ok(p) => { match os.env("VELA_OPT") { Some("0") => return Ok(p), _ => {} }; return Ok(opt.optimize(p)) }, Err(e) => return Err(e) }
 }

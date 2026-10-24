@@ -198,3 +198,7 @@ VELA_CACHE="$PWD/build/cache-m21" python3 bench/run.py --quick --check --languag
 VELA_CACHE="$PWD/build/cache-m21" python3 bench/run.py sha256 crc32 --runs 7 \
     --languages c vela --json bench/after-m21.json
 ```
+
+With the M24 launcher, C examples run or test with explicit permission, for
+example `vela test --allow unsafe examples/ffi/main.vl`. Standalone builds
+retain their trusted execution workflow. See [the M24 policy profile](m24-agent-safety.md).

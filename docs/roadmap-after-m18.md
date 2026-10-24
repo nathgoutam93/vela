@@ -109,6 +109,9 @@ retained views, Bytes, inline fixed arrays, typed arenas and measured C parity.
 
 ## M23: A standard library for systems work
 
+**Status:** implemented; see [the walkthrough](m23-systems-library.md) for
+effect fakes, systems APIs and remaining Linux native/sanitizer validation.
+
 **Needs:** M19, M20 (readers and writers as interfaces), M21 (the OS's calls) and M22 (byte buffers).
 
 **What gets built:** A standard library for systems work: time and clocks (uses clock), Unicode text (UTF-8, code points), TCP and UDP sockets and an HTTP/1.1 client (uses net), processes with pipes, directory walking; every effect with a fake for tests.
@@ -118,6 +121,11 @@ retained views, Bytes, inline fixed arrays, typed arenas and measured C parity.
 **Done when:** An HTTP fetcher and a TCP echo server ship as examples with tests that use fakes; every effect in std has a with fake.
 
 ## M24: Agent safety and queries
+
+**Status:** implemented for the supported macOS C profile, with fail-closed
+limits for unsafe policies. Linux seccomp/Landlock execution acceptance is
+still outstanding. See [the walkthrough](m24-agent-safety.md) and VAL-004 in
+[the tooling backlog](tooling-backlog.md).
 
 **Needs:** M21 (unsafe, to allow or deny) and M23 (net and clock, to enforce).
 

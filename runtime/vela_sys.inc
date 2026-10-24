@@ -173,6 +173,7 @@ static bool sys_clock_read(bool mono,int64_t *out,vela_str *e) {
         return true;
     }
     unlock_fakes();
+    if (!vela_cap_check("clock",VELA_STR("",0),e)) return false;
     struct timespec t;
     if (clock_gettime(mono?CLOCK_MONOTONIC:CLOCK_REALTIME,&t)) return sys_errno(e);
     if (t.tv_sec>INT64_MAX/1000000000 || t.tv_sec<INT64_MIN/1000000000) return sys_error(e,"clock out of nanosecond range");
@@ -202,6 +203,7 @@ bool vela_sys_sleep_ns(int64_t n,vela_unit *o,vela_str *e) {
         return true;
     }
     unlock_fakes();
+    if (!vela_cap_check("clock",VELA_STR("",0),e)) return false;
     struct timespec t= {
         n/1000000000,n%1000000000
     };
@@ -258,6 +260,7 @@ const vela_type vela_type_io_handle= {
 };
 // Called with handle lock held. All fake operations additionally hold fake_lock.
 static bool sys_live(vela_io_handle *h,int kind,vela_str *e) {
+    if (!h->fake && !vela_cap_check("net",VELA_STR("",0),e)) return false;
     if (h->closed) return sys_error(e,"socket is closed");
     if (kind && h->kind!=kind) return sys_error(e,"wrong socket kind");
     if ((h->fake && (!h->fake->active || h->fake!=sys_net)) || (!h->fake && sys_net)) return sys_error(e,"socket does not belong to the active network scope");
@@ -326,6 +329,7 @@ static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io
         return true;
     }
     unlock_fakes();
+    if (!vela_cap_check("net",VELA_STR("",0),e)) {free(name);return false;}
     char service[16];
     snprintf(service,sizeof service,"%lld",(long long)port);
     struct addrinfo hints= {
@@ -760,6 +764,7 @@ bool vela_sys_process(vela_array *args,vela_str input,int64_t limit,int64_t time
         free(argv);
         return ok;
     }
+    if (!vela_cap_process(e)) {for(int64_t i=0;i<args->len;i++)free(argv[i]);free(argv);return false;}
     int pipes[3][2]= {
         {
             -1,-1
@@ -978,6 +983,7 @@ bool vela_sys_kind(vela_str path,int64_t *o,vela_str *e) {
         unlock_fakes();
         return true;
     }
+    if (!vela_cap_check("fs",path,e)) {free(p);return false;}
     struct stat s;
     int r=lstat(p,&s);
     free(p);
@@ -1025,6 +1031,7 @@ bool vela_sys_list(vela_str path,vela_array **o,vela_str *e) {
         vela_str_release(prefix);
         unlock_fakes();
     }else {
+        if (!vela_cap_check("fs",path,e)) {free(p);vela_array_release(out);return false;}
         DIR *d=opendir(p);
         free(p);
         if (!d) {
@@ -1083,6 +1090,7 @@ bool vela_sys_mkdir(vela_str path,vela_unit *o,vela_str *e) {
         unlock_fakes();
         return true;
     }
+    if (!vela_cap_check("fs",path,e)) {free(p);return false;}
     int r=mkdir(p,0777);
     free(p);
     return r==0 || sys_errno(e);

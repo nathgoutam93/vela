@@ -1,0 +1,205 @@
+{
+  "machine": {
+    "cpu": "arm",
+    "cores": 8,
+    "os": "Darwin arm64",
+    "gcc": "Apple clang version 17.0.0 (clang-1700.3.19.1)",
+    "rustc": "",
+    "commit": "de1594b",
+    "date": "2026-10-24"
+  },
+  "runs": 7,
+  "quick": false,
+  "results": {
+    "varints": {
+      "c": {
+        "build": 0.063,
+        "size": 33608,
+        "best": 0.0486,
+        "median": 0.0488
+      },
+      "vela": {
+        "build": 0.089,
+        "size": 134272,
+        "best": 0.0531,
+        "median": 0.0532
+      }
+    },
+    "arena_trees": {
+      "c": {
+        "build": 0.059,
+        "size": 33648,
+        "best": 0.0623,
+        "median": 0.0629
+      },
+      "vela": {
+        "build": 0.084,
+        "size": 134480,
+        "best": 0.0662,
+        "median": 0.0665
+      }
+    },
+    "sha256": {
+      "c": {
+        "build": 0.071,
+        "size": 33896,
+        "best": 0.1322,
+        "median": 0.1325
+      },
+      "vela": {
+        "build": 0.159,
+        "size": 153368,
+        "best": 0.1393,
+        "median": 0.1395
+      }
+    },
+    "crc32": {
+      "c": {
+        "build": 0.057,
+        "size": 33768,
+        "best": 0.3098,
+        "median": 0.3103
+      },
+      "vela": {
+        "build": 0.126,
+        "size": 136488,
+        "best": 0.2834,
+        "median": 0.2836
+      }
+    }
+  },
+  "compiler": {
+    "vela": {
+      "check": 0.09514466597465798,
+      "c": 0.23446179198799655
+    }
+  },
+  "sizes": {
+    "varints": [
+      "262144",
+      "32"
+    ],
+    "arena_trees": [
+      "16"
+    ],
+    "sha256": [
+      "1048576",
+      "32"
+    ],
+    "crc32": [
+      "4194304",
+      "32"
+    ]
+  },
+  "build_identity": {
+    "baseline_commit": "de1594b44dac9375c60c5467776c775b3d3dbdaf",
+    "dirty_worktree": true,
+    "note": "M24 measured before commit; fingerprints identify the compiler/sources. Retain M19/M22 thresholds.",
+    "compiler_sha256": "ceeb4d9162703da3fdb685467275b08f371585dcbe0c7aea5afb1dc1da49f0e3",
+    "source_sha256": {
+      "bench/arena_trees/main.c": "790c8477cee0dc85f9691d660d37df9131a2396c308ca41dd3cf2716176abbd8",
+      "bench/arena_trees/main.rs": "5a6fe7ee4db16c8654e60caa62b66675a266522c88e3990c157f3983f90579c4",
+      "bench/arena_trees/main.vl": "119a5a953a399f31d490c8be0a4d4a6f0abbea92597d2134fb78ea614bc63f46",
+      "bench/crc32/crc32.vl": "940fa4bc09d8d34ab68ac3fe6df50e70981cbec778b472d827deb62b1f558e57",
+      "bench/crc32/main.c": "64bf516e5d8779b1eedc2e1f021988e1b1e1c3fe342c856911728fa3b4ab62db",
+      "bench/crc32/main.rs": "74a089aa854974eeaf33918a7219fbbd26a9db4b4d45e809df8285b07de8887f",
+      "bench/crc32/main.vl": "659c723a12dbaaf51a65f34d887ec4c65db0596c79af9fbc001b2b82cf535dc5",
+      "bench/run.py": "c549458564879b76b0798d73bfe9240f97a7977a02db99464d9428b55940a652",
+      "bench/sha256/main.c": "1b870bbf6256a16fe2288cc52d03ca3165d91796982d670eafaa3237866bd436",
+      "bench/sha256/main.rs": "42ba06a4758adff7ec42a7db64a4dd10dbc8ced5cb4cdf61774dee852bfd7ae4",
+      "bench/sha256/main.vl": "4e2e40e32af28142fd28a32eaabee00c3ec7f209a5ec3e4b26b87e1392c66858",
+      "bench/sha256/sha256.vl": "b6c34fef785be9a10097bf16a3b265b3dfc9a899dd9b33a7a511bf301429fcd3",
+      "bench/varints/main.c": "c17814b48cb1c11279da2d1641c5a84f3362d83b719fbb328a95b8299b119640",
+      "bench/varints/main.rs": "6972054b0f58eb681ec5234991904832106baa63fa23be309c9f5d99c10de584",
+      "bench/varints/main.vl": "04bfc7d67540aa0f8090b52d3e890fc27629d6cea1aa1653dbc401011486162d",
+      "bench/varints/varints.vl": "7ceb978c501c606f14d4ff850945de76d90513406bd239700ec5414d2beeb2bf",
+      "bootstrap/vela1.c": "79885b9adc267872a6470aff67901178ef1cf8a728037a9b0e41bb36138ff722",
+      "runtime/vela_int.h": "e600cfd5cab132401aba9e03b5e4a3c45995c33cbbab7f8b581739a258d74059",
+      "runtime/vela_policy.inc": "8d47496d28ce3c54fb0a9440af339630ead2d18a7db4de8b58c6202c9bb33863",
+      "runtime/vela_rt.c": "c6607cf5489509b7736c237633fd218f4b40a1f9281d019febe1614123c51e3c",
+      "runtime/vela_rt.h": "df712a670f3a07cde70e8aae2403631092350ac6e06eeb1faf3d012cde875154",
+      "runtime/vela_sys.inc": "ae975ea3cd2ff0de26d9630e534891d1befcf091e0b64933695297b71031bba2",
+      "stage1/agent_queries.vl": "9a717de947f1ea4fbf4ad677fa9b6ca731cb15351fb13e59d61ebee84e503bc6",
+      "stage1/ast.vl": "71be5595bf344c9ed88c60276e59789cda435bccc8d19b753b46d68a4fa8b45a",
+      "stage1/call_graph.vl": "07cf773d2aa93e647983787bfcfcbde08a6aed430e8296d4d8aa7017d2ffd18a",
+      "stage1/capabilities.vl": "e2b5001268db73d9ecd5275428d25752e63ae2765404c6bed18adcc1e8dfebad",
+      "stage1/cffi.vl": "ea32c52b095d3b7af33fa03d9b89dea78887a9bcf98b90a68f81288669df059f",
+      "stage1/chars.vl": "c42a95f8a5cb41d535981094761ccd447db7eb643ba40a8449b3504e7e7652d9",
+      "stage1/checker.vl": "419169f6522c818012932a7b885246ac53f6eeb8ca68422e24322d1cf365f072",
+      "stage1/codegen.vl": "06606852dff2e83bfc814541696c00a134583bfb2dbda89ab9cb4827996211be",
+      "stage1/complete.vl": "9be671eabb5bf04851362dcd26ff8ca88c630199dfc7dd5e26df9959aab543f9",
+      "stage1/diagnostics.vl": "49c10e8e6c75c0e356aa454946f101007ea117380edee91f320dea01f0b8b94c",
+      "stage1/errors.vl": "2a31eea563f9ea1b591e700955c82c1ee887bd24b4797bb7c9eb3d5d733a8e27",
+      "stage1/fixer.vl": "7370240f796cc19c3e6b38f0e03dc66061d0e6343154f29b31e7a7d9ac87a2a8",
+      "stage1/format.vl": "d8a7a58a851aa909e1e7818a8850888c11998c25c8eee56915cad77c93b5baf0",
+      "stage1/guide.vl": "6087d61ce1fe3c26d2f363398708a52c4c7b3e243d78b73e73f0ee34eed293d7",
+      "stage1/index.vl": "a20818022208522a8e3b6816269d33fe7540f5c799e992f6ec7727cba9886566",
+      "stage1/integers.vl": "8a580cd712b592475ea30bb4fd06ce61dc033c1183ebb77cad55a7b5b9865012",
+      "stage1/interfaces.vl": "990c820ed20895079cc23b0a926d935f32844d30919da49fb91d8f8875af110f",
+      "stage1/ir.vl": "699a95e9e1bd2df73c3607e2101e41899a364d5dca14bded99b8bf691cfdfdd0",
+      "stage1/layout.vl": "2556147fbf66b348ec4b5b00926fdabc0c32b4030f4bd88598ce7eaee5e16b24",
+      "stage1/lexer.vl": "b253ef64ffe1a5e5f8466e666c8379010eba177c28d2a619d7a6d666ebfcc2e3",
+      "stage1/lower.vl": "aab528f03cd1ea6d730bdcede5e7799c3c14204c8278d27273c301bf93d8ae15",
+      "stage1/lsp.vl": "4c5d880e580b92557dfffcd9eabf6fccc7c3d78130b83148e58c42ef1b1d5ead",
+      "stage1/main.vl": "15c4b0c99e487de3e327ee280daff8bc8646ddc564d32b62f5f2a7df61411782",
+      "stage1/match_check.vl": "e91be1b1bf88c868bba3b5c986d66834688dc1f626922357d594d781ba4bc8b5",
+      "stage1/memops.vl": "938eae0dd685ef057699207b39b259d9ea74604b248e0bbff70e2c69eb1c97ad",
+      "stage1/modules.vl": "309c848045975d0d8fa0626ff460416e6625e6436c1aefd341c35b911d787056",
+      "stage1/mono.vl": "be0e0e52218cdf2bf99abc8677c39657992b491cd3d036e90de3894d3bd54265",
+      "stage1/opt.vl": "65d860166f4791578a801eda33c823db04a3005a1f48f3bd3a975b223cf8e7b9",
+      "stage1/packages.vl": "de2a8e6e42c907b3bbb3a69d9ddef328dfdacdd4c544cd2033f06cf0505ae1f2",
+      "stage1/parser.vl": "e714ee9ed7889b9ba33b4878d56e2a6cd432597d904d603e00e1c3ec6bd9f3c7",
+      "stage1/query.vl": "9500415ec2af12c43021b1a959b11e580f1c5e47c95585ff7c73df23df140dae",
+      "stage1/ranges.vl": "b5dd510f6e158ca00ba1312b3e1ed016fc508bfed81bacdb32675af5e69bcd3b",
+      "stage1/rename.vl": "c419d39210d1939fcf8185054890100c14562d3c38b41b0438304290a8d3dfe8",
+      "stage1/repairs.vl": "0583b8d36f2795b67e581d504264f6ee15cf2ab19847fa180217190192ee7050",
+      "stage1/sysops.vl": "20146b0bc85754a714d3b38a15fa0bd1bce05543b9567c0399a64d2e07a7270d",
+      "stage1/types.vl": "9c05be4ca1308fe027dff7ac5577e93a964fd2e8f9ff307b3a058266cb6a54fa",
+      "stage1/unsafe_query.vl": "08450ad03a8d7f7e6acd5e8e93e52e6156e70bbd50cfa2886e7d0c78c0a9007f",
+      "stage1/x64.vl": "a9689a504c4cf9d02805c079e5d11e5c4ce7045399978e32f2cf3f95e54ec24c",
+      "std/arenas.vl": "7712c21cd8f2c734be19a0cfe266242b4db4e8d352e48facf8f26678fb340c5e",
+      "std/buffers.vl": "d5f89c0c7efa5a137a6fdc111733aebbba30a82776f6f229b648307339191854",
+      "std/bytes.vl": "2a893336976e500559bd2684d211454bb70226423e53c6f9550911988510d6cc",
+      "std/http.vl": "6e67ba10da0a2d8611943757fa0317251d2fea063f4a3864f8ae34fb27a9889e",
+      "std/io.vl": "c258a1047ca0dbc3038a5cb6f85be8c422c15e526dc5db3b5e5f607968c412c4",
+      "std/lists.vl": "dfbc5cf2b06d0b26af0e6e312da5024fb0dd8bba774df005d592712f47996f59",
+      "std/net.vl": "7e39b15bbb0fe1f61f575d55c7552997c20c5cf756460c8aaa75209e720050cb",
+      "std/paths.vl": "0e46f2ae7b152f3127c156279c53662477955d9f037c4334df50937384919812",
+      "std/processes.vl": "cbdb77e8000a706444b415499cbe08109626348f930db25177f5d08c7c28d92e",
+      "std/text.vl": "8e3fcd808bfd5d8f8e4f0028e0043850a85173b50c78aaf3d4410e1df0f95bfa",
+      "std/time.vl": "c2183e86f32cc9d10857e0ef606a1e056789938cd0f91d4862d8afa4b7f8c4d5",
+      "std/unicode.vl": "0870ced2fd92f50a354ebe193a663ff7a962d4bf91b24da4c7bd1fb884fec158",
+      "std/views.vl": "63b6c03f6b0c9e3954cef246c2f9e869dc53ac244fe8057168ab40b14188a314"
+    }
+  },
+  "quick_output_check": {
+    "benchmarks": 12,
+    "languages": [
+      "c",
+      "vela"
+    ],
+    "passed": true
+  },
+  "acceptance": {
+    "varints": {
+      "vela_over_c": 1.0925925925925928,
+      "limit": 1.1,
+      "passed": true
+    },
+    "arena_trees": {
+      "vela_over_c": 1.0626003210272872,
+      "limit": 1.1,
+      "passed": true
+    },
+    "sha256": {
+      "vela_over_c": 1.0537065052950074,
+      "limit": 1.2,
+      "passed": true
+    },
+    "crc32": {
+      "vela_over_c": 0.9147837314396384,
+      "limit": 1.2,
+      "passed": true
+    }
+  }
+}

@@ -1,0 +1,37 @@
+// Driver policy parsing and conservative unsafe admission, before compilation.
+import call_graph
+import checker
+import json
+import os
+import packages
+import strings
+import text
+pub type Options = struct { allow: [Str], deny: [Str], rest: [Str], coverage: Str }
+pub fn parse(args: [Str], testing: Bool) -> Options uses os {
+    let mut allow: [Str] = []; let mut deny: [Str] = []; let mut coverage = ""; let mut i = 0
+    for i < len(args) {
+        let option = args[i]; if option == "--" { i = i + 1; break }
+        if option != "--allow" && option != "--deny" && option != "--coverage" { break }
+        if i + 1 >= len(args) { fail("missing value after " + option) }; let value = args[i + 1]; i = i + 2
+        if option == "--coverage" { if !testing || coverage != "" || value == "" { fail("--coverage REPORT is available once on test") }; coverage = value; continue }
+        if !valid(value, option == "--allow") { fail("invalid capability '" + value + "'; use fs[:PATH], os, net, clock or unsafe") }
+        if option == "--allow" { push(mut allow, value) } else { push(mut deny, value) }
+    }
+    if i >= len(args) { fail("missing source file") }
+    return Options { allow: allow, deny: deny, rest: args[i..len(args)], coverage: coverage }
+}
+fn valid(value: Str, allow: Bool) -> Bool {
+    if value == "fs" || value == "os" || value == "net" || value == "clock" || value == "unsafe" { return true }
+    return allow && text.starts_with(value, "fs:") && len(value) > 3
+}
+pub fn fail(message: Str) uses os { os.eprint("vela: " + message + " [E6010]"); os.exit(1) }
+pub fn unsafe_allowed(options: Options) -> Bool {
+    let mut allowed = false; for value in options.allow { if value == "unsafe" { allowed = true } }; for value in options.deny { if value == "unsafe" { allowed = false } }; return allowed
+}
+pub fn admit(k: checker.Checked, options: Options, libraries: [Str], testing: Bool) uses os {
+    if unsafe_allowed(options) { return }
+    let g = call_graph.build(k)
+    for i in 0..len(k.fns) { if !testing && k.fns[i].is_test { continue }; if g.unsafe[i] { fail("unsafe code in '" + k.fns[i].decl.name + "' requires --allow unsafe (including audited wrappers)") } }
+    // Foreign constructors can execute before any Vela function is entered.
+    if len(libraries) > 0 { fail("linked C libraries require --allow unsafe") }
+}

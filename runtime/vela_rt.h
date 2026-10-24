@@ -640,6 +640,16 @@ void vela_fake_net_restore(void *);
 void *vela_fake_processes(vela_array *);
 void vela_fake_processes_restore(void *);
 
+// Run-policy boundary. Empty path selects a non-filesystem capability.
+bool vela_cap_check(const char *effect, vela_str path, vela_str *error);
+void vela_cap_require(const char *effect);
+bool vela_cap_process(vela_str *error);
+void vela_policy_init(int argc, char **argv);
+bool vela_sys_sandbox_run(vela_array *, vela_array *, vela_array *, int64_t *, vela_str *);
+bool vela_sys_canonical(vela_str, vela_str *, vela_str *);
+void vela_coverage_begin(int argc, char **argv, int64_t count);
+void vela_coverage_hit(int64_t id);
+
 #include "vela_int.h"
 
 #endif

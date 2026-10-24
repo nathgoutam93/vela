@@ -25,6 +25,8 @@ class Checks:
 
     def run(self, *args: str, cwd: Path | None = None, code: int = 0,
             env: dict[str, str] | None = None, executable: str | None = None):
+        if args and args[0] == 'test':
+            args = ('test', '--allow', 'unsafe', *args[1:])  # trusted reference/guide fixtures
         result = subprocess.run([executable or str(self.compiler), *args], cwd=cwd or self.base,
                                 env=env or self.env, capture_output=True, text=True, timeout=120)
         assert result.returncode == code, (args, result.returncode, result.stdout, result.stderr)

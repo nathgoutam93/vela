@@ -457,7 +457,9 @@ fn type_param_text(p: ast.TypeParam) -> Str {
 }
 
 // The whole declaration, a member a line, up to a screenful of them.
-pub fn type_detail(t: ast.TypeDecl) -> Str {
+pub fn type_detail(t: ast.TypeDecl) -> Str { return type_detail_limit(t, 30) }
+pub fn full_type_detail(t: ast.TypeDecl) -> Str { return type_detail_limit(t, -1) }
+fn type_detail_limit(t: ast.TypeDecl, limit: Int) -> Str {
     let mut s = strings.builder()
     if t.public {
         strings.add(mut s, "pub ")
@@ -481,7 +483,7 @@ pub fn type_detail(t: ast.TypeDecl) -> Str {
         }
     }
     for i in 0..len(lines) {
-        if i == 30 {
+        if i == limit {
             strings.add(mut s, "\n    // ...")
             break
         }

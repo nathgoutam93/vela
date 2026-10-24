@@ -158,6 +158,11 @@ strict UTF-8/code-point helpers, subprocess pipes, directory walking and
 reader/writer interfaces. Network, clock and process fakes keep their examples
 and library clients deterministic in tests. See
 [`docs/m23-systems-library.md`](docs/m23-systems-library.md).
+M24 adds runtime permission policies for run/test, explicit unsafe admission,
+OS enforcement, and JSON summary/impact/coverage queries. `vela test --coverage`
+records measured entries; coverage queries distinguish those from potential
+static reachability. See [`docs/m24-agent-safety.md`](docs/m24-agent-safety.md)
+for command syntax, policy defaults, and platform limits.
 What comes next, toward a systems language that is also agent-first, is in
 [`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
 See `docs/` for a walkthrough of each milestone.

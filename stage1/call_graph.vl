@@ -1,0 +1,89 @@
+// Conservative whole-program dependencies; static potential is never a hit count.
+import ast
+import cffi
+import checker
+import maps
+import sysops
+import types
+pub type Candidate = struct { ty: Int, owner: Int }
+pub type Site = struct { ty: Int, owner: Int }
+pub type Graph = struct {
+    k: checker.Checked, owner: Int, edges: [[Int]], reverse: [[Int]], effects: [[Str]],
+    unsafe: [Bool], uncertain: [Bool], values: [Candidate], indirect: [Site]
+}
+pub fn build(k: checker.Checked) -> Graph {
+    let mut g = Graph { k: k, owner: 0, edges: [], reverse: [], effects: [], unsafe: [], uncertain: [], values: [], indirect: [] }
+    for f in k.fns {
+        push(mut g.edges, []); push(mut g.reverse, []); push(mut g.effects, f.decl.effects)
+        let mut raw = f.decl.foreign != ""; for e in f.decl.effects { if e == "unsafe" { raw = true } }
+        push(mut g.unsafe, raw); push(mut g.uncertain, false)
+    }
+    for i in 0..len(k.fns) { g.owner = i; let f = k.fns[i].decl; for e in f.requires { expr(mut g, e) }; for e in f.ensures { expr(mut g, e) }; block(mut g, f.body) }
+    for site in g.indirect {
+        let mut matched = false
+        for value in g.values { if compatible(k.table, site.ty, value.ty) { edge(mut g, site.owner, value.owner); matched = true } }
+        if !matched { g.uncertain[site.owner] = true }
+    }
+    for i in 0..len(g.edges) { for target in g.edges[i] { push(mut g.reverse[target], i) } }
+    return g
+}
+pub fn reach(g: Graph, seeds: [Int], backwards: Bool) -> [Bool] {
+    let mut seen: [Bool] = []; for _ in g.edges { push(mut seen, false) }
+    let mut queue: [Int] = []; for seed in seeds { if seed >= 0 && seed < len(seen) && !seen[seed] { seen[seed] = true; push(mut queue, seed) } }
+    let mut i = 0; for i < len(queue) { let at = queue[i]; i = i + 1; let mut next = g.edges[at]; if backwards { next = g.reverse[at] }; for n in next { if !seen[n] { seen[n] = true; push(mut queue, n) } } }; return seen
+}
+fn edge(g: mut Graph, owner: Int, target: Int) { if target < 0 || target >= len(g.edges) { return }; for old in g.edges[owner] { if old == target { return } }; push(mut g.edges[owner], target) }
+fn compatible(t: types.Table, a: Int, b: Int) -> Bool {
+    if a == b { return true }; if a < 0 || b < 0 { return false }; if types.is_param(t, a) || types.is_param(t, b) { return true }
+    let x = types.get(t, a); let y = types.get(t, b)
+    if x.tag != y.tag || x.name != y.name || x.module != y.module || x.origin != y.origin || len(x.args) != len(y.args) { return false }
+    for i in 0..len(x.args) { if !compatible(t, x.args[i], y.args[i]) { return false } }
+    return x.result == y.result || compatible(t, x.result, y.result)
+}
+fn block(g: mut Graph, b: ast.Block) { for s in b.stmts { stmt(mut g, s) } }
+fn stmt(g: mut Graph, s: ast.Stmt) {
+    match s.kind {
+        ast.StmtKind.Block(b) => block(mut g, b), ast.StmtKind.Unsafe(b) => block(mut g, b),
+        ast.StmtKind.ExprStmt(e) => expr(mut g, e), ast.StmtKind.Let(_, _, _, e) => expr(mut g, e),
+        ast.StmtKind.Assign(a, b) => { expr(mut g, a); expr(mut g, b) },
+        ast.StmtKind.If(e, b, other) => { expr(mut g, e); block(mut g, b); match other { ast.Else.NoElse => {}, ast.Else.ElseBlock(b) => block(mut g, b), ast.Else.ElseIf(s) => stmt(mut g, s) } },
+        ast.StmtKind.For(e, b) => { match e { Some(e) => expr(mut g, e), None => {} }; block(mut g, b) },
+        ast.StmtKind.ForRange(_, a, b, body) => { expr(mut g, a); expr(mut g, b); block(mut g, body) },
+        ast.StmtKind.ForEach(_, e, b) => { expr(mut g, e); block(mut g, b) },
+        ast.StmtKind.Return(e) => { match e { Some(e) => expr(mut g, e), None => {} } },
+        ast.StmtKind.MatchStmt(e, values) => arms(mut g, e, values),
+        ast.StmtKind.With(items, b) => { for item in items { expr(mut g, item.value) }; block(mut g, b) }, _ => {}
+    }
+}
+fn arms(g: mut Graph, e: ast.Expr, values: [ast.Arm]) { expr(mut g, e); for arm in values { match arm.body { ast.ArmBody.Value(e) => expr(mut g, e), ast.ArmBody.Do(s) => stmt(mut g, s) } } }
+fn method(g: mut Graph, t: Int, name: Str) {
+    let direct = checker.method(g.k, t, name); if direct.fn_id >= 0 { edge(mut g, g.owner, direct.fn_id); return }
+    if !types.is_param(g.k.table, t) { return }; let mut found = false
+    for i in 0..len(g.k.fns) { let f = g.k.fns[i]; if len(f.params) == 0 { continue }; let n = f.decl.name; let mut matches = n == name
+        for j in 0..len(n) { if n[j] == '.' && n[j + 1..len(n)] == name { matches = true } }
+        if matches { edge(mut g, g.owner, i); found = true }
+    }; if !found { g.uncertain[g.owner] = true }
+}
+fn effect(g: mut Graph, name: Str) { g.effects[g.owner] = types.union_effects(g.effects[g.owner], [name]); if name == "unsafe" { g.unsafe[g.owner] = true } }
+fn builtin(g: mut Graph, name: Str) {
+    if len(name) > 2 && name[0..2] == "c." && cffi.hazardous(name[2..len(name)]) { effect(mut g, "unsafe") }
+    if len(name) > 6 && (name[0..6] == "sysio." || name[0..6] == "clock.") { effect(mut g, sysops.effect(name[6..len(name)])) }
+    if len(name) > 6 && name[0..6] == "files." { effect(mut g, "fs") }
+    if name == "os.args" || name == "os.env" || name == "os.run" || name == "os.output" || name == "os.read_line" || name == "os.read" || name == "os.executable" || name == "os.exit" { effect(mut g, "os") }
+}
+fn expr(g: mut Graph, e: ast.Expr) {
+    match g.k.refs[e.id] {
+        checker.Ref.Function(id) => { edge(mut g, g.owner, id); if types.is_func(g.k.table, g.k.ty[e.id]) { push(mut g.values, Candidate { ty: g.k.ty[e.id], owner: id }) } },
+        checker.Ref.Method(t, name) => method(mut g, t, name), checker.Ref.Builtin(name) => builtin(mut g, name),
+        checker.Ref.Indirect => { match e.kind { ast.ExprKind.Call(callee, _) => { let t = g.k.ty[callee.id]; push(mut g.indirect, Site { ty: t, owner: g.owner }); for e in types.effects_of(g.k.table, t) { effect(mut g, e) } }, _ => {} } }, _ => {}
+    }
+    match e.kind {
+        ast.ExprKind.Unary(_, e) => expr(mut g, e), ast.ExprKind.Binary(_, a, b) => { expr(mut g, a); expr(mut g, b) },
+        ast.ExprKind.Call(f, args) => { expr(mut g, f); for a in args { expr(mut g, a) } }, ast.ExprKind.Field(e, _) => expr(mut g, e),
+        ast.ExprKind.Index(a, b) => { expr(mut g, a); expr(mut g, b) }, ast.ExprKind.Slice(a, b, c) => { expr(mut g, a); expr(mut g, b); expr(mut g, c) },
+        ast.ExprKind.Try(e) => expr(mut g, e), ast.ExprKind.MutArg(e) => expr(mut g, e), ast.ExprKind.ArrayLit(es) => { for e in es { expr(mut g, e) } },
+        ast.ExprKind.MapLit(es) => { for e in es { expr(mut g, e.key); expr(mut g, e.value) } }, ast.ExprKind.StructLit(_, _, fields) => { for f in fields { expr(mut g, f.value) } },
+        ast.ExprKind.Match(e, values) => arms(mut g, e, values),
+        ast.ExprKind.Closure(_, _, body, _) => { push(mut g.values, Candidate { ty: g.k.ty[e.id], owner: g.owner }); block(mut g, body) }, _ => {}
+    }
+}

@@ -31,10 +31,10 @@ QUESTIONS = [
     ("Rename it without changing what any other name means", "yes", "vela query rename"),
     ("What is declared in this file?", "yes", "vela query symbols"),
     ("What does this function touch and promise?", "yes", "vela query type: signature with uses, requires, ensures"),
-    ("Who calls this function?", "partly", "refs lists the uses, not the functions they are in"),
-    ("What is this module's public API?", "partly", "symbols lists one file, private names too"),
-    ("Which tests cover this function?", "no", ""),
-    ("What breaks if I change this signature?", "no", ""),
+    ("Who calls this function?", "partly", "query impact lists conservative transitive dependents, including possible indirect callers"),
+    ("What is this module's public API?", "yes", "vela query summary: public signatures, effects, contracts and types"),
+    ("Which tests cover this function?", "yes", "vela query coverage TARGET --report REPORT uses measured Vela entry hits; without a report it lists static possibilities"),
+    ("What breaks if I change this signature?", "partly", "vela query impact lists potential dependencies; the proposed signature still needs type checking"),
     ("What does this error mean, and how do I fix it?", "yes", "vela explain CODE; vela check --json includes edits; vela fix applies them"),
 ]
 

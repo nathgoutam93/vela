@@ -23,6 +23,7 @@
 // A question with no answer (no name at that position, or a file that
 // does not parse) prints {"error": "..."} and exits with 1.
 import ast
+import agent_queries
 import unsafe_query
 import checker
 import errors
@@ -114,10 +115,21 @@ pub fn program_completing(path: Str, std_dir: Str, open: Map[Str, Str], completi
 }
 
 pub fn command(args: [Str], std_dir: Str) uses fs, os {
-    if len(args) != 2 {
-        usage()
-    }
+    if len(args) != 2 && !(len(args) == 4 && args[0] == "coverage" && args[2] == "--report") { usage() }
     let what = args[0]
+    if what == "summary" || what == "impact" || what == "coverage" {
+        let mut path = args[1]; let mut line = 0; let mut col = 0
+        if what != "summary" { match position(args[1]) { Some(p) => { path = p.path; line = p.line; col = p.col }, None => {} } }
+        let analysis = load(path, std_dir)
+        if len(analysis.errors) > 0 { for e in analysis.errors { if !e.warning { fail(errors.render(e)) } } }
+        let k = checked(analysis)
+        let mut result: Result[json.Json, Str] = Err("unknown query")
+        if what == "summary" { result = agent_queries.summary(k, path) }
+        if what == "impact" { result = agent_queries.impact(k, path, line, col) }
+        if what == "coverage" { let mut report = ""; if len(args) == 4 { report = args[3] }; result = agent_queries.coverage(k, path, line, col, report) }
+        match result { Ok(value) => print(json.pretty(value)), Err(e) => fail(e) }
+        return
+    }
     if what == "unsafe" {
         print(json.pretty(unsafe_query.report(checked(load(args[1], std_dir)))))
         return
@@ -180,7 +192,7 @@ pub fn command(args: [Str], std_dir: Str) uses fs, os {
 
 fn usage() uses os {
     os.eprint("usage: vela query (type | def | refs | complete) FILE:LINE:COL, vela query rename FILE:LINE:COL NEW, " +
-        "or vela query (symbols | unsafe) FILE")
+        "or vela query (symbols | unsafe | summary) FILE, vela query (impact | coverage) FILE[:LINE:COL] [--report REPORT]")
     os.exit(2)
 }
 

@@ -116,6 +116,7 @@ type Low = struct {
     cstrs: Map[Str, Str]  // the label of each C string
     made: Map[Str, Bool]  // functions written on demand (wrappers, thunks), by symbol
     descs: Map[Int, Str]  // descriptors written, by type
+    coverage: Bool
 }
 
 fn new_fn(name: Str, result: Int) -> Fn {
@@ -129,7 +130,9 @@ fn new_fn(name: Str, result: Int) -> Fn {
 
 // The IR of a program, or of `vela test`'s program (`for_tests`), or the
 // errors only making the generic copies finds.
-pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] {
+pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] { return lower_mode(checked, for_tests, false) }
+pub fn lower_coverage(checked: checker.Checked) -> Result[ir.Program, [errors.CompileError]] { return lower_mode(checked, true, true) }
+fn lower_mode(checked: checker.Checked, for_tests: Bool, coverage: Bool) -> Result[ir.Program, [errors.CompileError]] {
     let mut k = checker.erased(checked)
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
@@ -167,7 +170,7 @@ pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [e
     let l = layout.new_layout(k.table, user_types, elements)
     let mut g = Low {
         k: k, l: l, shapes: [:], instance_names: [:], fs: new_fn("", -1), funcs: [], data: [], strs: [:], cstrs: [:],
-        made: [:], descs: [:],
+        made: [:], descs: [:], coverage: coverage,
     }
     // The copies of generic functions are named as codegen.vl names them.
     let mut taken: Map[Str, Bool] = [:]
@@ -231,6 +234,7 @@ fn entry(g: mut Low, for_tests: Bool, tests: [Int]) {
         finish(mut g)
         return
     }
+    if g.coverage { ccall(mut g, "vela_coverage_begin", [argc, argv, konst(mut g, len(g.k.fns))], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }
     let n = reg(mut g, ir.INT())
     emit(mut g, ir.inst(ir.Op.Sext32, n, argc, -1, 0))
     let which = reg(mut g, ir.INT())
@@ -1369,6 +1373,7 @@ fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
         let t = local_ty(g, lid)
         param_local(mut g, lid, t, f.decl.params[i].mutable)
     }
+    if g.coverage { ccall(mut g, "vela_coverage_hit", [konst(mut g, id)], [ir.KIND_INT()], ir.RET_NONE(), -1) }
     for r in f.decl.requires {
         push_frame(mut g, "stmt")
         assert_code(mut g, r, r, "requires of '" + f.decl.name + "'")

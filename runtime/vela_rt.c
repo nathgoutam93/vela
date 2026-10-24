@@ -1,4 +1,7 @@
 // os.run needs POSIX (fork, exec, wait), which -std=c11 alone hides.
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
 #define _POSIX_C_SOURCE 200809L
 #if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
 #define _DARWIN_C_SOURCE
@@ -856,6 +859,7 @@ static char **saved_argv;
 
 // Ask the OS, rather than argv[0]: callers may use PATH or a symlink.
 vela_str vela_os_executable(void) {
+    vela_cap_require("os");
     size_t cap = 256;
     for (;;) {
         char *buffer = vela_alloc(cap);
@@ -895,6 +899,7 @@ void vela_init(int argc, char **argv) {
     if (!isatty(STDOUT_FILENO)) setvbuf(stdout, output_buffer, _IOFBF, sizeof output_buffer);
     saved_argc = argc;
     saved_argv = argv;
+    vela_policy_init(argc, argv);
 }
 
 vela_array *vela_os_args(void) {
@@ -902,6 +907,7 @@ vela_array *vela_os_args(void) {
         vela_array_retain(fake_args);
         return fake_args;
     }
+    vela_cap_require("os");
     vela_array *a = vela_array_new(&vela_type_str, saved_argc);
     for (int i = 0; i < saved_argc; i++) {
         // argv lives as long as the program, so its strings need no object,
@@ -913,6 +919,7 @@ vela_array *vela_os_args(void) {
 }
 
 void vela_os_exit(int64_t code, const char *loc) {
+    vela_cap_require("os");
     if (code < 0 || code > 255) vela_panic(loc, "exit code must be 0 to 255");
     fflush(stdout);
     fflush(stderr);
@@ -962,6 +969,7 @@ bool vela_files_read(vela_str path, vela_str *out) {
         }
         return true;
     }
+    if (!vela_cap_check("fs", path, out)) return false;
     char *p = c_path(path);
     if (!p) {
         *out = file_error("cannot read", path, "the path contains a zero byte");
@@ -1011,6 +1019,7 @@ bool vela_files_write(vela_str path, vela_str data, vela_str *err) {
         unlock_fakes();
         return true;
     }
+    if (!vela_cap_check("fs", path, err)) return false;
     char *p = c_path(path);
     if (!p) {
         *err = file_error("cannot write", path, "the path contains a zero byte");
@@ -1078,6 +1087,7 @@ bool vela_files_remove(vela_str path, vela_str *err) {
         *err = file_error("cannot remove", path, strerror(ENOENT));
         return false;
     }
+    if (!vela_cap_check("fs", path, err)) return false;
     char *p = c_path(path);
     if (!p) {
         *err = file_error("cannot remove", path, "the path contains a zero byte");
@@ -1108,6 +1118,7 @@ bool vela_files_temp_dir(vela_str *out) {
     }
     const char *base = getenv("TMPDIR");
     if (!base || !*base) base = "/tmp";
+    if (!vela_cap_check("fs", VELA_STR(base, (int64_t)strlen(base)), out)) return false;
     size_t n = strlen(base) + 20;
     char *dir = vela_alloc(n);
     snprintf(dir, n, "%s/vela-XXXXXX", base);
@@ -1144,6 +1155,7 @@ static bool sys_legacy_process(vela_array *, int64_t *, vela_str *, vela_str *, 
 static bool run_program(vela_array *command, int64_t *code, vela_str *err, vela_str *captured) {
     bool handled=false;bool fake_ok=sys_legacy_process(command,code,err,captured,&handled);
     if(handled)return fake_ok;
+    if (!vela_cap_process(err)) return false;
     if (command->len == 0) {
         *err = str_from("os.run needs a program to run", 29);
         return false;
@@ -1314,6 +1326,7 @@ bool vela_os_read_line(vela_str *out) {
         unlock_fakes();
         return more;
     }
+    vela_cap_require("os");
     fflush(stdout);
     size_t cap = 128, len = 0;
     char *buf = vela_alloc(cap);
@@ -1345,6 +1358,7 @@ vela_str vela_os_read(int64_t n, const char *loc) {
         unlock_fakes();
         return s;
     }
+    vela_cap_require("os");
     fflush(stdout);
     vela_strobj *obj = vela_alloc(sizeof(vela_strobj) + (size_t)n);
     obj->rc = 1;
@@ -1378,6 +1392,7 @@ bool vela_os_env(vela_str name, vela_str *out) {
         vela_str_retain(*out);
         return true;
     }
+    vela_cap_require("os");
     char *n = c_path(name);
     if (!n) return false;
     const char *v = getenv(n);
@@ -1751,3 +1766,5 @@ int64_t vela_memory_signed(uint64_t bits, int64_t width, const char *loc) {
 }
 
 #include "vela_sys.inc"
+
+#include "vela_policy.inc"

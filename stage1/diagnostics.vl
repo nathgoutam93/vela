@@ -3,6 +3,8 @@ pub type Entry = struct { code: Str, message: Str, help: Str }
 
 pub fn all() -> [Entry] {
     return [
+        Entry { code: "E6010", message: "A capability was denied or a run/test permission rule is invalid.", help: "Put --allow/--deny flags before FILE. Unsafe code and C libraries require --allow unsafe, including audited wrappers. --allow fs:PATH narrows access to existing canonical roots; deny wins. Pure fakes remain usable. macOS deny net also disables native process launches and cannot be combined with unsafe; use Linux for that combination." },
+        Entry { code: "E6011", message: "The OS sandbox or instrumentation setup failed.", help: "The program is not run without its requested restrictions. Filesystem restrictions on Linux require Landlock ABI 3 or newer; unsupported platforms or nested macOS sandboxes fail closed. Check the stated OS error and existing canonical roots. Never treat a setup failure as proof that user code ran safely." },
         Entry { code: "E3190", message: "An interface was used as a value type.", help: "Use the interface as a generic bound, as in fn render[T: Show](value: T). Interface dispatch is static; there are no runtime interface values." },
         Entry { code: "E3191", message: "An interface signature is invalid.", help: "Use immutable parameters with Self first, an optional result and concrete fs/os/net/clock/unsafe effects. Interface signatures have no bodies, contracts or method type parameters." },
         Entry { code: "E3192", message: "Interface methods have duplicate or conflicting signatures.", help: "Declare each method once. Inherited methods with the same name must have matching parameter, result and effect types." },
