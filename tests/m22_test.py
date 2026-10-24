@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """M22 inline values, retained views, byte/varint oracles and arena lifetimes."""
 from pathlib import Path
+from hosts import native_supported
 import json
 import os
 import platform
@@ -36,7 +37,7 @@ def cross(c, work, env, p):
         return
     for opt in ('1', '0'):
         s = work/'case.s'
-        s.write_text(command(c, {**env, 'VELA_OPT':opt}, 'asm', p).stdout)
+        s.write_text(command(c, {**env, 'VELA_OPT':opt}, 'asm', '--target', 'x86_64-unknown-linux-gnu', p).stdout)
         r = subprocess.run(['clang', '--target=x86_64-unknown-linux-gnu', '-c', str(s), '-o', str(work/'case.o')], capture_output=True, text=True, timeout=60)
         assert r.returncode == 0, r.stderr
 
@@ -236,7 +237,7 @@ def main():
         env.pop('VELA_ROOT',None)
         for test in (fixed,buffers,lifetime,panics,rejected,varints,tooling):
             test(c,work,env);print('m22:',test.__name__,'passed',flush=True)
-        if platform.system()=='Linux' and platform.machine()=='x86_64':
+        if native_supported():
             for opt in ('1','0'):
                 for test in (fixed,buffers,lifetime,panics,varints):test(c,work,{**env,'VELA_BACKEND':'native','VELA_OPT':opt})
                 print('m22: native optimization',opt,'passed',flush=True)

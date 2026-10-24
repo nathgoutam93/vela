@@ -649,6 +649,8 @@ bool vela_sys_sandbox_run(vela_array *, vela_array *, vela_array *, int64_t *, v
 bool vela_sys_canonical(vela_str, vela_str *, vela_str *);
 void vela_coverage_begin(int argc, char **argv, int64_t count);
 void vela_coverage_hit(int64_t id);
+void vela_native_rc_inc(int64_t *rc);
+bool vela_native_rc_dec(int64_t *rc);
 
 #include "vela_int.h"
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """M24 OS capability boundaries, agent queries and measured test coverage."""
 from pathlib import Path
+from hosts import native_supported
 import hashlib
 import json
 import os
@@ -198,7 +199,7 @@ test "other"{assert(true)}
     if shutil.which('clang'):
         # Core managed/foreign policy calls and coverage lower for both modes.
         for opt in ('1','0'):
-            asm=command(c,{**env,'VELA_OPT':opt},'asm',p).stdout;(w/'case.s').write_text(asm)
+            asm=command(c,{**env,'VELA_OPT':opt},'asm','--target','x86_64-unknown-linux-gnu',p).stdout;(w/'case.s').write_text(asm)
             subprocess.run(['clang','--target=x86_64-unknown-linux-gnu','-c',str(w/'case.s'),'-o',str(w/'case.o')],check=True,capture_output=True)
 
 def cache(c,w,env):
@@ -210,7 +211,7 @@ def cache(c,w,env):
 
 def main():
     c=Path(sys.argv[1] if len(sys.argv)>1 else ROOT/'build/vela').resolve();backends=['c']
-    if platform.system()=='Linux' and platform.machine()=='x86_64':backends.append('native')
+    if native_supported():backends.append('native')
     with tempfile.TemporaryDirectory(prefix='vela-m24-') as td:
         for backend in backends:
             w=Path(td)/backend;w.mkdir();env={**os.environ,'VELA_BACKEND':backend,'VELA_CACHE':str(w/'cache')};env.pop('VELA_ROOT',None)

@@ -3,6 +3,9 @@
 Status: implementation complete for the supported macOS ARM64 C profile;
 Linux kernel and native execution validation remains outstanding (VAL-004 and
 VAL-001). Unsupported policy combinations fail before user code runs.
+[M26a](m26a-macos-arm64.md) subsequently validates the same strict policy
+profile through the macOS ARM64 native backend, optimized and unoptimized.
+The measurements below retain the original M24 implementation evidence.
 
 ## Run and test permissions
 

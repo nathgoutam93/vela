@@ -6,7 +6,9 @@ execution and broader sanitizer validation remain in VAL-001.
 `import c` provides C scalar aliases and the nominal raw types c.Ptr (object
 pointer) and c.Fn (function pointer). The initial ABI profile is LP64 POSIX:
 32-bit int, 64-bit long/size_t/pointers, IEEE binary32/binary64. The C backend
-runs on macOS ARM64 and Linux x86-64; the native backend emits Linux x86-64.
+runs on macOS ARM64 and Linux x86-64. The native backend emits Linux x86-64
+and, since [M26a](m26a-macos-arm64.md), executes the scalar/callback/variadic
+oracles on macOS ARM64 with both optimization settings.
 Other data models and targets need their own profile in M26.
 
 Declare `extern fn name(arguments...) -> result uses unsafe`, optionally

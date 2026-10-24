@@ -69,7 +69,7 @@ mv "$build/vela-gen3" "$build/vela"
 rm -f "$build/vela-gen1" "$build/vela-gen2" "$build/gen2.c" "$build/gen3.c"
 echo "built build/vela"
 
-# The native backend: the compiler compiled to x86-64 assembly by build/vela,
+# The native backend: the compiler compiled to native host assembly by build/vela,
 # then by itself; both must write the same assembly for the compiler.
 if $native; then
     echo "native 1: built by build/vela with VELA_BACKEND=native"

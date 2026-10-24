@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """M20 conformance, coherent dispatch, custom keys, effects, and editor queries."""
 from pathlib import Path
+from hosts import native_supported
 import json
 import os
 import platform
@@ -41,7 +42,7 @@ def acceptance(c, work, env):
     program(c, work, env, source, expected)
     # C-backend host still validates that native output is valid Linux assembly.
     if shutil.which('clang'):
-        asm = command(c, env, 'asm', work/'case.vl').stdout
+        asm = command(c, env, 'asm', '--target', 'x86_64-unknown-linux-gnu', work/'case.vl').stdout
         s = work/'acceptance.s'
         s.write_text(asm)
         r = subprocess.run(['clang','--target=x86_64-unknown-linux-gnu','-c',str(s),'-o',str(work/'acceptance.o')], capture_output=True, text=True, timeout=60)
@@ -172,7 +173,7 @@ def main():
         for test in (acceptance,dispatch,rejected,tooling):
             test(c,work,env)
             print('m20:',test.__name__,'passed',flush=True)
-        if platform.system()=='Linux' and platform.machine()=='x86_64':
+        if native_supported():
             for opt in ('1','0'):
                 for test in (acceptance,dispatch):
                     test(c,work,{**env,'VELA_BACKEND':'native','VELA_OPT':opt})

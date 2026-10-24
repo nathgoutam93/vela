@@ -1768,3 +1768,7 @@ int64_t vela_memory_signed(uint64_t bits, int64_t width, const char *loc) {
 #include "vela_sys.inc"
 
 #include "vela_policy.inc"
+
+// Native backends share the runtime's immortal/shared reference-count rules.
+void vela_native_rc_inc(int64_t *rc) { vela_rc_inc(rc); }
+bool vela_native_rc_dec(int64_t *rc) { return vela_rc_dec(rc); }

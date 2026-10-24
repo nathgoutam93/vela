@@ -85,6 +85,7 @@ pub type Inst = struct {
     sym: Str
     args: [Int]
     kinds: [Int]
+    sizes: [Int]  // foreign scalar widths; empty means 8. CCall imm2: fixed variadic count + 1, or 0.
 }
 
 // How a CCall passes an argument: in an integer register, in a Float one,
@@ -141,6 +142,7 @@ pub type Func = struct {
     slot_sizes: [Int]
     slot_aligns: [Int]
     labels: Int  // labels made so far
+    abi: [Int]  // C callback parameter widths; empty for the internal convention
 }
 
 // Read-only data: a label and the assembler lines that make it.
@@ -158,7 +160,7 @@ pub type Program = struct {
 pub fn new_func(name: Str, result: Int) -> Func {
     return Func {
         name: name, public: false, params: [], result: result, insts: [], classes: [], slot_sizes: [], slot_aligns: [],
-        labels: 0,
+        labels: 0, abi: [],
     }
 }
 
@@ -189,7 +191,7 @@ pub fn label(f: mut Func) -> Int {
 }
 
 pub fn inst(op: Op, dst: Int, a: Int, b: Int, imm: Int) -> Inst {
-    return Inst { op: op, dst: dst, a: a, b: b, imm: imm, imm2: 0, sym: "", args: [], kinds: [] }
+    return Inst { op: op, dst: dst, a: a, b: b, imm: imm, imm2: 0, sym: "", args: [], kinds: [], sizes: [] }
 }
 
 pub fn add(f: mut Func, i: Inst) {

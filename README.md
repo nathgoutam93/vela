@@ -27,8 +27,8 @@ build/vela build hello.vl     # produce ./hello, through C
 build/vela test hello.vl      # run its `test` blocks (and those of what it imports)
 build/vela fmt -w hello.vl    # format it in place (-l lists unformatted files)
 build/vela c hello.vl         # show the generated C
-build/vela asm hello.vl       # show the x86-64 assembly of the native backend (ir: its IR)
-VELA_BACKEND=c build/vela run hello.vl   # through C (run and test are native on Linux x86-64)
+build/vela asm hello.vl       # show native host assembly (ir: its IR)
+VELA_BACKEND=c build/vela run hello.vl   # through C (run/test are native on Linux x86-64 and macOS ARM64)
 build/vela check hello.vl     # check a program or library (--json for codes and edits)
 build/vela explain E3036      # explain a diagnostic code
 build/vela fix hello.vl       # apply available fixes (--dry-run to preview)
@@ -163,6 +163,13 @@ OS enforcement, and JSON summary/impact/coverage queries. `vela test --coverage`
 records measured entries; coverage queries distinguish those from potential
 static reachability. See [`docs/m24-agent-safety.md`](docs/m24-agent-safety.md)
 for command syntax, policy defaults, and platform limits.
+M26a brings macOS ARM64 native execution forward before M25: Mach-O assembly,
+Apple scalar C/callback/variadic ABI, explicit build/asm targets and local
+native bootstrap. Builds still default to C; run/test select the native host.
+`vela asm --target x86_64-unknown-linux-gnu FILE` retains Linux assembly output;
+`vela build --target aarch64-apple-darwin FILE` selects native Mac code.
+Performance parity and remaining platforms stay open. See
+[`docs/m26a-macos-arm64.md`](docs/m26a-macos-arm64.md).
 What comes next, toward a systems language that is also agent-first, is in
 [`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
 See `docs/` for a walkthrough of each milestone.

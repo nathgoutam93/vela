@@ -1746,6 +1746,13 @@ fn assign(g: mut Low, target: ast.Expr, v: ast.Expr) {
         ast.ExprKind.Index(obj, i) => {
             let container = writable(mut g, obj)
             let ot = ty(g, obj)
+            if types.is_fixed(g.k.table, ot) {
+                let index = scalar(mut g, expr(mut g, i))
+                let member = mem_val(fixed_at(mut g, container, index, ot, target), 0, ty(g, target))
+                release(mut g, member.ty, member)
+                put_place(mut g, member, c)
+                return
+            }
             if types.is_map(g.k.table, ot) {
                 let key = consume(mut g, expr(mut g, i))
                 let ka = element_copy(mut g, key)
@@ -3301,6 +3308,13 @@ fn method_value(g: mut Low, e: ast.Expr, args: [ast.Expr], t: Int, name: Str) ->
 }
 
 // ---- The scalar C ABI ----
+fn abi_size(t: Int, syntax: ast.TypeName, indirect: Bool) -> Int {
+    if indirect { return 8 }
+    if codegen.abi_float32(syntax) { return 4 }
+    if t == types.BOOL() { return 1 }
+    if types.is_integer(t) { return types.integer_width(t) / 8 }
+    return 8
+}
 fn foreign_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
     let f = g.k.fns[id]
     let at = loc_of(mut g, e)
@@ -3342,6 +3356,13 @@ fn foreign_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
     if f.result == types.BOOL() { ret_kind = ir.RET_BOOL() }
     match f.decl.result { Some(t) => { if codegen.abi_float32(t) { ret_kind = ir.RET_FLOAT32() } }, None => {} }
     let mut result = ccall(mut g, f.decl.foreign, regs, kinds, ret_kind, -1)
+    let at_call = len(g.fs.f.insts) - 1
+    for i in 0..len(args) {
+        let mut size = 8
+        if i < len(f.params) { size = abi_size(f.params[i], f.decl.params[i].ty, f.decl.params[i].mutable) }
+        push(mut g.fs.f.insts[at_call].sizes, size)
+    }
+    if f.decl.variadic { g.fs.f.insts[at_call].imm2 = len(f.params) + 1 }
     if types.is_integer(f.result) {
         result = ccall(mut g, "vela_fixed_load", [result, konst(mut g, types.integer_width(f.result)), konst(mut g, fixed_sign(f.result))],
             [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
@@ -3366,6 +3387,7 @@ fn callback(g: mut Low, id: Int) -> Val {
         g.fs = new_fn(name, result_class)
         let mut regs: [Int] = []
         for i in 0..len(f.params) {
+            push(mut g.fs.f.abi, abi_size(f.params[i], f.decl.params[i].ty, false))
             let mut parameter = ir.param(mut g.fs.f, class_of(f.params[i]))
             if types.is_integer(f.params[i]) {
                 parameter = ccall(mut g, "vela_fixed_load", [parameter, konst(mut g, types.integer_width(f.params[i])), konst(mut g, fixed_sign(f.params[i]))],

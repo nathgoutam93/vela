@@ -27,6 +27,13 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M19 recurrence:** manual host-specific filters also require a coverage
   inventory. The M17 filter list omitted 15 supported dump tests. M19 adds
   `tests/dump/` explicitly because literal parsing and AST dumps change.
+- **M26a recurrence:** milestone scripts gated native execution on Linux x86-64
+  and cross-assembly probes assumed asm always meant that target. Introduce a
+  shared supported-native-host predicate and request the x86 target explicitly
+  for cross probes; exercise Darwin native cases instead of silently skipping.
+  The first full run passed 302/303 checks; the remaining native_asm CLI
+  snapshot also needed an explicit x86 target and then passed its focused rerun.
+  This preserves the existing Linux assembly oracle while asm defaults to host.
 - **Workaround:** select the supported tests explicitly, check benchmarks with
   `python3 bench/run.py --quick --check --languages c vela`, and run native
   execution tests on Linux x86-64. Record the exclusions.
@@ -96,6 +103,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   integration verifies unchanged-input reuse and a new object after changing
   only that include. Rebuild the trusted compiler too when launcher policy
   changes: its own embedded runtime installs the child policy.
+- **M26a extension:** include the native host target in the runtime key. The
+  cache regression confirms C/native on one host reuse a matching object;
+  systems/policy include invalidation also runs through the ARM64 backend.
 - **Acceptance:** a change to the included header creates a new cache entry;
   unchanged sources and flags reuse the previous entry on both backends.
 
@@ -396,6 +406,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   prose preserves the new permission/query commands and generated APIs at
   31,989 bytes (7,997 tokens by the estimate). Actual tokenizer validation
   remains VAL-003.
+- **M26a recurrence:** target/native-platform text initially produced 32,001
+  bytes. Shorten the preamble and C profile description without dropping the
+  new target syntax. The rebuilt guide is 31,988 bytes (7,997 tokens by the
+  estimate); M17/M21/M22 guide checks pass. Actual tokenizer work remains VAL-003.
 - **Validation:** the final M22 guide is 28,599 bytes (about 7,149 tokens by
   bytes/4). M17 compiles and tests all its examples in the 295-check suite.
 
@@ -583,6 +597,63 @@ the same entry. Close it with a commit or validation result; keep its history.
   unsafe/C-library rejection and ordinary run/test behavior remain covered by
   the M24 integration and supported regression suite.
 
+### TL-027: Native IR omits target ABI argument layout metadata
+
+- **Status:** resolved during M26a; Linux execution remains VAL-001.
+- **Evidence:** foreign_call/callback in stage1/lower.vl pass scalar class and
+  float32 kind, but ir.Inst lacks scalar widths/variadic fixed-argument count;
+  ir.Func lacks C callback parameter widths. The x86 emitter uses 8-byte stack
+  argument slots, while Apple's ABI packs narrow fixed scalars and puts unnamed
+  variadic arguments on the stack. This is an observed representation gap;
+  no ARM64 misexecution is claimed before the emitter exists.
+- **Impact:** a direct port cannot correctly call mixed/spilled C functions or
+  receive narrow/float32 callback stack arguments on Darwin ARM64.
+- **Workaround:** retain the trusted C backend until the ABI metadata and
+  independent native/C oracles pass.
+- **Resolution:** retain widths and variadic boundaries through IR
+  transformations, consume them in the ARM64 emitter, preserve x86 behavior.
+- **Acceptance:** independent C providers cover narrow packed spills, mixed
+  float/integer registers, float32 callbacks and variadics in both opt modes;
+  x86 assembly regressions and the existing C suite continue to pass.
+- **Validation:** the independent packed mixed-width/mixed-bank/variadic C
+  provider and callback oracle pass C and Darwin native opt=1/0. M21
+  native scalar/float32/spilled callbacks, zlib and SQLite also pass both modes.
+
+### TL-028: An unavailable default cache leaks mkdir stderr
+
+- **Status:** deferred; observed during the initial M26a intermediate build.
+- **Evidence:** build/vela build stage1/main.vl -o build/vela-m26a succeeded
+  while printing mkdir: /Users/nathgoutam93/.cache/vela: Operation not permitted
+  under the workspace sandbox. cached_runtime in stage1/main.vl attempts to
+  create the default cache through os.run before falling back without caching.
+- **Impact:** a successful compilation emits a low-level permission message,
+  which can be mistaken for a compiler failure.
+- **Workaround:** set VELA_CACHE to a writable build/ directory on this host.
+- **Proposed improvement:** suppress expected mkdir stderr on cache fallback
+  or emit an optional structured cache diagnostic while preserving real errors.
+- **Acceptance:** an inaccessible cache still builds correctly with intentional
+  diagnostics, and a writable cache retains reuse/invalidation coverage.
+
+### TL-029: Native direct fixed-array assignment uses the growable-array ABI
+
+- **Status:** resolved during M26a; Linux execution of shared lowering remains
+  in VAL-001.
+- **Evidence:** the new large-frame fixture in tests/m26a_test.py passes via C
+  and exits SIGSEGV with native optimization on and off. Its IR for xs[1023]=17
+  calls vela_array_set using the inline array's first element as a heap pointer.
+  Inspection of lower.assign confirms only place/read had a fixed-array branch.
+- **Impact:** direct fixed-array element mutation can crash or corrupt memory
+  on either native emitter; the earlier C/assembly-only checks missed execution.
+- **Workaround:** use the C backend until the native lowering fix is validated.
+- **Resolution:** bounds-check the inline element address, release its
+  previous managed value, and store the consumed replacement in place.
+- **Acceptance:** scalar and managed/nested fixed-array updates preserve copies,
+  panic on bad indices and pass M22 and M26a with native optimization on/off.
+- **Validation:** both M26a large-frame cases and the M22 scalar/managed/fixed
+  snapshot/lifetime/panic/varint native selections pass with opt=1/0.
+  The full native suite passes all 303 checks and the 124-check native UBSan
+  selection passes; systems/policy integrations also pass with VELA_OPT=0.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
@@ -627,6 +698,20 @@ the same entry. Close it with a commit or validation result; keep its history.
   assembly cross-assembles optimized/unoptimized; the strict runtime C also
   cross-compiles for Linux x86-64. No native execution, native bootstrap, ASan
   or TSan is inferred from this. Kernel policy execution is separately VAL-004.
+- **M26a evidence:** macOS ARM64 now executes native code and reaches a
+  1,717,092-line native bootstrap fixed point (C: 130,317). The complete native
+  selection passes 303 checks; C passes 302 plus the focused corrected CLI
+  golden case. M19–M24 now execute their native cases on the supported Mac,
+  including scalar/float32/callback/variadic ABI and managed fixed-array
+  updates in both optimization modes where selected. This closes local
+  execution gaps without claiming Linux x86 execution or kernel-policy proof.
+  The native UBSan selection passes 124 checks (117 runtime fixtures plus
+  M19–M24/M26a integrations, whose provider cases exercise both backends).
+  M23/M24 pass additional unoptimized C/native runs. UBSan instruments the C
+  runtime/helpers; emitted assembly is not sanitizer-instrumented. The
+  ARM64-built compiler additionally passes 236 runtime/negative fixtures and
+  the independent Apple ABI/target suite, and emits byte-identical C/ARM64
+  assembly to the C-built compiler for its own source.
 - **Workaround:** retain the host-supported results and these explicit limits.
 - **Required work:** on Linux x86-64, run both bootstrap fixed points and the
   applicable C/native suites under ASan and TSan. See
@@ -664,6 +749,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M24 evidence:** eval/m24-static.json retains 373/373 coded diagnostics
   and 21 with edits; the inventory now credits API summary/measured coverage
   and conservative impact. This is not a model-driven agent trial.
+- **M26a evidence:** eval/m26a-static.json retains 373/373 coded diagnostics
+  and 21 with edits; the guide stays within its estimate gate. No new agent
+  trial was performed.
 - **Workaround:** use the static metrics and seeded repair checks as
   implementation evidence; do not claim measured agent improvements.
 - **Required work:** compare the guide and prior documentation conditions on
@@ -691,6 +779,8 @@ the same entry. Close it with a commit or validation result; keep its history.
   7,850 tokens by the same estimate, after compacting generated signatures.
 - **M24 measurement:** the permission/query guide is 31,989 bytes, or about
   7,997 tokens under the estimate.
+- **M26a measurement:** the target/native guide is 31,988 bytes, or 7,997
+  tokens under the estimate; executable and installed guide checks pass.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """M21 C ABI, unsafe effects/audit, linker metadata and zlib/SQLite oracles."""
 from pathlib import Path
+from hosts import native_supported
 import json
 import os
 import platform
@@ -129,7 +130,7 @@ print("ABI passed")
     p = program(c,work,env,source,'ABI passed\n')
     if shutil.which('clang'):
         for opt in ('1','0'):
-            asm = command(c,{**env,'VELA_OPT':opt},'asm',p).stdout
+            asm = command(c,{**env,'VELA_OPT':opt},'asm','--target','x86_64-unknown-linux-gnu',p).stdout
             assert all(s in asm for s in ('ffi_f32spill','ffi_mixed','ffi_variadic','vcabi_','cvtsd2ss','cvtss2sd'))
             (work/'abi.s').write_text(asm)
             r = subprocess.run(['clang','--target=x86_64-unknown-linux-gnu','-c',str(work/'abi.s'),'-o',str(work/'abi.o')],capture_output=True,text=True,timeout=60)
@@ -322,7 +323,7 @@ def main():
         for test in (abi,memory,effects,tooling,libraries,examples):
             test(c,work,env)
             print('m21:',test.__name__,'passed',flush=True)
-        if platform.system()=='Linux' and platform.machine()=='x86_64':
+        if native_supported():
             for opt in ('1','0'):
                 for test in (abi,memory,examples):test(c,work,{**env,'VELA_BACKEND':'native','VELA_OPT':opt})
                 print('m21: native optimization',opt,'passed',flush=True)

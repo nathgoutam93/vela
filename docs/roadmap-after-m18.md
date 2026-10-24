@@ -29,7 +29,8 @@ M21 calling C .................. M19
 M22 memory control ............. M19
 M23 std for systems work ....... M19 M20 M21 M22
 M24 agent safety ............... M21 M23
-M25 native backend parity ...... (nothing; before M26)
+M26a macOS ARM64 native ........ M23, current IR (brought forward)
+M25 native backend parity ...... M26a for local native measurement
 M26 platforms .................. M23 M25
 M27 debugging .................. M25 M26
 M28 verification ............... M19 M20
@@ -122,7 +123,8 @@ effect fakes, systems APIs and remaining Linux native/sanitizer validation.
 
 ## M24: Agent safety and queries
 
-**Status:** implemented for the supported macOS C profile, with fail-closed
+**Status:** implemented for the supported macOS C/native profiles (native
+execution added in M26a), with fail-closed
 limits for unsafe policies. Linux seccomp/Landlock execution acceptance is
 still outstanding. See [the walkthrough](m24-agent-safety.md) and VAL-004 in
 [the tooling backlog](tooling-backlog.md).
@@ -137,7 +139,10 @@ still outstanding. See [the walkthrough](m24-agent-safety.md) and VAL-004 in
 
 ## M25: Native backend parity
 
-**Needs:** nothing before it; before M26, so ARM64 gets the optimized backend.
+**Status:** not started; M26a now provides local ARM64 native execution and
+measured compiler baselines. Performance acceptance remains open.
+
+**Needs:** the existing IR; M26a enables measurements on the available Mac.
 
 **What gets built:** Native backend parity: the C backend's optimizations in the IR (ranges, checks proved away, copy-on-write before loops, inlining across modules) and a better register allocator.
 
@@ -145,7 +150,27 @@ still outstanding. See [the walkthrough](m24-agent-safety.md) and VAL-004 in
 
 **Done when:** Natively built programs run within 1.5 times C by the geometric mean (now 1.3 to 10 times), and the compiler built natively is faster than the C-built one.
 
+## M26a: macOS ARM64 native execution
+
+**Status:** implemented; see [the walkthrough](m26a-macos-arm64.md) for local
+C/native execution and both bootstrap fixed points. Brought forward before
+M25 to enable native testing on Apple Silicon; performance work remains M25.
+
+**Needs:** M23 and the existing IR/lowering/optimizer. M25 is not a correctness
+prerequisite for an initial ARM64 emitter.
+
+**What gets built:** Darwin ARM64 assembly, Apple scalar C/callback/variadic
+ABI, target selection, runtime linking, local native tests and self-hosting.
+M25 remains responsible for performance parity and improved allocation.
+
+**Done when:** the C/native supported suites and C interop agree on macOS
+ARM64, native bootstrap reaches a fixed point, and target errors are explicit.
+Windows, WASI, general cross-linking and Linux execution proofs remain separate.
+
 ## M26: Platforms
+
+**Status:** partially implemented through [M26a](m26a-macos-arm64.md). Windows,
+WASI, general cross-linking and remaining platform validation are still open.
 
 **Needs:** M23 (std on every OS) and M25 (the native backend to port).
 

@@ -1,0 +1,18 @@
+// Native formats currently implemented. Cross-linking is a later M26 slice.
+import arm64
+import ir
+import os
+import x64
+pub fn host() -> Str uses os {
+    match os.output(["uname", "-sm"]) { Ok(s) => { if s == "Darwin arm64\n" { return "aarch64-apple-darwin" }; if s == "Linux x86_64\n" { return "x86_64-unknown-linux-gnu" } }, Err(_) => {} }; return "unsupported"
+}
+pub fn normalize(name: Str) -> Str uses os {
+    if name == "" || name == "native" { let h = host(); if h != "unsupported" { return h } }
+    if name == "arm64-apple-darwin" || name == "aarch64-apple-darwin" { return "aarch64-apple-darwin" }
+    if name == "x86_64-unknown-linux-gnu" || name == "x86_64-linux-gnu" { return "x86_64-unknown-linux-gnu" }
+    fail("unsupported native target '" + name + "'; use aarch64-apple-darwin or x86_64-unknown-linux-gnu")
+    return ""
+}
+pub fn require_host(name: Str) uses os { let target = normalize(name); if target != host() { fail("cross-linking target '" + target + "' is not implemented; use asm --target to emit assembly") } }
+pub fn program(p: ir.Program, name: Str) -> Str uses os { let target = normalize(name); if target == "aarch64-apple-darwin" { return arm64.program(p) }; return x64.program(p) }
+fn fail(s: Str) uses os { os.eprint("vela: " + s + " [E6001]"); os.exit(1) }

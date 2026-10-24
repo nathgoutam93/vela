@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """M19 arithmetic against Python integers, layout, diagnostics and cache invalidation."""
 from pathlib import Path
+from hosts import native_supported
 import os
 import subprocess
 import random
@@ -181,13 +182,13 @@ def containers(c, work, env):
     expected = '\n'.join(line[8:] for line in source.splitlines() if line.startswith('// out: '))+'\n'
     invoke(c, work, env, source, expected=expected)
     # The actual native execution case is exercised on its supported host.
-    if platform.system() == 'Linux' and platform.machine() == 'x86_64':
+    if native_supported():
         invoke(c, work, {**env, 'VELA_BACKEND':'native'}, source, expected=expected)
         invoke(c, work, {**env, 'VELA_BACKEND':'native', 'VELA_OPT':'0'}, source, expected=expected)
     elif shutil.which('clang'):
         p = work/'case.vl'
         p.write_text(source)
-        r = subprocess.run([str(c), 'asm', str(p)], env=env, capture_output=True, text=True, timeout=60)
+        r = subprocess.run([str(c), 'asm', '--target', 'x86_64-unknown-linux-gnu', str(p)], env=env, capture_output=True, text=True, timeout=60)
         assert r.returncode == 0, r.stderr
         asm = work/'case.s'
         asm.write_text(r.stdout)
@@ -206,7 +207,7 @@ def cache(c, work, env):
     def run():
         r = subprocess.run([str(c), 'run', str(path)], env=case_env, capture_output=True, text=True, timeout=60)
         assert (r.returncode, r.stdout, r.stderr) == (0, '1\n', ''), (r.returncode,r.stdout,r.stderr)
-        if platform.system() == 'Linux' and platform.machine() == 'x86_64':
+        if native_supported():
             r = subprocess.run([str(c), 'run', str(path)], env={**case_env, 'VELA_BACKEND':'native'}, capture_output=True, text=True, timeout=60)
             assert (r.returncode, r.stdout, r.stderr) == (0, '1\n', ''), (r.returncode,r.stdout,r.stderr)
         return {p.name:p.stat().st_mtime_ns for p in cache.glob('runtime-*.o')}
@@ -249,7 +250,7 @@ fn main() {
     assert hashlib.sha256(vectors[2]).hexdigest() == '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1'
     assert zlib.crc32(b'123456789') == 0xcbf43926
     backends = ['c']
-    if platform.system() == 'Linux' and platform.machine() == 'x86_64':
+    if native_supported():
         backends.append('native')
     for backend in backends:
         exe = work/('hashes-'+backend)
@@ -286,10 +287,11 @@ def main():
         for test in (oracle, boundaries, rejected, containers, cache, hashes):
             test(c, work, env)
             print('m19:',test.__name__,'passed',flush=True)
-        if platform.system() == 'Linux' and platform.machine() == 'x86_64':
-            for test in (oracle, boundaries):
-                test(c, work, {**env, 'VELA_BACKEND':'native'})
-                print('m19: native',test.__name__,'passed',flush=True)
+        if native_supported():
+            for opt in ('1','0'):
+                for test in (oracle, boundaries, containers):
+                    test(c, work, {**env, 'VELA_BACKEND':'native','VELA_OPT':opt})
+                    print('m19: native',opt,test.__name__,'passed',flush=True)
     return 0
 
 if __name__ == '__main__':
