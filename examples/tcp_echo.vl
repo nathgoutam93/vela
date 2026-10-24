@@ -1,0 +1,20 @@
+// A bounded one-client TCP echo server. Run with a port (0 chooses a free port).
+import net
+import os
+import text
+pub fn echo(listener: net.Listener) -> Result[Int, Str] uses net {
+    let socket = listener.accept()?; let result = echo_connection(socket); socket.close(); return result
+}
+fn echo_connection(socket: net.Tcp) -> Result[Int, Str] uses net {
+    let mut total = 0; for { let data = socket.read(4096)?; if data == "" { break }; if len(data) > 1048576 - total { return Err("echo limit exceeded") }; socket.write(data)?; total = total + len(data) }; return Ok(total)
+}
+fn serve(port: Int) -> Result[Unit, Str] uses net {
+    let listener = net.listen("127.0.0.1", port)?; match listener.port() { Ok(p) => print(p), Err(_) => {} }
+    let result = echo(listener); listener.close(); match result { Err(e) => return Err(e), Ok(_) => {} }; return Ok(())
+}
+fn main() { let args = os.args(); let mut port = 8080; if len(args) > 1 { match text.parse_int(args[1]) { Some(p) => port = p, None => { os.eprint("invalid port"); return } } }; match serve(port) { Ok(_) => {}, Err(e) => os.eprint(e) } }
+test "echo without sockets" {
+    with net = [net.incoming("127.0.0.1", 8080, "hello\n", "hello\n")] {
+        match net.listen("127.0.0.1", 8080) { Ok(listener) => { match echo(listener) { Ok(n) => assert(n == 6), Err(_) => assert(false) }; listener.close() }, Err(_) => assert(false) }
+    }
+}

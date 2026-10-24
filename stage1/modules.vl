@@ -6,6 +6,7 @@ import errors
 import integers
 import cffi
 import memops
+import sysops
 import files
 import lexer
 import maps
@@ -77,6 +78,8 @@ type Loader = struct {
 // The built-in modules and their functions, in Stage 0's order.
 pub fn builtin_functions(name: Str) -> [Str] {
     return match name {
+        "sysio" => sysops.functions("sysio")
+        "clock" => sysops.functions("clock")
         "memory" => memops.functions()
         "c" => cffi.functions()
         "ints" => integers.functions()
@@ -201,6 +204,7 @@ fn builtin_module(ld: mut Loader, name: Str) -> Int {
     let mut m = new_module(name, "")
     m.is_std = true
     m.std = builtin_functions(name)
+    if name == "sysio" { m.types["Handle"] = types.HANDLE() }
     if name == "strings" {
         m.types["Builder"] = types.BUILDER()
     }
@@ -495,5 +499,5 @@ test "paths" {
 }
 
 pub fn builtin_modules() -> [Str] {
-    return ["memory", "maps", "files", "os", "strings", "tasks", "math", "ints", "c"]
+    return ["sysio", "clock", "memory", "maps", "files", "os", "strings", "tasks", "math", "ints", "c"]
 }

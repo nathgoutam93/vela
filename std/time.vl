@@ -1,0 +1,10 @@
+// Nanosecond wall/monotonic clocks. Durations are signed Int nanoseconds.
+import clock
+pub fn wall_ns() -> Result[Int, Str] uses clock { return clock.wall_ns() }
+pub fn monotonic_ns() -> Result[Int, Str] uses clock { return clock.monotonic_ns() }
+pub fn sleep_ns(ns: Int) -> Result[Unit, Str] uses clock { return clock.sleep_ns(ns) }
+pub fn milliseconds(n: Int) -> Int { return n * 1000000 }
+pub fn seconds(n: Int) -> Int { return n * 1000000000 }
+pub fn elapsed(start: Int) -> Result[Int, Str] uses clock {
+    let now = clock.monotonic_ns()?; if (start < 0 || now < start) { return Err("invalid monotonic start") }; return Ok(now - start)
+}

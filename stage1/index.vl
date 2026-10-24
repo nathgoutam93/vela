@@ -16,6 +16,7 @@
 import ast
 import cffi
 import memops
+import sysops
 import integers
 import checker
 import lexer
@@ -273,6 +274,9 @@ fn word_def(b: mut Builder, name: Str) -> Int {
             "files.remove, files.temp_dir), or calls a function that does."
         "os" => "An effect: the function uses the process's surroundings (os.args, os.exit, os.env, os.run, " +
             "os.output, os.read_line, os.read), or calls a function that does."
+        "net" => "An effect: TCP, UDP and HTTP networking; fake with net = [net.reply(...)]."
+        "clock" => "An effect: wall/monotonic clocks and sleep; fake with clock = [wall_ns, mono_ns]."
+        "processes" => "A test fake for subprocesses: processes = [processes.reply(args, input, status, stdout, stderr)]."
         "unsafe" => "An effect: the function may call C or access raw memory. An unsafe block acknowledges and contains that effect; wrappers remain visible to vela query unsafe."
         "Eq" => "A bound: values of the type can be compared with == and !=."
         "Ord" => "A bound: values of the type can be compared with ==, !=, <, <=, > and >=."
@@ -319,6 +323,8 @@ fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
 // for a name that is not one. The checker has the rules (checker.builtin);
 // this is how hover and completion show them.
 pub fn builtin_info(name: Str) -> [Str] {
+    if name == "sysio.Handle" { return ["sysio.Handle", "Owning external I/O resource. Copies alias the resource; final release closes it."] }
+    if len(name) > 6 && (name[0..6] == "sysio." || name[0..6] == "clock.") { return [sysops.signature(name[0..5], name[6..len(name)]), "Blocking systems I/O with test fakes, bounds and explicit effects."] }
     if len(name) > 7 && name[0..7] == "memory." { return [memops.signature(name[7..len(name)]), "Checked contiguous storage; views retain snapshots and writes use copy-on-write."] }
     if len(name) > 2 && name[0..2] == "c." {
         let short = name[2..len(name)]

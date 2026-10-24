@@ -1,0 +1,35 @@
+// Blocking sockets. Copies share a connection; close invalidates its aliases.
+import sysio
+import strings
+import text
+pub type Tcp = struct { handle: sysio.Handle }
+pub type Listener = struct { handle: sysio.Handle }
+pub type Udp = struct { handle: sysio.Handle }
+pub type Packet = struct { data: Str, host: Str, port: Int }
+pub fn connect(host: Str, port: Int) -> Result[Tcp, Str] uses net { return connect_timeout(host, port, 5000) }
+pub fn connect_timeout(host: Str, port: Int, timeout_ms: Int) -> Result[Tcp, Str] uses net { return Ok(Tcp { handle: sysio.tcp_connect(host, port, timeout_ms)? }) }
+pub fn listen(host: Str, port: Int) -> Result[Listener, Str] uses net { return Ok(Listener { handle: sysio.tcp_listen(host, port, 5000)? }) }
+pub fn Listener.accept(s: Listener) -> Result[Tcp, Str] uses net { return Ok(Tcp { handle: sysio.accept(s.handle)? }) }
+pub fn Tcp.read(s: Tcp, max: Int) -> Result[Str, Str] uses net { return sysio.net_read(s.handle, max) }
+pub fn Tcp.write(s: Tcp, data: Str) -> Result[Int, Str] uses net { return sysio.net_write(s.handle, data) }
+pub fn Tcp.close(s: Tcp) -> Result[Unit, Str] uses net { return sysio.net_close(s.handle) }
+pub fn Listener.close(s: Listener) -> Result[Unit, Str] uses net { return sysio.net_close(s.handle) }
+pub fn Udp.close(s: Udp) -> Result[Unit, Str] uses net { return sysio.net_close(s.handle) }
+pub fn Tcp.timeout(s: Tcp, ms: Int) -> Result[Unit, Str] uses net { return sysio.net_timeout(s.handle, ms) }
+pub fn Listener.timeout(s: Listener, ms: Int) -> Result[Unit, Str] uses net { return sysio.net_timeout(s.handle, ms) }
+pub fn Udp.timeout(s: Udp, ms: Int) -> Result[Unit, Str] uses net { return sysio.net_timeout(s.handle, ms) }
+pub fn Tcp.port(s: Tcp) -> Result[Int, Str] uses net { return sysio.net_port(s.handle) }
+pub fn Listener.port(s: Listener) -> Result[Int, Str] uses net { return sysio.net_port(s.handle) }
+pub fn Udp.port(s: Udp) -> Result[Int, Str] uses net { return sysio.net_port(s.handle) }
+pub fn udp_bind(host: Str, port: Int) -> Result[Udp, Str] uses net { return Ok(Udp { handle: sysio.udp_bind(host, port)? }) }
+pub fn Udp.send(s: Udp, host: Str, port: Int, data: Str) -> Result[Int, Str] uses net { return sysio.udp_send(s.handle, host, port, data) }
+pub fn Udp.receive(s: Udp, max: Int) -> Result[Packet, Str] uses net {
+    let row = sysio.udp_receive(s.handle, max)?
+    match text.parse_int(row[2]) { Some(p) => return Ok(Packet { data: row[0], host: row[1], port: p }), None => return Err("invalid datagram port") }
+}
+// Transcript factories. Requests are consumed in matching order; writes are exact.
+pub fn reply(host: Str, port: Int, write: Str, response: Str) -> [Str] { return ["connect", host, strings.from_int(port), write, response] }
+pub fn incoming(host: Str, port: Int, received: Str, write: Str) -> [Str] { return ["accept", host, strings.from_int(port), write, received] }
+pub fn failure(host: Str, port: Int, error: Str) -> [Str] { return ["error", host, strings.from_int(port), error] }
+pub fn udp_in(host: Str, port: Int, data: Str, peer: Str, peer_port: Int) -> [Str] { return ["udp-in", host, strings.from_int(port), data, peer, strings.from_int(peer_port)] }
+pub fn udp_out(host: Str, port: Int, data: Str) -> [Str] { return ["udp-out", host, strings.from_int(port), data] }

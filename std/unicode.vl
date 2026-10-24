@@ -1,0 +1,26 @@
+// Strict RFC 3629 UTF-8 and Unicode scalar values; no normalization or casing.
+import strings
+pub fn decode(s: Str) -> Result[[u32], Str] {
+    let mut out: [u32] = []; let mut i = 0
+    for i < len(s) {
+        let lead = int(s[i]); let mut count = 1; let mut value = lead; let mut minimum = 0
+        if lead >= 194 && lead <= 223 { count = 2; value = lead - 192; minimum = 128 } else if lead >= 224 && lead <= 239 { count = 3; value = lead - 224; minimum = 2048 } else if lead >= 240 && lead <= 244 { count = 4; value = lead - 240; minimum = 65536 } else if lead >= 128 { return Err("invalid UTF-8 lead byte") }
+        if count > len(s) - i { return Err("truncated UTF-8") }
+        for j in 1..count { let c = int(s[i + j]); if c < 128 || c > 191 { return Err("invalid UTF-8 continuation") }; value = value * 64 + c - 128 }
+        if value < minimum || value > 1114111 || (value >= 55296 && value <= 57343) { return Err("invalid Unicode scalar") }
+        push(mut out, u32(value)); i = i + count
+    }; return Ok(out)
+}
+pub fn encode(points: [u32]) -> Result[Str, Str] {
+    let mut b = strings.builder()
+    for p in points {
+        let n = int(p); if n > 1114111 || (n >= 55296 && n <= 57343) { return Err("invalid Unicode scalar") }
+        if n < 128 { strings.add_byte(mut b, byte(n)) } else if n < 2048 { strings.add_byte(mut b, byte(192 + n / 64)); strings.add_byte(mut b, byte(128 + n % 64)) } else if n < 65536 { strings.add_byte(mut b, byte(224 + n / 4096)); strings.add_byte(mut b, byte(128 + n / 64 % 64)); strings.add_byte(mut b, byte(128 + n % 64)) } else { strings.add_byte(mut b, byte(240 + n / 262144)); strings.add_byte(mut b, byte(128 + n / 4096 % 64)); strings.add_byte(mut b, byte(128 + n / 64 % 64)); strings.add_byte(mut b, byte(128 + n % 64)) }
+    }; return Ok(strings.build(b))
+}
+pub fn valid(s: Str) -> Bool { match decode(s) { Ok(_) => return true, Err(_) => return false } }
+pub fn length(s: Str) -> Result[Int, Str] { return Ok(len(decode(s)?)) }
+pub fn at(s: Str, index: Int) -> Result[u32, Str] { let xs = decode(s)?; if index < 0 || index >= len(xs) { return Err("code point index out of range") }; return Ok(xs[index]) }
+pub fn slice(s: Str, start: Int, end: Int) -> Result[Str, Str] {
+    let xs = decode(s)?; if start < 0 || end < start || end > len(xs) { return Err("code point range out of bounds") }; let mut out: [u32] = []; for i in start..end { push(mut out, xs[i]) }; return encode(out)
+}

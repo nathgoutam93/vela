@@ -1,0 +1,31 @@
+// Value-state interfaces: each operation returns the reader/writer's next state.
+import net
+import strings
+pub type Read[T] = struct { data: Str, next: T }
+pub type Reader = interface { fn read(value: Self, max: Int) -> Result[Read[Self], Str] uses fs, os, net }
+pub type Writer = interface { fn write(value: Self, data: Str) -> Result[Self, Str] uses fs, os, net }
+pub type MemoryReader = struct { data: Str, position: Int }
+pub type MemoryWriter = struct { data: strings.Builder }
+pub type Socket = struct { connection: net.Tcp }
+pub type Copied[R, W] = struct { reader: R, writer: W, size: Int }
+pub fn reader(data: Str) -> MemoryReader { return MemoryReader { data: data, position: 0 } }
+pub fn writer() -> MemoryWriter { return MemoryWriter { data: strings.builder() } }
+pub fn MemoryReader.read(value: MemoryReader, max: Int) -> Result[Read[MemoryReader], Str] {
+    if max <= 0 { return Err("read size must be positive") }
+    if value.position < 0 || value.position > len(value.data) { return Err("invalid reader position") }
+    let mut n = len(value.data) - value.position; if n > max { n = max }
+    return Ok(Read { data: value.data[value.position..value.position + n], next: MemoryReader { data: value.data, position: value.position + n } })
+}
+pub fn MemoryWriter.write(value: MemoryWriter, data: Str) -> Result[MemoryWriter, Str] { let mut b = value.data; strings.add(mut b, data); return Ok(MemoryWriter { data: b }) }
+pub fn MemoryWriter.text(value: MemoryWriter) -> Str { return strings.build(value.data) }
+pub fn Socket.read(value: Socket, max: Int) -> Result[Read[Socket], Str] uses net { return Ok(Read { data: value.connection.read(max)?, next: value }) }
+pub fn Socket.write(value: Socket, data: Str) -> Result[Socket, Str] uses net { value.connection.write(data)?; return Ok(value) }
+// A finite total limit bounds copy even for an untrusted or infinite source.
+pub fn copy[R: Reader, W: Writer](reader: R, writer: W, limit: Int) -> Result[Copied[R, W], Str] uses fs, os, net {
+    if limit < 0 { return Err("negative copy limit") }; let mut r = reader; let mut w = writer; let mut size = 0
+    for { let mut ask = 8192; if limit - size < 8192 { ask = limit - size + 1 }; let step = r.read(ask)?; r = step.next
+        if len(step.data) == 0 { return Ok(Copied { reader: r, writer: w, size: size }) }
+        if len(step.data) > ask || len(step.data) > limit - size { return Err("copy limit exceeded") }
+        w = w.write(step.data)?; size = size + len(step.data)
+    }
+}

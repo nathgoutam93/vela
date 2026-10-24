@@ -76,7 +76,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-004: Runtime cache omitted an included header
 
-- **Status:** resolved in M19; native execution validation remains in VAL-001.
+- **Status:** resolved in M19, extended in M23; native execution remains in VAL-001.
 - **Evidence:** `cached_runtime` in `stage1/main.vl` hashed only `vela_rt.c` and
   `vela_rt.h`. M19 adds `vela_int.h`, included by the public runtime header.
   Changes to that file alone would leave a cached native runtime object stale.
@@ -87,6 +87,11 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Resolution:** include `vela_int.h` in the runtime cache key. A header-only
   invalidation regression passes in `tests/m19_test.py` through C; the
   Linux-only native case is checked in and tracked by VAL-001.
+- **M23 extension:** `vela_sys.inc` is now included by the runtime. Hash it
+  alongside all three previous inputs so changing only the systems code cannot
+  reuse a stale runtime object. The include-only invalidation regression in
+  tests/m23_test.py passes in the 298-check supported C suite, including
+  unchanged-input cache reuse. Native execution remains VAL-001.
 - **Acceptance:** a change to the included header creates a new cache entry;
   unchanged sources and flags reuse the previous entry on both backends.
 
@@ -166,7 +171,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-009: New declarations need semantic editor metadata
 
-- **Status:** resolved in M20, extended in M21; native execution remains in VAL-001.
+- **Status:** resolved in M20, extended through M23; native execution remains in VAL-001.
 - **Evidence:** `vela-m20-maps query symbols build/m20-probe.vl` reported
   `type Show = interface { ... }` as an enum with no method children.
   The index and completion paths only distinguished structs and enums.
@@ -208,6 +213,17 @@ the same entry. Close it with a commit or validation result; keep its history.
   Fixed annotations now index their element types, hide internal fields and
   retain source syntax in hover/signatures. M22 tooling and M17 guide checks
   pass within the 295-check supported suite.
+- **M23 recurrence:** net/clock effects, process/network/clock fakes and the
+  owning sysio.Handle type require index/completion metadata and current effect
+  diagnostics. Preserve the previous interfaces/memory/FFI metadata; add query
+  and automatic-effect-repair coverage to the M23 integration. The legacy
+  negative fixtures used net as an unknown effect/fake; use gpu to retain their
+  intended rejection coverage now that net is implemented. The completion,
+  hover and automatic clock-effect repair checks pass in the 298-check C
+  suite. M23's supported
+  run also caught the 17-rename evaluation fixture's local paths.vl shadowing
+  std/paths.vl: its reference solution had zero errors but one warning. Rename
+  the fixture module routes in its workspace, solution and task instructions.
 - **Acceptance:** query/LSP regressions report interfaces and method children,
   resolve generic and concrete method calls, and offer applicable methods.
   Rename must retain its existing semantic validation and reject broken edits.
@@ -336,6 +352,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Impact:** library development produces a misleading shadow warning.
 - **Workaround:** test via a program outside std/ that imports the libraries;
   retain the direct std tests as well, with their actual warning output.
+- **M23 recurrence:** `build/vela-m23 check std/http.vl` also warns that
+  net/text/bytes hide their own standard-library files. External M23 imports
+  avoid the warning and continue to exercise those libraries.
 - **Proposed work:** compare canonical file identity before issuing E7005;
   retain the warning for a genuinely different local module.
 - **Acceptance:** direct std tests have no self-shadow warnings, and genuine
@@ -343,7 +362,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-017: Keep the expanded memory guide within its reading budget
 
-- **Status:** resolved in M22.
+- **Status:** resolved in M22, extended in M23.
 - **Evidence:** the first M22 `build/vela-m22 guide` output is 37,751 bytes,
   exceeding the existing 32,000-byte / estimated-8,000-token integration gate.
   New library signatures and rules add to repeated per-builtin explanation.
@@ -355,7 +374,14 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** guide output stays under the estimate gate, contains the
   memory/FFI/interface APIs and compiles/tests every executable example.
   Actual model-tokenizer validation remains VAL-003.
-- **Validation:** the final guide is 28,599 bytes (about 7,149 tokens by
+- **M23 recurrence:** adding the systems APIs produces a 34,512-byte guide
+  (`build/vela-m23 guide`), exceeding the same 32,000-byte gate. Compact the
+  presentation while preserving generated API coverage. Generated signatures
+  now use compact text blocks and omit repeated builtin labels; commands and
+  prose are shortened. The final guide is 31,400 bytes (7,850 tokens by the
+  estimate); the M17/M23 guide and installation checks pass in the 298-check
+  supported suite. Actual tokenizer validation remains VAL-003.
+- **Validation:** the final M22 guide is 28,599 bytes (about 7,149 tokens by
   bytes/4). M17 compiles and tests all its examples in the 295-check suite.
 
 ### TL-018: Select benchmark input generators by name
@@ -428,11 +454,50 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Validation:** the final negative/M17/M21/M22 selection passes 122 checks;
   the updated M22 integration also passes under UBSan.
 
+### TL-022: Blocking socket locks prevented full duplex I/O
+
+- **Status:** resolved during M23; Linux native/thread sanitizer execution is
+  still tracked in VAL-001.
+- **Evidence:** `tests/m23_test.py`'s duplex oracle runs two tasks on one TCP
+  connection. One waits to read; the other writes after 20 ms. The independent
+  loopback peer replies only after receiving that write. The initial runtime
+  returned `I/O timeout` (500 ms), because read held the handle mutex while
+  waiting, preventing the other task from writing.
+- **Impact:** a blocking receive could prevent necessary writes on the same
+  connection even though the OS socket supports full duplex traffic.
+- **Workaround:** use sequential request/response operations until fixed.
+- **Resolution:** duplicate/pin the descriptor under the handle lock, then
+  release the lock before blocking. The duplicate is close-on-exec and closed
+  at operation completion. Closing an alias rejects new operations; operations
+  already in progress finish or time out without descriptor-reuse races.
+- **Acceptance:** the two-task loopback oracle passes, as do alias close,
+  timeout, repeated automatic descriptor drop, and nested fake-scope checks.
+
+### TL-023: Long literals fail the strict C warning gate
+
+- **Status:** deferred; discovered during M23.
+- **Evidence:** the HTTP oversized-header oracle initially embedded 65,556
+  bytes in one Vela literal. Under the suite's `-Wall -Wextra -Werror -pedantic`,
+  generated VELA_STR receives Clang's overlength-string warning and E6002.
+  Reproduce with a >4,095-byte literal and those VELA_CFLAGS. Ordinary builds
+  accept it; the observed failure is the strict warning gate.
+- **Impact:** generated boundary fixtures can fail C compilation before
+  exercising the feature under test, with an internal-error diagnostic.
+- **Workaround:** construct the oversized header at runtime with text.repeat;
+  keep the same HTTP limit/error oracle and the strict warning flags.
+- **Proposed work:** consider pooled static byte constants for long literals,
+  retaining their immortal lifetime across returns/captures, and improve
+  diagnostics for toolchain translation limits. This is independent of M23.
+- **M23 validation:** the runtime-constructed oversized-header oracle passes
+  with the strict C flags in the 298-check suite and again under UBSan.
+- **Acceptance:** long literal boundary/escape/return/task cases compile under
+  strict C flags and retain byte identity; native behavior still agrees.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
 
-- **Status:** open; carried from M17 and extended during M19/M20/M21/M22.
+- **Status:** open; carried from M17 and extended during M19/M20/M21/M22/M23.
 - **Evidence:** the C bootstrap, supported C suite, UBSan runtime tests, and
   benchmark output checks passed. Native `os.executable` lowering assembles
   for Linux x86-64, but was not executed there. This macOS ARM64 host has no
@@ -459,6 +524,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   Fixed values, retained views, Bytes and typed arenas have C oracle/lifetime
   coverage. Their fixtures and the final packed-varint parser cross-assemble
   for Linux x86-64 with optimization on/off. Native execution was not run.
+- **M23 evidence:** the C bootstrap reaches a 122,086-line fixed point; all
+  298 supported checks pass and UBSan passes 122 runtime/M19–M23 checks.
+  Independent local TCP/UDP, full duplex, pipe pressure/timeout, filesystem,
+  UTF-8 and HTTP/fake oracles pass. Both examples and a managed-handle fixture
+  cross-assemble for Linux x86-64 with optimization on/off. Neither native
+  execution nor ASan/TSan was run for M23 on this macOS ARM64 host.
 - **Workaround:** retain the host-supported results and these explicit limits.
 - **Required work:** on Linux x86-64, run both bootstrap fixed points and the
   applicable C/native suites under ASan and TSan. See
@@ -474,6 +545,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   Run `tests/m22_test.py build/vela` with both native optimization settings,
   including fixed managed/function values, byte order, view/task lifetimes,
   reset/growth/snapshot behavior and the malformed-varint oracle.
+  Run `tests/m23_test.py build/vela` on Linux x86-64 normally and with
+  `VELA_OPT=0`; that host executes both C and native cases. Cover handle
+  ownership/tasks, fake restoration, full duplex, TCP/UDP, clocks, process
+  pipes/limits/closed stdin, Unicode, HTTP framing and runtime include-cache
+  invalidation under the applicable sanitizers.
 - **Acceptance:** record host, compiler/toolchain, commit, commands, and actual
   results. Keep any failures open instead of inferring a pass from C or UBSan.
 
@@ -483,6 +559,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Evidence:** the twenty evaluation tasks pass their reference-solution
   self-test. Static checks find codes on 374 of 374 negative-test diagnostics,
   with edits on 21. No new model-driven agent runs were performed.
+- **M23 evidence:** the evaluation reference checks pass in the supported
+  suite; eval/m23-static.json records 373/373 coded diagnostics and 21 with
+  edits. No new model-driven agent trials were run.
 - **Workaround:** use the static metrics and seeded repair checks as
   implementation evidence; do not claim measured agent improvements.
 - **Required work:** compare the guide and prior documentation conditions on
@@ -506,6 +585,8 @@ the same entry. Close it with a commit or validation result; keep its history.
   7,704 tokens under the estimate, within its 8,000-token estimate gate.
 - **M22 measurement:** the compacted memory guide is 28,599 bytes, about
   7,149 tokens under the same estimate; generated API signatures remain.
+- **M23 measurement:** the systems-library guide is 31,400 bytes, or about
+  7,850 tokens by the same estimate, after compacting generated signatures.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.

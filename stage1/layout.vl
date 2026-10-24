@@ -69,6 +69,7 @@ test "C names of a module's things" {
 }
 
 fn primitive_c(t: Int) -> Str {
+    if t == types.HANDLE() { return "vela_io_handle *" }
     if t == cffi.PTR() { return "void *" }
     if t == cffi.FN() { return "vela_c_fn" }
     if types.is_integer(t) {
@@ -88,6 +89,7 @@ fn primitive_c(t: Int) -> Str {
 }
 
 fn runtime_descriptor(t: Int) -> Str {
+    if t == types.HANDLE() { return "&vela_type_io_handle" }
     if t == cffi.PTR() { return "&vela_type_c_ptr" }
     if t == cffi.FN() { return "&vela_type_c_fn" }
     if t >= 8 && t <= 13 {
@@ -219,6 +221,7 @@ fn base_name(l: Layout, t: Int) -> Str {
 pub fn suffix(l: Layout, t: Int) -> Str {
     let ti = types.get(l.table, t)
     if primitive_c(t) != "" {
+        if t == types.HANDLE() { return "io_handle" }
         if t == cffi.PTR() { return "c_ptr" }
         if t == cffi.FN() { return "c_fn" }
         return ti.name
@@ -395,6 +398,7 @@ pub fn is_boxed(l: Layout, t: Int, name: Str, index: Int) -> Bool {
 
 // Whether values of `t` hold references that must be counted.
 pub fn managed(l: mut Layout, t: Int) -> Bool {
+    if t == types.HANDLE() { return true }
     if t == types.NOTHING() || primitive_c(t) != "" && t != types.STR() {
         return false
     }
@@ -419,6 +423,7 @@ pub fn managed(l: mut Layout, t: Int) -> Bool {
 
 // A C statement retaining the value `c` of type `t`, or "".
 pub fn retain(l: mut Layout, t: Int, c: Str) -> Str {
+    if t == types.HANDLE() { return "vela_handle_retain(" + c + ");" }
     if !managed(mut l, t) {
         return ""
     }
@@ -435,6 +440,7 @@ pub fn retain(l: mut Layout, t: Int, c: Str) -> Str {
 }
 
 pub fn release(l: mut Layout, t: Int, c: Str) -> Str {
+    if t == types.HANDLE() { return "vela_handle_release(" + c + ");" }
     if !managed(mut l, t) {
         return ""
     }
@@ -453,6 +459,7 @@ pub fn release(l: mut Layout, t: Int, c: Str) -> Str {
 // A C statement marking what the value `c` of type `t` holds as shared
 // between threads, or "".
 pub fn share(l: mut Layout, t: Int, c: Str) -> Str {
+    if t == types.HANDLE() { return "vela_handle_share(" + c + ");" }
     if !managed(mut l, t) {
         return ""
     }

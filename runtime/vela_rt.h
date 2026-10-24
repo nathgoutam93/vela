@@ -609,6 +609,37 @@ void *vela_c_offset(void *p, int64_t offset);
 uint64_t vela_c_fn_bits(vela_c_fn fn);
 vela_c_fn vela_c_fn_from_bits(uint64_t bits);
 
+// Audited POSIX systems boundary. Arguments are borrowed; outputs are owned.
+typedef struct vela_io_handle vela_io_handle;
+extern const vela_type vela_type_io_handle;
+void vela_handle_retain(vela_io_handle *);
+void vela_handle_release(vela_io_handle *);
+void vela_handle_share(vela_io_handle *);
+bool vela_sys_wall_ns(int64_t *out, vela_str *error);
+bool vela_sys_monotonic_ns(int64_t *out, vela_str *error);
+bool vela_sys_sleep_ns(int64_t, vela_unit *out, vela_str *error);
+bool vela_sys_tcp_connect(vela_str, int64_t, int64_t, vela_io_handle * *out, vela_str *error);
+bool vela_sys_tcp_listen(vela_str, int64_t, int64_t, vela_io_handle * *out, vela_str *error);
+bool vela_sys_accept(vela_io_handle *, vela_io_handle * *out, vela_str *error);
+bool vela_sys_net_read(vela_io_handle *, int64_t, vela_str *out, vela_str *error);
+bool vela_sys_net_write(vela_io_handle *, vela_str, int64_t *out, vela_str *error);
+bool vela_sys_net_close(vela_io_handle *, vela_unit *out, vela_str *error);
+bool vela_sys_net_port(vela_io_handle *, int64_t *out, vela_str *error);
+bool vela_sys_net_timeout(vela_io_handle *, int64_t, vela_unit *out, vela_str *error);
+bool vela_sys_udp_bind(vela_str, int64_t, vela_io_handle * *out, vela_str *error);
+bool vela_sys_udp_send(vela_io_handle *, vela_str, int64_t, vela_str, int64_t *out, vela_str *error);
+bool vela_sys_udp_receive(vela_io_handle *, int64_t, vela_array * *out, vela_str *error);
+bool vela_sys_process(vela_array *, vela_str, int64_t, int64_t, vela_array * *out, vela_str *error);
+bool vela_sys_list(vela_str, vela_array * *out, vela_str *error);
+bool vela_sys_kind(vela_str, int64_t *out, vela_str *error);
+bool vela_sys_mkdir(vela_str, vela_unit *out, vela_str *error);
+void *vela_fake_clock(vela_array *);
+void vela_fake_clock_restore(void *);
+void *vela_fake_net(vela_array *);
+void vela_fake_net_restore(void *);
+void *vela_fake_processes(vela_array *);
+void vela_fake_processes_restore(void *);
+
 #include "vela_int.h"
 
 #endif

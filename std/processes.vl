@@ -1,0 +1,18 @@
+// Synchronous pipe communication, bounded by combined output and elapsed time.
+import sysio
+import strings
+import text
+pub type Output = struct { status: Int, stdout: Str, stderr: Str }
+pub fn run(args: [Str], input: Str) -> Result[Output, Str] uses os { return communicate(args, input, 16777216, 30000) }
+pub fn communicate(args: [Str], input: Str, limit: Int, timeout_ms: Int) -> Result[Output, Str] uses os {
+    let row = sysio.process(args, input, limit, timeout_ms)?
+    match text.parse_int(row[0]) { Some(status) => return Ok(Output { status: status, stdout: row[1], stderr: row[2] }), None => return Err("invalid process status") }
+}
+pub fn reply(args: [Str], input: Str, status: Int, stdout: Str, stderr: Str) -> [Str] requires status >= 0 && status <= 255 {
+    let mut row = ["ok", input, strings.from_int(status), stdout, stderr]
+    for arg in args { push(mut row, arg) }; return row
+}
+pub fn failure(args: [Str], input: Str, error: Str) -> [Str] {
+    let mut row = ["error", input, "0", error, ""]
+    for arg in args { push(mut row, arg) }; return row
+}

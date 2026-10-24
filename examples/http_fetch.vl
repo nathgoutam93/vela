@@ -1,0 +1,11 @@
+// vela run examples/http_fetch.vl http://example.com/
+import http
+import net
+import os
+pub fn fetch(url: Str) -> Result[Str, Str] uses net { return Ok(http.get(url)?.body) }
+fn main() { let args = os.args(); if len(args) != 2 { print("usage: http_fetch http://HOST/PATH"); return }; match fetch(args[1]) { Ok(body) => os.write(body), Err(e) => os.eprint(e) } }
+test "fetch without network" {
+    with net = [net.reply("example.test", 80, "GET /hello HTTP/1.1\r\nHost: example.test\r\nConnection: close\r\n\r\n", "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")] {
+        match fetch("http://example.test/hello") { Ok(body) => assert(body == "hello"), Err(_) => assert(false) }
+    }
+}

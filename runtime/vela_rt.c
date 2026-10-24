@@ -1140,7 +1140,10 @@ static pthread_mutex_t fork_lock = PTHREAD_MUTEX_INITIALIZER;
 // Runs `command`, waits for it and sets *code. When `captured` is not NULL
 // the program's stdout goes into *captured instead of ours. False, with a
 // message in *err, if it could not be started at all.
+static bool sys_legacy_process(vela_array *, int64_t *, vela_str *, vela_str *, bool *);
 static bool run_program(vela_array *command, int64_t *code, vela_str *err, vela_str *captured) {
+    bool handled=false;bool fake_ok=sys_legacy_process(command,code,err,captured,&handled);
+    if(handled)return fake_ok;
     if (command->len == 0) {
         *err = str_from("os.run needs a program to run", 29);
         return false;
@@ -1746,3 +1749,5 @@ int64_t vela_memory_signed(uint64_t bits, int64_t width, const char *loc) {
     memcpy(&value, &raw, sizeof value);
     return value;
 }
+
+#include "vela_sys.inc"

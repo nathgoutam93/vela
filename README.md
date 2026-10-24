@@ -153,6 +153,11 @@ M22 adds retained array/text views, the Bytes buffer with checked endian
 reads/writes, fixed inline arrays (`[T; N]`), and reusable typed arenas with
 snapshot semantics. Binary parsing and arena-tree benchmarks exercise the
 memory APIs; see [`docs/m22-memory-control.md`](docs/m22-memory-control.md).
+M23 adds blocking TCP/UDP, a bounded plaintext HTTP/1.1 client, clocks,
+strict UTF-8/code-point helpers, subprocess pipes, directory walking and
+reader/writer interfaces. Network, clock and process fakes keep their examples
+and library clients deterministic in tests. See
+[`docs/m23-systems-library.md`](docs/m23-systems-library.md).
 What comes next, toward a systems language that is also agent-first, is in
 [`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
 See `docs/` for a walkthrough of each milestone.

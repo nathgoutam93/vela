@@ -83,6 +83,7 @@ M19_TEST = TESTS / "m19_test.py"
 M20_TEST = TESTS / "m20_test.py"
 M21_TEST = TESTS / "m21_test.py"
 M22_TEST = TESTS / "m22_test.py"
+M23_TEST = TESTS / "m23_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -171,6 +172,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(CACHE_TEST, compiler, env)
     if path == M17_TEST:
         return run_script(M17_TEST, compiler, env)
+    if path == M23_TEST:
+        return run_script(M23_TEST, compiler, env)
     if path == M22_TEST:
         return run_script(M22_TEST, compiler, env)
     if path == M21_TEST:
@@ -329,6 +332,7 @@ def run_nvim_test(compiler: list[str], env: dict[str, str]) -> list[str]:
 def find_tests(filters: list[str]) -> list[Path]:
     tests = []
     tests += sorted((ROOT / "examples").glob("*/main.vl"))
+    tests += [p for p in sorted((ROOT / "examples").glob("*.vl")) if 'test "' in p.read_text()]
     tests.append(ROOT / "stage1" / "main.vl")  # the compiler's own tests
     tests += [p for p in sorted((ROOT / "std").glob("*.vl")) if 'test "' in p.read_text()]
     tests += [p for p in sorted((ROOT / "packages").glob("*/*.vl")) if 'test "' in p.read_text()]
@@ -343,6 +347,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(M20_TEST)
     tests.append(M21_TEST)
     tests.append(M22_TEST)
+    tests.append(M23_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

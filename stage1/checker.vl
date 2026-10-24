@@ -12,6 +12,7 @@ import ast
 import errors
 import integers
 import cffi
+import sysops
 import interfaces
 import lexer
 import maps
@@ -530,7 +531,7 @@ fn signatures(c: mut Checker) {
             if types.concrete_effect(u) {
             } else if pi < 0 {
                 report(mut c, f.effects_line, f.effects_col, "E3015", "unknown effect '" + u + "'; the effects are fs (the files module), " +
-                    "os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), or the name of a " +
+                    "os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), net (networking), clock (time), or the name of a " +
                         "parameter that is a function, for whatever that function uses")
             } else if !types.is_func(c.table, params[pi]) {
                 if params[pi] != types.ERROR() {
@@ -616,6 +617,13 @@ fn param_named(f: ast.FnDecl, name: Str) -> Int {
 
 // The type a TypeName in the source stands for (ERROR if unknown).
 fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
+    if t.module == "sysio" {
+        let module = module_in_type(mut c, t.line, t.col, "sysio")
+        if module < 0 { return types.ERROR() }
+        if t.name == "Handle" && len(t.args) == 0 { return types.HANDLE() }
+        report(mut c, t.line, t.col, "E3220", "unknown systems type; use sysio.Handle")
+        return types.ERROR()
+    }
     if t.module == "c" {
         let module = module_in_type(mut c, t.line, t.col, "c")
         if module < 0 { return types.ERROR() }
@@ -647,7 +655,7 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
             if types.concrete_effect(u) {
                 effects = types.union_effects(effects, [u])
             } else {
-                report(mut c, t.line, t.col, "E3023", "unknown effect '" + u + "' in a function type; its effects can be fs, os and unsafe. " +
+                report(mut c, t.line, t.col, "E3023", "unknown effect '" + u + "' in a function type; its effects can be fs, os, unsafe, net and clock. " +
                     "For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to")
             }
         }
@@ -987,7 +995,7 @@ fn effect_hint(c: Checker, found: Int, want: Int) -> Str {
         types.plain(c.table, found) != types.plain(c.table, want) {
         return ""
     }
-    return "; a function that uses fs, os or unsafe goes only where its type says so, or to a parameter its function " +
+    return "; a function that uses fs, os, net, clock or unsafe goes only where its type says so, or to a parameter its function " +
         "names in `uses`"
 }
 
@@ -1022,7 +1030,7 @@ fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block
         report(mut c, s.line, s.col, "E3037", "'with' cannot be used inside a function value; put the function value inside the " +
             "'with' instead")
     } else if !c.fns[c.current_fn].is_test {
-        report(mut c, s.line, s.col, "E3038", "'with' only works in tests, where it fakes files, args, env, stdin or stdout for the code " +
+        report(mut c, s.line, s.col, "E3038", "'with' only works in tests, where it fakes files, args, env, stdin, stdout, clock, net or processes for the code " +
             "the test calls")
     }
     let text_map = types.map(mut c.table, types.STR(), types.STR())
@@ -1035,7 +1043,11 @@ fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block
             }
         }
         push(mut seen, w.name)
-        if w.name == "files" {
+        if w.name == "clock" {
+            check_expr(mut c, w.value, types.array(mut c.table, types.INT()), msg("clock fake needs [wall_ns, monotonic_ns], found ", ""))
+        } else if w.name == "net" || w.name == "processes" {
+            check_expr(mut c, w.value, types.array(mut c.table, words), msg("network/process fakes need a list of reply/failure fixtures, found ", ""))
+        } else if w.name == "files" {
             check_expr(mut c, w.value, text_map, msg("'with files' needs a Map[Str, Str] from paths to contents, found ", ""))
         } else if w.name == "env" {
             check_expr(mut c, w.value, text_map, msg("'with env' needs a Map[Str, Str] from names to values, found ", ""))
@@ -1060,7 +1072,7 @@ fn with_stmt(c: mut Checker, s: ast.Stmt, items: [ast.WithItem], body: ast.Block
                 report_at(mut c, w.value, "E3041", "'with stdout' needs a strings.Builder to collect what is printed, found " + show(c, t))
             }
         } else {
-            report(mut c, w.line, w.col, "E3042", "'with' cannot fake '" + w.name + "'; it fakes files, args, env, stdin and stdout")
+            report(mut c, w.line, w.col, "E3042", "'with' cannot fake '" + w.name + "'; it fakes files, args, env, stdin, stdout, clock, net and processes")
             infer(mut c, w.value)
         }
     }
@@ -3791,6 +3803,7 @@ fn integer_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], exp
 // A call to a built-in function, written as `written`: one of the
 // prelude's (`len`) or of a built-in module's (`maps.get`, named by `name`).
 fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: Str, expected: Int) -> Int {
+    if len(name) > 6 && (name[0..6] == "sysio." || name[0..6] == "clock.") { return system_builtin(mut c, e, name[6..len(name)], args) }
     if len(name) > 7 && name[0..7] == "memory." { return memory_builtin(mut c, e, name[7..len(name)], args, expected) }
     if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut c, e, name[2..len(name)], args, expected) }
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
@@ -4131,7 +4144,7 @@ fn define_interface(c: mut Checker, id: Int, d: ast.TypeDecl) {
         let mut result = types.NOTHING()
         match method.result { Some(t) => { result = resolve_type(mut c, t); if d.public { exposes(mut c, t, "interface '" + d.name + "'") } }, None => {} }
         for effect in method.effects {
-            if !types.concrete_effect(effect) { report(mut c, method.line, method.col, "E3191", "interface effects must be fs, os or unsafe") }
+            if !types.concrete_effect(effect) { report(mut c, method.line, method.col, "E3191", "interface effects must be fs, os, unsafe, net or clock") }
         }
         if types.field_index(c.table, id, method.name) >= 0 {
             report(mut c, method.line, method.col, "E3192", "duplicate interface method '" + method.name + "'")
@@ -4645,4 +4658,15 @@ fn validate_fixed(c: mut Checker) {
             if info.tag == types.Tag.Enum { for variant in info.variants { for value in variant.payload { push(mut queue, value) } } }
         }
     }
+}
+
+fn system_type(c: mut Checker, tag: Int) -> Int {
+    return match tag { 1 => types.INT(), 2 => types.STR(), 3 => types.BOOL(), 4 => types.HANDLE(), 5 => types.array(mut c.table, types.STR()), _ => types.UNIT() }
+}
+fn system_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr]) -> Int {
+    use_effect(mut c, e, sysops.effect(name), name)
+    let ps = sysops.params(name)
+    if !arity(mut c, e, name, len(ps), len(args)) { for arg in args { infer(mut c, arg) }; return types.ERROR() }
+    for i in 0..len(args) { check_expr(mut c, args[i], system_type(mut c, ps[i]), msg("systems argument must be " + sysops.type_text(ps[i]) + ", found ", "")) }
+    return types.result(mut c.table, system_type(mut c, sysops.result(name)), types.STR())
 }

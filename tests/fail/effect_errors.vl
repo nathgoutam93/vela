@@ -2,17 +2,17 @@
 // err: effect_errors.vl:20:18: error: 'read' uses fs, through files.read, but does not say so; add `uses fs` after its signature [E3036]
 // err: effect_errors.vl:23:28: warning: 'first' says `uses fs` but uses nothing of it [E7008]
 // err: effect_errors.vl:30:12: error: effect 'os' is listed twice [E3019]
-// err: effect_errors.vl:30:12: error: unknown effect 'net'; the effects are fs (the files module), os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), or the name of a parameter that is a function, for whatever that function uses [E3015]
+// err: effect_errors.vl:30:12: error: unknown effect 'gpu'; the effects are fs (the files module), os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), net (networking), clock (time), or the name of a parameter that is a function, for whatever that function uses [E3015]
 // err: effect_errors.vl:35:5: error: 'caller' uses os, through 'leave', but does not say so; add `uses os` after its signature [E3036]
 // err: effect_errors.vl:38:11: warning: 'tidy' says `uses os` but uses nothing of it [E7008]
 // err: effect_errors.vl:43:14: error: a requires clause must be Bool, found Int [E3093]
 // err: effect_errors.vl:48:4: error: 'odd' has a parameter called 'result', which its ensures clauses cannot tell from the value it returns; rename the parameter [E3033]
 // err: effect_errors.vl:54:13: error: undefined name 'result' [E3087]
-// err: effect_errors.vl:59:5: error: 'with' only works in tests, where it fakes files, args, env, stdin or stdout for the code the test calls [E3038]
+// err: effect_errors.vl:59:5: error: 'with' only works in tests, where it fakes files, args, env, stdin, stdout, clock, net or processes for the code the test calls [E3038]
 // err: effect_errors.vl:65:18: error: 'with files' needs a Map[Str, Str] from paths to contents, found [Str] [E3093]
 // err: effect_errors.vl:65:31: error: 'with env' needs a Map[Str, Str] from names to values, found Int [E3093]
 // err: effect_errors.vl:65:43: error: 'with stdout' collects what is printed into a strings.Builder variable, written `stdout = mut out` [E3040]
-// err: effect_errors.vl:65:46: error: 'with' cannot fake 'net'; it fakes files, args, env, stdin and stdout [E3042]
+// err: effect_errors.vl:65:46: error: 'with' cannot fake 'gpu'; it fakes files, args, env, stdin, stdout, clock, net and processes [E3042]
 import files
 import os
 
@@ -27,7 +27,7 @@ fn first(path: Str) -> Str uses fs {
     }
 }
 
-fn leave() uses net, os, os {
+fn leave() uses gpu, os, os {
     os.exit(1)
 }
 
@@ -62,6 +62,6 @@ fn main() {
 }
 
 test "fakes need the right types" {
-    with files = ["a"], env = 3, stdout = 1, net = 2 {
+    with files = ["a"], env = 3, stdout = 1, gpu = 2 {
     }
 }

@@ -512,7 +512,7 @@ fn in_memory(g: Low, t: Int) -> Bool {
     if t == types.STR() {
         return true
     }
-    if cffi.pointer(t) || t == types.NOTHING() || types.is_integer(t) || t == types.BOOL() || t == types.UNIT() ||
+    if t == types.HANDLE() || cffi.pointer(t) || t == types.NOTHING() || types.is_integer(t) || t == types.BOOL() || t == types.UNIT() ||
         t == types.FLOAT() || is_array_like(g, t) || types.is_map(g.k.table, t) {
         return false
     }
@@ -860,6 +860,7 @@ fn object(g: mut Low, v: Val, off: Int) -> Int {
 }
 
 fn retain(g: mut Low, t: Int, v: Val) {
+    if t == types.HANDLE() { ccall(mut g, "vela_handle_retain", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_NONE(), -1); return }
     if !managed(mut g, t) {
         return
     }
@@ -884,6 +885,7 @@ fn retain(g: mut Low, t: Int, v: Val) {
 }
 
 fn release(g: mut Low, t: Int, v: Val) {
+    if t == types.HANDLE() { ccall(mut g, "vela_handle_release", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_NONE(), -1); return }
     if !managed(mut g, t) {
         return
     }
@@ -935,6 +937,7 @@ fn mark_shared(g: mut Low, obj: Int) -> Int {
 }
 
 fn share(g: mut Low, t: Int, v: Val) {
+    if t == types.HANDLE() { ccall(mut g, "vela_handle_share", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_NONE(), -1); return }
     if !managed(mut g, t) {
         return
     }
@@ -973,6 +976,7 @@ fn share(g: mut Low, t: Int, v: Val) {
 // The vela_type describing `t` to arrays and maps: the runtime's, or one
 // written here.
 fn descriptor(g: mut Low, t: Int) -> Int {
+    if t == types.HANDLE() { return sym_addr(mut g, "vela_type_io_handle") }
     if t == cffi.PTR() { return sym_addr(mut g, "vela_type_c_ptr") }
     if t == cffi.FN() { return sym_addr(mut g, "vela_type_c_fn") }
     if t >= 8 && t <= 13 { return sym_addr(mut g, "vela_type_" + types.get(g.k.table, t).name) }
@@ -2918,6 +2922,7 @@ fn shown(g: mut Low, t: Int, v: Val) -> Int {
 // ---- Built-in functions ----
 
 fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    if len(name) > 6 && (name[0..6] == "sysio." || name[0..6] == "clock.") { return system_builtin(mut g, e, name[6..len(name)], args) }
     if len(name) > 7 && name[0..7] == "memory." { return memory_builtin(mut g, e, name[7..len(name)], args) }
     if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut g, e, name[2..len(name)], args) }
     let t = ty(g, e)
@@ -3508,4 +3513,29 @@ fn memory_builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     for i in 1..len(args) { push(mut regs, scalar(mut g, fresh(mut g, expr(mut g, args[i])))); push(mut kinds, ir.KIND_INT()) }
     push(mut regs, loc); push(mut kinds, ir.KIND_INT())
     return reg_val(ccall(mut g, target, regs, kinds, ir.RET_INT(), -1), t)
+}
+
+fn system_builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    let r = ty(g, e)
+    let payload = types.get(g.k.table, r).args[0]
+    let result = slot_val(mut g, r)
+    let output = slot_val(mut g, payload)
+    let error = slot_val(mut g, types.STR())
+    copy_mem(mut g, error.reg, sym_addr(mut g, str_literal(mut g, "")), 24)
+    let mut regs: [Int] = []
+    let mut kinds: [Int] = []
+    for arg in args {
+        let v = own(mut g, fresh(mut g, consume(mut g, expr(mut g, arg))))
+        if v.ty == types.STR() { push(mut regs, address(mut g, v)); push(mut kinds, ir.KIND_STR()) } else { push(mut regs, scalar(mut g, v)); push(mut kinds, ir.KIND_INT()) }
+    }
+    push(mut regs, output.reg); push(mut kinds, ir.KIND_INT())
+    push(mut regs, error.reg); push(mut kinds, ir.KIND_INT())
+    let ok = ccall(mut g, "vela_sys_" + name, regs, kinds, ir.RET_BOOL(), -1)
+    let yes = label(mut g); let no = label(mut g); let done = label(mut g)
+    let a = types.variant_index(g.k.table, r, "Ok"); let b = types.variant_index(g.k.table, r, "Err")
+    branch(mut g, ok, yes, no)
+    place_label(mut g, yes); store(mut g, result.reg, 0, 4, konst(mut g, a)); put_payload(mut g, result, r, a, 0, output); jump(mut g, done)
+    place_label(mut g, no); store(mut g, result.reg, 0, 4, konst(mut g, b)); put_payload(mut g, result, r, b, 0, error)
+    place_label(mut g, done)
+    return own(mut g, result)
 }

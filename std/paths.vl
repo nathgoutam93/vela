@@ -1,0 +1,17 @@
+// Sorted directory traversal, yielding leaf paths. Does not follow symlinks.
+import sysio
+import text
+pub fn join(base: Str, name: Str) -> Str {
+    if base == "" { return name }; if text.ends_with(base, "/") { return base + name }; return base + "/" + name
+}
+pub fn list(path: Str) -> Result[[Str], Str] uses fs { return sysio.list(path) }
+// kind: 0 missing, 1 file/other, 2 directory, 3 symbolic link.
+pub fn kind(path: Str) -> Result[Int, Str] uses fs { return sysio.kind(path) }
+pub fn mkdir(path: Str) -> Result[Unit, Str] uses fs { return sysio.mkdir(path) }
+pub fn walk(path: Str) -> Result[[Str], Str] uses fs { return walk_depth(path, 0) }
+fn walk_depth(path: Str, depth: Int) -> Result[[Str], Str] uses fs {
+    if depth >= 128 { return Err("directory depth exceeds 128") }
+    let k = kind(path)?; if k == 0 { return Err("path does not exist") }; if k != 2 { return Ok([path]) }
+    let mut out: [Str] = []
+    for name in list(path)? { for child in walk_depth(join(path, name), depth + 1)? { push(mut out, child) } }; return Ok(out)
+}

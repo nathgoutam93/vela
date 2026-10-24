@@ -133,8 +133,13 @@ pub fn new_table() -> Table {
     }
     push(mut t.types, info(Tag.Prim, "c.Ptr"))
     push(mut t.types, info(Tag.Prim, "c.Fn"))
+    let mut handle = info(Tag.Std, "Handle")
+    handle.module = "sysio"
+    push(mut t.types, handle)
     return t
 }
+
+pub fn HANDLE() -> Int { return 16 }
 
 pub fn is_integer(t: Int) -> Bool { return integers.width(t) > 0 }
 pub fn integer_width(t: Int) -> Int { return integers.width(t) }
@@ -937,4 +942,4 @@ pub fn used_as_key(table: Table, t: Int) -> Bool {
 }
 
 // Concrete effects, shared by declarations and function/interface signatures.
-pub fn concrete_effect(name: Str) -> Bool { return name == "fs" || name == "os" || name == "unsafe" }
+pub fn concrete_effect(name: Str) -> Bool { return name == "fs" || name == "os" || name == "unsafe" || name == "clock" || name == "net" }

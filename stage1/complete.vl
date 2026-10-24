@@ -269,6 +269,7 @@ fn module_items(k: checker.Checked, target: Int) -> [Item] {
         for f in m.std {
             push(mut out, builtin_item(f, m.name + "." + f))
         }
+        if m.name == "sysio" { push(mut out, Item { name: "Handle", kind: "type", detail: "sysio.Handle", doc: "Owning external I/O resource; copies alias the connection." }) }
         if m.name == "strings" {
             push(mut out, Item {
                 name: "Builder", kind: "type", detail: "strings.Builder", doc: "Makes a Str from many pieces: strings.builder().",

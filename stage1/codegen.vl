@@ -877,7 +877,7 @@ fn with_code(g: mut Gen, items: [ast.WithItem], body: ast.Block) {
             let mut c_ty = "vela_map *"
             if w.name == "args" {
                 c_ty = "vela_array *"
-            } else if w.name == "stdin" {
+            } else if w.name == "stdin" || w.name == "clock" || w.name == "net" || w.name == "processes" {
                 c_ty = "void *"
             }
             emit(mut g, c_ty + saved + " = vela_fake_" + w.name + "(" + v + ");")
@@ -2415,6 +2415,7 @@ fn shown(t: Int, c: Str) -> Str {
 }
 
 fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
+    if len(name) > 6 && (name[0..6] == "sysio." || name[0..6] == "clock.") { return system_builtin(mut g, e, name[6..len(name)], args) }
     if len(name) > 7 && name[0..7] == "memory." { return memory_builtin(mut g, e, name[7..len(name)], args) }
     if len(name) > 2 && name[0..2] == "c." { return c_builtin(mut g, e, name[2..len(name)], args) }
     let t = ty(g, e)
@@ -2906,4 +2907,21 @@ fn memory_builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value
     call = call + "(" + data.c
     for i in 1..len(args) { let v = expr(mut g, args[i]); call = call + ", " + scalar(mut g, v.ty, v.c) }
     return store(mut g, t, call + ", " + loc + ")")
+}
+
+fn system_builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
+    let r = ty(g, e)
+    let rt = c_type(g, r)
+    let payload = types.get(g.k.table, r).args[0]
+    let mut call = "vela_sys_" + name + "("
+    for a in args { let v = expr(mut g, a); let pinned = store(mut g, v.ty, consume(mut g, v)); call = call + pinned.c + ", " }
+    let output = new_temp(mut g)
+    let error = new_temp(mut g)
+    let ok = new_temp(mut g)
+    emit(mut g, c_type(g, payload) + " " + output + " = {0};")
+    emit(mut g, "vela_str " + error + " = VELA_STR(\"\", 0);")
+    emit(mut g, "bool " + ok + " = " + call + "&" + output + ", &" + error + ");")
+    let yes = "(" + rt + "){.tag = " + layout.tag(g.l, r, "Ok") + ", .as.m_Ok = {._0 = " + output + "}}"
+    let no = "(" + rt + "){.tag = " + layout.tag(g.l, r, "Err") + ", .as.m_Err = {._0 = " + error + "}}"
+    return store(mut g, r, ok + " ? " + yes + " : " + no)
 }

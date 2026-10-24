@@ -1,10 +1,10 @@
 import geometry
-import paths
+import routes
 import strings
 
 fn main() {
     let pts = [geometry.Point { x: 1, y: 2 }, geometry.Point { x: 4, y: 6 }, geometry.Point { x: -3, y: 0 }]
-    print(strings.from_int(paths.spread(pts)))
-    print(strings.from_int(paths.farthest(pts)))
+    print(strings.from_int(routes.spread(pts)))
+    print(strings.from_int(routes.farthest(pts)))
     print(strings.from_int(geometry.distance_squared(pts[0], geometry.origin())))
 }

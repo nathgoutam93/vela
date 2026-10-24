@@ -1,0 +1,107 @@
+// Bounded plaintext HTTP/1.1 GET. HTTPS/TLS and automatic redirects are separate.
+import net
+import text
+import strings
+import maps
+import bytes
+pub type Response = struct { status: Int, headers: Map[Str, Str], body: Str }
+type Url = struct { host: Str, port: Int, authority: Str, target: Str }
+type Stream = struct { socket: net.Tcp, buffer: Str }
+fn decimal(s: Str) -> Result[Int, Str] {
+    if len(s) == 0 { return Err("empty decimal") }; for c in s { if c < '0' || c > '9' { return Err("invalid decimal") } }
+    match text.parse_int(s) { Some(n) => return Ok(n), None => return Err("decimal overflow") }
+}
+fn url(value: Str) -> Result[Url, Str] {
+    if !text.starts_with(value, "http://") { return Err("only http:// URLs are supported") }
+    for c in value { if c <= 32 || c >= 127 { return Err("URL must contain printable ASCII without spaces") } }
+    let mut rest = value[7..len(value)]; match text.index_of(rest, "#") { Some(i) => rest = rest[0..i], None => {} }
+    let mut end = len(rest); for i in 0..len(rest) { if rest[i] == '/' || rest[i] == '?' { end = i; break } }
+    let authority = rest[0..end]; if len(authority) == 0 || text.contains(authority, "@") || text.contains(authority, "\\") { return Err("invalid HTTP authority") }
+    let mut host = authority; let mut port = 80
+    if authority[0] == '[' {
+        let mut close = -1; match text.index_of(authority, "]") { Some(i) => close = i, None => return Err("unclosed IPv6 host") }
+        host = authority[1..close]; if close + 1 < len(authority) { if authority[close + 1] != ':' { return Err("invalid HTTP port") }; port = decimal(authority[close + 2..len(authority)])? }
+    } else {
+        match text.index_of(authority, ":") { Some(i) => { host = authority[0..i]; port = decimal(authority[i + 1..len(authority)])? }, None => {} }
+        if text.contains(host, "[") || text.contains(host, "]") { return Err("invalid HTTP host") }
+    }
+    if len(host) == 0 || port < 1 || port > 65535 { return Err("invalid HTTP host or port") }
+    let mut target = rest[end..len(rest)]; if target == "" { target = "/" } else if target[0] == '?' { target = "/" + target }
+    return Ok(Url { host: host, port: port, authority: authority, target: target })
+}
+fn line(s: mut Stream, limit: Int) -> Result[Str, Str] uses net {
+    for {
+        match text.index_of(s.buffer, "\r\n") {
+            Some(i) => { if i + 2 > limit { return Err("HTTP line limit exceeded") }; let result = s.buffer[0..i]; s.buffer = s.buffer[i + 2..len(s.buffer)]; return Ok(result) }, None => {}
+        }
+        if len(s.buffer) >= limit { return Err("HTTP line limit exceeded") }
+        let mut n = 4096; if n > limit - len(s.buffer) { n = limit - len(s.buffer) }
+        let part = s.socket.read(n)?; if part == "" { return Err("truncated HTTP line") }; s.buffer = s.buffer + part
+    }
+}
+fn take(s: mut Stream, n: Int) -> Result[Str, Str] uses net {
+    let mut b = strings.builder(); let mut left = n
+    for left > 0 {
+        if len(s.buffer) == 0 { let mut size = left; if size > 8192 { size = 8192 }; s.buffer = s.socket.read(size)?; if s.buffer == "" { return Err("truncated HTTP body") } }
+        let mut count = len(s.buffer); if count > left { count = left }; strings.add(mut b, s.buffer[0..count]); s.buffer = s.buffer[count..len(s.buffer)]; left = left - count
+    }; return Ok(strings.build(b))
+}
+fn punctuation(c: Byte) -> Bool { for p in "!#$%&'*+-.^_`|~" { if c == p { return true } }; return false }
+fn token(name: Str) -> Bool {
+    if name == "" { return false }; for c in name { if !(bytes.is_letter(c) || bytes.is_digit(c) || punctuation(c)) { return false } }; return true
+}
+fn field(row: Str) -> Result[[Str], Str] {
+    let mut colon = -1; match text.index_of(row, ":") { Some(i) => colon = i, None => return Err("invalid HTTP field") }
+    let name = text.to_lower(row[0..colon]); if !token(name) { return Err("invalid HTTP field name") }
+    let value = row[colon + 1..len(row)]; for c in value { if (c < 32 && c != '\t') || c == 127 { return Err("invalid HTTP field value") } }
+    return Ok([name, text.trim(value)])
+}
+fn response(socket: net.Tcp, limit: Int) -> Result[Response, Str] uses net {
+    let mut s = Stream { socket: socket, buffer: "" }; let mut remaining = 65536; let mut status = 0; let mut headers: Map[Str, Str] = [:]
+    for interim in 0..9 {
+        let first = line(mut s, remaining)?; remaining = remaining - len(first) - 2
+        if len(first) < 12 || (first[0..9] != "HTTP/1.1 " && first[0..9] != "HTTP/1.0 ") || (len(first) > 12 && first[12] != ' ') { return Err("invalid HTTP status line") }
+        status = decimal(first[9..12])?; if status < 100 || status > 599 { return Err("invalid HTTP status") }
+        for c in first { if c < 32 || c == 127 { return Err("invalid HTTP status text") } }
+        headers = [:]
+        for {
+            let row = line(mut s, remaining)?; remaining = remaining - len(row) - 2; if row == "" { break }; let pair = field(row)?; let name = pair[0]
+            if maps.has(headers, name) { if name == "content-length" || name == "transfer-encoding" { return Err("duplicate HTTP framing field") }; headers[name] = headers[name] + ", " + pair[1] } else { headers[name] = pair[1] }
+        }
+        if status >= 200 { break }; if status == 101 || interim == 8 { return Err("unsupported HTTP upgrade or too many interim responses") }
+    }
+    let cl = maps.has(headers, "content-length"); let te = maps.has(headers, "transfer-encoding")
+    if cl && te { return Err("ambiguous HTTP framing") }
+    if status == 204 || status == 304 { return Ok(Response { status: status, headers: headers, body: "" }) }
+    let mut body = strings.builder(); let mut total = 0
+    if te {
+        if text.to_lower(headers["transfer-encoding"]) != "chunked" { return Err("unsupported HTTP transfer coding") }
+        for {
+            let row = line(mut s, remaining)?; remaining = remaining - len(row) - 2; let mut digits = row; match text.index_of(row, ";") { Some(i) => digits = row[0..i], None => {} }
+            if digits == "" { return Err("empty HTTP chunk size") }; let mut size = 0
+            for c in digits {
+                let mut d = -1; if c >= '0' && c <= '9' { d = int(c - '0') } else if c >= 'a' && c <= 'f' { d = int(c - 'a') + 10 } else if c >= 'A' && c <= 'F' { d = int(c - 'A') + 10 }
+                if d < 0 || d > limit - total || size > (limit - total - d) / 16 { return Err("invalid or excessive HTTP chunk") }; size = size * 16 + d
+            }
+            for c in row { if c < 32 || c == 127 { return Err("invalid chunk extension") } }
+            if size == 0 {
+                for { let trailer = line(mut s, remaining)?; remaining = remaining - len(trailer) - 2; if trailer == "" { break }; let pair = field(trailer)?; if pair[0] == "content-length" || pair[0] == "transfer-encoding" { return Err("framing field in trailer") } }; break
+            }
+            strings.add(mut body, take(mut s, size)?); total = total + size; if take(mut s, 2)? != "\r\n" { return Err("invalid chunk terminator") }
+        }
+    } else if cl {
+        let size = decimal(headers["content-length"])?; if size > limit { return Err("HTTP body limit exceeded") }; strings.add(mut body, take(mut s, size)?)
+    } else {
+        for { let part = s.buffer; s.buffer = ""; if len(part) > limit - total { return Err("HTTP body limit exceeded") }; strings.add(mut body, part); total = total + len(part)
+            let mut ask = 8192; if limit - total < 8192 { ask = limit - total + 1 }; s.buffer = socket.read(ask)?; if s.buffer == "" { break }
+        }
+    }
+    return Ok(Response { status: status, headers: headers, body: strings.build(body) })
+}
+pub fn get(value: Str) -> Result[Response, Str] uses net { return get_limit(value, 8388608, 5000) }
+pub fn get_limit(value: Str, body_limit: Int, timeout_ms: Int) -> Result[Response, Str] uses net {
+    if body_limit < 0 || body_limit > 67108864 { return Err("invalid HTTP body limit") }; let u = url(value)?; let socket = net.connect_timeout(u.host, u.port, timeout_ms)?
+    let sent = socket.write("GET " + u.target + " HTTP/1.1\r\nHost: " + u.authority + "\r\nConnection: close\r\n\r\n")
+    match sent { Err(e) => { socket.close(); return Err(e) }, Ok(_) => {} }
+    let result = response(socket, body_limit); socket.close(); return result
+}
