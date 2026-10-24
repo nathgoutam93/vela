@@ -1,0 +1,16 @@
+import os
+import text
+import crc32
+
+fn main() {
+    let args = os.args()
+    let mut size = 4194304
+    let mut rounds = 32
+    if len(args) > 1 { match text.parse_int(args[1]) { Some(n) => size = n, None => os.exit(2) } }
+    if len(args) > 2 { match text.parse_int(args[2]) { Some(n) => rounds = n, None => os.exit(2) } }
+    let data = text.repeat("a", size)
+    let entries = crc32.table()
+    let mut result = 0u32
+    for _ in 0..rounds { result = crc32.update(data, entries, result) }
+    print(result)
+}

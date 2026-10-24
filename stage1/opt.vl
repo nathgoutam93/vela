@@ -181,8 +181,10 @@ fn branch_holds(cond: Str, a: Int, b: Int) -> Bool {
         "le" => a <= b
         "gt" => a > b
         "ge" => a >= b
-        "ult" => a >= 0 && (b < 0 || a < b)  // unsigned: a negative number is big
-        _ => !(a >= 0 && (b < 0 || a < b))
+        "ult" => (a >= 0 && b < 0) || ((a < 0) == (b < 0) && a < b)
+        "ugt" => (a < 0 && b >= 0) || ((a < 0) == (b < 0) && a > b)
+        "ule" => (a >= 0 && b < 0) || ((a < 0) == (b < 0) && a <= b)
+        _ => !((a >= 0 && b < 0) || ((a < 0) == (b < 0) && a < b))
     }
 }
 
@@ -474,4 +476,13 @@ test "inlining, then folding what it shows" {
 test "unsigned comparisons of constants" {
     assert(branch_holds("ult", 1, 2) && !branch_holds("ult", -1, 2) && branch_holds("ult", 2, -1))
     assert(branch_holds("uge", -1, 2) && !branch_holds("uge", 1, 2))
+}
+
+test "unsigned branches compare both high-bit values correctly" {
+    assert(branch_holds("ult", -2, -1))
+    assert(!branch_holds("ult", -1, -2))
+    assert(branch_holds("ugt", -1, -2))
+    assert(!branch_holds("ugt", 1, -1))
+    assert(branch_holds("ule", -1, -1))
+    assert(!branch_holds("uge", -2, -1))
 }

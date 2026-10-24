@@ -1,0 +1,41 @@
+// out: -128
+// out: 65535
+// out: -2147483648
+// out: 18446744073709551615
+// out: -32768
+// out: 10
+// out: 0
+// out: 9223372036854775808
+// out: 18446744073709551615
+// out: 18446744073709551615
+// out: true
+// out: -128
+// out: high
+// out: negative
+// out: before-max
+import lists
+import maps
+import ints
+pub type Mixed = struct { a: i8, b: u16, c: i32, d: u64 }
+fn update(x: mut Mixed) { x.a = -128; x.b = 65535; x.c = -2147483648; x.d = 18446744073709551615 }
+fn main() {
+    let mut x = Mixed { a: 1, b: 2, c: 3, d: 4 }
+    update(mut x)
+    print(x.a); print(x.b); print(x.c); print(x.d)
+    let mut a: [i16] = [-32768, 0, 32767]
+    let b = a
+    a[0] = 10
+    print(b[0]); print(a[0])
+    let sorted = lists.sort([0xffff_ffff_ffff_ffffu64, 0u64, 0x8000_0000_0000_0000u64])
+    for n in sorted { print(n) }
+    let mut m: Map[i8, u64] = [:]
+    m[-128] = 18446744073709551615
+    print(m[-128])
+    print(maps.has(m, -128))
+    let f: fn(i8) -> i8 = fn(n) => ints.wrapping_add(n, 1)
+    print(f(127))
+    let n = 0x8000_0000_0000_0000u64
+    match n { 0u64..=0x7fff_ffff_ffff_ffffu64 => print("low"), 0x8000_0000_0000_0000u64..=0xffff_ffff_ffff_ffffu64 => print("high") }
+    match -128i8 { -128i8..=-1i8 => print("negative"), 0i8..=127i8 => print("nonnegative") }
+    match 18446744073709551614u64 { 18446744073709551615u64..=18446744073709551615u64 => print("wrong"), _ => print("before-max") }
+}

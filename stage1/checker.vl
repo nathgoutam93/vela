@@ -10,6 +10,7 @@
 // before and after where the type goes.
 import ast
 import errors
+import integers
 import maps
 import match_check
 import modules
@@ -244,11 +245,13 @@ fn variant_family(name: Str) -> Str {
 }
 
 pub fn prelude() -> [Str] {
-    return ["print", "len", "push", "int", "byte", "assert", "float"]
+    let mut names = ["print", "len", "push", "int", "byte", "assert", "float"]
+    for name in integers.names() { push(mut names, name) }
+    return names
 }
 
 fn is_prelude(name: Str) -> Bool {
-    return name == "print" || name == "len" || name == "push" || name == "int" || name == "byte" || name == "assert" ||
+    return integers.type_id(name) >= 0 || name == "print" || name == "len" || name == "push" || name == "int" || name == "byte" || name == "assert" ||
         name == "float"
 }
 
@@ -617,7 +620,7 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
         if t.name == "Map" {
             if !key_type(c, args[0]) && args[0] != types.ERROR() {
                 let k = t.args[0]
-                report(mut c, k.line, k.col, "E3026", "Map keys must be Int, Byte, Bool or Str, not " + show(c, args[0]))
+                report(mut c, k.line, k.col, "E3026", "Map keys must be integers, Bool or Str, not " + show(c, args[0]))
                 return types.ERROR()
             }
             return types.map(mut c.table, args[0], args[1])
@@ -719,7 +722,7 @@ fn satisfies(c: Checker, t: Int, b: Str) -> Bool {
         return comparable(c, t)
     }
     if b == "Ord" {
-        return t == types.INT() || t == types.BYTE() || t == types.STR() || t == types.FLOAT() ||
+        return types.is_integer(t) || t == types.STR() || t == types.FLOAT() ||
             types.has_bound(c.table, t, "Ord")
     }
     return key_type(c, t)
@@ -1101,15 +1104,8 @@ fn private(c: mut Checker, line: Int, col: Int, module: Int, what: Str, name: St
 
 // `; it is maps.get` for a name that lives in a built-in module.
 fn std_hint(c: Checker, name: Str) -> Str {
-    for module in ["maps", "files", "os", "strings", "tasks", "math"] {
-        let fns = match module {
-            "maps" => ["has", "get", "remove", "keys"]
-            "math" => ["sqrt"]
-            "files" => ["read", "write", "remove", "temp_dir"]
-            "os" => ["args", "executable", "exit", "eprint", "run", "env", "read_line", "read", "write", "output"]
-            "tasks" => ["map", "each", "workers"]
-            _ => ["builder", "add", "add_byte", "add_int", "build", "from_int", "from_float", "parse_float"]
-        }
+    for module in modules.builtin_modules() {
+        let fns = modules.builtin_functions(module)
         for f in fns {
             if f == name {
                 let hint = "; it is " + module + "." + name
@@ -1532,7 +1528,14 @@ fn simplify(c: Checker, p: ast.Pattern) -> match_check.SPat {
         ast.PatternKind.Bind(_) => return match_check.SPat.Wild
         ast.PatternKind.Lit(e) => {
             match e.kind {
-                ast.ExprKind.IntLit(n) => return match_check.SPat.Ctor(match_check.Key.Interval(n, n), [])
+                ast.ExprKind.IntLit(n) => {
+                    let value = integers.ordered(n, c.ty[e.id])
+                    return match_check.SPat.Ctor(match_check.Key.Interval(value, value), [])
+                }
+                ast.ExprKind.FixedIntLit(n, _, _) => {
+                    let value = integers.ordered(n, c.ty[e.id])
+                    return match_check.SPat.Ctor(match_check.Key.Interval(value, value), [])
+                }
                 ast.ExprKind.ByteLit(n) => return match_check.SPat.Ctor(match_check.Key.Interval(n, n), [])
                 ast.ExprKind.BoolLit(b) => return match_check.SPat.Ctor(match_check.Key.Bool(b), [])
                 ast.ExprKind.StrLit(s) => return match_check.SPat.Ctor(match_check.Key.Str(s), [])
@@ -1540,7 +1543,7 @@ fn simplify(c: Checker, p: ast.Pattern) -> match_check.SPat {
             }
         }
         ast.PatternKind.Range(lo, hi) => {
-            return match_check.SPat.Ctor(match_check.Key.Interval(literal_value(lo), literal_value(hi)), [])
+            return match_check.SPat.Ctor(match_check.Key.Interval(integers.ordered(literal_value(lo), c.ty[lo.id]), integers.ordered(literal_value(hi), c.ty[hi.id])), [])
         }
         ast.PatternKind.Variant(_, _, _, _, args) => {
             let mut subs: [match_check.SPat] = []
@@ -1558,6 +1561,7 @@ fn simplify(c: Checker, p: ast.Pattern) -> match_check.SPat {
 fn literal_value(e: ast.Expr) -> Int {
     return match e.kind {
         ast.ExprKind.IntLit(n) => n
+        ast.ExprKind.FixedIntLit(n, _, _) => n
         ast.ExprKind.ByteLit(n) => n
         _ => 0
     }
@@ -1581,12 +1585,12 @@ fn pattern(c: mut Checker, p: ast.Pattern, t: Int, bindings: mut Map[Str, Int]) 
         ast.PatternKind.Lit(e) => return pattern_literal(mut c, e, t, p)
         ast.PatternKind.Range(lo, hi) => {
             let ok = pattern_literal(mut c, lo, t, p) && pattern_literal(mut c, hi, t, p)
-            if ok && t != types.INT() && t != types.BYTE() && t != types.ERROR() {
+            if ok && !types.is_integer(t) && t != types.ERROR() {
                 report(mut c, p.line, p.col, "E3070", "a range pattern matches Int or Byte values, but the value being matched is " +
                     show(c, t))
                 return false
             }
-            if ok && literal_value(lo) > literal_value(hi) {
+            if ok && integers.ordered(literal_value(lo), t) > integers.ordered(literal_value(hi), t) {
                 report(mut c, p.line, p.col, "E3071", "this range is empty: " + strings.from_int(literal_value(lo)) +
                     " is greater than " + strings.from_int(literal_value(hi)))
                 return false
@@ -1715,18 +1719,30 @@ fn variant_pattern(c: mut Checker, p: ast.Pattern, t: Int, bindings: mut Map[Str
 
 // A literal in a pattern; an Int literal matching a Byte is a Byte.
 fn pattern_literal(c: mut Checker, lit: ast.Expr, t: Int, p: ast.Pattern) -> Bool {
-    match lit.kind {
-        ast.ExprKind.IntLit(n) => {
-            if t == types.BYTE() {
-                if n < 0 || n > 255 {
-                    report(mut c, p.line, p.col, "E3080", strings.from_int(n) + " does not fit in a Byte (0 to 255)")
+    if types.is_integer(t) {
+        match lit.kind {
+            ast.ExprKind.IntLit(n) => {
+                if !integers.fits(n, t, n < 0) {
+                    if t == types.BYTE() { report(mut c, p.line, p.col, "E3080", strings.from_int(n) + " does not fit in a Byte (0 to 255)") } else { report(mut c, p.line, p.col, "E3182", "integer pattern does not fit in " + show(c, t)) }
                     return false
                 }
-                set_ty(mut c, lit, types.BYTE())
+                set_ty(mut c, lit, t)
                 return true
             }
+            ast.ExprKind.FixedIntLit(n, name, neg) => {
+                if name != "" && integers.type_id(name) != t {
+                    report(mut c, p.line, p.col, "E3081", "this pattern is " + name + ", but the value being matched is " + show(c, t))
+                    return false
+                }
+                if !integers.fits(n, t, neg) {
+                    report(mut c, p.line, p.col, "E3182", "integer pattern does not fit in " + show(c, t))
+                    return false
+                }
+                set_ty(mut c, lit, t)
+                return true
+            }
+            _ => {}
         }
-        _ => {}
     }
     let lit_t = infer(mut c, lit)
     if t != types.ERROR() && lit_t != t {
@@ -1851,6 +1867,9 @@ fn check_expr(c: mut Checker, e: ast.Expr, want: Int, m: Msg) {
                 _ => {}
             }
         }
+        ast.ExprKind.FixedIntLit(_, name, _) => {
+            if want == types.FLOAT() && name == "" { set_ty(mut c, e, types.FLOAT()); return }
+        }
         ast.ExprKind.IntLit(_) => {
             if want == types.FLOAT() {
                 set_ty(mut c, e, types.FLOAT())  // a number is an Int unless the context wants a Float
@@ -1868,12 +1887,13 @@ fn check_expr(c: mut Checker, e: ast.Expr, want: Int, m: Msg) {
     }
     match e.kind {
         ast.ExprKind.IntLit(n) => {
-            if want == types.BYTE() {
-                // A number is an Int unless the context wants a Byte.
-                if n >= 0 && n <= 255 {
-                    set_ty(mut c, e, types.BYTE())
-                } else {
+            if types.is_integer(want) {
+                if integers.fits(n, want, n < 0) {
+                    set_ty(mut c, e, want)
+                } else if want == types.BYTE() {
                     report_at(mut c, e, "E3090", strings.from_int(n) + " does not fit in a Byte (0 to 255)")
+                } else {
+                    report_at(mut c, e, "E3182", "integer literal does not fit in " + show(c, want))
                 }
                 return
             }
@@ -1952,7 +1972,28 @@ fn infer(c: mut Checker, e: ast.Expr) -> Int {
 
 fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
     match e.kind {
-        ast.ExprKind.IntLit(_) => return types.INT()
+        ast.ExprKind.IntLit(n) => {
+            if types.is_integer(expected) {
+                if !integers.fits(n, expected, n < 0) { report_at(mut c, e, "E3182", "integer literal does not fit in " + show(c, expected)) }
+                return expected
+            }
+            if expected == types.FLOAT() { return expected }
+            return types.INT()
+        }
+        ast.ExprKind.FixedIntLit(n, name, neg) => {
+            if expected == types.FLOAT() && name == "" { return types.FLOAT() }
+            let mut t = types.INT()
+            if types.is_integer(expected) { t = expected }
+            if name != "" { t = integers.type_id(name) }
+            if !integers.fits(n, t, neg) {
+                if t == types.INT() && name == "" && !neg {
+                    report_at(mut c, e, "E1005", "integer literal " + integers.unsigned_text(n) + " does not fit in Int (max 9223372036854775807)")
+                } else {
+                    report_at(mut c, e, "E3182", "integer literal does not fit in " + show(c, t))
+                }
+            }
+            return t
+        }
         ast.ExprKind.FloatLit(_) => return types.FLOAT()
         ast.ExprKind.ByteLit(_) => return types.BYTE()
         ast.ExprKind.BoolLit(_) => return types.BOOL()
@@ -1971,20 +2012,18 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
             }
         }
         ast.ExprKind.Unary(op, operand) => {
-            let mut want = types.BOOL()
-            if op == "-" {
-                want = types.INT()
-            }
+            if (op == "-" || op == "~") && types.is_integer(expected) { c.expected = expected }
             let ty = value(mut c, operand)
-            if op == "-" && ty == types.FLOAT() {
-                return ty
-            }
+            if op == "-" && (types.is_integer(ty) || ty == types.FLOAT()) { return ty }
+            if op == "~" && types.is_integer(ty) { return ty }
+            let mut want = types.BOOL()
+            if op == "-" || op == "~" { want = types.INT() }
             if ty != want && ty != types.ERROR() {
                 report_at(mut c, e, "E3095", "operator '" + op + "' needs " + show(c, want) + ", found " + show(c, ty))
             }
-            return want  // the result type is known even if the operand was wrong
+            return want
         }
-        ast.ExprKind.Binary(op, l, r) => return binary(mut c, e, op, l, r)
+        ast.ExprKind.Binary(op, l, r) => return binary(mut c, e, op, l, r, expected)
         ast.ExprKind.Call(callee, args) => {
             let t = call(mut c, e, callee, args, expected)
             stale_copies(mut c, args)
@@ -2008,12 +2047,20 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
 fn is_int_lit(e: ast.Expr) -> Bool {
     return match e.kind {
         ast.ExprKind.IntLit(_) => true
+        ast.ExprKind.FixedIntLit(_, name, _) => name == ""
+        ast.ExprKind.Unary(op, x) => (op == "-" || op == "~") && is_int_lit(x)
+        ast.ExprKind.Binary(op, l, r) => (is_arithmetic(op) || is_bitwise(op)) && is_int_lit(l) && is_int_lit(r)
         _ => false
     }
 }
 
 // The operands' types. A literal number next to a Byte is a Byte.
-fn operands(c: mut Checker, l: ast.Expr, r: ast.Expr) -> [Int] {
+fn operands(c: mut Checker, l: ast.Expr, r: ast.Expr, expected: Int) -> [Int] {
+    if (types.is_integer(expected) || expected == types.FLOAT()) && is_int_lit(l) && is_int_lit(r) {
+        check_expr(mut c, l, expected, msg("expected " + show(c, expected) + ", found ", ""))
+        check_expr(mut c, r, expected, msg("expected " + show(c, expected) + ", found ", ""))
+        return [expected, expected]
+    }
     if is_int_lit(l) && !is_int_lit(r) {
         let right = value(mut c, r)
         return [literal_like(mut c, l, right), right]
@@ -2027,12 +2074,12 @@ fn operands(c: mut Checker, l: ast.Expr, r: ast.Expr) -> [Int] {
 
 fn literal_like(c: mut Checker, lit: ast.Expr, other: Int) -> Int {
     if other == types.FLOAT() {
-        set_ty(mut c, lit, types.FLOAT())
+        check_expr(mut c, lit, types.FLOAT(), msg("expected Float, found ", ""))
         return types.FLOAT()
     }
-    if other == types.BYTE() {
-        check_expr(mut c, lit, types.BYTE(), msg("", ""))  // reports only an out-of-range number
-        return types.BYTE()
+    if types.is_integer(other) {
+        check_expr(mut c, lit, other, msg("", ""))
+        return other
     }
     return value(mut c, lit)
 }
@@ -2054,14 +2101,25 @@ fn comparable(c: Checker, t: Int) -> Bool {
     return ti.tag == types.Tag.Enum && len(ti.args) == 0 && types.c_like(c.table, t)
 }
 
-fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Int {
-    let ops = operands(mut c, l, r)
+fn is_bitwise(op: Str) -> Bool { return op == "&" || op == "|" || op == "^" || op == "<<" || op == ">>" }
+
+fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr, expected: Int) -> Int {
+    if op == "<<" || op == ">>" {
+        if types.is_integer(expected) && is_int_lit(l) { c.expected = expected }
+        let left = value(mut c, l)
+        let right = value(mut c, r)
+        if (!types.is_integer(left) || !types.is_integer(right)) && left != types.ERROR() && right != types.ERROR() {
+            report_at(mut c, e, "E3183", "bit operations need integer operands")
+        }
+        return left
+    }
+    let ops = operands(mut c, l, r, expected)
     let left = ops[0]
     let right = ops[1]
     let mut result = types.BOOL()
-    if is_arithmetic(op) {
+    if is_arithmetic(op) || is_bitwise(op) {
         result = types.INT()
-        if left == types.INT() || left == types.BYTE() || left == types.FLOAT() || left == types.STR() && op == "+" {
+        if types.is_integer(left) || left == types.FLOAT() || left == types.STR() && op == "+" {
             result = left
         }
     }
@@ -2070,7 +2128,9 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Int
     }
     let int = types.INT()
     let byte = types.BYTE()
-    if op == "==" || op == "!=" {
+    if is_bitwise(op) {
+        if !types.is_integer(left) || left != right { report_at(mut c, e, "E3183", "bit operations need integers of the same type") }
+    } else if op == "==" || op == "!=" {
         if left != right {
             report_at(mut c, e, "E3097", "cannot compare " + show(c, left) + " with " + show(c, right))
         } else if !comparable(c, left) && types.is_param(c.table, left) {
@@ -2096,11 +2156,16 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Int
         if op == "%" {
             report_at(mut c, e, "E3102", "operator '%' needs Int operands; a Float has no remainder")
         }
-    } else if (left == types.FLOAT() || right == types.FLOAT()) && (left == int || left == byte || left == types.FLOAT()) &&
-        (right == int || right == byte || right == types.FLOAT()) {
+    } else if (left == types.FLOAT() || right == types.FLOAT()) && (types.is_integer(left) || left == types.FLOAT()) &&
+        (types.is_integer(right) || right == types.FLOAT()) {
         report_at(mut c, e, "E3103", "operator '" + op + "' needs two Floats or two Ints, found " + show(c, left) + " and " +
             show(c, right) + "; convert with float() or int()")
-    } else if left != right || left != int && left != byte {
+    } else if left != right || !types.is_integer(left) {
+        if types.is_integer(left) && types.is_integer(right) && left != right &&
+            !((left == int && right == byte) || (left == byte && right == int)) {
+            report_at(mut c, e, "E3185", "operator '" + op + "' requires matching integer types; convert explicitly")
+            return result
+        }
         let both_numbers = (left == int || left == byte) && (right == int || right == byte)
         if (left == byte || right == byte) && both_numbers {
             report_at(mut c, e, "E3104", "operator '" + op + "' needs two Bytes or two Ints, found " + show(c, left) + " and " +
@@ -2109,7 +2174,7 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Int
             report_at(mut c, e, "E3105", "operator '" + op + "' needs values that can be ordered; declare the type parameter as `" +
                 show(c, left) + ": Ord`")
         } else if is_ordering(op) {
-            report_at(mut c, e, "E3106", "operator '" + op + "' needs two Ints, two Bytes or two Strs, found " + show(c, left) +
+            report_at(mut c, e, "E3106", "operator '" + op + "' needs matching integers, Floats or Strs, found " + show(c, left) +
                 " and " + show(c, right))
         } else {
             report_at(mut c, e, "E3107", "operator '" + op + "' needs Int operands, found " + show(c, left) + " and " + show(c, right))
@@ -2223,7 +2288,7 @@ fn map_lit(c: mut Checker, e: ast.Expr, entries: [ast.MapEntry]) -> Int {
     let mut k = value(mut c, entries[0].key)
     let v = value(mut c, entries[0].value)
     if !types.is_map_key(k) && k != types.ERROR() {
-        report_at(mut c, entries[0].key, "E3116", "Map keys must be Int, Byte, Bool or Str, not " + show(c, k))
+        report_at(mut c, entries[0].key, "E3116", "Map keys must be integers, Bool or Str, not " + show(c, k))
         k = types.ERROR()
     }
     for en in entries[1..len(entries)] {
@@ -2966,7 +3031,7 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
             if name == "tasks.map" || name == "tasks.each" {
                 return tasks_call(mut c, e, name, args)
             }
-            return builtin(mut c, e, name, args, written(callee))
+            return builtin(mut c, e, name, args, written(callee), expected)
         }
         Ref.Variant(enum, vi) => {
             if types.is_generic(c.table, enum) {
@@ -3551,7 +3616,7 @@ fn arity(c: mut Checker, e: ast.Expr, name: Str, expected: Int, got: Int) -> Boo
 }
 
 fn is_printable(t: Int) -> Bool {
-    return t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.STR() || t == types.FLOAT()
+    return types.is_integer(t) || t == types.BOOL() || t == types.STR() || t == types.FLOAT()
 }
 
 // The built-in functions whose types do not depend on their arguments.
@@ -3618,9 +3683,41 @@ fn signature(c: mut Checker, name: Str) -> [Int] {
     }
 }
 
+fn integer_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], expected: Int) -> Int {
+    let target = integers.type_id(name)
+    let mut short = name
+    if target < 0 { short = name[5..len(name)] }
+    let op = integers.function_op(short)
+    let mut count = 2
+    if target >= 0 || short == "to_str" || op == 5 { count = 1 }
+    if !arity(mut c, e, name, count, len(args)) {
+        for a in args { infer(mut c, a) }
+        if target >= 0 { return target }
+        return types.ERROR()
+    }
+    let mut context = target
+    if target < 0 && types.is_integer(expected) { context = expected }
+    if target < 0 && types.is_builtin_enum(c.table, expected) && types.get(c.table, expected).name == "Option" {
+        context = types.get(c.table, expected).args[0]
+    }
+    if types.is_integer(context) && is_int_lit(args[0]) { c.expected = context }
+    let t = value(mut c, args[0])
+    if !types.is_integer(t) && t != types.ERROR() {
+        report_at(mut c, args[0], "E3184", "integer conversion and arithmetic functions require an integer")
+    }
+    if target >= 0 { return target }
+    if short == "to_str" { return types.STR() }
+    if count == 2 { check_expr(mut c, args[1], t, msg("integer operands must have the same type, found ", "")) }
+    if integers.mode(short) == 1 { return types.option(mut c.table, t) }
+    return t
+}
+
 // A call to a built-in function, written as `written`: one of the
 // prelude's (`len`) or of a built-in module's (`maps.get`, named by `name`).
-fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: Str) -> Int {
+fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: Str, expected: Int) -> Int {
+    if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
+        return integer_builtin(mut c, e, name, args, expected)
+    }
     if has_signature(name) {
         return fixed_builtin(mut c, e, name, args, written)
     }
@@ -3650,7 +3747,7 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
     if name == "print" || name == "os.eprint" {
         let t = value(mut c, args[0])
         if !is_printable(t) && t != types.ERROR() {
-            report_at(mut c, args[0], "E3170", written + " takes an Int, Byte, Float, Bool or Str, not " + show(c, t))
+            report_at(mut c, args[0], "E3170", written + " takes an integer, Float, Bool or Str, not " + show(c, t))
         }
         return types.NOTHING()
     }
@@ -3666,28 +3763,20 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
         return types.INT()
     }
     if name == "int" {
-        // int(x) of a Byte, or of a Float (rounded toward zero).
-        let mut is_lit = false
-        match args[0].kind {
-            ast.ExprKind.IntLit(_) => is_lit = true
-            _ => {}
-        }
-        if is_lit {
-            check_expr(mut c, args[0], types.BYTE(), msg("int takes a Byte or a Float, found ", ""))
-        } else {
-            let t = value(mut c, args[0])
-            if t != types.BYTE() && t != types.FLOAT() && t != types.ERROR() {
-                report_at(mut c, args[0], "E3172", "int takes a Byte or a Float, found " + show(c, t))
-            }
+        let t = value(mut c, args[0])
+        if !types.is_integer(t) && t != types.FLOAT() && t != types.ERROR() {
+            report_at(mut c, args[0], "E3172", "int takes an integer or a Float, found " + show(c, t))
         }
         return types.INT()
     }
     if name == "float" {
-        check_expr(mut c, args[0], types.INT(), msg("float takes an Int, found ", ""))
+        let t = value(mut c, args[0])
+        if !types.is_integer(t) && t != types.ERROR() { report_at(mut c, args[0], "E3093", "float takes an Int, found " + show(c, t)) }
         return types.FLOAT()
     }
     if name == "byte" {
-        check_expr(mut c, args[0], types.INT(), msg("byte takes an Int, found ", ""))
+        let t = value(mut c, args[0])
+        if !types.is_integer(t) && t != types.ERROR() { report_at(mut c, args[0], "E3093", "byte takes an Int, found " + show(c, t)) }
         return types.BYTE()
     }
     if name == "push" {

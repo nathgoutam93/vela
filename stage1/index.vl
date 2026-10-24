@@ -14,6 +14,7 @@
 // the whole starts. The parts are found in the file's tokens: a qualified
 // name is a name, a dot, a name, and so on.
 import ast
+import integers
 import checker
 import lexer
 import maps
@@ -298,6 +299,17 @@ fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
 // for a name that is not one. The checker has the rules (checker.builtin);
 // this is how hover and completion show them.
 pub fn builtin_info(name: Str) -> [Str] {
+    if integers.type_id(name) >= 0 { return ["fn " + name + "(value: integer) -> " + name, "Checked integer conversion; panics if the value does not fit."] }
+    if len(name) > 5 && name[0..5] == "ints." {
+        let short = name[5..len(name)]
+        if short == "to_str" { return ["fn to_str(value: integer) -> Str", "The complete decimal value, including the unsigned u64 range."] }
+        let op = integers.function_op(short)
+        let mut args = "a: T, b: T"
+        if op == 5 { args = "a: T" }
+        let mut result = "T"
+        if integers.mode(short) == 1 { result = "Option[T]" }
+        return ["fn " + short + "(" + args + ") -> " + result, "T is one fixed-width integer type. Checked operations return None on failure; wrapping operations wrap; saturating operations clamp. Division by zero panics except in checked operations."]
+    }
     return match name {
         "print" => ["fn print(x: Int | Byte | Float | Bool | Str)", "Prints x and a newline on stdout."]
         "len" => ["fn len(x: Str | [T] | Map[K, V]) -> Int", "How many bytes a Str has, or elements an array or a map."]

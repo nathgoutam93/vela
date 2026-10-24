@@ -17,6 +17,7 @@
 // variants are the declaration's with the arguments put in. A type that
 // mentions a parameter anywhere is "open"; only closed types reach C.
 import maps
+import integers
 import strings
 
 pub type Tag = enum {
@@ -125,11 +126,20 @@ pub fn new_table() -> Table {
     builder.module = "strings"
     push(mut t.types, builder)
     push(mut t.types, info(Tag.Prim, "Float"))
+    for name in ["i8", "i16", "i32", "u16", "u32", "u64"] {
+        push(mut t.types, info(Tag.Prim, name))
+    }
     return t
 }
 
+pub fn is_integer(t: Int) -> Bool { return integers.width(t) > 0 }
+pub fn integer_width(t: Int) -> Int { return integers.width(t) }
+pub fn integer_signed(t: Int) -> Bool { return integers.signed(t) }
+
 // The built-in types by name, or -1.
 pub fn primitive(name: Str) -> Int {
+    let fixed = integers.type_id(name)
+    if fixed >= 0 { return fixed }
     return match name {
         "Int" => INT()
         "Byte" => BYTE()
@@ -152,7 +162,7 @@ pub fn generic_arity(name: Str) -> Int {
 }
 
 pub fn is_map_key(t: Int) -> Bool {
-    return t == INT() || t == BYTE() || t == BOOL() || t == STR()
+    return is_integer(t) || t == BOOL() || t == STR()
 }
 
 // A new user struct or enum; its fields or variants are filled in later.

@@ -62,6 +62,11 @@ test "C names of a module's things" {
 }
 
 fn primitive_c(t: Int) -> Str {
+    if types.is_integer(t) {
+        let mut prefix = "uint"
+        if types.integer_signed(t) { prefix = "int" }
+        return prefix + strings.from_int(types.integer_width(t)) + "_t"
+    }
     return match t {
         1 => "int64_t"
         2 => "uint8_t"
@@ -74,6 +79,9 @@ fn primitive_c(t: Int) -> Str {
 }
 
 fn runtime_descriptor(t: Int) -> Str {
+    if t >= 8 && t <= 13 {
+        return "&vela_type_" + types.get(types.new_table(), t).name
+    }
     return match t {
         1 => "&vela_type_int"
         2 => "&vela_type_byte"

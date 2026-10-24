@@ -8,6 +8,7 @@
 // A missing part is "" for a
 // missing name (a module, an enum) and Option for a missing node.
 import strings
+import integers
 
 pub type TypeName = struct {
     // "[]" for an array type [T], with T as its one argument; "fn" for a
@@ -32,6 +33,7 @@ pub type Expr = struct {
 
 pub type ExprKind = enum {
     IntLit(Int)
+    FixedIntLit(Int, Str, Bool)  // bit pattern, optional type suffix, written negative
     FloatLit(Str)  // as written: 1.5, 2e10
     ByteLit(Int)
     BoolLit(Bool)
@@ -597,6 +599,7 @@ fn sx_exprs(head: Sx, xs: [Expr]) -> Sx {
 fn sx_expr(e: Expr) -> Sx {
     match e.kind {
         ExprKind.IntLit(n) => return atom(strings.from_int(n))
+        ExprKind.FixedIntLit(n, name, neg) => return atom(integers.spelling(n, name, neg))
         ExprKind.FloatLit(text) => return atom(text)
         ExprKind.ByteLit(n) => return atom(quote_byte(n))
         ExprKind.BoolLit(b) => {
@@ -803,8 +806,13 @@ fn op_power(op: Str) -> Int {
     return match op {
         "||" => 2
         "&&" => 4
-        "+" => 10
-        "-" => 10
+        "|" => 7
+        "^" => 8
+        "&" => 9
+        "<<" => 10
+        ">>" => 10
+        "+" => 12
+        "-" => 12
         "*" => 20
         "/" => 20
         "%" => 20
@@ -834,6 +842,7 @@ fn texts(es: [Expr]) -> Str {
 pub fn expr_text(e: Expr) -> Str {
     match e.kind {
         ExprKind.IntLit(n) => return strings.from_int(n)
+        ExprKind.FixedIntLit(n, name, neg) => return integers.spelling(n, name, neg)
         ExprKind.FloatLit(text) => return text
         ExprKind.ByteLit(n) => return quote_byte(n)
         ExprKind.BoolLit(b) => {

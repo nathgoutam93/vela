@@ -61,6 +61,8 @@ BENCHES = [
     Bench("fasta", ["2500000"], ["1000"], "string building, output"),
     Bench("knucleotide", ["{fasta}"], ["{fasta}"], "maps with string keys, slicing"),
     Bench("wordfreq", ["{words}"], ["{words}"], "a file, string slicing, a map"),
+    Bench("sha256", ["1048576", "32"], ["1024", "2"], "u32 wrapping arithmetic, rotates and byte parsing"),
+    Bench("crc32", ["4194304", "32"], ["4096", "2"], "u32 bit operations and table lookup"),
 ]
 
 LANGS = ["c", "rust", "vela", "vela-native"]

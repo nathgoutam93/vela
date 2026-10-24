@@ -152,6 +152,18 @@ static void share_str(void *v) { vela_str_share(*(vela_str *)v); }
 static void share_array(void *v) { vela_array_share(*(vela_array **)v); }
 static void share_map(void *v) { vela_map_share(*(vela_map **)v); }
 
+#define FIXED_DESCRIPTOR(name, type) \
+    static uint64_t hash_fixed_##name(const void *v) { return hash_u64((uint64_t)*(const type *)v); } \
+    static bool eq_fixed_##name(const void *a, const void *b) { return *(const type *)a == *(const type *)b; } \
+    const vela_type vela_type_##name = {sizeof(type), NULL, NULL, hash_fixed_##name, eq_fixed_##name, NULL};
+FIXED_DESCRIPTOR(i8, int8_t)
+FIXED_DESCRIPTOR(i16, int16_t)
+FIXED_DESCRIPTOR(i32, int32_t)
+FIXED_DESCRIPTOR(u16, uint16_t)
+FIXED_DESCRIPTOR(u32, uint32_t)
+FIXED_DESCRIPTOR(u64, uint64_t)
+#undef FIXED_DESCRIPTOR
+
 const vela_type vela_type_unit = {sizeof(vela_unit), NULL, NULL, hash_byte, eq_byte, NULL};
 const vela_type vela_type_int = {sizeof(int64_t), NULL, NULL, hash_int, eq_int, NULL};
 const vela_type vela_type_byte = {sizeof(uint8_t), NULL, NULL, hash_byte, eq_byte, NULL};
@@ -1564,4 +1576,47 @@ vela_array *vela_tasks_map(vela_array *xs, void *f, vela_env *env, vela_task_cal
 
 void vela_tasks_each(vela_array *xs, void *f, vela_env *env, vela_task_call call) {
     run_tasks(xs, f, env, call, NULL, 0);
+}
+
+// Exported forms for native code; C output uses the same core inline.
+uint64_t vela_fixed_op(uint64_t a, uint64_t b, int64_t bits, int64_t sign, int64_t op, int64_t mode, const char *loc) {
+    return vela_fixed_inline(a, b, (int)bits, sign != 0, (int)op, (int)mode, loc, NULL);
+}
+bool vela_fixed_try(uint64_t a, uint64_t b, int64_t bits, int64_t sign, int64_t op, uint64_t *out) {
+    bool ok;
+    *out = vela_fixed_inline(a, b, (int)bits, sign != 0, (int)op, 1, "checked integer operation", &ok);
+    return ok;
+}
+uint64_t vela_fixed_cast(uint64_t a, int64_t from_bits, int64_t from_sign, int64_t bits, int64_t sign, const char *loc) {
+    return vela_fixed_cast_inline(a, (int)from_bits, from_sign != 0, (int)bits, sign != 0, loc);
+}
+uint64_t vela_fixed_load(uint64_t a, int64_t bits, int64_t sign) {
+    return vela_fixed_normalize(a, (int)bits, sign != 0);
+}
+int64_t vela_fixed_compare(uint64_t a, uint64_t b, int64_t condition) {
+    switch (condition) {
+    case 0: return a == b;
+    case 1: return a != b;
+    case 2: return a < b;
+    case 3: return a <= b;
+    case 4: return a > b;
+    default: return a >= b;
+    }
+}
+double vela_uint_to_float(uint64_t n) { return (double)n; }
+vela_str vela_from_uint(uint64_t n) {
+    char buf[32];
+    int len = snprintf(buf, sizeof buf, "%" PRIu64, n);
+    return str_from(buf, (size_t)len);
+}
+void vela_print_uint(uint64_t n) {
+    if (fake_stdout) { vela_str s = vela_from_uint(n); captured(s); vela_str_release(s); return; }
+    char buf[32];
+    int len = snprintf(buf, sizeof buf, "%" PRIu64, n);
+    print_line(stdout, buf, (size_t)len);
+}
+void vela_eprint_uint(uint64_t n) {
+    char buf[32];
+    int len = snprintf(buf, sizeof buf, "%" PRIu64, n);
+    print_line(stderr, buf, (size_t)len);
 }

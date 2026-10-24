@@ -3,6 +3,7 @@
 // other by index.
 import ast
 import errors
+import integers
 import files
 import lexer
 import maps
@@ -74,6 +75,7 @@ type Loader = struct {
 // The built-in modules and their functions, in Stage 0's order.
 pub fn builtin_functions(name: Str) -> [Str] {
     return match name {
+        "ints" => integers.functions()
         "maps" => ["has", "get", "remove", "keys"]
         "files" => ["read", "write", "remove", "temp_dir"]
         "os" => ["args", "executable", "exit", "eprint", "run", "env", "read_line", "read", "write", "output"]
@@ -489,5 +491,5 @@ test "paths" {
 }
 
 pub fn builtin_modules() -> [Str] {
-    return ["maps", "files", "os", "strings", "tasks", "math"]
+    return ["maps", "files", "os", "strings", "tasks", "math", "ints"]
 }

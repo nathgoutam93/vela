@@ -15,7 +15,7 @@
 // err: generics_errors.vl:70:34: error: value 1 of Tree.Node must be Str, found Int [E3093]
 // err: generics_errors.vl:71:29: error: 'Box' has no field 'extra' [E3131]
 // err: generics_errors.vl:72:36: error: field 'value' of 'Box' must be Int, found Str [E3093]
-// err: generics_errors.vl:73:16: error: Map keys must be Int, Byte, Bool or Str, not Box[Int] [E3026]
+// err: generics_errors.vl:73:16: error: Map keys must be integers, Bool or Str, not Box[Int] [E3026]
 type Box[T] = struct {
     value: T
 }

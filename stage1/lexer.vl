@@ -2,6 +2,7 @@
 // not a token. Every rule is in the functions below; the walkthroughs in
 // docs/ (m01 on) say why.
 import errors
+import integers
 import strings
 import chars
 
@@ -62,6 +63,12 @@ pub type Kind = enum {
     LBracket
     RBracket
     Question
+    Amp
+    Pipe
+    Caret
+    Tilde
+    Shl
+    Shr
 }
 
 pub type Token = struct {
@@ -130,6 +137,12 @@ pub fn kind_name(k: Kind) -> Str {
         Kind.LBracket => "["
         Kind.RBracket => "]"
         Kind.Question => "?"
+        Kind.Amp => "&"
+        Kind.Pipe => "|"
+        Kind.Caret => "^"
+        Kind.Tilde => "~"
+        Kind.Shl => "<<"
+        Kind.Shr => ">>"
     }
 }
 
@@ -206,6 +219,8 @@ fn ends_statement(k: Kind) -> Bool {
 
 fn operator2(op: Str) -> Option[Kind] {
     return match op {
+        "<<" => Some(Kind.Shl)
+        ">>" => Some(Kind.Shr)
         "==" => Some(Kind.EqEq)
         "!=" => Some(Kind.NotEq)
         "<=" => Some(Kind.LtEq)
@@ -221,6 +236,10 @@ fn operator2(op: Str) -> Option[Kind] {
 
 fn operator1(c: Byte) -> Option[Kind] {
     return match c {
+        '&' => Some(Kind.Amp)
+        '|' => Some(Kind.Pipe)
+        '^' => Some(Kind.Caret)
+        '~' => Some(Kind.Tilde)
         '(' => Some(Kind.LParen)
         ')' => Some(Kind.RParen)
         '+' => Some(Kind.Plus)
@@ -377,13 +396,27 @@ fn run(lx: mut Lexer) {
 
 // The largest Int, as digits: a literal is too big if it is longer, or as
 // long and greater as a Str (the same digit count makes byte order numeric).
-fn too_big(digits: Str) -> Bool {
-    let max = "9223372036854775807"
-    return len(digits) > len(max) || len(digits) == len(max) && digits > max
-}
-
 fn number(lx: mut Lexer) {
     let start = lx.pos
+    let mut end = start
+    for end < len(lx.src) && (is_ident_char(int(lx.src[end]))) { end = end + 1 }
+    let candidate = lx.src[start..end]
+    let decoded = integers.literal(candidate)
+    let extended = decoded.suffix != "" || len(candidate) >= 2 && candidate[0] == '0' && (candidate[1] == 'x' || candidate[1] == 'b')
+    let mut separated = false
+    for c in candidate { if c == '_' { separated = true } }
+    if extended || separated {
+        lx.pos = end
+        if !decoded.valid {
+            error(mut lx, start, "E1003", "invalid number '" + candidate + "'")
+        } else if decoded.leading_zero {
+            error(mut lx, start, "E1004", "integer literal '" + candidate + "' has a leading zero")
+        } else if decoded.overflow {
+            error(mut lx, start, "E3180", "integer literal exceeds the u64 range")
+        }
+        add(mut lx, Kind.Int, candidate, start, decoded.suffix)
+        return
+    }
     for is_digit(peek(lx, 0)) {
         lx.pos = lx.pos + 1
     }
@@ -439,8 +472,8 @@ fn number(lx: mut Lexer) {
     let digits = lx.src[start..lx.pos]
     if len(digits) > 1 && digits[0] == '0' {
         error(mut lx, start, "E1004", "integer literal '" + digits + "' has a leading zero")
-    } else if too_big(digits) {
-        error(mut lx, start, "E1005", "integer literal " + digits + " does not fit in Int (max 9223372036854775807)")
+    } else if integers.literal(digits).overflow {
+        error(mut lx, start, "E3180", "integer literal exceeds the u64 range")
     }
     add(mut lx, Kind.Int, digits, start, "")
 }

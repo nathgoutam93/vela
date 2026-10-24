@@ -1,4 +1,4 @@
-// err: int_too_large.vl:3:12: error: integer literal 9223372036854775808 does not fit in Int (max 9223372036854775807) [E1005]
+// err: int_too_large.vl:3:12: error: negative literal is below the i64 minimum [E3181]
 fn main() {
-    print(-9223372036854775808)
+    print(-9223372036854775809)
 }

@@ -114,7 +114,7 @@ fn pieces(lexed: lexer.Lexed) -> [Piece] {
             continue
         }
         let mut unary = false
-        if t.kind == lexer.Kind.Minus || t.kind == lexer.Kind.Bang {
+        if t.kind == lexer.Kind.Minus || t.kind == lexer.Kind.Bang || t.kind == lexer.Kind.Tilde {
             unary = len(out) == 0 || out[len(out) - 1].line != t.line || before_operand(out[len(out) - 1])
         }
         push(mut out, Piece { kind: t.kind, text: t.text, line: t.line, is_comment: false, unary: unary })
@@ -144,6 +144,11 @@ fn before_operand(p: Piece) -> Bool {
 
 fn is_binary(k: lexer.Kind) -> Bool {
     return match k {
+        lexer.Kind.Amp => true
+        lexer.Kind.Pipe => true
+        lexer.Kind.Caret => true
+        lexer.Kind.Shl => true
+        lexer.Kind.Shr => true
         lexer.Kind.Plus => true
         lexer.Kind.Minus => true
         lexer.Kind.Star => true

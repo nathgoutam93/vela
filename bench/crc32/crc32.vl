@@ -1,0 +1,29 @@
+// Reflected CRC-32 with the polynomial described by RFC 1952 section 8.
+// https://www.rfc-editor.org/rfc/rfc1952.html#section-8
+import lists
+
+pub fn table() -> [u32] {
+    let mut entries = lists.repeat(0u32, 256)
+    for i in 0..len(entries) {
+        let mut c = u32(i)
+        for _ in 0..8 {
+            if (c & 1) != 0 { c = (c >> 1) ^ 0xedb88320u32 } else { c = c >> 1 }
+        }
+        entries[i] = c
+    }
+    return entries
+}
+
+pub fn update(data: Str, entries: [u32], seed: u32) -> u32 {
+    let mut c = ~seed
+    for b in data { c = (c >> 8) ^ entries[int((c ^ u32(b)) & 255)] }
+    return ~c
+}
+
+test "CRC-32 check string and empty input" {
+    let entries = table()
+    assert(update("123456789", entries, 0) == 0xcbf43926u32)
+    assert(update("", entries, 0) == 0u32)
+    let first = update("1234", entries, 0)
+    assert(update("56789", entries, first) == 0xcbf43926u32)
+}

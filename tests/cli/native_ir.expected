@@ -10,8 +10,8 @@
     .quad 8
 
 fn f_square(%0)
-    %1 = mul.chk .Lc0 %0, %0
-    ret %1
+    %2 = mul.chk .Lc0 %0, %0
+    ret %2
 
 fn f_main()
     %0 = const #0
@@ -22,20 +22,23 @@ fn f_main()
 L0:
     branch.cmp ge %5, %3 L2
     %6 = move %5
-    %15 = mul.chk .Lc0 %6, %6
-    %8 = add.chk .Lc1 %1, %15
-    %1 = move %8
+    %7 = move %1
+    %19 = mul.chk .Lc0 %6, %6
+    %9 = add.chk .Lc1 %7, %19
+    %1 = move %9
     %5 = addi %5 #1
     jump L0
 L2:
-    %10 = cmpi %1 #4 #10
-    branch %10 L6 L4
+    %10 = move %1
+    %12 = cmpi %10 #4 #10
+    branch %12 L6 L4
 L6:
-    %12 = cmpi %1 #2 #20
-    branch %12 L3 L4
+    %13 = move %1
+    %15 = cmpi %13 #2 #20
+    branch %15 L3 L4
 L3:
-    %13 = sym .Ls3
-    ccall vela_print_str (%13 as str) #0
+    %16 = sym .Ls3
+    ccall vela_print_str (%16 as str) #0
     jump L5
 L4:
 L5:

@@ -6,6 +6,7 @@
 // nothing overflows even when a range ends at the largest Int. (Python's
 // Stage 0, with integers that have no limit, cut them at `hi + 1`.)
 import strings
+import integers
 import types
 
 pub type Key = enum {
@@ -63,14 +64,12 @@ fn int_max() -> Int {
 }
 
 fn has_domain(t: Int) -> Bool {
-    return t == types.INT() || t == types.BYTE()
+    return types.is_integer(t)
 }
 
 fn domain(t: Int) -> Key {
-    if t == types.BYTE() {
-        return Key.Interval(0, 255)
-    }
-    return Key.Interval(int_min(), int_max())
+    if t == 13 { return Key.Interval(int_min(), int_max()) }
+    return Key.Interval(integers.min(t), integers.max(t))
 }
 
 // Every constructor of `t` with its payload types; none for a type with
@@ -333,6 +332,7 @@ fn useful_interval(table: types.Table, rows: [[SPat]], q: [SPat], ts: [Int]) -> 
 }
 
 fn render_number(value: Int, t: Int) -> Str {
+    if t == 13 { return integers.unsigned_text(integers.ordered(value, t)) + "u64" }
     if t == types.BYTE() && value >= 32 && value < 127 && value != 39 && value != 92 {
         let mut b = strings.builder()
         strings.add_byte(mut b, '\'')

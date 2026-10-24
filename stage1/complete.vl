@@ -19,6 +19,7 @@
 // types, and the keywords. Only names starting with what is typed already
 // are given.
 import ast
+import integers
 import checker
 import files
 import index
@@ -206,7 +207,7 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
     for name in ["print", "len", "push", "int", "float", "byte", "assert"] {
         push(mut out, builtin_item(name, name))
     }
-    for name in ["Int", "Float", "Bool", "Byte", "Str", "Option", "Result", "Map"] {
+    for name in ["Int", "Float", "Bool", "Byte", "Str", "Option", "Result", "Map", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64"] {
         push(mut out, Item { name: name, kind: "built-in", detail: name, doc: "A built-in type." })
     }
     for v in [["Some", "Some(T)"], ["None", "None"], ["Ok", "Ok(T)"], ["Err", "Err(E)"]] {

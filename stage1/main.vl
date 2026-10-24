@@ -758,7 +758,7 @@ fn cached_runtime(root: Str, cc: Str, opt: Str, flags: [Str]) -> Str uses fs, os
     }
     let mut b = strings.builder()
     strings.add(mut b, cc + "\n" + opt + "\n" + join_words(flags) + "\n")
-    for name in ["vela_rt.c", "vela_rt.h"] {
+    for name in ["vela_rt.c", "vela_rt.h", "vela_int.h"] {
         match files.read(modules.join(modules.join(root, "runtime"), name)) {
             Ok(t) => strings.add(mut b, t)
             Err(_) => return ""

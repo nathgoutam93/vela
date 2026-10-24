@@ -24,6 +24,7 @@ import ast
 import checker
 import codegen
 import errors
+import integers
 import ir
 import layout
 import maps
@@ -510,7 +511,7 @@ fn in_memory(g: Low, t: Int) -> Bool {
     if t == types.STR() {
         return true
     }
-    if t == types.NOTHING() || t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.UNIT() ||
+    if t == types.NOTHING() || types.is_integer(t) || t == types.BOOL() || t == types.UNIT() ||
         t == types.FLOAT() || is_array_like(g, t) || types.is_map(g.k.table, t) {
         return false
     }
@@ -526,6 +527,7 @@ fn class_of(t: Int) -> Int {
 
 // The bytes a scalar takes in memory.
 fn scalar_size(t: Int) -> Int {
+    if types.is_integer(t) { return types.integer_width(t) / 8 }
     if t == types.BYTE() || t == types.BOOL() || t == types.UNIT() {
         return 1
     }
@@ -649,7 +651,12 @@ fn scalar(g: mut Low, v: Val) -> Int {
         emit(mut g, ir.inst(ir.Op.FLoad, r, v.reg, -1, v.off))
         return r
     }
-    return load(mut g, v.reg, v.off, scalar_size(v.ty))
+    let r = load(mut g, v.reg, v.off, scalar_size(v.ty))
+    if v.ty >= 8 && v.ty <= 12 {
+        return ccall(mut g, "vela_fixed_load", [r, konst(mut g, types.integer_width(v.ty)), konst(mut g, fixed_sign(v.ty))],
+            [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    }
+    return r
 }
 
 // Write the value `v` of type `t` to the memory at addr + off.
@@ -965,6 +972,7 @@ fn share(g: mut Low, t: Int, v: Val) {
 // The vela_type describing `t` to arrays and maps: the runtime's, or one
 // written here.
 fn descriptor(g: mut Low, t: Int) -> Int {
+    if t >= 8 && t <= 13 { return sym_addr(mut g, "vela_type_" + types.get(g.k.table, t).name) }
     let builtin = match t {
         1 => "vela_type_int"
         2 => "vela_type_byte"
@@ -1922,14 +1930,18 @@ fn tests(g: mut Low, p: ast.Pattern, path: Val, t: Int, fail: Int) {
                     fail_unless(mut g, eq, fail)
                 }
                 ast.ExprKind.IntLit(n) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
+                ast.ExprKind.FixedIntLit(n, _, _) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
                 ast.ExprKind.ByteLit(n) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
                 _ => {}
             }
         }
         ast.PatternKind.Range(lo, hi) => {
             let s = scalar(mut g, path)
-            branch_cmp(mut g, "lt", s, konst(mut g, literal(lo)), fail)
-            branch_cmp(mut g, "gt", s, konst(mut g, literal(hi)), fail)
+            let mut less = "lt"
+            let mut greater = "gt"
+            if t == 13 { less = "ult"; greater = "ugt" }
+            branch_cmp(mut g, less, s, konst(mut g, literal(lo)), fail)
+            branch_cmp(mut g, greater, s, konst(mut g, literal(hi)), fail)
         }
         ast.PatternKind.Variant(_, _, _, _, args) => {
             let r = variant_ref(g, p.id)
@@ -1947,6 +1959,7 @@ fn tests(g: mut Low, p: ast.Pattern, path: Val, t: Int, fail: Int) {
 fn literal(e: ast.Expr) -> Int {
     return match e.kind {
         ast.ExprKind.IntLit(n) => n
+        ast.ExprKind.FixedIntLit(n, _, _) => n
         ast.ExprKind.ByteLit(n) => n
         _ => 0
     }
@@ -1990,6 +2003,10 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
             return reg_val(konst(mut g, n), t)
         }
         ast.ExprKind.FloatLit(text) => return float_const(mut g, text)
+        ast.ExprKind.FixedIntLit(n, _, neg) => {
+            if t == types.FLOAT() { return float_const(mut g, integers.spelling(n, "", neg) + ".0") }
+            return reg_val(konst(mut g, n), t)
+        }
         ast.ExprKind.ByteLit(n) => return reg_val(konst(mut g, n), t)
         ast.ExprKind.BoolLit(b) => {
             if b {
@@ -2012,6 +2029,12 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
             }
         }
         ast.ExprKind.Unary(op, operand) => {
+            if op == "~" || op == "-" && types.is_integer(t) && t != types.INT() {
+                let first = expr(mut g, operand)
+                let mut code = 9
+                if op == "-" { code = 5 }
+                return fixed_operation(mut g, e, t, first, reg_val(konst(mut g, 0), t), code, 0)
+            }
             let c = scalar(mut g, expr(mut g, operand))
             if op == "-" && t == types.FLOAT() {
                 let r = reg(mut g, ir.FLOAT())
@@ -2643,7 +2666,10 @@ fn binary(g: mut Low, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Val {
         g.fs.dead = false
         return result
     }
-    let left = expr(mut g, l)
+    let mut left = expr(mut g, l)
+    if types.is_integer(left.ty) || left.ty == types.FLOAT() || left.ty == types.BOOL() || left.ty == types.UNIT() {
+        left = fresh(mut g, left)  // load before the right side can mutate its source
+    }
     let right = expr(mut g, r)
     return operation(mut g, e, op, left, right, ty(g, l))
 }
@@ -2669,6 +2695,19 @@ fn float_op(op: Str) -> ir.Op {
 
 // `left op right`, for operands already worked out, of type `operand`.
 fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: Int) -> Val {
+    if op == "&" || op == "|" || op == "^" || op == "<<" || op == ">>" {
+        return fixed_operation(mut g, e, operand, left, right, integers.operation(op), 0)
+    }
+    if types.is_integer(operand) && operand != types.INT() && operand != types.BYTE() &&
+        (op == "+" || op == "-" || op == "*" || op == "/" || op == "%") {
+        let code = match op { "+" => 0, "-" => 1, "*" => 2, "/" => 3, _ => 4 }
+        return fixed_operation(mut g, e, operand, left, right, code, 0)
+    }
+    if operand == 13 {
+        let r = ccall(mut g, "vela_fixed_compare", [scalar(mut g, left), scalar(mut g, right), konst(mut g, cond_code(op))],
+            [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+        return reg_val(r, types.BOOL())
+    }
     if op == "+" || op == "-" || op == "*" || op == "/" || op == "%" {
         if operand == types.FLOAT() {
             // IEEE arithmetic: no overflow checks, and x / 0.0 is an infinity.
@@ -2728,6 +2767,7 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
 }
 
 fn print_function(t: Int) -> Str {
+    if t == 13 { return "vela_print_uint" }
     if t == types.BOOL() {
         return "vela_print_bool"
     }
@@ -2756,7 +2796,7 @@ fn assert_code(g: mut Low, e: ast.Expr, cond: ast.Expr, kind: Str) {
         ast.ExprKind.Binary(op, l, r) => {
             let t = ty(g, l)
             let comparison = op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">="
-            let printable = t == types.INT() || t == types.BYTE() || t == types.BOOL() || t == types.STR() ||
+            let printable = types.is_integer(t) || t == types.BOOL() || t == types.STR() ||
                 t == types.FLOAT()
             if comparison && printable {
                 let left = expr(mut g, l)
@@ -2809,7 +2849,9 @@ fn shown(g: mut Low, t: Int, v: Val) -> Int {
         return out.reg
     }
     let out = slot_val(mut g, types.STR())
-    if t == types.FLOAT() {
+    if t == 13 {
+        ccall(mut g, "vela_from_uint", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_STR(), out.reg)
+    } else if t == types.FLOAT() {
         ccall(mut g, "vela_from_float", [scalar(mut g, v)], [ir.KIND_FLOAT()], ir.RET_STR(), out.reg)
     } else {
         ccall(mut g, "vela_from_int", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_STR(), out.reg)
@@ -2821,6 +2863,9 @@ fn shown(g: mut Low, t: Int, v: Val) -> Int {
 
 fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     let t = ty(g, e)
+    if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
+        return integer_builtin(mut g, e, name, args)
+    }
     if name == "tasks.map" || name == "tasks.each" {
         return tasks_call(mut g, name, args, t)
     }
@@ -2947,14 +2992,19 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
                 ir.RET_INT(), -1)
             return reg_val(r, types.INT())
         }
+        if arg.ty == 13 { return integer_cast(mut g, e, arg, types.INT()) }
         return reg_val(scalar(mut g, arg), types.INT())
     }
     if name == "float" {
+        if ty(g, args[0]) == 13 {
+            return reg_val(ccall(mut g, "vela_uint_to_float", [scalar(mut g, expr(mut g, args[0]))], [ir.KIND_INT()], ir.RET_FLOAT(), -1), types.FLOAT())
+        }
         let r = reg(mut g, ir.FLOAT())
         emit(mut g, ir.inst(ir.Op.IntToFloat, r, scalar(mut g, expr(mut g, args[0])), -1, 0))
         return reg_val(r, types.FLOAT())
     }
     if name == "byte" {
+        if ty(g, args[0]) != types.INT() { return integer_cast(mut g, e, expr(mut g, args[0]), types.BYTE()) }
         let c = scalar(mut g, expr(mut g, args[0]))
         return reg_val(checked_op(mut g, ir.Op.ToByte, c, -1, loc(mut g, e.line, e.col)), types.BYTE())
     }
@@ -3070,4 +3120,64 @@ fn file_call(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     put_payload(mut g, result, r, err_i, 0, text)
     place_label(mut g, done)
     return own(mut g, result)
+}
+
+fn fixed_sign(t: Int) -> Int {
+    if types.integer_signed(t) { return 1 }
+    return 0
+}
+
+fn fixed_operation(g: mut Low, e: ast.Expr, t: Int, a: Val, b: Val, op: Int, mode: Int) -> Val {
+    let r = ccall(mut g, "vela_fixed_op", [scalar(mut g, a), scalar(mut g, b), konst(mut g, types.integer_width(t)),
+        konst(mut g, fixed_sign(t)), konst(mut g, op), konst(mut g, mode), loc_of(mut g, e)],
+        [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    return reg_val(r, t)
+}
+
+fn integer_cast(g: mut Low, e: ast.Expr, source: Val, t: Int) -> Val {
+    let r = ccall(mut g, "vela_fixed_cast", [scalar(mut g, source), konst(mut g, types.integer_width(source.ty)),
+        konst(mut g, fixed_sign(source.ty)), konst(mut g, types.integer_width(t)), konst(mut g, fixed_sign(t)), loc_of(mut g, e)],
+        [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    return reg_val(r, t)
+}
+
+fn integer_builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
+    let target = integers.type_id(name)
+    let first = expr(mut g, args[0])
+    if target >= 0 { return integer_cast(mut g, e, first, target) }
+    let short = name[5..len(name)]
+    let t = first.ty
+    if short == "to_str" {
+        let out = slot_val(mut g, types.STR())
+        let mut func = "vela_from_int"
+        if t == 13 { func = "vela_from_uint" }
+        ccall(mut g, func, [scalar(mut g, first)], [ir.KIND_INT()], ir.RET_STR(), out.reg)
+        return own(mut g, out)
+    }
+    let left = fresh(mut g, first)  // arguments are read before later mutable arguments
+    let mut second = reg_val(konst(mut g, 0), t)
+    if len(args) == 2 { second = expr(mut g, args[1]) }
+    let op = integers.function_op(short)
+    let mode = integers.mode(short)
+    if mode != 1 { return fixed_operation(mut g, e, t, left, second, op, mode) }
+    let raw = slot_val(mut g, types.INT()).reg
+    let ok = ccall(mut g, "vela_fixed_try", [scalar(mut g, left), scalar(mut g, second), konst(mut g, types.integer_width(t)),
+        konst(mut g, fixed_sign(t)), konst(mut g, op), raw],
+        [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+    let result = ty(g, e)
+    let out = slot_val(mut g, result)
+    let some = types.variant_index(g.k.table, result, "Some")
+    let none = types.variant_index(g.k.table, result, "None")
+    let yes = label(mut g)
+    let no = label(mut g)
+    let done = label(mut g)
+    branch(mut g, ok, yes, no)
+    place_label(mut g, yes)
+    store(mut g, out.reg, 0, 4, konst(mut g, some))
+    put_payload(mut g, out, result, some, 0, reg_val(load(mut g, raw, 0, 8), t))
+    jump(mut g, done)
+    place_label(mut g, no)
+    store(mut g, out.reg, 0, 4, konst(mut g, none))
+    place_label(mut g, done)
+    return own(mut g, out)
 }

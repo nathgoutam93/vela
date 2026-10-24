@@ -108,6 +108,12 @@ typedef uint8_t vela_unit;
 extern const vela_type vela_type_unit;
 extern const vela_type vela_type_int;
 extern const vela_type vela_type_byte;
+extern const vela_type vela_type_i8;
+extern const vela_type vela_type_i16;
+extern const vela_type vela_type_i32;
+extern const vela_type vela_type_u16;
+extern const vela_type vela_type_u32;
+extern const vela_type vela_type_u64;
 extern const vela_type vela_type_float;
 extern const vela_type vela_type_bool;
 extern const vela_type vela_type_str;
@@ -438,6 +444,9 @@ void vela_builder_add(vela_array *b, vela_str s);
 void vela_builder_add_int(vela_array *b, int64_t n);
 vela_str vela_builder_build(vela_array *b);
 vela_str vela_from_int(int64_t n);
+vela_str vela_from_uint(uint64_t n);
+void vela_print_uint(uint64_t n);
+void vela_eprint_uint(uint64_t n);
 // The shortest decimal that reads back as exactly x, with ".0" when it
 // would look like an Int: 0.1, 2.5, 3.0, 1e+20, inf, -inf, nan.
 vela_str vela_from_float(double x);
@@ -530,5 +539,7 @@ static inline uint8_t vela_to_byte(int64_t n, const char *loc) {
     if (n < 0 || n > 255) vela_panic(loc, "value does not fit in a Byte");
     return (uint8_t)n;
 }
+
+#include "vela_int.h"
 
 #endif

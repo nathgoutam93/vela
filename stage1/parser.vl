@@ -9,6 +9,7 @@
 import ast
 import errors
 import lexer
+import integers
 import strings
 
 type Parser = struct {
@@ -54,8 +55,13 @@ fn left_power(k: lexer.Kind) -> Int {
         lexer.Kind.LtEq => 6
         lexer.Kind.Gt => 6
         lexer.Kind.GtEq => 6
-        lexer.Kind.Plus => 10
-        lexer.Kind.Minus => 10
+        lexer.Kind.Pipe => 7
+        lexer.Kind.Caret => 8
+        lexer.Kind.Amp => 9
+        lexer.Kind.Shl => 10
+        lexer.Kind.Shr => 10
+        lexer.Kind.Plus => 12
+        lexer.Kind.Minus => 12
         lexer.Kind.Star => 20
         lexer.Kind.Slash => 20
         lexer.Kind.Percent => 20
@@ -78,6 +84,7 @@ fn starts_expression(k: lexer.Kind) -> Bool {
         lexer.Kind.Ident => true
         lexer.Kind.Minus => true
         lexer.Kind.Bang => true
+        lexer.Kind.Tilde => true
         lexer.Kind.LParen => true
         lexer.Kind.Match => true
         lexer.Kind.Fn => true
@@ -904,13 +911,19 @@ fn pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
     return Ok(pattern_node(mut p, kind, tok.line, tok.col))
 }
 
-// The value of a run of decimal digits that the lexer has checked fits.
-fn digits_value(digits: Str) -> Int {
-    let mut n = 0
-    for c in digits {
-        n = n * 10 + int(c - '0')
+fn integer_expr(p: mut Parser, tok: lexer.Token, negative: Bool, line: Int, col: Int) -> Result[ast.Expr, errors.CompileError] {
+    let number = integers.literal(tok.text)
+    let mut bits = number.bits
+    if negative {
+        if bits < 0 && bits != integers.min(1) {
+            return Err(error(tok, "E3181", "negative literal is below the i64 minimum"))
+        }
+        if bits >= 0 { bits = -bits }
     }
-    return n
+    if number.suffix == "" && (bits >= 0 || negative) {
+        return Ok(expr(mut p, ast.ExprKind.IntLit(bits), line, col))
+    }
+    return Ok(expr(mut p, ast.ExprKind.FixedIntLit(bits, number.suffix, negative), line, col))
 }
 
 // An Int literal (possibly negative) or a Byte literal, in a pattern.
@@ -924,9 +937,9 @@ fn number_literal(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
         if num.kind != lexer.Kind.Int {
             return Err(error(num, "E2018", "expected a number after '-'" + found(num)))
         }
-        return Ok(expr(mut p, ast.ExprKind.IntLit(-digits_value(num.text)), tok.line, tok.col))
+        return integer_expr(mut p, num, true, tok.line, tok.col)
     }
-    return Ok(expr(mut p, ast.ExprKind.IntLit(digits_value(tok.text)), tok.line, tok.col))
+    return integer_expr(mut p, tok, false, tok.line, tok.col)
 }
 
 // ---- Expressions ----
@@ -995,7 +1008,7 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
     advance(mut p)
     let k = tok.kind
     if k == lexer.Kind.Int {
-        return Ok(expr(mut p, ast.ExprKind.IntLit(digits_value(tok.text)), tok.line, tok.col))
+        return integer_expr(mut p, tok, false, tok.line, tok.col)
     }
     if k == lexer.Kind.Float {
         return Ok(expr(mut p, ast.ExprKind.FloatLit(tok.text), tok.line, tok.col))
@@ -1024,7 +1037,11 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
         }
         return Ok(expr(mut p, ast.ExprKind.Name(tok.text), tok.line, tok.col))
     }
-    if k == lexer.Kind.Minus || k == lexer.Kind.Bang {
+    if k == lexer.Kind.Minus && peek(p, 0).kind == lexer.Kind.Int {
+        let number = advance(mut p)
+        return integer_expr(mut p, number, true, tok.line, tok.col)
+    }
+    if k == lexer.Kind.Minus || k == lexer.Kind.Bang || k == lexer.Kind.Tilde {
         let operand = expression(mut p, prefix_power())?
         return Ok(expr(mut p, ast.ExprKind.Unary(lexer.kind_name(k), operand), tok.line, tok.col))
     }

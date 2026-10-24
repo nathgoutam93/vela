@@ -134,6 +134,11 @@ codes with `vela explain`, machine-applicable edits with `vela fix`, and
 `vela guide`, generated from compiler metadata and the installed standard
 library. The agent evaluation uses the guide by default. See
 [`docs/m17-agent-tooling.md`](docs/m17-agent-tooling.md).
+M19 adds signed and unsigned 8/16/32/64-bit integers, checked conversions,
+checked/wrapping/saturating arithmetic, and bit operations. Int aliases i64
+and Byte aliases u8. SHA-256 and CRC-32 pass standard vectors and run at
+1.05 and 0.91 times C on the measured macOS ARM64 host. See
+[`docs/m19-integers.md`](docs/m19-integers.md) for validation and platform limits.
 What comes next, toward a systems language that is also agent-first, is in
 [`docs/roadmap-after-m18.md`](docs/roadmap-after-m18.md).
 See `docs/` for a walkthrough of each milestone.

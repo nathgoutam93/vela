@@ -9,12 +9,12 @@
 // err: heap_type_errors.vl:34:15: error: len takes a Str, an array or a map, not Int [E3171]
 // err: heap_type_errors.vl:35:19: error: 300 does not fit in a Byte (0 to 255) [E3090]
 // err: heap_type_errors.vl:37:17: error: operator '+' needs two Bytes or two Ints, found Byte and Int; convert with int() or byte() [E3104]
-// err: heap_type_errors.vl:38:15: error: int takes a Byte or a Float, found Int [E3172]
+// int(Int) is now an identity conversion.
 // err: heap_type_errors.vl:40:14: error: the keys of Map[Str, Int] are Str, but this is Int [E3093]
 // err: heap_type_errors.vl:41:14: error: a map cannot be looped over directly; loop over maps.keys(m) instead [E3052]
 // err: heap_type_errors.vl:43:14: error: cannot loop over Int; 'for ... in' needs an array, a Str or a range [E3053]
 // err: heap_type_errors.vl:45:20: error: maps.has needs a map, not [Int] [E3174]
-// err: heap_type_errors.vl:46:16: error: Map keys must be Int, Byte, Bool or Str, not [Int] [E3026]
+// err: heap_type_errors.vl:46:16: error: Map keys must be integers, Bool or Str, not [Int] [E3026]
 // err: heap_type_errors.vl:47:15: error: operator '+' joins two Strs, found Str and Int [E3101]
 // err: heap_type_errors.vl:48:16: error: the bounds of a slice must be Int, found Bool [E3093]
 import maps

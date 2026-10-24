@@ -1,0 +1,84 @@
+// SHA-256, FIPS 180-4. Constants and operations follow sections 4.1.2,
+// 4.2.2, 5.1.1, 5.3.3 and 6.2.2:
+// https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+import ints
+import lists
+import strings
+
+fn rotr(x: u32, n: Int) -> u32 { return (x >> n) | (x << (32 - n)) }
+
+pub fn digest(data: Str) -> [u32] {
+    let constants = [0x428a2f98u32, 0x71374491u32, 0xb5c0fbcfu32, 0xe9b5dba5u32, 0x3956c25bu32, 0x59f111f1u32, 0x923f82a4u32, 0xab1c5ed5u32, 0xd807aa98u32, 0x12835b01u32, 0x243185beu32, 0x550c7dc3u32, 0x72be5d74u32, 0x80deb1feu32, 0x9bdc06a7u32, 0xc19bf174u32, 0xe49b69c1u32, 0xefbe4786u32, 0x0fc19dc6u32, 0x240ca1ccu32, 0x2de92c6fu32, 0x4a7484aau32, 0x5cb0a9dcu32, 0x76f988dau32, 0x983e5152u32, 0xa831c66du32, 0xb00327c8u32, 0xbf597fc7u32, 0xc6e00bf3u32, 0xd5a79147u32, 0x06ca6351u32, 0x14292967u32, 0x27b70a85u32, 0x2e1b2138u32, 0x4d2c6dfcu32, 0x53380d13u32, 0x650a7354u32, 0x766a0abbu32, 0x81c2c92eu32, 0x92722c85u32, 0xa2bfe8a1u32, 0xa81a664bu32, 0xc24b8b70u32, 0xc76c51a3u32, 0xd192e819u32, 0xd6990624u32, 0xf40e3585u32, 0x106aa070u32, 0x19a4c116u32, 0x1e376c08u32, 0x2748774cu32, 0x34b0bcb5u32, 0x391c0cb3u32, 0x4ed8aa4au32, 0x5b9cca4fu32, 0x682e6ff3u32, 0x748f82eeu32, 0x78a5636fu32, 0x84c87814u32, 0x8cc70208u32, 0x90befffau32, 0xa4506cebu32, 0xbef9a3f7u32, 0xc67178f2u32]
+    let mut state = [0x6a09e667u32, 0xbb67ae85u32, 0x3c6ef372u32, 0xa54ff53au32, 0x510e527fu32, 0x9b05688cu32, 0x1f83d9abu32, 0x5be0cd19u32]
+    let mut words = lists.repeat(0u32, 64)
+    let padded = ((len(data) + 9 + 63) / 64) * 64
+    let bit_length = u64(len(data)) << 3
+    for block in 0..padded / 64 {
+        for i in 0..len(words) {
+            if i < 16 {
+                let mut word = 0u32
+                for j in 0..4 {
+                    let at = block * 64 + i * 4 + j
+                    let mut b = 0u32
+                    if at < len(data) { b = u32(data[at]) } else if at == len(data) { b = 128 } else if at >= padded - 8 { b = u32((bit_length >> ((padded - 1 - at) * 8)) & 255u64) }
+                    word = (word << 8) | b
+                }
+                words[i] = word
+            } else {
+                let x = words[i - 15]
+                let y = words[i - 2]
+                let s0 = rotr(x, 7) ^ rotr(x, 18) ^ (x >> 3)
+                let s1 = rotr(y, 17) ^ rotr(y, 19) ^ (y >> 10)
+                words[i] = ints.wrapping_add(ints.wrapping_add(words[i - 16], s0), ints.wrapping_add(words[i - 7], s1))
+            }
+        }
+        let mut a = state[0]
+        let mut b = state[1]
+        let mut c = state[2]
+        let mut d = state[3]
+        let mut e = state[4]
+        let mut f = state[5]
+        let mut g = state[6]
+        let mut h = state[7]
+        for i in 0..len(words) {
+            let s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)
+            let choice = (e & f) ^ (~e & g)
+            let t1 = ints.wrapping_add(ints.wrapping_add(h, s1), ints.wrapping_add(choice, ints.wrapping_add(constants[i], words[i])))
+            let s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)
+            let majority = (a & b) ^ (a & c) ^ (b & c)
+            let t2 = ints.wrapping_add(s0, majority)
+            h = g
+            g = f
+            f = e
+            e = ints.wrapping_add(d, t1)
+            d = c
+            c = b
+            b = a
+            a = ints.wrapping_add(t1, t2)
+        }
+        state[0] = ints.wrapping_add(state[0], a)
+        state[1] = ints.wrapping_add(state[1], b)
+        state[2] = ints.wrapping_add(state[2], c)
+        state[3] = ints.wrapping_add(state[3], d)
+        state[4] = ints.wrapping_add(state[4], e)
+        state[5] = ints.wrapping_add(state[5], f)
+        state[6] = ints.wrapping_add(state[6], g)
+        state[7] = ints.wrapping_add(state[7], h)
+    }
+    return state
+}
+
+pub fn hex(words: [u32]) -> Str {
+    let digits = "0123456789abcdef"
+    let mut out = strings.builder()
+    for word in words {
+        for i in 0..8 { strings.add_byte(mut out, digits[int((word >> ((7 - i) * 4)) & 15u32)]) }
+    }
+    return strings.build(out)
+}
+
+test "NIST SHA-256 abc and two-block vectors" {
+    assert(hex(digest("abc")) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    assert(hex(digest("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")) == "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1")
+    assert(hex(digest("")) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+}

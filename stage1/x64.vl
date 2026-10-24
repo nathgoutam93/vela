@@ -426,7 +426,14 @@ fn low32(r: Str) -> Str {
     }
 }
 
+fn low16(r: Str) -> Str {
+    return match r {
+        "rax" => "ax", "rbx" => "bx", "rcx" => "cx", "rdx" => "dx", "rsi" => "si", "rdi" => "di", _ => r + "w",
+    }
+}
+
 fn sized(r: Str, size: Int) -> Str {
+    if size == 2 { return low16(r) }
     if size == 1 {
         return low8(r)
     }
@@ -437,6 +444,7 @@ fn sized(r: Str, size: Int) -> Str {
 }
 
 fn ptr_word(size: Int) -> Str {
+    if size == 2 { return "word ptr " }
     if size == 1 {
         return "byte ptr "
     }
@@ -796,6 +804,8 @@ fn branch_suffix(c: Str) -> Str {
         "gt" => "g"
         "ge" => "ge"
         "ult" => "b"
+        "ugt" => "a"
+        "ule" => "be"
         _ => "ae"
     }
 }
@@ -871,7 +881,7 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         if o.locs[i.dst].kind == 0 {
             d = o.locs[i.dst].reg
         }
-        if i.imm2 == 1 {
+        if i.imm2 == 1 || i.imm2 == 2 {
             emit(mut o, "movzx " + low32(d) + ", " + m)
         } else if i.imm2 == 4 {
             emit(mut o, "movsxd " + d + ", " + m)

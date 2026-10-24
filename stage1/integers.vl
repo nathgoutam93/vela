@@ -1,0 +1,225 @@
+// Integer metadata and literal decoding, also usable by the bootstrap compiler.
+// Values use an Int bit pattern; high/low halves avoid overflowing while parsing.
+import strings
+
+pub fn names() -> [Str] {
+    return ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64"]
+}
+
+pub fn type_id(name: Str) -> Int {
+    return match name {
+        "i64" => 1
+        "u8" => 2
+        "i8" => 8
+        "i16" => 9
+        "i32" => 10
+        "u16" => 11
+        "u32" => 12
+        "u64" => 13
+        _ => -1
+    }
+}
+
+pub fn width(t: Int) -> Int {
+    return match t {
+        1 => 64
+        2 => 8
+        8 => 8
+        9 => 16
+        10 => 32
+        11 => 16
+        12 => 32
+        13 => 64
+        _ => 0
+    }
+}
+
+pub fn signed(t: Int) -> Bool {
+    return t == 1 || t == 8 || t == 9 || t == 10
+}
+
+pub fn min(t: Int) -> Int {
+    if !signed(t) {
+        return 0
+    }
+    if width(t) == 64 {
+        return -9223372036854775807 - 1
+    }
+    return -power(2, width(t) - 1)
+}
+
+// u64's mathematical maximum cannot be represented by the compiler's Int.
+// Callers must handle u64 separately, rather than use this signed bound.
+pub fn max(t: Int) -> Int {
+    if width(t) == 64 {
+        return 9223372036854775807
+    }
+    let mut bits = width(t)
+    if signed(t) {
+        bits = bits - 1
+    }
+    return power(2, bits) - 1
+}
+
+fn power(base: Int, n: Int) -> Int {
+    let mut result = 1
+    for _ in 0..n {
+        result = result * base
+    }
+    return result
+}
+
+pub type Literal = struct {
+    bits: Int
+    suffix: Str
+    valid: Bool
+    overflow: Bool
+    leading_zero: Bool
+}
+
+pub fn digit(c: Byte) -> Int {
+    if c >= '0' && c <= '9' { return int(c - '0') }
+    if c >= 'a' && c <= 'f' { return int(c - 'a') + 10 }
+    if c >= 'A' && c <= 'F' { return int(c - 'A') + 10 }
+    return -1
+}
+
+pub fn literal(text: Str) -> Literal {
+    let mut suffix = ""
+    let mut end = len(text)
+    for name in names() {
+        if len(text) > len(name) && text[len(text) - len(name)..len(text)] == name {
+            suffix = name
+            end = len(text) - len(name)
+            break
+        }
+    }
+    let mut base = 10
+    let mut start = 0
+    if end >= 2 && text[0] == '0' {
+        if text[1] == 'x' { base = 16; start = 2 }
+        if text[1] == 'b' { base = 2; start = 2 }
+    }
+    let mut out = Literal { bits: 0, suffix: suffix, valid: start < end, overflow: false, leading_zero: false }
+    let mut hi = 0
+    let mut lo = 0
+    let mut previous_digit = false
+    let mut digits = 0
+    for i in start..end {
+        let c = text[i]
+        if c == '_' {
+            if !previous_digit || i + 1 == end {
+                out.valid = false
+            }
+            previous_digit = false
+            continue
+        }
+        let d = digit(c)
+        if d < 0 || d >= base {
+            out.valid = false
+            continue
+        }
+        previous_digit = true
+        digits = digits + 1
+        let next = lo * base + d
+        lo = next % 4294967296
+        hi = hi * base + next / 4294967296
+        if hi > 4294967295 {
+            out.overflow = true
+            hi = hi % 4294967296
+        }
+    }
+    out.leading_zero = base == 10 && digits > 1 && text[start] == '0'
+    if hi < 2147483648 {
+        out.bits = hi * 4294967296 + lo
+    } else {
+        out.bits = (hi - 2147483648) * 4294967296 + lo + min(1)
+    }
+    return out
+}
+
+pub fn fits(bits: Int, t: Int, negative: Bool) -> Bool {
+    if t == 13 {
+        return !negative || bits == 0
+    }
+    if !negative && bits < 0 {
+        return false  // the positive u64 magnitude uses its high bit
+    }
+    return bits >= min(t) && bits <= max(t)
+}
+
+pub fn operation(name: Str) -> Int {
+    return match name {
+        "add" => 0
+        "sub" => 1
+        "mul" => 2
+        "div" => 3
+        "rem" => 4
+        "neg" => 5
+        "&" => 6
+        "|" => 7
+        "^" => 8
+        "~" => 9
+        "<<" => 10
+        ">>" => 11
+        _ => -1
+    }
+}
+
+pub fn functions() -> [Str] {
+    return ["checked_add", "checked_sub", "checked_mul", "checked_div", "checked_rem", "checked_neg",
+        "wrapping_add", "wrapping_sub", "wrapping_mul", "wrapping_div", "wrapping_rem", "wrapping_neg",
+        "saturating_add", "saturating_sub", "saturating_mul", "saturating_div", "saturating_rem", "saturating_neg", "to_str"]
+}
+
+pub fn mode(name: Str) -> Int {
+    if len(name) > 8 && name[0..8] == "checked_" { return 1 }
+    if len(name) > 9 && name[0..9] == "wrapping_" { return 2 }
+    return 3
+}
+
+pub fn function_op(name: Str) -> Int {
+    let mut start = 0
+    for i in 0..len(name) {
+        if name[i] == '_' { start = i + 1 }
+    }
+    return operation(name[start..len(name)])
+}
+
+test "literal halves preserve the entire u64 domain" {
+    assert(literal("18446744073709551615u64").bits == -1)
+    assert(literal("0xffff_ffff_ffff_ffffu64").bits == -1)
+    assert(literal("18446744073709551616u64").overflow)
+    assert(literal("0b1010u8").bits == 10)
+    assert(!literal("0x_12").valid)
+    assert(!literal("1__2").valid)
+}
+
+pub fn unsigned_text(bits: Int) -> Str {
+    if bits >= 0 { return strings.from_int(bits) }
+    let positive = bits - min(1)
+    let mut hi = positive / 4294967296 + 2147483648
+    let mut lo = positive % 4294967296
+    let mut out = ""
+    for hi > 0 || lo > 0 {
+        let combined = (hi % 10) * 4294967296 + lo
+        out = strings.from_int(combined % 10) + out
+        hi = hi / 10
+        lo = combined / 10
+    }
+    return out
+}
+
+pub fn spelling(bits: Int, suffix: Str, negative: Bool) -> Str {
+    let mut text = unsigned_text(bits)
+    if negative { text = strings.from_int(bits) }
+    return text + suffix
+}
+
+// Bias u64's unsigned ordering into the compiler's signed interval domain.
+// Applying the same transform again recovers the original bits.
+pub fn ordered(bits: Int, t: Int) -> Int {
+    if t != 13 { return bits }
+    if bits < 0 { return bits - min(1) }
+    return bits + min(1)
+}

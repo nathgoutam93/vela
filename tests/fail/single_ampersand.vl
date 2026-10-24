@@ -1,4 +1,4 @@
-// err: single_ampersand.vl:3:16: error: unexpected character '&'; did you mean '&&'? [E1016]
+// err: single_ampersand.vl:3:16: error: bit operations need integers of the same type [E3183]
 fn main() {
     print(true & false)
 }

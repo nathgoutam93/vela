@@ -12,6 +12,7 @@
 // Unknown values and effects retain their runtime checks.
 import ast
 import checker
+import integers
 import maps
 import strings
 import types
@@ -163,12 +164,39 @@ pub fn new_env(params: [[Range]]) -> Env {
 }
 
 fn is_int(k: checker.Checked, e: ast.Expr) -> Bool {
-    return e.id < len(k.ty) && k.ty[e.id] == types.INT()
+    return e.id < len(k.ty) && ranged_type(k.ty[e.id])
 }
 
 // The range of an Int expression; full() for anything not known.
+fn ranged_type(t: Int) -> Bool {
+    return types.is_integer(t) && t != 13
+}
+
+fn clip(r: Range, t: Int) -> Range {
+    if !ranged_type(t) { return r }
+    let mut out = r
+    if out.lo < integers.min(t) { out.lo = integers.min(t) }
+    if out.hi > integers.max(t) { out.hi = integers.max(t) }
+    return out
+}
+
+fn fits_type(r: Range, t: Int) -> Bool {
+    if t == types.INT() { return fits(r) }
+    return ranged_type(t) && r.lo >= integers.min(t) && r.hi <= integers.max(t)
+}
+
 pub fn of(k: checker.Checked, env: Env, e: ast.Expr) -> Range {
+    let r = of_inner(k, env, e)
+    if is_int(k, e) { return clip(r, k.ty[e.id]) }
+    return r
+}
+
+fn of_inner(k: checker.Checked, env: Env, e: ast.Expr) -> Range {
     match e.kind {
+        ast.ExprKind.FixedIntLit(n, _, _) => {
+            if is_int(k, e) { return Range { lo: n, hi: n } }
+            return full()
+        }
         ast.ExprKind.IntLit(n) => {
             if is_int(k, e) {
                 return Range { lo: n, hi: n }
@@ -222,6 +250,10 @@ pub fn of(k: checker.Checked, env: Env, e: ast.Expr) -> Range {
                     if name == "len" {
                         return Range { lo: 0, hi: max_len() }
                     }
+                    if integers.type_id(name) >= 0 && len(args) == 1 && is_int(k, e) {
+                        if is_int(k, args[0]) { return of(k, env, args[0]) }
+                        return full()
+                    }
                     if name == "int" && len(args) == 1 && args[0].id < len(k.ty) && k.ty[args[0].id] == types.BYTE() {
                         return Range { lo: 0, hi: 255 }
                     }
@@ -247,7 +279,7 @@ pub fn cannot_fail(k: checker.Checked, env: Env, e: ast.Expr) -> Bool {
                 return false
             }
             if op == "+" || op == "-" || op == "*" {
-                return fits(of(k, env, e))
+                return fits_type(of_inner(k, env, e), k.ty[e.id])
             }
             if op == "/" || op == "%" {
                 // A positive divisor: never zero, and never the -1 that
@@ -257,7 +289,7 @@ pub fn cannot_fail(k: checker.Checked, env: Env, e: ast.Expr) -> Bool {
             return false
         }
         ast.ExprKind.Unary(op, x) => {
-            return op == "-" && is_int(k, e) && of(k, env, x).lo > min_int()
+            return op == "-" && is_int(k, e) && fits_type(neg(of(k, env, x)), k.ty[e.id])
         }
         _ => return false
     }
@@ -433,7 +465,7 @@ pub fn analyze(k: checker.Checked) -> [[Range]] {
 // arguments; a function used as a value has unrestricted inputs.
 fn tracked(k: checker.Checked, as_value: Map[Int, Bool], id: Int, i: Int) -> Bool {
     let f = k.fns[id]
-    return !maps.has(as_value, id) && f.params[i] == types.INT()
+    return !maps.has(as_value, id) && ranged_type(f.params[i])
 }
 
 fn walk_fn(w: mut Walk, id: Int) {
@@ -579,7 +611,7 @@ fn set_local(w: mut Walk, l: Int, e: ast.Expr) {
     }
     let bound = limit(w.k, w.env, e)
     invalidate(mut w.env, l)
-    if w.k.locals[l].ty == types.INT() {
+    if ranged_type(w.k.locals[l].ty) {
         let f = w.k.fns[w.fn_id]
         for i in 0..len(f.param_locals) {
             if f.param_locals[i] == l && f.mutable[i] {
@@ -783,7 +815,7 @@ fn walk_loop(w: mut Walk, c: Option[ast.Expr], body: ast.Block, var: Int, r: Ran
         }
         let f = w.k.fns[w.fn_id]
         for i in 0..len(f.params) {
-            if f.mutable[i] && f.params[i] == types.INT() {
+            if f.mutable[i] && ranged_type(f.params[i]) {
                 w.env.locals[f.param_locals[i]] = w.env.params[w.fn_id][i]
             }
         }
@@ -901,7 +933,7 @@ fn forget_changed(w: mut Walk, c: Option[ast.Expr], body: ast.Block) {
     for l in maps.keys(changed) {
         invalidate(mut w.env, l)
         for i in 0..len(f.param_locals) {
-            if f.param_locals[i] == l && f.mutable[i] && f.params[i] == types.INT() && i < len(w.env.params[w.fn_id]) {
+            if f.param_locals[i] == l && f.mutable[i] && ranged_type(f.params[i]) && i < len(w.env.params[w.fn_id]) {
                 w.env.locals[l] = w.env.params[w.fn_id][i]
             }
         }
@@ -1195,7 +1227,7 @@ fn walk_call(w: mut Walk, e: ast.Expr, callee: ast.Expr, args: [ast.Expr]) {
     let steady = stable_args(args) && stable(callee)
     for i in 0..len(args) {
         walk_expr(mut w, args[i])
-        if callee_id >= 0 && i < len(params) && params[i] == types.INT() && !mutable[i] {
+        if callee_id >= 0 && i < len(params) && ranged_type(params[i]) && !mutable[i] {
             let mut passed = full()
             if steady {
                 passed = w.last
@@ -1304,6 +1336,7 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
     let mut result = full()
     match e.kind {
         ast.ExprKind.IntLit(_) => result = of(w.k, w.env, e)
+        ast.ExprKind.FixedIntLit(_, _, _) => result = of(w.k, w.env, e)
         ast.ExprKind.Name(_) => {
             result = of(w.k, w.env, e)
             note_value(mut w, e)
@@ -1312,7 +1345,7 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
             walk_expr(mut w, x)
             if op == "-" && is_int(w.k, e) {
                 if w.record {
-                    w.proven[e.id] = w.last.lo > min_int()
+                    w.proven[e.id] = fits_type(neg(w.last), w.k.ty[e.id])
                 }
                 result = neg(w.last)
             }
@@ -1345,7 +1378,7 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
                         result = full()
                     }
                     if w.record && (op == "+" || op == "-" || op == "*" || op == "/" || op == "%") {
-                        let mut safe = fits(result)
+                        let mut safe = fits_type(result, w.k.ty[e.id])
                         if op == "/" || op == "%" {
                             safe = right.lo > 0 && stable(e)
                         }
@@ -1428,6 +1461,7 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
         }
         _ => {}
     }
+    if is_int(w.k, e) { result = clip(result, w.k.ty[e.id]) }
     w.last = result
 }
 
@@ -1442,4 +1476,14 @@ test "ranges of operations" {
     let m = rem(Range { lo: 0, hi: 100 }, Range { lo: 7, hi: 7 })
     assert(m.lo == 0 && m.hi == 6)
     assert(strings.from_int(neg(Range { lo: 1, hi: 5 }).lo) == "-5")
+}
+
+test "integer domains constrain proofs to the result width" {
+    assert(fits_type(Range { lo: -128, hi: 127 }, 8))
+    assert(!fits_type(Range { lo: -128, hi: 128 }, 8))
+    assert(!fits_type(Range { lo: -1, hi: 255 }, types.BYTE()))
+    assert(fits_type(Range { lo: 0, hi: 4294967295 }, 12))
+    assert(!fits_type(Range { lo: 0, hi: 4294967296 }, 12))
+    assert(!fits_type(Range { lo: 0, hi: 1 }, 13))
+    assert(clip(full(), 8).lo == -128 && clip(full(), 8).hi == 127)
 }

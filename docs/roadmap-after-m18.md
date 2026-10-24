@@ -57,6 +57,9 @@ measurements and remaining platform validation.
 
 ## M19: Fixed-width integers and bit operations
 
+**Status:** implemented; C-backend acceptance passes. See [the walkthrough](m19-integers.md)
+for semantics, benchmark measurements, and outstanding Linux native/sanitizer validation.
+
 **Needs:** nothing before it.
 
 **What gets built:** Fixed-width integers: i8, i16, i32, i64, u8, u16, u32, u64 (Byte becomes u8), explicit conversions, checked, wrapping and saturating operations, and the bit operations & | ^ ~ << >>.

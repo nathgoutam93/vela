@@ -1,0 +1,16 @@
+// Chain SHA-256 hex digests into the next message so every round is required.
+import os
+import text
+import sha256
+
+fn main() {
+    let args = os.args()
+    let mut size = 1048576
+    let mut rounds = 32
+    if len(args) > 1 { match text.parse_int(args[1]) { Some(n) => size = n, None => os.exit(2) } }
+    if len(args) > 2 { match text.parse_int(args[2]) { Some(n) => rounds = n, None => os.exit(2) } }
+    let data = text.repeat("a", size)
+    let mut result = ""
+    for _ in 0..rounds { result = sha256.hex(sha256.digest(result + data)) }
+    print(result)
+}

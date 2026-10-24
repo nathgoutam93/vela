@@ -1,5 +1,5 @@
 // The parser alone: names are not resolved, so `Shape.Circle` is still a
-// field access, and `-2` outside a pattern is unary minus applied to 2.
+// field access; signed integer constants are stored as literal values.
 // dump: ast
 // out: (struct Point (x Int) (y Int))
 // out: (enum Shape (Dot) (Circle Point Int) (Many Option[Shape]))
@@ -8,7 +8,7 @@
 // out:     (return (match s (=> Shape.Dot (call Ok 0)) (=> (Shape.Circle _ r) (call Ok (* r r))) (=> (Shape.Many (Some inner)) (call area inner)) (=> (Shape.Many None) (call Err "empty"))))))
 // out: (fn main ()
 // out:   (block
-// out:     (let mut p Point (struct Point (x 1) (y (- 2))))
+// out:     (let mut p Point (struct Point (x 1) (y -2)))
 // out:     (= (. p x) (. (. q r) s))
 // out:     (match (call (. Shape Circle) p 3) (=> 0 (return)) (=> -1 (break))
 // out:       (=> true
