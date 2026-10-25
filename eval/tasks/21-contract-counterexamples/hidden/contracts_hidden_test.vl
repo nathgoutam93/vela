@@ -1,0 +1,26 @@
+import contracts
+
+test "next" {
+    for n in 0..255 {
+        assert(contracts.next(u8(n)) == u8(n + 1))
+    }
+}
+
+test "magnitude" {
+    for n in [-2147483647i32, -100i32, -1i32, 0i32, 1i32, 100i32, 2147483647i32] {
+        let mut expected = n
+        if n < 0i32 { expected = -n }
+        assert(contracts.magnitude(n) == expected)
+    }
+}
+
+test "clamp" {
+    for limit in [0, 1, 2, 255, 1000] {
+        for n in [-9223372036854775808, -1, 0, 1, 255, 1000, 9223372036854775807] {
+            let mut expected = n
+            if n < 0 { expected = 0 }
+            if n > limit { expected = limit }
+            assert(contracts.clamp(n, limit) == expected)
+        }
+    }
+}

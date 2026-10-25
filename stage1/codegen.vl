@@ -4,6 +4,7 @@
 import cffi
 import ast
 import checker
+import contract_checks
 import errors
 import integers
 import layout
@@ -292,7 +293,9 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int,
             push(mut out, "    switch (which) {")
         }
         for i in 0..len(tests) {
-            push(mut out, "    case " + strings.from_int(i) + ": " + fn_name(k, tests[i]) + "(); return 0;")
+            if len(k.fns[tests[i]].params)==1 {
+                push(mut out, "    case " + strings.from_int(i) + ": return " + fn_name(k,tests[i]) + "(argc > 2 ? strtol(argv[2], NULL, 10) : -1) ? 0 : 77;")
+            } else { push(mut out, "    case " + strings.from_int(i) + ": " + fn_name(k, tests[i]) + "(); return 0;") }
         }
         for line in ["    default: return 2;", "    }", "}", ""] {
             push(mut out, line)
@@ -706,6 +709,7 @@ fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
         }
     }
     for r in f.decl.requires {
+        if contract_checks.removable(g.k,r) { continue }
         push_frame(mut g, "stmt")
         assert_code(mut g, r, r, "requires of '" + f.decl.name + "'")
         pop_frame(mut g)
@@ -744,6 +748,7 @@ fn ensures_code(g: mut Gen, result_c: Str) {
         emit(mut g, c_type(g, local_ty(g, f.result_local)) + " " + name + " = " + result_c + ";")
     }
     for e in f.decl.ensures {
+        if contract_checks.removable(g.k,e) { continue }
         assert_code(mut g, e, e, "ensures of '" + f.decl.name + "'")
     }
     pop_frame(mut g)
@@ -773,7 +778,7 @@ fn observe_scope(g: mut Gen, name: Str, line: Int, col: Int) {
 fn stmt(g: mut Gen, s: ast.Stmt) {
     let saved_source = g.source; g.source = s.line
     if g.mode > 0 {
-        if g.mode == 1 { emit(mut g, "vela_observe_point(" + c_string(g.filename) + ", " + strings.from_int(s.line) + ", " + strings.from_int(s.col) + ");") }
+        if g.mode == 1 || g.mode == 3 { emit(mut g, "vela_observe_point(" + c_string(g.filename) + ", " + strings.from_int(s.line) + ", " + strings.from_int(s.col) + ");") }
     }
     match s.kind {
         ast.StmtKind.Block(b) => {

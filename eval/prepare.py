@@ -18,6 +18,7 @@ std and examples), `readme` (README and std), or `none` (std only).
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -39,12 +40,15 @@ def task_dir(name: str) -> Path:
 
 
 def install(vela: Path, dest: Path, context: str) -> None:
+    if os.name == "nt" and not vela.is_file() and vela.with_suffix(".exe").is_file():
+        vela = vela.with_suffix(".exe")
     (dest / "bin").mkdir(parents=True)
-    shutil.copy2(vela, dest / "bin" / "vela")
+    compiler = dest / "bin" / ("vela.exe" if os.name == "nt" else "vela")
+    shutil.copy2(vela, compiler)
     shutil.copytree(ROOT / "runtime", dest / "runtime")
     shutil.copytree(ROOT / "std", dest / "std")
     if context == "guide":
-        guide = subprocess.run([str((dest / "bin" / "vela").resolve()), "guide"],
+        guide = subprocess.run([str(compiler.resolve()), "guide"],
                                env={**os.environ, "VELA_ROOT": str(dest.resolve())},
                                capture_output=True, text=True, check=True)
         (dest / "GUIDE.md").write_text(guide.stdout)
@@ -69,6 +73,22 @@ def prepare(task: Path, out: Path, vela: Path, context: str) -> None:
     prompt += (task / "task.md").read_text()
     (out / "TASK.md").write_text(prompt)
     install(vela, out / "_vela", context)
+    spec = json.loads((task / "task.json").read_text())
+    if spec.get("counterexamples"):
+        compiler = (out / "_vela" / "bin" / ("vela.exe" if os.name == "nt" else "vela")).resolve()
+        report = out / "COUNTEREXAMPLES.json"
+        result = subprocess.run(
+            [str(compiler), "test", "--properties", "--json", "--cases", "32",
+             "--timeout", "3000", "--budget", "30000", "--report", str(report), spec["main"]],
+            cwd=out, env={**os.environ, "VELA_ROOT": str((out / "_vela").resolve())},
+            capture_output=True, text=True, timeout=180)
+        if result.returncode != 1 or not report.exists():
+            raise RuntimeError(f"counterexample preparation failed: {result.stdout}\n{result.stderr}")
+        evidence = json.loads(report.read_text())
+        if evidence.get("status") != "failed" or not all(
+                row.get("status") == "failed" and row.get("counterexample")
+                for row in evidence.get("results", [])) or not evidence.get("results"):
+            raise RuntimeError("task requires a concrete counterexample for every contract")
 
 
 def main() -> int:

@@ -1,0 +1,17 @@
+pub fn next(x: u8) -> u8
+    requires x < 255u8
+    ensures result > x {
+    return x
+}
+
+pub fn magnitude(x: i32) -> i32
+    requires x > -2147483648i32
+    ensures result >= 0i32 {
+    return x
+}
+
+pub fn clamp(x: Int, limit: Int) -> Int
+    requires limit >= 0 && limit <= 1000
+    ensures result >= 0 && result <= limit {
+    return x
+}

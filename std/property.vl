@@ -1,0 +1,50 @@
+// Deterministic raw-bit generators. Typed domains decode bits into values;
+// user generators use ordinary static interfaces, without runtime reflection.
+import ints
+pub type Generator = interface {
+    fn sample(value: Self, seed: u64, index: Int) -> u64
+    fn shrink(value: Self, bits: u64) -> [u64]
+}
+pub type Bits = struct { salt: u64 }
+pub fn generator() -> Bits { return Bits { salt: 0u64 } }
+pub fn Bits.sample(value: Bits, seed: u64, index: Int) -> u64 {
+    let boundaries: [u64] = [0u64, 1u64, 2u64, 127u64, 128u64, 255u64, 256u64, 32767u64, 32768u64, 65535u64,
+        2147483647u64, 2147483648u64, 4294967295u64, 9223372036854775807u64, 9223372036854775808u64, 18446744073709551615u64]
+    if index >= 0 && index < len(boundaries) { return boundaries[index] }
+    let mut n = 0u64; if index > 0 { n = u64(index) }
+    let mut z = ints.wrapping_add(ints.wrapping_add(seed, value.salt), ints.wrapping_mul(n, 11400714819323198485u64))
+    z = ints.wrapping_mul(z ^ (z >> 30), 13787848793156543929u64)
+    z = ints.wrapping_mul(z ^ (z >> 27), 10723151780598845931u64)
+    return z ^ (z >> 31)
+}
+pub fn Bits.shrink(value: Bits, bits: u64) -> [u64] {
+    let mut out: [u64] = []; let _ = value
+    if bits > 0u64 { push(mut out, 0u64) }
+    if bits > 1u64 { push(mut out, 1u64); push(mut out, bits / 2u64) }
+    return out
+}
+pub fn samples[G: Generator](value: G, seed: u64, count: Int) -> [u64] {
+    let mut out: [u64] = []; let mut n = count; if n < 0 { n = 0 }; if n > 4096 { n = 4096 }
+    for i in 0..n { push(mut out, value.sample(seed, i)) }; return out
+}
+test "generator boundaries, determinism and bounded shrinking" {
+    let g = generator(); let a = samples(g, 42u64, 20); let b = samples(g, 42u64, 20)
+    assert(len(a) == len(b) && a[0] == 0u64 && a[15] == 18446744073709551615u64)
+    for i in 0..len(a) { assert(a[i] == b[i]) }
+    assert(len(samples(g, 1u64, -1)) == 0); assert(len(g.shrink(0u64)) == 0)
+    for n in g.shrink(100u64) { assert(n < 100u64) }
+}
+
+// Custom generators satisfy the same ordinary interface as Bits.
+type Single = struct { n: u64 }
+fn Single.sample(value: Single, seed: u64, index: Int) -> u64 {
+    let _ = seed; return value.n
+}
+fn Single.shrink(value: Single, bits: u64) -> [u64] {
+    let _ = value; if bits > 0u64 { return [0u64] }; return []
+}
+test "user generator through static interface" {
+    let g = Single { n: 42u64 }; let values = samples(g, 1u64, 3)
+    assert(len(values) == 3 && values[0] == 42u64 && values[2] == 42u64)
+    assert(g.shrink(values[0])[0] == 0u64)
+}

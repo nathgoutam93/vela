@@ -72,6 +72,7 @@ type ClosureCtx = struct {
 }
 
 pub type Checked = struct {
+    proved_contracts: Map[Int, Bool]  // fresh compiler-only proof annotations; never loaded from a report
     target: Str
     errors: [errors.CompileError]  // sorted
     warnings: [errors.CompileError]  // sorted; they do not stop the program from compiling
@@ -202,6 +203,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
     program(mut c, for_tests)
     validate_fixed(mut c)
     return Checked {
+        proved_contracts: [:],
         target: target,
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
         locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
@@ -1266,7 +1268,17 @@ fn stmt(c: mut Checker, s: ast.Stmt) {
                 // `1 + 2` on a line by itself computes a value and throws it away.
                 report_at(mut c, e, "E3051", "this value is not used; only a call can stand alone as a statement")
             }
-            infer(mut c, e)  // a call's result may be ignored
+            let result = infer(mut c, e)
+            // Inspect the checked type: direct, indirect, generic and method
+            // calls obey the same rule. Try propagation is an acknowledgement.
+            match e.kind {
+                ast.ExprKind.Call(_, _) => {
+                    if types.is_builtin_enum(c.table, result) && types.get(c.table, result).name == "Result" {
+                        warn_at(mut c, e, "E7009", "discarded Result may contain an error; return, propagate, match or bind it; use let _ = ... for an intentional discard")
+                    }
+                }
+                _ => {}
+            }
         }
         ast.StmtKind.Let(name, mutable, annotation, value) => let_stmt(mut c, s, name, mutable, annotation, value)
         ast.StmtKind.Assign(target, value) => assign(mut c, target, value)
@@ -1359,6 +1371,9 @@ fn let_stmt(c: mut Checker, s: ast.Stmt, name: Str, mutable: Bool, annotation: O
     }
     check_name_allowed(mut c, name, s.line, s.col)
     let n = len(c.scopes) - 1
+    // Repeated immutable acknowledgements use the existing discard spelling.
+    // Keep ordinary local ownership/cleanup; only exempt this name check.
+    if name != "_" || mutable {
     match maps.get(c.scopes[n], name) {
         Some(first) => {
             let l = c.locals[first]
@@ -1366,6 +1381,7 @@ fn let_stmt(c: mut Checker, s: ast.Stmt, name: Str, mutable: Bool, annotation: O
                 strings.from_int(l.line) + ":" + strings.from_int(l.col))
         }
         None => {}
+    }
     }
     let mut kind = "let"
     if mutable {

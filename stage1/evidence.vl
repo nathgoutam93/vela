@@ -1,0 +1,44 @@
+// Evidence identities are compiler-only. Reports are never authority to erase
+// checks: a reused report is checked for freshness and recomputed from the AST.
+import checker
+import files
+import json
+import modules
+import os
+import proof_hash
+import sysio
+fn virtual_source(virtual: Bool, source: Str) -> Str { if virtual { return source }; return "" }
+pub fn context(k: checker.Checked) -> Result[json.Json, Str] uses fs, os {
+    let mut sources: [json.Json] = []
+    for m in k.modules {
+        if m.file == "" { continue }
+        let virtual = m.name == "<prelude>"
+        let mut path = modules.normpath(m.file); match sysio.canonical(m.file) { Ok(p) => path = p, Err(_) => {} }
+        push(mut sources, json.object([json.member("file", json.string(path)), json.member("virtual", json.boolean(virtual)), json.member("virtual_source", json.string(virtual_source(virtual, m.source))), json.member("sha256", json.string(proof_hash.source(m.source)))]))
+    }
+    let binary = files.read(os.executable())?
+    return Ok(json.object([json.member("model", json.string("vela-m28-bv-1")), json.member("target", json.string(k.target)),
+        json.member("compiler_sha256", json.string(proof_hash.source(binary))), json.member("sources", json.array(sources))]))
+}
+pub fn fresh(old: json.Json, current: json.Json) -> Result[Unit, Str] {
+    for name in ["model", "target", "compiler_sha256"] {
+        if json.str_or(json.get(old, name), "") != json.str_or(json.get(current, name), "?") { return Err("stale evidence: " + name + " differs") }
+    }
+    let a = json.items(json.get(old, "sources")); let b = json.items(json.get(current, "sources"))
+    if len(a) != len(b) { return Err("stale evidence: source set differs") }
+    let mut seen: [Str] = []
+    for row in a {
+        let file = json.str_or(json.get(row, "file"), ""); for old_file in seen { if old_file == file { return Err("invalid evidence: duplicate source") } }; push(mut seen, file)
+        let mut matched = false
+        for now in b { if json.str_or(json.get(now, "file"), "?") == file {
+            matched = true; if json.str_or(json.get(row, "sha256"), "") != json.str_or(json.get(now, "sha256"), "?") { return Err("stale evidence: " + file) }
+        } }
+        if !matched { return Err("stale evidence: source set differs") }
+    }
+    return Ok(())
+}
+pub fn function(k: checker.Checked, id: Int) -> json.Json {
+    let f = k.fns[id]
+    return json.object([json.member("file", json.string(k.modules[f.module].file)), json.member("name", json.string(f.decl.name)),
+        json.member("line", json.integer(f.decl.line)), json.member("column", json.integer(f.decl.col))])
+}

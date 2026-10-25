@@ -1,0 +1,235 @@
+// Opt-in bounded symbolic verification. Only scalar, finite straight-line code
+// is translated. Unsupported calls/loops/mutation of memory remain unknown.
+import ast
+import checker
+import contract_checks
+import evidence
+import integers
+import json
+import maps
+import processes
+import os
+import strings
+import text
+import time
+import types
+pub type Outcome = struct { checked: checker.Checked, report: json.Json }
+type Term = struct { value: Str, defined: Str, ty: Int, ok: Bool }
+type State = struct { values: Map[Int, Term], path: Str, safe: Str, dead: Bool }
+type Walk = struct { k: checker.Checked, id: Int, bad: Str, reason: Str, returns: Int, steps: Int }
+fn num(n: Int) -> Str { return strings.from_int(n) }
+fn both(a: Str, b: Str) -> Str { if a == "false" || b == "false" { return "false" }; if a == "true" { return b }; if b == "true" || a == b { return a }; return "(and " + a + " " + b + ")" }
+fn either(a: Str, b: Str) -> Str { if a == "true" || b == "true" { return "true" }; if a == "false" { return b }; if b == "false" || a == b { return a }; return "(or " + a + " " + b + ")" }
+fn no(a: Str) -> Str { if a == "true" { return "false" }; if a == "false" { return "true" }; return "(not " + a + ")" }
+fn choose(c: Str, a: Str, b: Str) -> Str { if a == b { return a }; if c == "true" { return a }; if c == "false" { return b }; return "(ite " + c + " " + a + " " + b + ")" }
+fn unknown() -> Term { return Term { value: "", defined: "false", ty: types.ERROR(), ok: false } }
+fn term(v: Str, d: Str, t: Int) -> Term { return Term { value: v, defined: d, ty: t, ok: len(v) + len(d) <= 131072 } }
+fn bv(n: Int, t: Int) -> Str { let mut bits = n; let w = integers.width(t); if w < 64 { bits = n & ((1 << w) - 1) }; return "(_ bv" + integers.unsigned_text(bits) + " " + num(w) + ")" }
+fn sort(t: Int) -> Str { if t == types.BOOL() { return "Bool" }; return "(_ BitVec " + num(integers.width(t)) + ")" }
+fn extend(v: Str, from: Int, to: Int, signed: Bool) -> Str { if from == to { return v }; if from > to { return "((_ extract " + num(to - 1) + " 0) " + v + ")" }; let mut op = "zero_extend"; if signed { op = "sign_extend" }; return "((_ " + op + " " + num(to - from) + ") " + v + ")" }
+fn binary(op: Str, a: Term, b: Term, t: Int, wrapping: Bool) -> Term {
+    if !a.ok || !b.ok { return unknown() }; let mut safe = both(a.defined, b.defined)
+    if op == "&&" { return term(both(a.value, b.value), both(a.defined, either(no(a.value), b.defined)), types.BOOL()) }
+    if op == "||" { return term(either(a.value, b.value), both(a.defined, either(a.value, b.defined)), types.BOOL()) }
+    if op == "==" || op == "!=" {
+        let mut v = "(= " + a.value + " " + b.value + ")"; if a.value == b.value { v = "true" }; if op == "!=" { v = no(v) }; return term(v, safe, types.BOOL())
+    }
+    if !types.is_integer(a.ty) || !types.is_integer(b.ty) { return unknown() }
+    let w = integers.width(a.ty); let signed = integers.signed(a.ty); let mut order = "bvult"; if signed { order = "bvslt" }
+    if op == "<=" { order = "bvule"; if signed { order = "bvsle" } }; if op == ">" { order = "bvugt"; if signed { order = "bvsgt" } }; if op == ">=" { order = "bvuge"; if signed { order = "bvsge" } }
+    if op == "<" || op == "<=" || op == ">" || op == ">=" { return term("(" + order + " " + a.value + " " + b.value + ")", safe, types.BOOL()) }
+    let mut name = match op { "+" => "bvadd", "-" => "bvsub", "*" => "bvmul", "/" => "bvudiv", "%" => "bvurem", "&" => "bvand", "|" => "bvor", "^" => "bvxor", "<<" => "bvshl", ">>" => "bvlshr", _ => "" }
+    if name == "" { return unknown() }; if signed && op == "/" { name = "bvsdiv" }; if signed && op == "%" { name = "bvsrem" }; if signed && op == ">>" { name = "bvashr" }
+    let mut right = b.value
+    if op == "<<" || op == ">>" {
+        safe = both(safe, "(bvult " + b.value + " " + bv(w, b.ty) + ")")
+        if integers.signed(b.ty) { safe = both(safe, "(bvsge " + b.value + " " + bv(0, b.ty) + ")") }
+        right = extend(b.value, integers.width(b.ty), w, false)
+    }
+    let v = "(" + name + " " + a.value + " " + right + ")"
+    if (op == "+" || op == "-" || op == "*") && !wrapping {
+        let wide = "(" + name + " " + extend(a.value, w, w * 2, signed) + " " + extend(b.value, w, w * 2, signed) + ")"
+        safe = both(safe, "(= " + wide + " " + extend(v, w, w * 2, signed) + ")")
+    }
+    if op == "/" || op == "%" {
+        safe = both(safe, no("(= " + b.value + " " + bv(0, b.ty) + ")"))
+        if signed && !wrapping { safe = both(safe, no(both("(= " + a.value + " " + bv(integers.min(a.ty), a.ty) + ")", "(= " + b.value + " " + bv(-1, b.ty) + ")"))) }
+    }
+    return term(v, safe, t)
+}
+fn expression(k: checker.Checked, values: Map[Int, Term], e: ast.Expr, fuel: Int) -> Term {
+    if fuel <= 0 || e.id < 0 || e.id >= len(k.ty) { return unknown() }; let t = k.ty[e.id]
+    if !types.is_integer(t) && t != types.BOOL() { return unknown() }
+    match e.kind {
+        ast.ExprKind.IntLit(n) => return term(bv(n, t), "true", t)
+        ast.ExprKind.FixedIntLit(n, _, _) => return term(bv(n, t), "true", t)
+        ast.ExprKind.ByteLit(n) => return term(bv(n, t), "true", t)
+        ast.ExprKind.BoolLit(b) => { if b { return term("true", "true", t) }; return term("false", "true", t) }
+        ast.ExprKind.Name(_) => { match k.refs[e.id] { checker.Ref.Local(id) => { match maps.get(values, id) { Some(v) => return v, None => {} } }, _ => {} } }
+        ast.ExprKind.Unary(op, x) => {
+            let a = expression(k, values, x, fuel - 1); if !a.ok { return unknown() }
+            if op == "!" { return term(no(a.value), a.defined, t) }
+            if op == "~" { return term("(bvnot " + a.value + ")", a.defined, t) }
+            if op == "-" { return binary("-", term(bv(0, t), "true", t), a, t, false) }
+        }
+        ast.ExprKind.Binary(op, a, b) => return binary(op, expression(k, values, a, fuel / 2), expression(k, values, b, fuel / 2), t, false)
+        ast.ExprKind.Call(_, args) => {
+            let mut builtin = ""; match k.refs[e.id] { checker.Ref.Builtin(n) => builtin = n, _ => {} }
+            if len(args) == 1 && types.is_integer(t) {
+                let dest = types.primitive(builtin); let a = expression(k, values, args[0], fuel - 1)
+                if (dest == t || builtin == "int" || builtin == "byte") && a.ok && types.is_integer(a.ty) {
+                    let from = integers.width(a.ty); let to = integers.width(t); let mut wide = from + 1; if to >= from { wide = to + 1 }
+                    let v = extend(a.value, from, to, integers.signed(a.ty))
+                    let fits = "(= " + extend(a.value, from, wide, integers.signed(a.ty)) + " " + extend(v, to, wide, integers.signed(t)) + ")"
+                    return term(v, both(a.defined, fits), t)
+                }
+            }
+            if text.starts_with(builtin, "ints.wrapping_") && len(args) >= 1 && len(args) <= 2 {
+                let a = expression(k, values, args[0], fuel / 2); let op = integers.function_op(builtin)
+                if len(args) == 1 && op == 5 { return binary("-", term(bv(0, t), "true", t), a, t, true) }
+                if len(args) == 2 { let name = match op { 0 => "+", 1 => "-", 2 => "*", 3 => "/", 4 => "%", _ => "" }; return binary(name, a, expression(k, values, args[1], fuel / 2), t, true) }
+            }
+        }
+        ast.ExprKind.Match(subject, arms) => {
+            let value = expression(k, values, subject, fuel / 2); if !value.ok { return unknown() }; let mut out = unknown(); let mut i = len(arms) - 1
+            for i >= 0 {
+                let arm = arms[i]; let mut v = unknown(); match arm.body { ast.ArmBody.Value(x) => v = expression(k, values, x, fuel / 2), _ => {} }
+                if !v.ok { return unknown() }
+                match arm.pattern.kind {
+                    ast.PatternKind.Wild => out = v
+                    ast.PatternKind.Lit(lit) => { let key = expression(k, values, lit, fuel / 2); if !key.ok || !out.ok { return unknown() }; let condition = "(= " + value.value + " " + key.value + ")"; out = term(choose(condition, v.value, out.value), choose(condition, v.defined, out.defined), t) }
+                    _ => return unknown()
+                }; i = i - 1
+            }
+            if out.ok { out.defined = both(value.defined, out.defined) }; return out
+        }
+        _ => {}
+    }
+    return unknown()
+}
+fn local(k: checker.Checked, e: ast.Expr) -> Int { match k.refs[e.id] { checker.Ref.Local(n) => return n, _ => return -1 } }
+fn returned(w: mut Walk, s: State, value: Option[ast.Expr]) {
+    let f = w.k.fns[w.id]; let mut state = s
+    match value { Some(e) => { let v = expression(w.k, state.values, e, 128); if !v.ok { w.reason = "unsupported return expression"; return }; state.safe = both(state.safe, v.defined); if f.result_local >= 0 { state.values[f.result_local] = v } }, None => {} }
+    let mut good = state.safe
+    for e in f.decl.ensures { if contract_checks.removable(w.k, e) { continue }; let v = expression(w.k, state.values, e, 128); if !v.ok { w.reason = "unsupported postcondition (calls/effects, memory or type)"; return }; good = both(good, both(v.defined, v.value)) }
+    w.bad = either(w.bad, both(state.path, no(good))); w.returns = w.returns + 1
+}
+fn block(w: mut Walk, states: [State], body: ast.Block) -> [State] {
+    let mut active = states
+    for stmt in body.stmts {
+        let mut next: [State] = []
+        for original in active {
+            if original.dead { push(mut next, original); continue }
+            let mut s = original; w.steps = w.steps + 1
+            if w.steps > 512 || len(active) > 64 { w.reason = "symbolic node/path budget exceeded"; return [] }
+            match stmt.kind {
+                ast.StmtKind.Let(_, _, _, e) => { let v = expression(w.k, s.values, e, 128); let id = local(w.k, ast.Expr { kind: ast.ExprKind.Name(""), id: stmt.id, line: stmt.line, col: stmt.col }); if !v.ok || id < 0 { w.reason = "unsupported local initialization"; return [] }; s.safe = both(s.safe, v.defined); s.values[id] = v; push(mut next, s) }
+                ast.StmtKind.Assign(place, e) => { let id = local(w.k, place); let v = expression(w.k, s.values, e, 128); if id < 0 || !v.ok { w.reason = "memory assignment or unsupported value"; return [] }; s.values[id] = v; s.safe = both(s.safe, v.defined); push(mut next, s) }
+                ast.StmtKind.Return(value) => { returned(mut w, s, value); s.dead = true; push(mut next, s) }
+                ast.StmtKind.If(cond, yes, otherwise) => {
+                    let c = expression(w.k, s.values, cond, 128); if !c.ok { w.reason = "unsupported branch condition"; return [] }
+                    s.safe = both(s.safe, c.defined); let mut a = s; let mut b = s; a.path = both(s.path, c.value); b.path = both(s.path, no(c.value))
+                    for state in block(mut w, [a], yes) { push(mut next, state) }
+                    match otherwise {
+                        ast.Else.NoElse => push(mut next, b)
+                        ast.Else.ElseBlock(no_block) => { for state in block(mut w, [b], no_block) { push(mut next, state) } }
+                        ast.Else.ElseIf(other) => { for state in block(mut w, [b], ast.Block { stmts: [other], end_line: other.line, end_col: other.col }) { push(mut next, state) } }
+                    }
+                }
+                ast.StmtKind.Block(nested) => { for state in block(mut w, [s], nested) { push(mut next, state) } }
+                ast.StmtKind.ExprStmt(e) => {
+                    let mut supported = false
+                    match e.kind { ast.ExprKind.Call(_, args) => { match w.k.refs[e.id] { checker.Ref.Builtin(name) => { if name == "assert" && len(args) == 1 { let v = expression(w.k, s.values, args[0], 128); if v.ok { s.safe = both(s.safe, both(v.defined, v.value)); supported = true } } }, _ => {} } }, _ => {} }
+                    if !supported { w.reason = "call may have effects, panic or fail to terminate"; return [] }; push(mut next, s)
+                }
+                _ => { w.reason = "loop, closure, unsafe block or unsupported statement"; return [] }
+            }
+        }
+        active = next
+        if len(active) > 64 { w.reason = "symbolic path budget exceeded"; return [] }
+    }
+    return active
+}
+fn clock_ms() -> Int uses os, clock { match time.monotonic_ns() { Ok(n) => return n / 1000000, Err(_) => { os.eprint("vela: verification clock unavailable [E6012]"); os.exit(1) } }; return -1 }
+fn query(solver: Str, declarations: Str, predicate: Str, timeout: Int, model: Str) -> Result[Str, Str] uses os {
+    let script = "(set-option :timeout " + num(timeout) + ")\n(set-option :rlimit 500000)\n(set-option :memory_max_size 128)\n(set-logic QF_BV)\n" + declarations + "(assert " + predicate + ")\n(check-sat)\n" + model
+    let out = processes.communicate([solver, "-in", "-smt2"], script, 1048576, timeout + 100)?
+    if out.status != 0 || out.stderr != "" || text.contains(out.stdout, "(error") { return Err("solver failed: " + out.stderr + out.stdout) }
+    return Ok(text.trim(out.stdout))
+}
+fn answer(s: Str) -> Str { let mut found = "invalid"; let mut count = 0; for line in text.lines(s) { let value = text.trim(line); if value == "sat" || value == "unsat" || value == "unknown" { found = value; count = count + 1 } }; if count != 1 { return "invalid" }; return found }
+fn byte_text(c: Byte) -> Str { let mut b = strings.builder(); strings.add_byte(mut b, c); return strings.build(b) }
+fn tokens(s: Str) -> [Str] { let mut out: [Str] = []; let mut word = ""; for c in s { if c == '(' || c == ')' || c == ' ' || c == '\n' || c == '\t' || c == '\r' { if word != "" { push(mut out, word); word = "" }; if c == '(' || c == ')' { push(mut out, byte_text(c)) } } else { word = word + byte_text(c) } }; if word != "" { push(mut out, word) }; return out }
+fn counterexample(k: checker.Checked, id: Int, output: Str) -> Result[json.Json, Str] {
+    let ts = tokens(output); let f = k.fns[id]; let mut args: [json.Json] = []
+    for p in 0..len(f.params) {
+        let name = "p" + num(p); let mut value = ""; let mut i = 0
+        for i + 1 < len(ts) { if ts[i] == name { value = ts[i + 1]; if value == "(" && i + 3 < len(ts) && ts[i + 2] == "_" && text.starts_with(ts[i + 3], "bv") { value = ts[i + 3][2..len(ts[i + 3])] + integers_name(f.params[p]) }; break }; i = i + 1 }
+        let t = f.params[p]; let mut literal = value
+        if t == types.BOOL() { if value != "true" && value != "false" { return Err("invalid Boolean model") } } else {
+            if text.starts_with(value, "#x") { value = "0x" + value[2..len(value)] + integers_name(t) } else if text.starts_with(value, "#b") { value = "0b" + value[2..len(value)] + integers_name(t) }
+            let parsed = integers.literal(value); if !parsed.valid || parsed.overflow { return Err("invalid bit-vector model") }; literal = integer_source(parsed.bits, t)
+        }
+        push(mut args, json.object([json.member("name", json.string(f.decl.params[p].name)), json.member("type", json.string(types.show(k.table, t, ""))), json.member("source", json.string(literal))]))
+    }
+    return Ok(json.array(args))
+}
+pub fn integers_name(t: Int) -> Str { if t == types.INT() { return "i64" }; if t == types.BYTE() { return "u8" }; for name in integers.names() { if integers.type_id(name) == t { return name } }; return "" }
+pub fn integer_source(bits: Int, t: Int) -> Str {
+    let w = integers.width(t); let mut n = bits; if w < 64 { n = bits & ((1 << w) - 1); if integers.signed(t) && n >= (1 << (w - 1)) { n = n - (1 << w) } }
+    if integers.signed(t) { return num(n) + integers_name(t) }; return integers.unsigned_text(n) + integers_name(t)
+}
+fn row(k: checker.Checked, id: Int, status: Str, method: Str, reason: Str, model: json.Json) -> json.Json {
+    return json.object([json.member("function", evidence.function(k, id)), json.member("status", json.string(status)), json.member("method", json.string(method)), json.member("scope", json.string("body definedness and ensures under well-defined, true requires")), json.member("reason", json.string(reason)), json.member("counterexample", model)])
+}
+pub fn run(checked: checker.Checked, solver: Str, timeout: Int, budget: Int) -> Result[Outcome, Str] uses fs, os, clock {
+    let context = evidence.context(checked)?; let mut k = checked; let mut rows: [json.Json] = []; let start = clock_ms(); let mut count = 0
+    let mut solver_version = "disabled"
+    let mut version_limit = timeout; if budget < version_limit { version_limit = budget }
+    if solver != "" { match processes.communicate([solver, "-version"], "", 16384, version_limit) { Ok(v) => { if v.status == 0 { solver_version = text.trim(v.stdout) } else { solver_version = "unavailable" } }, Err(_) => solver_version = "unavailable" } }
+    for id in 0..len(k.fns) {
+        let f = k.fns[id]; if f.is_test || k.modules[f.module].is_std || len(f.decl.requires) + len(f.decl.ensures) == 0 { continue }
+        count = count + 1; let mut reason = ""; let mut declarations = ""; let mut values: Map[Int, Term] = [:]; let mut model_names = ""
+        if len(f.type_params) > 0 || f.decl.foreign != "" { reason = "generic or foreign function is outside the proof subset" }
+        for i in 0..len(f.params) { let t = f.params[i]; if f.mutable[i] || (!types.is_integer(t) && t != types.BOOL()) { reason = "only immutable scalar parameters are supported"; continue }; let name = "p" + num(i); values[f.param_locals[i]] = term(name, "true", t); declarations = declarations + "(declare-const " + name + " " + sort(t) + ")\n"; model_names = model_names + " " + name }
+        let mut pre = "true"
+        for e in f.decl.requires { if contract_checks.always(k, e) { continue }; let v = expression(k, values, e, 128); if !v.ok { reason = "unsupported precondition (calls/effects, memory or type)" } else { pre = both(pre, both(v.defined, v.value)) } }
+        let mut w = Walk { k: k, id: id, bad: "false", reason: reason, returns: 0, steps: 0 }
+        if reason == "" {
+            let states = block(mut w, [State { values: values, path: pre, safe: "true", dead: false }], f.decl.body)
+            for state in states { if !state.dead { if f.result == types.NOTHING() { returned(mut w, state, None) } else { w.reason = "fallthrough is outside the proof subset" } } }
+        }
+        if w.reason == "" && contract_checks.body_total(k, id) { let mut all = true; for e in f.decl.ensures { all = all && contract_checks.removable(k, e) }; if all { w.bad = "false" } }
+        if w.reason != "" { push(mut rows, row(k, id, "unknown", "unsupported", w.reason, json.null())); continue }
+        if w.returns == 0 || pre == "false" { push(mut rows, row(k, id, "unknown", "domain", "no reachable return or unsatisfiable precondition", json.null())); continue }
+        let mut status = "unknown"; let mut method = "symbolic"; let mut why = "solver was not requested"; let mut witness = json.null()
+        if pre == "true" && w.bad == "false" { status = "proved"; method = "constant/range"; why = "total scalar expression reduces to true" } else if pre == "true" && w.bad == "true" && len(f.params) == 0 { status = "refuted"; method = "constant"; why = "constant counterexample"; witness = json.array([]) } else if solver != "" {
+            let elapsed = clock_ms() - start; let mut limit = timeout; if budget - elapsed < limit { limit = budget - elapsed }
+            if start < 0 || limit <= 0 || count > 128 { why = "verification budget exhausted" } else {
+                let mut domain = "sat"; if pre != "true" { match query(solver, declarations, pre, limit, "") { Ok(out) => domain = answer(out), Err(e) => { domain = "unknown"; why = e } } }
+                if domain == "unsat" { why = "unsatisfiable preconditions; vacuity is not certified" } else if domain != "sat" { why = "precondition feasibility unknown or solver failed" } else {
+                    let mut remaining = budget - (clock_ms() - start); if remaining > timeout { remaining = timeout }
+                    if remaining <= 0 { why = "verification budget exhausted" } else { match query(solver, declarations, w.bad, remaining, "") {
+                        Ok(out) => { let a = answer(out); if a == "unsat" { status = "proved"; method = "smt-bv"; why = "no violating defined return or body operation" } else if a == "sat" { if len(f.params) == 0 { status = "refuted"; witness = json.array([]); why = "violating execution" } else {
+                            let mut left = budget - (clock_ms() - start); if left > timeout { left = timeout }
+                            if left > 0 { match query(solver, declarations, w.bad, left, "(get-value (" + model_names + "))\n") {
+                                Ok(model) => { if answer(model) == "sat" { match counterexample(k, id, model) { Ok(args) => { status = "refuted"; witness = args; method = "smt-bv"; why = "violating execution" }, Err(e) => why = e } } else { why = "model query did not return sat" } }, Err(e) => why = e
+                            } } else { why = "verification budget exhausted before model" }
+                        } } else { why = "solver returned unknown or invalid output" } }
+                        Err(e) => why = e
+                    } }
+                }
+            }
+        }
+        if status == "proved" { for e in f.decl.ensures { k.proved_contracts[e.id] = true } }
+        push(mut rows, row(k, id, status, method, why, witness))
+    }
+    let mut overall = "proved"; let mut proved = 0; let mut refuted = 0; let mut undecided = 0
+    for result in rows { let status = json.str_or(json.get(result, "status"), "unknown"); if status == "proved" { proved = proved + 1 } else if status == "refuted" { refuted = refuted + 1 } else { undecided = undecided + 1 } }
+    if undecided > 0 || len(rows) == 0 { overall = "unknown" }; if refuted > 0 { overall = "refuted" }
+    let report = json.object([json.member("status", json.string(overall)), json.member("proved", json.integer(proved)), json.member("refuted", json.integer(refuted)), json.member("unknown", json.integer(undecided)), json.member("format", json.string("vela.verify")), json.member("version", json.integer(1)), json.member("context", context), json.member("results", json.array(rows)),
+        json.member("solver", json.string(solver)), json.member("solver_version", json.string(solver_version)), json.member("timeout_ms", json.integer(timeout)), json.member("budget_ms", json.integer(budget)),
+        json.member("assumptions", json.array([json.string("fixed-width Vela integers and checked arithmetic"), json.string("well-defined true preconditions; nonempty domain checked for SMT proofs"), json.string("trusted explicitly selected solver; cached report claims are never trusted"), json.string("unsupported calls, effects, loops, memory and generics remain unknown")])), json.member("limits", json.object([json.member("nodes", json.integer(512)), json.member("paths", json.integer(64)), json.member("expression_fuel", json.integer(128)), json.member("solver_memory_mb", json.integer(128)), json.member("solver_resource_limit", json.integer(500000))])), json.member("property_testing_is_proof", json.boolean(false)), json.member("reports_authorize_check_removal", json.boolean(false)), json.member("elapsed_ms", json.integer(clock_ms() - start))])
+    return Ok(Outcome { checked: k, report: report })
+}

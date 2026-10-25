@@ -1,0 +1,24 @@
+{
+  "title": "Repair contracts from JSON counterexamples",
+  "category": "verification",
+  "main": "contracts.vl",
+  "tests": [
+    "contracts_hidden_test.vl"
+  ],
+  "clean": true,
+  "counterexamples": true,
+  "require": [
+    {
+      "glob": "contracts.vl",
+      "pattern": "pub\\s*fn\\s*next\\(x:\\s*u8\\)\\s*\\->\\s*u8\\s*requires\\s*x\\s*<\\s*255u8\\s*ensures\\s*result\\s*>\\s*x\\s*\\{"
+    },
+    {
+      "glob": "contracts.vl",
+      "pattern": "pub\\s*fn\\s*magnitude\\(x:\\s*i32\\)\\s*\\->\\s*i32\\s*requires\\s*x\\s*>\\s*\\-2147483648i32\\s*ensures\\s*result\\s*>=\\s*0i32\\s*\\{"
+    },
+    {
+      "glob": "contracts.vl",
+      "pattern": "pub\\s*fn\\s*clamp\\(x:\\s*Int,\\s*limit:\\s*Int\\)\\s*\\->\\s*Int\\s*requires\\s*limit\\s*>=\\s*0\\s*\\&\\&\\s*limit\\s*<=\\s*1000\\s*ensures\\s*result\\s*>=\\s*0\\s*\\&\\&\\s*result\\s*<=\\s*limit\\s*\\{"
+    }
+  ]
+}

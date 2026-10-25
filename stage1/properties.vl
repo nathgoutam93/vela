@@ -1,0 +1,265 @@
+// Compiler-generated contract cases, expressed in existing Vela syntax and
+// rechecked before either backend sees them. Unsupported domains are explicit.
+import ast
+import call_graph
+import checker
+import codegen
+import capabilities
+import os
+import processes
+import time
+import evidence
+import integers
+import ints
+import json
+import lexer
+import maps
+import modules
+import parser
+import property
+import strings
+import text
+import types
+import verification
+pub type Spec = struct { original: Int, module: Int, helper: Str, params: [Int], types: [Str], type_arguments: [Str], cases: [[Str]], groups: [[Int]], initial: Int, source: Str }
+pub type Plan = struct { loaded: modules.Loaded, specs: [Spec], skipped: [json.Json] }
+type Gen = struct { k: checker.Checked, module: Int, seed: u64, size: Int, reason: Str, nodes: Int }
+fn num(n: Int) -> Str { return strings.from_int(n) }
+pub fn unsigned(n: Int) -> u64 { if n >= 0 { return u64(n) }; return u64(n - (-9223372036854775807 - 1)) + 9223372036854775808u64 }
+fn word(g: Gen, index: Int) -> u64 { return property.generator().sample(g.seed, index) }
+fn choose_index(bits: u64, count: Int) -> Int { return int(bits % u64(count)) }
+fn base_name(g: Gen, t: Int) -> Str {
+    let ti = types.get(g.k.table, t)
+    if ti.module == "" || ti.module == g.k.modules[g.module].name || types.is_builtin_enum(g.k.table, t) { return ti.name }
+    for name in maps.keys(g.k.modules[g.module].imports) { let id = g.k.modules[g.module].imports[name]; if g.k.modules[id].name == ti.module { return name + "." + ti.name } }
+    return ""
+}
+fn type_name(g: Gen, t: Int, depth: Int) -> Str {
+    if depth <= 0 || t < 0 { return "" }; let ti = types.get(g.k.table, t)
+    if types.is_integer(t) || t == types.BOOL() || t == types.STR() || t == types.FLOAT() || t == types.UNIT() { return types.show(g.k.table, t, "") }
+    if types.sequence(g.k.table, t) { let elem = type_name(g, ti.args[0], depth - 1); if elem == "" { return "" }; if types.is_fixed(g.k.table, t) { return "[" + elem + "; " + num(ti.length) + "]" }; return "[" + elem + "]" }
+    if types.is_map(g.k.table, t) { let a = type_name(g, ti.args[0], depth - 1); let b = type_name(g, ti.args[1], depth - 1); if a == "" || b == "" { return "" }; return "Map[" + a + ", " + b + "]" }
+    if types.is_struct(g.k.table, t) || types.is_enum(g.k.table, t) { let mut name = base_name(g, t); if name == "" { return "" }; if len(ti.args) > 0 { let mut args: [Str] = []; for a in ti.args { let v = type_name(g, a, depth - 1); if v == "" { return "" }; push(mut args, v) }; name = name + "[" + join(args, ", ") + "]" }; return name }
+    return ""
+}
+fn join(xs: [Str], sep: Str) -> Str { let mut b = strings.builder(); for i in 0..len(xs) { if i > 0 { strings.add(mut b, sep) }; strings.add(mut b, xs[i]) }; return strings.build(b) }
+fn value(g: mut Gen, t: Int, index: Int, depth: Int) -> Str {
+    g.nodes = g.nodes + 1; if depth < 0 || g.nodes > 1024 { g.reason = "generator recursion/node budget exceeded"; return "" }
+    let bits = word(g, index); let ti = types.get(g.k.table, t)
+    if types.is_integer(t) { let n = integers.literal(ints.to_str(bits) + "u64"); return verification.integer_source(n.bits, t) }
+    if t == types.BOOL() { if bits % 2u64 == 0u64 { return "false" }; return "true" }
+    if t == types.UNIT() { return "()" }
+    if t == types.FLOAT() { let xs = ["0.0", "-0.0", "1.0", "-1.0", "1e-300", "1e300", "1.0 / 0.0", "0.0 / 0.0"]; return xs[choose_index(bits, len(xs))] }
+    if t == types.STR() { let xs = ["", "a", " ", "\n", "\0", "é", "abc"]; if index < len(xs) { return ast.quote(xs[index]) }; return ast.quote(text.repeat("a", choose_index(bits, g.size + 1))) }
+    if types.sequence(g.k.table, t) { let mut size = choose_index(bits, g.size + 1); if size > 8 { size = 8 }; if types.is_fixed(g.k.table, t) { size = ti.length; if size > 8 { g.reason = "fixed array exceeds automatic generator size"; return "" } }; if depth == 0 && size > 0 { g.reason = "recursive sequence needs a smaller sample"; return "" }; let mut items: [Str] = []; for i in 0..size { let v = value(mut g, ti.args[0], index + i, depth - 1); if v == "" { return "" }; push(mut items, v) }; return "[" + join(items, ", ") + "]" }
+    if types.is_map(g.k.table, t) { if depth == 0 || index % 3 == 0 { return "[:]" }; let key = value(mut g, ti.args[0], index, depth - 1); let val = value(mut g, ti.args[1], index, depth - 1); if key == "" || val == "" { return "" }; return "[" + key + ": " + val + "]" }
+    if types.is_struct(g.k.table, t) { let name = base_name(g, t); if name == "" { g.reason = "type is not visible from the function's module"; return "" }; let mut fields: [Str] = []; for f in ti.fields { let v = value(mut g, f.ty, index, depth - 1); if v == "" { return "" }; push(mut fields, f.name + ": " + v) }; return name + " {" + join(fields, ", ") + "}" }
+    if types.is_enum(g.k.table, t) { let n = len(ti.variants); if n == 0 { g.reason = "enum has no constructors"; return "" }; let mut selected = choose_index(bits, n); if depth <= 0 { let mut found = false; for i in 0..n { if len(ti.variants[i].payload) == 0 { selected = i; found = true; break } }; if !found { g.reason = "recursive enum has no bounded constructor"; return "" } }
+        let v = ti.variants[selected]; let mut name = v.name; if !types.is_builtin_enum(g.k.table, t) { let prefix = base_name(g, t); if prefix == "" { g.reason = "enum type is not visible"; return "" }; name = prefix + "." + name }
+        let mut args: [Str] = []; for p in v.payload { let x = value(mut g, p, index, depth - 1); if x == "" { return "" }; push(mut args, x) }; if len(args) > 0 { name = name + "(" + join(args, ", ") + ")" }; return name
+    }
+    g.reason = "type has no automatic generator"; return ""
+}
+fn pure(k: checker.Checked, e: ast.Expr, fuel: Int) -> Bool {
+    if fuel <= 0 { return false }
+    return match e.kind {
+        ast.ExprKind.IntLit(_) => true, ast.ExprKind.FixedIntLit(_, _, _) => true, ast.ExprKind.FloatLit(_) => true, ast.ExprKind.ByteLit(_) => true, ast.ExprKind.BoolLit(_) => true, ast.ExprKind.StrLit(_) => true, ast.ExprKind.UnitLit => true,
+        ast.ExprKind.Name(_) => match k.refs[e.id] { checker.Ref.Local(_) => true, _ => false }
+        ast.ExprKind.Unary(_, x) => pure(k, x, fuel - 1)
+        ast.ExprKind.Binary(op, a, b) => pure_operator(k, op, a) && pure(k, a, fuel / 2) && pure(k, b, fuel / 2)
+        ast.ExprKind.Field(x, _) => pure(k, x, fuel - 1)
+        ast.ExprKind.Index(a, b) => (types.sequence(k.table, k.ty[a.id]) || k.ty[a.id] == types.STR()) && pure(k, a, fuel / 2) && pure(k, b, fuel / 2)
+        ast.ExprKind.Call(_, args) => pure_call(k, e, args, fuel)
+        _ => false
+    }
+}
+fn pure_operator(k: checker.Checked, op: Str, a: ast.Expr) -> Bool {
+    if op != "==" && op != "!=" && op != "<" && op != "<=" && op != ">" && op != ">=" { return true }
+    let t = k.ty[a.id]
+    // Generic automatic instances use Int/Str only. User Eq/Ord methods can
+    // print despite an empty effect set and must not be evaluated twice.
+    return types.is_integer(t) || t == types.BOOL() || t == types.STR() || t == types.FLOAT() || types.is_param(k.table, t)
+}
+fn pure_call(k: checker.Checked, e: ast.Expr, args: [ast.Expr], fuel: Int) -> Bool {
+    let mut name = ""; match k.refs[e.id] { checker.Ref.Builtin(n) => name = n, _ => {} }
+    let valid = name == "len" || name == "int" || name == "byte" || name == "float" || types.primitive(name) >= 0 || text.starts_with(name, "ints.")
+    let mut all = valid; for arg in args { all = all && pure(k, arg, fuel / 2) }; return all
+}
+fn rename(k: checker.Checked, e: ast.Expr, names: Map[Int, Str]) -> ast.Expr {
+    let mut out = e
+    match e.kind {
+        ast.ExprKind.Name(_) => { match k.refs[e.id] { checker.Ref.Local(id) => { match maps.get(names, id) { Some(name) => out.kind = ast.ExprKind.Name(name), None => {} } }, _ => {} } }
+        ast.ExprKind.Unary(op, x) => out.kind = ast.ExprKind.Unary(op, rename(k, x, names))
+        ast.ExprKind.Binary(op, a, b) => out.kind = ast.ExprKind.Binary(op, rename(k, a, names), rename(k, b, names))
+        ast.ExprKind.Field(x, n) => out.kind = ast.ExprKind.Field(rename(k, x, names), n)
+        ast.ExprKind.Index(a, b) => out.kind = ast.ExprKind.Index(rename(k, a, names), rename(k, b, names))
+        ast.ExprKind.Call(f, args) => { let mut xs: [ast.Expr] = []; for x in args { push(mut xs, rename(k, x, names)) }; out.kind = ast.ExprKind.Call(rename(k, f, names), xs) }
+        _ => {}
+    }; return out
+}
+fn omitted(k: checker.Checked, id: Int, reason: Str) -> json.Json { return json.object([json.member("function", evidence.function(k, id)), json.member("status", json.string("unknown")), json.member("reason", json.string(reason))]) }
+fn shrink_values(g: mut Gen, t: Int, source: Str) -> [Str] {
+    let mut out: [Str] = []
+    if types.is_integer(t) { let mut raw = source; let mut negative = false; if text.starts_with(raw, "-") { negative = true; raw = raw[1..len(raw)] }; let literal = integers.literal(raw); let bits = unsigned(literal.bits)
+        for n in property.generator().shrink(bits) { let mut s = verification.integer_source(integers.literal(ints.to_str(n) + "u64").bits, t); if negative && n != 0u64 { s = "-" + ints.to_str(n) + verification.integers_name(t) }; if s != source { push(mut out, s) } }
+    } else if t == types.STR() { if source != "\"\"" { push(mut out, "\"\"") }; if source != "\"a\"" { push(mut out, "\"a\"") } } else if types.is_array(g.k.table, t) { if source != "[]" { push(mut out, "[]") } } else { let saved = g.reason; g.reason = ""; g.nodes = 0; let v = value(mut g, t, 0, 4); g.reason = saved; if v != "" && v != source { push(mut out, v) } }
+    return out
+}
+fn mention(table: types.Table, t: Int, param: Int, fuel: Int) -> Bool {
+    if t == param { return true }; if t < 0 || fuel <= 0 { return false }; let ti = types.get(table, t)
+    for arg in ti.args { if mention(table, arg, param, fuel - 1) { return true } }
+    if ti.result >= 0 && mention(table, ti.result, param, fuel - 1) { return true }; return false
+}
+fn literal_bits(e: ast.Expr) -> Option[Int] { return match e.kind { ast.ExprKind.IntLit(n) => Some(n), ast.ExprKind.FixedIntLit(n, _, _) => Some(n), ast.ExprKind.ByteLit(n) => Some(n), _ => None } }
+fn parameter(k: checker.Checked, e: ast.Expr, id: Int) -> Bool { return match k.refs[e.id] { checker.Ref.Local(found) => found == id, _ => false } }
+fn add_hint(out: mut [Str], source: Str) { if source == "" || len(out) >= 12 { return }; for old in out { if old == source { return } }; push(mut out, source) }
+fn length_value(g: mut Gen, t: Int, n: Int, index: Int) -> Str {
+    if n < 0 || n > g.size { return "" }; if t == types.STR() { return ast.quote(text.repeat("a", n)) }
+    if types.is_array(g.k.table, t) && n <= 8 { let mut xs: [Str] = []; for i in 0..n { g.nodes = 0; let s = value(mut g, types.get(g.k.table, t).args[0], index + i, 3); if s == "" { return "" }; push(mut xs, s) }; return "[" + join(xs, ", ") + "]" }
+    return ""
+}
+fn comparison_hints(g: mut Gen, operand: ast.Expr, literal: ast.Expr, id: Int, t: Int, out: mut [Str]) {
+    match literal_bits(literal) { None => {}, Some(bits) => {
+        if parameter(g.k, operand, id) && types.is_integer(t) { let order = integers.ordered(bits, t); let mut lo = integers.min(t); let mut hi = integers.max(t); if t == 13 { lo = -9223372036854775807 - 1; hi = 9223372036854775807 }
+            add_hint(mut out, verification.integer_source(bits, t))
+            if order > lo { add_hint(mut out, verification.integer_source(integers.ordered(order - 1, t), t)) }
+            if order < hi { add_hint(mut out, verification.integer_source(integers.ordered(order + 1, t), t)) }
+        }
+        match operand.kind { ast.ExprKind.Call(_, args) => { let mut length = false; match g.k.refs[operand.id] { checker.Ref.Builtin(name) => length = name == "len", _ => {} }
+            if length && len(args) == 1 && parameter(g.k, args[0], id) && bits >= 0 && bits <= 32 {
+                let saved = g.reason
+                add_hint(mut out, length_value(mut g, t, bits, 0)); if bits > 0 { add_hint(mut out, length_value(mut g, t, bits - 1, 0)) }; if bits < 32 { add_hint(mut out, length_value(mut g, t, bits + 1, 0)) }
+                g.reason = saved
+            }
+        }, _ => {} }
+    } }
+}
+fn collect_hints(g: mut Gen, e: ast.Expr, id: Int, t: Int, out: mut [Str], fuel: Int) {
+    if fuel <= 0 || len(out) >= 12 { return }
+    match e.kind { ast.ExprKind.Binary(op, a, b) => {
+        if op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">=" { comparison_hints(mut g, a, b, id, t, mut out); comparison_hints(mut g, b, a, id, t, mut out) }
+        collect_hints(mut g, a, id, t, mut out, fuel / 2); collect_hints(mut g, b, id, t, mut out, fuel / 2)
+    }, ast.ExprKind.Unary(_, x) => collect_hints(mut g, x, id, t, mut out, fuel - 1), _ => {} }
+}
+
+pub fn prepare(loaded: modules.Loaded, checked: checker.Checked, cases: Int, seed: Int, size: Int, shrinks: Int, words: [Str]) -> Plan {
+    let mut plan = Plan { loaded: loaded, specs: [], skipped: [] }; let graph = call_graph.build(checked); let mut total = 0; let mut raw_program = false; for raw in graph.unsafe { raw_program = raw_program || raw }
+    for id in 0..len(checked.fns) { let f = checked.fns[id];let module=checked.modules[f.module]
+        let standard=module.is_std||(module.name!=""&&len(module.path)>4&&module.path[0..4]=="std/")
+        if f.is_test || standard || len(f.decl.requires) + len(f.decl.ensures) == 0 { continue }
+        let mut selected = len(words) == 0; for word in words { if text.contains(f.decl.name, word) { selected = true } }; if !selected { continue }
+        let mut reason = ""; if raw_program { reason = "automatic properties do not execute a program containing unsafe code" }; if f.decl.foreign != "" || len(f.params) > 8 { reason = "foreign function or too many parameters" }
+        let reachable = call_graph.reach(graph, [id], false)
+        for i in 0..len(reachable) { if reachable[i] && (graph.unsafe[i] || (graph.uncertain[i] && len(f.type_params) == 0) || len(graph.effects[i]) > 0) { reason = "automatic properties require known calls without fs/os/net/clock/unsafe effects" } }
+        for e in f.decl.requires { if !pure(checked, e, 128) { reason = "precondition cannot be filtered without repeating unknown effects" } }
+        for param in f.type_params { let mut visible = mention(checked.table, f.result, param, 16); for t in f.params { visible = visible || mention(checked.table, t, param, 16) }; if !visible { reason = "generic type parameter cannot be inferred from inputs/result" } }
+        for p in f.decl.type_params { for bound in p.bounds { if bound != "Eq" && bound != "Ord" && bound != "Key" { reason = "generic interface bound needs a manual property generator" } } }
+        if reason != "" { push(mut plan.skipped, omitted(checked, id, reason)); continue }
+        let mut instantiations = 1; if len(f.type_params) > 0 { instantiations = 2 }
+        for instance in 0..instantiations {
+            let mut g = Gen { k: checked, module: f.module, seed: unsigned(seed), size: size, reason: "", nodes: 0 }; let mut choices: [Int] = []; for _ in f.type_params { let mut t = types.INT(); if instance == 1 { t = types.STR() }; push(mut choices, t) }
+            let mut params: [Int] = []; for t in f.params { push(mut params, types.subst(mut g.k.table, t, f.type_params, choices)) }; let result = types.subst(mut g.k.table, f.result, f.type_params, choices); types.fill_instances(mut g.k.table)
+            let mut hints: [[Str]] = []; for p in 0..len(params) { let mut values: [Str] = []; for req in f.decl.requires { collect_hints(mut g, req, f.param_locals[p], params[p], mut values, 128) }; push(mut hints, values) }
+            let mut all: [[Str]] = []
+            let mut count = cases; if len(params) == 0 { count = 1 }
+            for index in 0..count { let mut row: [Str] = []; for p in 0..len(params) { g.nodes = 0; let mut v = ""; if index < len(hints[p]) { v = hints[p][index] } else { v = value(mut g, params[p], index - len(hints[p]) + p * 17, 4) }; if v == "" { if g.reason == "" { g.reason = "type generation failed" }; break }; push(mut row, v) }; if g.reason != "" { break }; push(mut all, row) }
+            if g.reason != "" { push(mut plan.skipped, omitted(checked, id, g.reason)); continue }
+            let initial = len(all); let mut groups: [[Int]] = []
+            for i in 0..initial { let mut remaining = shrinks; let mut group: [Int] = []; for p in 0..len(params) { for v in shrink_values(mut g, params[p], all[i][p]) { if remaining <= 0 { break }; let mut row = all[i]; row[p] = v; push(mut group, len(all)); push(mut all, row); remaining = remaining - 1 } }; push(mut groups, group) }
+            let mut helper = "__vela_property_" + num(id) + "_" + num(instance); for maps.has(checked.modules[f.module].fns, helper) { helper = helper + "_" }
+            let selector = helper + "_index"; let mut names: Map[Int, Str] = [:]; let mut args: [Str] = []; let mut param_types: [Str] = []; let mut header = "fn " + helper + "(" + selector + ":Int)->Bool {\nif " + selector + "<0 || " + selector + ">=" + num(len(all)) + "{return false}\n"
+            for p in 0..len(params) { let name = helper + "_arg" + num(p); names[f.param_locals[p]] = name; let ty = type_name(g, params[p], 12); if ty == "" { g.reason = "parameter type is not source-visible"; break }; push(mut param_types, ty); let mut mutable = ""; let mut arg = name; if f.mutable[p] { mutable = "mut "; arg = "mut " + name }
+                header = header + "let " + mutable + name + ":" + ty + "=match " + selector + " {\n"; for i in 0..len(all) { header = header + num(i) + "=>" + all[i][p] + ",\n" }; header = header + "_=>" + all[0][p] + "}\n"; push(mut args, arg)
+            }
+            for req in f.decl.requires { header = header + "if !(" + ast.expr_text(rename(checked, req, names)) + "){return false}\n" }
+            let mut call = f.decl.name + "(" + join(args, ", ") + ")"; for at in 0..len(f.decl.name) { if f.decl.name[at] == '.' && len(args) > 0 { call = helper + "_arg0." + f.decl.name[at + 1..len(f.decl.name)] + "(" + join(args[1..len(args)], ", ") + ")" } }
+            if result == types.NOTHING() { header = header + call + "\n" } else { let r = type_name(g, result, 12); if r == "" { g.reason = "result type is not source-visible" } else { header = header + "let " + helper + "_result:" + r + "=" + call + "\n" } }
+            header = header + "return true\n}\n"
+            if g.reason != "" || total + len(header) > 1048576 || len(plan.specs) >= 64 { push(mut plan.skipped, omitted(checked, id, "generator source/type budget exceeded: " + g.reason)); continue }
+            let mut padded = ""; for _ in 0..line_count(plan.loaded.modules[f.module].source) { padded = padded + "\n" }
+            let lexed = lexer.tokenize(padded + header); let parsed = parser.parse(lexed.tokens, plan.loaded.node_count)
+            if len(lexed.errors) > 0 || len(parsed.errors) > 0 { push(mut plan.skipped, omitted(checked, id, "generated source could not be parsed")); continue }
+            plan.loaded.modules[f.module].source = plan.loaded.modules[f.module].source + "\n" + header
+            plan.loaded.node_count = parsed.next_id; for decl in parsed.program.fns { push(mut plan.loaded.modules[f.module].program.fns, decl) }
+            let mut inst_types: [Str] = []; for choice in choices { push(mut inst_types, type_name(g, choice, 12)) }
+            push(mut plan.specs, Spec { original: id, module: f.module, helper: helper, params: params, types: param_types, type_arguments: inst_types, cases: all, groups: groups, initial: initial, source: header }); total = total + len(header)
+        }
+    }
+    return plan
+}
+fn line_count(s: Str) -> Int { let mut n = 1; for c in s { if c == '\n' { n = n + 1 } }; return n }
+pub fn mark(k: checker.Checked, specs: [Spec]) -> checker.Checked { let mut out = k; for i in 0..len(out.fns) { for spec in specs { if out.fns[i].module == spec.module && out.fns[i].decl.name == spec.helper { out.fns[i].is_test = true } } }; return out }
+pub fn arguments(k: checker.Checked, spec: Spec, index: Int) -> json.Json { let mut args: [json.Json] = []; for i in 0..len(spec.params) { push(mut args, json.object([json.member("name", json.string(k.fns[spec.original].decl.params[i].name)), json.member("type", json.string(spec.types[i])), json.member("source", json.string(spec.cases[index][i]))])) }; return json.array(args) }
+
+// Each selected case runs beneath the existing capability launcher inside a
+// bounded process group. The automatic domain excludes OS/unsafe effects.
+
+type Event = struct { kind: Str, diagnostic: json.Json, stdout: Str, stderr: Str, reason: Str }
+fn strings_json(values: [Str]) -> json.Json { let mut out: [json.Json] = []; for v in values { push(mut out, json.string(v)) }; return json.array(out) }
+fn words_json(values: [Str]) -> Str { return json.show(strings_json(values)) }
+fn execute(exe: Str, test_index: Int, index: Int, target: Str, options: capabilities.Options, timeout: Int) -> Event uses os {
+    let mut event = Event { kind: "unknown", diagnostic: json.null(), stdout: "", stderr: "", reason: "execution did not complete" }
+    let command = [os.executable(), "__vela-property-run-v1", words_json(options.allow), words_json(options.deny), exe, num(test_index), num(index)]
+    match processes.communicate(command, "", 262144, timeout) {
+        Err(e) => { event.reason = e; return event }
+        Ok(output) => {
+            event.stdout = output.stdout; event.stderr = output.stderr
+            if output.status == 0 { event.kind = "passed"; event.reason = "contract call completed"; return event }
+            if output.status == 77 { event.kind = "discarded"; event.reason = "generated inputs do not satisfy requires"; return event }
+            for line in text.lines(output.stderr) { match json.parse(line) { Ok(doc) => { if json.str_or(json.get(doc, "format"), "") == "vela.panic" && json.int_or(json.get(doc, "version"), 0) == 1 { event.diagnostic = doc } }, Err(_) => {} } }
+            if output.status == 101 && !json.is_null(event.diagnostic) {
+                let message = json.str_or(json.get(event.diagnostic, "message"), "")
+                if message == "out of memory" { event.reason = "resource limit: " + message; return event }
+                let frames = json.items(json.get(event.diagnostic, "frames"))
+                let mut entered = false; for frame in frames { entered = entered || json.str_or(json.get(frame, "function"), "") == target }
+                if !entered { event.kind = "discarded"; event.reason = "generation or requires was undefined before entering the target"; return event }
+                event.kind = "failed"; event.reason = "observed Vela panic"; return event
+            }
+            event.reason = "case exited without a valid Vela panic record (status " + num(output.status) + ")"; return event
+        }
+    }
+}
+fn now() -> Int uses os, clock { match time.monotonic_ns() { Ok(n) => return n / 1000000, Err(_) => { os.eprint("vela: property clock unavailable [E6012]"); os.exit(1) } }; return -1 }
+fn cost(args: [Str]) -> Int { let mut n = 0; for value in args { n = n + len(value) }; return n }
+fn counterexample_value(status: Str, value: json.Json) -> json.Json { if status == "failed" { return value }; return json.null() }
+pub fn run_cases(original: checker.Checked, compiled: checker.Checked, plan: Plan, exe: Str, options: capabilities.Options, context: json.Json) -> json.Json uses os, clock {
+    let start = now(); let mut rows = plan.skipped; let mut failed = false; let mut incomplete = len(rows) > 0; let mut tested = 0
+    let mut seed = integers.unsigned_text(options.seed)
+    for spec in plan.specs {
+        let actual = original.fns[spec.original]; let module = original.modules[actual.module].name; let mut target = actual.decl.name; if module != "" { target = module + "." + target }
+        let mut id = -1; let mut which = -1;let entries=codegen.test_ids(compiled)
+        for index in 0..len(entries) {let i=entries[index];let f=compiled.fns[i];if f.module==spec.module&&f.decl.name==spec.helper{id=i;which=index}}
+        let mut success = 0; let mut discarded = 0; let mut failure = -1; let mut tries = 0; let mut reason = "no admitted cases"; let mut event = Event { kind: "unknown", diagnostic: json.null(), stdout: "", stderr: "", reason: reason }
+        if id >= 0 {
+            for index in 0..spec.initial {
+                let mut limit = options.budget - (now() - start); if limit > options.timeout { limit = options.timeout }
+                if start < 0 || limit <= 0 { reason = "property execution budget exhausted"; break }
+                let outcome = execute(exe, which, index, target, options, limit)
+                if outcome.kind == "passed" { success = success + 1; tested = tested + 1 } else if outcome.kind == "discarded" { discarded = discarded + 1 } else { event = outcome; reason = outcome.reason; failure = index; break }
+            }
+        } else { reason = "generated test entry was not found" }
+        let mut state = "unknown"; let mut inputs = json.null(); let mut initial_inputs = json.null()
+        if failure >= 0 {
+            inputs = arguments(original, spec, failure); initial_inputs = inputs
+            if event.kind == "failed" {
+                state = "failed"; failed = true; let initial_failure = failure
+                for candidate in spec.groups[initial_failure] {
+                    let mut limit = options.budget - (now() - start); if limit > options.timeout { limit = options.timeout }; if limit <= 0 || tries >= options.shrinks { break }
+                    if cost(spec.cases[candidate]) >= cost(spec.cases[failure]) { continue }
+                    tries = tries + 1; let smaller = execute(exe, which, candidate, target, options, limit)
+                    if smaller.kind == "failed" && json.str_or(json.get(smaller.diagnostic, "location"), "") == json.str_or(json.get(event.diagnostic, "location"), "?") && json.str_or(json.get(smaller.diagnostic, "assertion"), "") == json.str_or(json.get(event.diagnostic, "assertion"), "") && json.str_or(json.get(smaller.diagnostic, "message"), "") == json.str_or(json.get(event.diagnostic, "message"), "") {
+                        failure = candidate; event = smaller; inputs = arguments(original, spec, failure)
+                    }
+                }
+            }
+        } else if success > 0 && success + discarded == spec.initial { state = "passed"; reason = "sampled admitted cases completed; this is not proof" }
+        if state == "unknown" { incomplete = true }
+        push(mut rows, json.object([json.member("function", evidence.function(original, spec.original)), json.member("status", json.string(state)), json.member("tested", json.integer(success)), json.member("discarded", json.integer(discarded)), json.member("reason", json.string(reason)),
+            json.member("counterexample", counterexample_value(state, inputs)), json.member("attempted_inputs", inputs), json.member("initial_counterexample", counterexample_value(state, initial_inputs)), json.member("case", json.integer(failure)), json.member("panic", event.diagnostic), json.member("stdout", json.string(event.stdout)), json.member("stderr", json.string(event.stderr)),
+            json.member("shrink_attempts", json.integer(tries)), json.member("minimal", json.boolean(false)), json.member("type_arguments", strings_json(spec.type_arguments)), json.member("generated_source", json.string(spec.source))]))
+    }
+    let mut status = "passed"; if incomplete || len(plan.specs) == 0 { status = "unknown" }; if failed { status = "failed" }
+    return json.object([json.member("format", json.string("vela.properties")), json.member("version", json.integer(1)), json.member("context", context), json.member("status", json.string(status)), json.member("proof", json.boolean(false)), json.member("generation", json.string("requires literals/lengths, type boundaries and deterministic raw bits")),
+        json.member("seed", json.string(seed)), json.member("cases", json.integer(options.cases)), json.member("size", json.integer(options.size)), json.member("timeout_ms", json.integer(options.timeout)), json.member("budget_ms", json.integer(options.budget)),
+        json.member("tested", json.integer(tested)), json.member("results", json.array(rows)), json.member("elapsed_ms", json.integer(now() - start)), json.member("scope", json.string("automatic contract properties; ordinary test blocks run separately with vela test"))])
+}

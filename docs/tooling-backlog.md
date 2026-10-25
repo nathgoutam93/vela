@@ -101,6 +101,18 @@ the same entry. Close it with a commit or validation result; keep its history.
   documented, and a deliberately timed-out case produces actionable evidence
   while remaining a failure.
 
+- **M28 recurrence/resolution:** one policy fixture produced unknown rather
+  than passed while the captured assertion included a report larger than the
+  output limit; a persistent rerun passed. A short case timeout under host
+  contention is suspected, not established. Keep full unexpected JSON in
+  build/m28/test-failure.json and print nonpassing rows concisely; use a
+  5-second timeout for property integration checks. A first-case timeout also
+  recurred for width during overlapping validation; preserve that unknown
+  artifact and rerun with explicit integration budgets. TL-055 later exposed
+  a distinct entry-index mismatch; earlier timeout causes remain unestablished
+  and earlier compiler-property successes were invalidated. Production defaults
+  remain bounded, and timeout outcomes remain unknown.
+
 ### TL-004: Runtime cache omitted an included header
 
 - **Status:** resolved in M19, extended through M24; native execution remains in VAL-001.
@@ -406,7 +418,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-017: Keep the expanded memory guide within its reading budget
 
-- **Status:** resolved in M22, extended through M27.
+- **Status:** resolved in M22, extended through M28.
 - **Evidence:** the first M22 `build/vela-m22 guide` output is 37,751 bytes,
   exceeding the existing 32,000-byte / estimated-8,000-token integration gate.
   New library signatures and rules add to repeated per-builtin explanation.
@@ -447,6 +459,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   flags, panic format and elapsed-time limits. The final guide is 31,963
   bytes; guide/installation gates pass in the clean 306-check C suite.
   Actual tokenization remains VAL-003.
+
+- **M28 recurrence/resolution:** verification commands and generator API
+  initially expanded the guide past the same 32,000-byte estimate gate.
+  Compact repeated prose/examples while retaining semantic rules and generated
+  APIs. The refreshed fixed-point guide is 31,969 bytes (7,992.25 by bytes/4).
+  Actual model-tokenizer acceptance remains VAL-003.
 
 ### TL-018: Select benchmark input generators by name
 
@@ -672,6 +690,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   50 also cannot create its default user cache here and exits before guest
   execution; retain the M26 harness convention `run -C cache=n`. This is a
   runner cache failure, not a failed WASI program.
+- **M28 recurrence:** an intermediate compiler build again succeeds while
+  the default user-cache mkdir reports a workspace-sandbox permission error.
+  Validation uses VELA_CACHE=$PWD/build/m28/cache; the unrelated cache-output
+  improvement remains deferred.
 - **Proposed improvement:** suppress expected mkdir stderr on cache fallback
   or emit an optional structured cache diagnostic while preserving real errors.
 - **Acceptance:** an inaccessible cache still builds correctly with intentional
@@ -884,7 +906,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-036: Result-returning calls can silently discard failures
 
-- **Status:** deferred to M28 under the accepted M30 baseline; discovered
+- **Status:** resolved during M28 under the accepted M30 baseline; discovered
   during the M25 pause's design review on 2026-10-25. This does not expand M25.
 - **Evidence:** the reproducible program in
   [the baseline](design-baseline-to-m30.md#current-behavior-evidence), saved as
@@ -905,9 +927,16 @@ the same entry. Close it with a commit or validation result; keep its history.
   verify stable codes/locations and ordinary warning compatibility. Confirm
   unchanged program code generation and measure normal check latency in M29.
 
+- **M28 resolution:** E7009 uses the checked built-in Result type for call
+  statements, covers direct/indirect/generic/method calls, and shares JSON/LSP
+  warning infrastructure. Explicit immutable `_` acknowledges intent; fixes
+  never insert it. The driver audit handles coverage-write failure and
+  explicitly acknowledges best-effort cleanup. tests/m28_test.py checks
+  counts/locations/editor severity, fixes and execution on C/native.
+
 ### TL-037: Guide contract purity exceeds the implemented check
 
-- **Status:** deferred to M28 under the accepted M30 baseline; discovered
+- **Status:** resolved during M28 under the accepted M30 baseline; discovered
   during the M25 pause's design review on 2026-10-25. This does not expand M25.
 - **Evidence:** the same
   [baseline program](design-baseline-to-m30.md#current-behavior-evidence)
@@ -928,6 +957,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   and other effects retain behavior; unknown/failing/nonterminating cases are
   not certified from a true result or empty effect set alone. Test pure proven
   and unproven cases separately on both backends as part of M28.
+
+- **M28 resolution:** corrected the guide; cheap removal accepts only total
+  scalar tautologies/literal-return intervals. Opt-in SMT includes definedness
+  and finite-path reasoning, rejects unsupported calls/loops, and never loads
+  old claims as proof. tests/m28_test.py retains a printing postcondition under
+  verify --build on C/native and checks unknown nontermination/resource cases.
 
 ### TL-038: Target selection forced the native backend and LP64 C aliases
 
@@ -1173,6 +1208,116 @@ the same entry. Close it with a commit or validation result; keep its history.
   report and also checks fail-closed behavior for an unavailable real clock.
   Rerun the corrected M27 acceptance, retaining the original native result.
 
+### TL-050: Bounded property capture and capability launch use separate APIs
+
+- **Status:** resolved within M28’s bounded automatic domain; broader API deferred.
+- **Observed source:** processes.communicate provides output/time limits;
+  sysio.sandbox_run applies allow/deny policy before exec and inherits the
+  current POSIX process group. Neither public operation combines both.
+  Nested processes.communicate calls create new process groups, so an outer
+  group kill alone is not a proof of arbitrary nested OS-process cleanup.
+- **Impact:** a property harness must preserve policy enforcement and bounds;
+  merely capturing a directly launched test would bypass requested policies.
+- **Workaround/resolution:** a private compiler helper calls the existing policy
+  launcher inside a bounded process group. Automatic properties conservatively
+  omit OS/unsafe/unknown call paths and foreign-library constructors; normal
+  programs/manual tests retain their existing accepted effects and contracts.
+- **Proposed later work:** consider a bounded policy-aware process primitive
+  after the freeze if needed; this entry does not authorize a new general API.
+- **Verify:** both backends capture JSON panics and reject forbidden effects;
+  a nonterminating pure case times out without a live child. Unsupported and
+  resource-limited cases are unknown, never reported as passing or proof.
+
+### TL-051: Generated Vela strings must use Vela quoting
+
+- **Status:** resolved during initial M28 property generation.
+- **Observed source:** codegen.c_string emits octal escapes for control and
+  UTF-8 bytes, while the Vela lexer accepts its named escapes and literal
+  UTF-8. Reusing the C quoting helper produces invalid generated Vela input.
+- **Impact:** generated NUL/newline/Unicode property cases would be skipped or
+  rejected before executing the contract.
+- **Workaround/resolution:** use ast.quote for generated Vela literals; keep
+  codegen.c_string for C/assembly output.
+- **Verify:** automatic Str properties admit empty, control/NUL and Unicode
+  values, and the generated source type-checks and executes on both backends.
+
+### TL-052: Repeated explicit discards collided as duplicate local names
+
+- **Status:** resolved during M28's discarded-Result acceptance.
+- **Observed:** two `let _ = outcome()` declarations in one block report
+  E3055, even though the accepted M28 scope uses this existing spelling for
+  intentional discard. The first comprehensive warning fixture exposed it.
+- **Impact:** acknowledging several independent Results requires artificial
+  nested blocks or unrelated variable names.
+- **Workaround:** separate scopes while retaining explicit acknowledgement.
+- **Resolution:** exempt immutable `_` declarations from the same-block name
+  collision check. Keep ordinary local typing, lifetime and cleanup; no
+  attribute, syntax or ownership model is introduced. Other duplicate names
+  and mutable duplicate declarations keep their diagnostics.
+- **Verify:** repeated immutable acknowledgements execute both calls, keep
+  warnings/fixes empty, and compile/run on both backends with managed values.
+
+- **Seed compatibility:** the old checker still rejects repeated `_` in
+  imported std test bodies during generation 2. Keep the compiler’s generator
+  source compatible with that seed until the refreshed fixed point; exercise
+  repeated acknowledgements in the acceptance fixture using the new checker.
+
+### TL-053: Checked source snapshots include a virtual prelude
+
+- **Status:** resolved during M28 evidence acceptance.
+- **Observed:** checker.check_target appends a Module named/filed <prelude>
+  containing the built-in interfaces. An independent SHA-256 acceptance
+  oracle tried to read that source row from disk and failed FileNotFoundError.
+- **Impact:** evidence consumers cannot assume every checked module is a
+  filesystem file; dropping built-in semantics would weaken identity checks.
+- **Workaround/resolution:** mark virtual rows explicitly and include their
+  virtual source while retaining the SHA-256. Real sources remain canonical
+  file/hash pairs, and compiler identity binds all built-in implementation.
+- **Verify:** independently hash every real/virtual source and the compiler
+  binary; stale source/target/compiler reports are rejected and claims are
+  always recomputed, never loaded as authority to erase checks.
+
+### TL-054: Evaluation installation did not preserve the Windows executable suffix
+
+- **Status:** corrected during M28; actual Windows execution remains VAL-005.
+- **Observed source:** eval/prepare.py installed every compiler as bin/vela
+  and used that path for guide/counterexample subprocesses. M28 adds installed
+  counterexample preparation to its acceptance script, including Windows CI.
+  Native Windows execution of this path has not been observed on this host.
+- **Impact:** copying an .exe without its suffix can break Windows executable
+  lookup; source-file hashing also needs the real existing compiler path.
+- **Workaround/resolution:** use bin/vela.exe on Windows, retain bin/vela on
+  POSIX, and resolve a missing suffix to an existing .exe before copying or
+  hashing. This changes evaluation installation, not language/runtime semantics.
+- **Verify:** tests/m28_test.py prepares the isolated repair task, executes its
+  installed compiler and checks all three concrete failures and source/compiler
+  SHA-256 identities. POSIX preparation passes; retain native Windows CI results
+  before claiming platform execution coverage.
+
+### TL-055: Property case indices differed from backend test entries
+
+- **Status:** resolved during M28; final affected acceptance passes.
+- **Observed source/result:** properties.run_cases excluded builtin modules
+  using is_std, while codegen.test_ids also excludes imported std/ source
+  modules. Exploratory std/processes properties returned child status 2;
+  inspection found the runner counted imported std test blocks that do not
+  appear in the generated executable. Existing compiler-property successes
+  could therefore select another test and cannot be retained as acceptance.
+- **Impact:** a case can select the wrong entry, return unknown, or falsely
+  appear to pass if that entry is an ordinary successful test.
+- **Workaround/resolution:** use codegen.test_ids as the single executable
+  entry list, and exclude imported standard-source functions from automatic
+  property selection while retaining explicitly tested root std modules.
+- **Verify:** tests/m28_test.py imports text before a separate local worker
+  with a deliberately failing contract and an ordinary passing test. Both
+  backends must report exactly that worker’s real failure, with its frame and
+  typed counterexample. Regenerate compiler-property artifacts and both
+  bootstrap fixed points; retain pre-fix full-suite/UBSan results separately.
+  The filtered reproduction returns unknown/status 2 before the fix and an
+  actual target-frame failure after it. Final M28/compiler/generator checks
+  pass, including both C/native property execution and regenerated compiler
+  evidence with 20 admitted samples.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
@@ -1290,6 +1435,24 @@ the same entry. Close it with a commit or validation result; keep its history.
   The same-source macOS release parity gate passes at 1.4604556; this does not
   close the remaining Linux native-host sanitizer/kernel/performance checks.
 
+- **M28 required follow-up:** execute tests/m28_test.py with Z3 on actual
+  Linux x86-64, both supported suites and sanitizer selections. Confirm
+  policy-aware bounded child cleanup, exact-width SMT/counterexample replay,
+  property JSON and the unchanged release parity gate on that host. The CI
+  job is configured; macOS execution and target-model math do not close it.
+
+- **M28 local evidence:** C/native full suites each passed 308 checks and
+  121 selected runtime/M28 checks passed UBSan before TL-055. After correcting
+  that property entry mismatch, both fixed points and the affected compiler,
+  generator and M28 acceptance passed again normally and under UBSan. These
+  runs include both C/native generated properties. Native instructions remain
+  outside C sanitizer instrumentation; no new macOS ASan pass is claimed.
+
+- **M28 release gate:** the unchanged same-source 12-workload macOS gate
+  passes at 1.468× C by native geometric mean; native compiler check and C
+  emission are faster. See bench/after-m28.json and bench/m28-validation.json.
+  This does not close Linux native-host performance acceptance.
+
 ### VAL-002: Measure M17 with agents
 
 - **Status:** open; carried from M17.
@@ -1310,6 +1473,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   model-driven agent trial was performed.
 - **M26 evidence:** eval/m26-static.json retains 373/373 coded diagnostics and
   21 with edits. No model-driven agent comparison was run.
+- **M28 scope:** task 21 prepares fresh typed JSON counterexamples for three
+  broken contracts. Hidden checks require unchanged contracts/signatures;
+  the starting code fails and the reference solution passes. This fixture
+  validation is not an actual agent trial. Run agents with COUNTEREXAMPLES.json
+  as the supplied failure feedback and retain graded repairs, model/condition,
+  turns and tokens before claiming M28’s agent-repair acceptance.
 - **Workaround:** use the static metrics and seeded repair checks as
   implementation evidence; do not claim measured agent improvements.
 - **Required work:** compare the guide and prior documentation conditions on
@@ -1318,6 +1487,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   here. Use repeated runs before drawing performance conclusions.
 - **Acceptance:** retain run metadata and graded results through the
   [evaluation harness](../eval/README.md), with claims limited to what was run.
+
+- **M28 local evidence:** the five stage1 contracts are proved and receive
+  bounded property checks. Four imported std contracts remain unknown in the
+  scalar proof report; the report’s overall unknown status is retained.
+  The expanded acceptance and custom Generator checks pass locally. The
+  generated task-21 report is not an actual agent repair result.
 
 ### VAL-003: Check the guide with the evaluation model's tokenizer
 
@@ -1344,6 +1519,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   tokenizer measurement is still outstanding.
 - **M26 measurement:** guide output is 31,975 bytes, about 7,994 tokens by
   bytes/4; actual model-specific counting remains outstanding.
+- **M28 measurement:** guide output is 31,969 bytes, 7,992.25 by bytes/4;
+  executable examples and installed guide are regression checked. Actual
+  model-specific counting remains outstanding.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.
@@ -1393,6 +1571,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   results. Port any remaining POSIX-specific fixture assumptions explicitly,
   retaining equivalent C and systems coverage. Validate Unicode argv/env,
   inherited handles, closure of process trees, full-duplex sockets and coverage.
+- **M28 follow-up:** the Windows core job now includes discarded-Result,
+  cheap proofs, source identities and generated contract-property acceptance.
+  Its unsupported deny-policy path must remain unknown/fail closed. Retain
+  actual native Windows execution and process-tree/output-limit behavior;
+  cross-target SMT alias checks do not establish that runtime coverage.
 - **Acceptance:** retained native Windows commands/results and a complete
   passing supported-suite inventory, with unavailable native-emitter/kernel
   profiles named separately.

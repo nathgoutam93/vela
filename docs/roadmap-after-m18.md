@@ -220,6 +220,11 @@ debugger execution is tracked separately as VAL-006.
 
 ## M28: Verification for agents
 
+**Status:** implemented; local regression, bounded verification and release
+performance gates pass. See
+[the walkthrough](m28-verification.md). Actual counterexample-only agent
+repair trials and foreign native-host acceptance remain outstanding.
+
 **Needs:** M19 (exact integer semantics for the solver) and M20 (generators as interfaces).
 
 **What gets built:** Verification for agents: contracts proved at compile time where the range analysis or an SMT solver can, the rest checked at run time as now; property tests generated from requires and ensures (vela test --properties); counterexamples as JSON.

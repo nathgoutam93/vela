@@ -22,7 +22,7 @@ pub type Range = struct {
     hi: Int
 }
 
-pub fn max_int() -> Int {
+pub fn max_int() -> Int ensures result == 9223372036854775807 {
     return 9223372036854775807
 }
 
@@ -31,7 +31,7 @@ pub fn min_int() -> Int {
 }
 
 // The longest a string, an array or a map can be: 2^48 (vela_rt.c checks).
-pub fn max_len() -> Int {
+pub fn max_len() -> Int ensures result == 281474976710656 {
     return 281474976710656
 }
 

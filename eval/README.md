@@ -1,6 +1,6 @@
 # The agent evaluation
 
-Twenty tasks to give an AI agent in Vela, with hidden checks that grade
+Twenty-one tasks to give an AI agent in Vela, with hidden checks that grade
 the result mechanically. Vela is new, so no agent has seen it in training:
 the evaluation measures how well an agent can learn the language from its
 documentation, its error messages and its tools, and do real work in it.
@@ -66,6 +66,7 @@ python3 eval/summary.py results.jsonl --by category
 | 18-write-tests | tests | `test` blocks, graded by mutation testing |
 | 19-performance | performance | replacing a quadratic loop with a map |
 | 20-intervals | new module | sorting with `lists.sort_by` and a closure, struct updates |
+| 21-contract-counterexamples | verification | repairs from generated JSON counterexamples, preserving contracts |
 
 A task is a directory in `tasks/`:
 
@@ -79,6 +80,12 @@ The checks are hidden `test` files run with `vela test`, runs of the
 built program with given arguments, input and files, mutation testing,
 patterns that must not or must appear, and "no errors or warnings"; see
 the top of `grade.py`.
+
+Task 21 generates `COUNTEREXAMPLES.json` in the prepared workspace with its
+installed compiler and original source hashes. Its prompt supplies no other
+failure explanation. Preparation requires concrete failures for all three
+contracts. Reference-solution self-tests validate the fixture; an actual agent
+run and its repair cost must be recorded separately.
 
 ## Checking the evaluation
 

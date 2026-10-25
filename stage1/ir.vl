@@ -136,11 +136,11 @@ pub fn RET_STR() -> Int {
     return 4
 }
 
-pub fn INT() -> Int {
+pub fn INT() -> Int ensures result == 0 {
     return 0
 }
 
-pub fn FLOAT() -> Int {
+pub fn FLOAT() -> Int ensures result == 1 {
     return 1
 }
 

@@ -24,7 +24,7 @@ jobs:
           python-version: '3.12'
       - name: Linux dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y clang gdb libsqlite3-dev zlib1g-dev
+        run: sudo apt-get update && sudo apt-get install -y clang gdb z3 libsqlite3-dev zlib1g-dev
       - name: Bootstrap both backends
         run: sh bootstrap/bootstrap.sh --native
       - name: Complete C suite
@@ -36,9 +36,14 @@ jobs:
           VELA_M27_DEBUGGER: '1'
           VELA_M27_COMPILER_PANIC: '1'
         run: python3 tests/m27_test.py build/vela
+      - name: Bounded SMT and contract properties
+        env:
+          VELA_SOLVER: z3
+        if: runner.os == 'Linux'
+        run: python3 tests/m28_test.py build/vela
       - name: Linux address and undefined-behavior sanitizers
         if: runner.os == 'Linux'
-        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --sanitize tests/run/ m23_test m27_test
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --sanitize tests/run/ m23_test m27_test m28_test
       - name: Linux thread sanitizer
         if: runner.os == 'Linux'
         run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --tsan tests/run/tasks
@@ -67,7 +72,7 @@ jobs:
         run: sh bootstrap/bootstrap.sh
       - name: Core C fixtures and target ABI/cache oracles
         shell: msys2 {0}
-        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ tests/fail/ tests/dump/ m26_test m27_test
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ tests/fail/ tests/dump/ m26_test m27_test m28_test
       - name: Windows systems oracle
         shell: msys2 {0}
         run: |

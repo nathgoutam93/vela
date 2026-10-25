@@ -6,11 +6,27 @@ import os
 import packages
 import strings
 import text
-pub type Options = struct { allow: [Str], deny: [Str], rest: [Str], coverage: Str, debug: Bool }
+import integers
+pub type Options = struct { allow: [Str], deny: [Str], rest: [Str], coverage: Str, debug: Bool, properties: Bool, as_json: Bool, report: Str, cases: Int, seed: Int, size: Int, shrinks: Int, timeout: Int, budget: Int }
 pub fn parse(args: [Str], testing: Bool) -> Options uses os {
-    let mut allow: [Str] = []; let mut deny: [Str] = []; let mut coverage = ""; let mut debug = false; let mut i = 0
+    let mut allow: [Str] = []; let mut deny: [Str] = []; let mut coverage = ""; let mut debug = false; let mut properties = false; let mut as_json = false; let mut report = ""; let mut cases = 32; let mut seed = 1; let mut size = 8; let mut shrinks = 16; let mut timeout = 1000; let mut budget = 30000; let mut extended = false; let mut i = 0
     for i < len(args) {
         let option = args[i]; if option == "--" { i = i + 1; break }
+        if option == "--properties" { if !testing { fail("--properties is available on test") }; properties=true;i=i+1;continue }
+        if option == "--json" { if !testing { fail("--json requires test --properties") };as_json=true;extended=true;i=i+1;continue }
+        if option == "--report" || option == "--cases" || option == "--seed" || option == "--size" || option == "--shrinks" || option == "--timeout" || option == "--budget" {
+            if !testing || i+1>=len(args) { fail("invalid property option "+option) };let value=args[i+1];i=i+2;extended=true
+            if option=="--report" { report=value;continue }
+            if option=="--seed" { let parsed=integers.literal(value+"u64");if !parsed.valid||parsed.overflow{fail("invalid u64 property seed")};seed=parsed.bits;continue }
+            let mut n=0;match text.parse_int(value){Some(v)=>n=v,None=>fail("invalid property budget")}
+            if n<0 {fail("property budgets must be nonnegative")}
+            if option=="--cases" {if n<1||n>256{fail("--cases must be 1..256")};cases=n}
+            if option=="--size" {if n>32{fail("--size must be 0..32")};size=n}
+            if option=="--shrinks" {if n>64{fail("--shrinks must be 0..64")};shrinks=n}
+            if option=="--timeout" {if n<1||n>10000{fail("--timeout must be 1..10000 milliseconds")};timeout=n}
+            if option=="--budget" {if n<1||n>60000{fail("--budget must be 1..60000 milliseconds")};budget=n}
+            continue
+        }
         if option == "--debug" { debug = true; i = i + 1; continue }
         if option != "--allow" && option != "--deny" && option != "--coverage" { break }
         if i + 1 >= len(args) { fail("missing value after " + option) }; let value = args[i + 1]; i = i + 2
@@ -19,7 +35,9 @@ pub fn parse(args: [Str], testing: Bool) -> Options uses os {
         if option == "--allow" { push(mut allow, value) } else { push(mut deny, value) }
     }
     if i >= len(args) { fail("missing source file") }
-    return Options { allow: allow, deny: deny, rest: args[i..len(args)], coverage: coverage, debug: debug }
+    if extended && !properties { fail("property reporting/budgets require --properties") }
+    if properties && coverage!="" { fail("run --coverage and --properties separately; measured coverage and generated case reports have different identities") }
+    return Options { allow: allow, deny: deny, rest: args[i..len(args)], coverage: coverage, debug: debug, properties: properties, as_json: as_json, report: report, cases: cases, seed: seed, size: size, shrinks: shrinks, timeout: timeout, budget: budget }
 }
 fn valid(value: Str, allow: Bool) -> Bool {
     if value == "fs" || value == "os" || value == "net" || value == "clock" || value == "unsafe" { return true }

@@ -1,0 +1,93 @@
+// Cheap, total tautologies only. Never interpret an empty effect set as purity.
+// Solver-backed evidence is added only by a fresh bounded verification pass.
+import ast
+import checker
+import maps
+import integers
+import types
+fn scalar(k: checker.Checked, e: ast.Expr) -> Bool {
+    if e.id < 0 || e.id >= len(k.ty) { return false }
+    if !types.is_integer(k.ty[e.id]) && k.ty[e.id] != types.BOOL() { return false }
+    return match e.kind {
+        ast.ExprKind.Name(_) => match k.refs[e.id] { checker.Ref.Local(_) => true, _ => false }
+        ast.ExprKind.IntLit(_) => true
+        ast.ExprKind.FixedIntLit(_, _, _) => true
+        ast.ExprKind.ByteLit(_) => true
+        ast.ExprKind.BoolLit(_) => true
+        _ => false
+    }
+}
+fn same(k: checker.Checked, a: ast.Expr, b: ast.Expr) -> Bool {
+    if !scalar(k, a) || !scalar(k, b) || k.ty[a.id] != k.ty[b.id] { return false }
+    match k.refs[a.id] { checker.Ref.Local(x) => { match k.refs[b.id] { checker.Ref.Local(y) => return x == y, _ => {} } }, _ => {} }
+    return ast.expr_text(a) == ast.expr_text(b)
+}
+pub fn removable(k: checker.Checked, e: ast.Expr) -> Bool { return maps.has(k.proved_contracts, e.id) || always(k, e) }
+pub fn always(k: checker.Checked, e: ast.Expr) -> Bool { return known(k, e, 64) == 1 }
+fn known(k: checker.Checked, e: ast.Expr, fuel: Int) -> Int {
+    if fuel <= 0 { return -1 }
+    match e.kind {
+        ast.ExprKind.BoolLit(b) => { if b { return 1 }; return 0 }
+        ast.ExprKind.Unary(op, x) => { if op == "!" { let v = known(k, x, fuel - 1); if v >= 0 { return 1 - v } } }
+        ast.ExprKind.Binary(op, a, b) => {
+            let x = known(k, a, fuel / 2); if op == "&&" { if x == 0 { return 0 }; if x == 1 { return known(k, b, fuel / 2) }; return -1 }
+            if op == "||" { if x == 1 { return 1 }; if x == 0 { return known(k, b, fuel / 2) }; return -1 }
+            if same(k, a, b) {
+                if op == "==" || op == "<=" || op == ">=" { return 1 }
+                if op == "!=" || op == "<" || op == ">" { return 0 }
+            }
+            // Every unsigned scalar is nonnegative, including full-range u64.
+            if scalar(k, a) && types.is_integer(k.ty[a.id]) && !integers.signed(k.ty[a.id]) {
+                let mut zero = false; match b.kind { ast.ExprKind.IntLit(n) => zero = n == 0, ast.ExprKind.FixedIntLit(n, _, _) => zero = n == 0, ast.ExprKind.ByteLit(n) => zero = n == 0, _ => {} }
+                if zero { if op == ">=" { return 1 }; if op == "<" { return 0 } }
+            }
+        }
+        _ => {}
+    }
+    return -1
+}
+
+// A tiny interval proof for a literal return or a scalar match whose arms
+// all return integer literals. This deliberately excludes calls/arithmetic.
+type Bound = struct { lo: Int, hi: Int, ok: Bool }
+fn absent() -> Bound { return Bound { lo: 0, hi: 0, ok: false } }
+fn literal(k: checker.Checked, e: ast.Expr) -> Bound {
+    let t = k.ty[e.id]; if !types.is_integer(t) { return absent() }; let mut n = 0
+    match e.kind { ast.ExprKind.IntLit(v) => n = v, ast.ExprKind.FixedIntLit(v, _, _) => n = v, ast.ExprKind.ByteLit(v) => n = v, _ => return absent() }
+    n = integers.ordered(n, t); return Bound { lo: n, hi: n, ok: true }
+}
+pub fn body_total(k: checker.Checked, id: Int) -> Bool { return returned_bound(k, id).ok }
+fn returned_bound(k: checker.Checked, id: Int) -> Bound {
+    let f = k.fns[id]; if len(f.decl.body.stmts) != 1 || !types.is_integer(f.result) { return absent() }
+    let mut value: Option[ast.Expr] = None; match f.decl.body.stmts[0].kind { ast.StmtKind.Return(e) => value = e, _ => return absent() }
+    match value { None => return absent(), Some(e) => {
+        let direct = literal(k, e); if direct.ok { return direct }
+        match e.kind { ast.ExprKind.Match(subject, arms) => {
+            if !scalar(k, subject) || !types.is_integer(k.ty[subject.id]) { return absent() }
+            let mut out = absent()
+            for arm in arms {
+                match arm.pattern.kind { ast.PatternKind.Wild => {}, ast.PatternKind.Lit(x) => { if !literal(k, x).ok { return absent() } }, _ => return absent() }
+                let mut b = absent(); match arm.body { ast.ArmBody.Value(x) => b = literal(k, x), _ => {} }
+                if !b.ok { return absent() }; if !out.ok { out = b } else { if b.lo < out.lo { out.lo = b.lo }; if b.hi > out.hi { out.hi = b.hi } }
+            }; return out
+        }, _ => return absent() }
+    } }
+}
+fn bound(k: checker.Checked, e: ast.Expr, result: Int, value: Bound) -> Bound {
+    match k.refs[e.id] { checker.Ref.Local(id) => { if id == result { return value } }, _ => {} }; return literal(k, e)
+}
+fn interval_truth(k: checker.Checked, e: ast.Expr, result: Int, value: Bound, fuel: Int) -> Bool {
+    if always(k, e) { return true }; if fuel <= 0 { return false }
+    match e.kind { ast.ExprKind.Binary(op, a, b) => {
+        if op == "&&" { return interval_truth(k, a, result, value, fuel / 2) && interval_truth(k, b, result, value, fuel / 2) }
+        let x = bound(k, a, result, value); let y = bound(k, b, result, value); if !x.ok || !y.ok || k.ty[a.id] != k.ty[b.id] { return false }
+        if op == "==" { return x.lo == x.hi && x.lo == y.lo && y.lo == y.hi }; if op == "!=" { return x.hi < y.lo || x.lo > y.hi }
+        if op == ">=" { return x.lo >= y.hi }; if op == ">" { return x.lo > y.hi }; if op == "<=" { return x.hi <= y.lo }; if op == "<" { return x.hi < y.lo }
+    }, _ => {} }; return false
+}
+pub fn prepare(checked: checker.Checked) -> checker.Checked {
+    let mut k = checked
+    for id in 0..len(k.fns) { let f = k.fns[id]; if len(f.decl.ensures) == 0 { continue }; let value = returned_bound(k, id); if !value.ok { continue }
+        for e in f.decl.ensures { if interval_truth(k, e, f.result_local, value, 64) { k.proved_contracts[e.id] = true } }
+    }; return k
+}

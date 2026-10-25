@@ -20,7 +20,14 @@ static void vela_json_bytes(FILE *out, const uint8_t *s, size_t n) {
     fputc('"', out);
 }
 static void vela_json_text(FILE *out, const char *s) { vela_json_bytes(out, (const uint8_t *)s, strlen(s)); }
-static bool vela_json_panics(void) { const char *v = getenv("VELA_PANIC"); return v && strcmp(v, "json") == 0; }
+#ifdef VELA_OBSERVE
+static bool vela_property_json;
+#endif
+static bool vela_json_panics(void) {
+#ifdef VELA_OBSERVE
+    if (vela_property_json) return true;
+#endif
+    const char *v = getenv("VELA_PANIC"); return v && strcmp(v, "json") == 0; }
 #ifdef VELA_OBSERVE
 #define VELA_TRACE_LIMIT 1024
 #define VELA_PROFILE_LIMIT 8192
@@ -114,6 +121,7 @@ static void vela_observe_flush(void) {
     pthread_mutex_unlock(&vela_profile_mutex);
 }
 void vela_observe_init(int64_t mode, const char *path) {
+    vela_property_json = mode == 3;
     vela_profiling = mode == 2;
     if (vela_profiling) { vela_profile_path = path; vela_profile_started = vela_observe_now(); atexit(vela_observe_flush); }
 }

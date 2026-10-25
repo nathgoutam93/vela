@@ -20,7 +20,7 @@ pub fn type_id(name: Str) -> Int {
     }
 }
 
-pub fn width(t: Int) -> Int {
+pub fn width(t: Int) -> Int ensures result >= 0 && result <= 64 {
     return match t {
         1 => 64
         2 => 8
