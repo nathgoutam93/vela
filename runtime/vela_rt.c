@@ -14,13 +14,18 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#if !defined(__wasi__) && !defined(_WIN32)
 #include <sys/wait.h>
+#endif
 #include <unistd.h>
 #include <inttypes.h>
-#include <pthread.h>
+#include "vela_threads.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_WIN32)
+#include "vela_windows.h"
+#endif
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #endif
@@ -60,7 +65,14 @@ void vela_assert_failed_values(const char *loc, const char *what, const char *te
 #define VELA_MAX_LEN ((int64_t)1 << 48)
 
 static void check_size(size_t size) {
-    if (size > (size_t)VELA_MAX_LEN) vela_panic("vela runtime", "out of memory");
+    if ((uint64_t)size > (uint64_t)VELA_MAX_LEN) vela_panic("vela runtime", "out of memory");
+}
+
+static size_t checked_bytes(uint64_t count, size_t width, size_t extra) {
+    if (count > (uint64_t)(SIZE_MAX - extra) / width) vela_panic("vela runtime", "out of memory");
+    size_t size = extra + (size_t)count * width;
+    check_size(size);
+    return size;
 }
 
 static void check_count(int64_t n) {
@@ -197,7 +209,7 @@ void vela_str_release(vela_str s) {
 vela_str vela_str_concat(vela_str a, vela_str b) {
     int64_t len;
     if (__builtin_add_overflow(a.len, b.len, &len)) vela_panic("vela runtime", "string too long");
-    vela_strobj *obj = vela_alloc(sizeof(vela_strobj) + (size_t)len);
+    vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
     obj->rc = 1;
     if (a.len) memcpy(obj->bytes, a.data, (size_t)a.len);
     if (b.len) memcpy(obj->bytes + a.len, b.data, (size_t)b.len);
@@ -262,8 +274,7 @@ static unsigned char *inline_data(vela_array *a) {
 
 vela_array *vela_array_new(const vela_type *elem, int64_t cap) {
     check_count(cap);
-    check_size(elem->size * (size_t)cap);
-    size_t size = sizeof(vela_array) + elem->size * (size_t)cap;
+    size_t size = checked_bytes((uint64_t)cap, elem->size, sizeof(vela_array));
     vela_array *a = vela_box_alloc(size);
     a->size = (int64_t)size;
     a->rc = 1;
@@ -322,7 +333,7 @@ void vela_array_grow(vela_array *a) {
     // Doubling makes n pushes cost O(n) in total.
     a->cap = a->cap < 4 ? 4 : a->cap * 2;
     check_count(a->cap);
-    array_resize(a, a->elem->size * (size_t)a->cap);
+    array_resize(a, checked_bytes((uint64_t)a->cap, a->elem->size, 0));
 }
 
 void vela_array_push(vela_array *a, const void *elem) {
@@ -397,10 +408,10 @@ static void *map_value(vela_map *m, int64_t i) { return m->values + m->value->si
 static void map_reserve(vela_map *m, int64_t cap) {
     check_count(cap);
     m->cap = cap;
-    m->keys = vela_realloc(m->keys, m->key->size * (size_t)cap);
-    m->values = vela_realloc(m->values, m->value->size * (size_t)cap);
-    m->live = vela_realloc(m->live, sizeof(bool) * (size_t)cap);
-    m->hashes = vela_realloc(m->hashes, sizeof(uint64_t) * (size_t)cap);
+    m->keys = vela_realloc(m->keys, checked_bytes((uint64_t)cap, m->key->size, 0));
+    m->values = vela_realloc(m->values, checked_bytes((uint64_t)cap, m->value->size, 0));
+    m->live = vela_realloc(m->live, checked_bytes((uint64_t)cap, sizeof(bool), 0));
+    m->hashes = vela_realloc(m->hashes, checked_bytes((uint64_t)cap, sizeof(uint64_t), 0));
 }
 
 static void map_rebuild_index(vela_map *m, int64_t index_cap) {
@@ -418,7 +429,7 @@ static void map_rebuild_index(vela_map *m, int64_t index_cap) {
     m->count = j;
     free(m->index);
     m->index_cap = index_cap;
-    m->index = vela_alloc(sizeof(int64_t) * (size_t)index_cap);
+    m->index = vela_alloc(checked_bytes((uint64_t)index_cap, sizeof(int64_t), 0));
     for (int64_t s = 0; s < index_cap; s++) m->index[s] = MAP_EMPTY;
     for (int64_t i = 0; i < m->count; i++) {
         uint64_t s = m->hashes[i] & (uint64_t)(index_cap - 1);
@@ -861,6 +872,9 @@ void vela_eprint_str(vela_str x) {
 
 static int saved_argc;
 static char **saved_argv;
+#if defined(_WIN32)
+static void win_free_args(void) { for(int i=0;i<saved_argc;i++)free(saved_argv[i]);free(saved_argv); }
+#endif
 
 // Ask the OS, rather than argv[0]: callers may use PATH or a symlink.
 vela_str vela_os_executable(void) {
@@ -880,6 +894,16 @@ vela_str vela_os_executable(void) {
         }
         free(buffer);
         cap = size;
+#elif defined(_WIN32)
+        free(buffer);
+        wchar_t *wide = vela_alloc(cap * sizeof(wchar_t));
+        DWORD n = GetModuleFileNameW(NULL, wide, (DWORD)cap);
+        if (n && n < cap) {
+            char *text = win_resolved_path(wide); free(wide);
+            if (!text) vela_panic("os.executable", "invalid executable path");
+            vela_str out = str_from(text, strlen(text)); free(text); return out;
+        }
+        free(wide); cap *= 2;
 #elif defined(__linux__)
         ssize_t n = readlink("/proc/self/exe", buffer, cap);
         if (n < 0) vela_panic("os.executable", "cannot read executable path");
@@ -902,8 +926,20 @@ void vela_init(int argc, char **argv) {
     // stdio buffer; the existing read, panic and exit paths flush it.
     static char output_buffer[65536];
     if (!isatty(STDOUT_FILENO)) setvbuf(stdout, output_buffer, _IOFBF, sizeof output_buffer);
+#if defined(_WIN32)
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+#endif
     saved_argc = argc;
     saved_argv = argv;
+#if defined(_WIN32)
+    wchar_t **wide_args=CommandLineToArgvW(GetCommandLineW(),&saved_argc);
+    if(!wide_args)vela_panic("os.args","cannot decode command line");
+    saved_argv=vela_alloc(((size_t)saved_argc+1)*sizeof(char*));
+    for(int i=0;i<saved_argc;i++){saved_argv[i]=win_utf8_text(wide_args[i]);if(!saved_argv[i])vela_panic("os.args","invalid command line encoding");}
+    saved_argv[saved_argc]=NULL;LocalFree(wide_args);atexit(win_free_args);
+#endif
     vela_policy_init(argc, argv);
 }
 
@@ -934,7 +970,7 @@ void vela_os_exit(int64_t code, const char *loc) {
 // ---- files ----
 
 static vela_str str_from(const char *data, size_t len) {
-    vela_strobj *obj = vela_alloc(sizeof(vela_strobj) + len);
+    vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
     obj->rc = 1;
     if (len) memcpy(obj->bytes, data, len);
     return (vela_str){obj, obj->bytes, (int64_t)len};
@@ -1121,9 +1157,24 @@ bool vela_files_temp_dir(vela_str *out) {
         unlock_fakes();
         return true;
     }
+#if defined(__wasi__)
+    *out = str_from("temporary directories are unsupported on WASI", 45);
+    return false;
+#else
+#if defined(_WIN32)
+    char *owned_base=win_env_text("TMPDIR");
+    if(!owned_base || !*owned_base){free(owned_base);owned_base=win_env_text("TEMP");}
+    const char *base=owned_base && *owned_base?owned_base:".";
+#else
     const char *base = getenv("TMPDIR");
     if (!base || !*base) base = "/tmp";
-    if (!vela_cap_check("fs", VELA_STR(base, (int64_t)strlen(base)), out)) return false;
+#endif
+    if (!vela_cap_check("fs", VELA_STR(base, (int64_t)strlen(base)), out)) {
+#if defined(_WIN32)
+        free(owned_base);
+#endif
+        return false;
+    }
     size_t n = strlen(base) + 20;
     char *dir = vela_alloc(n);
     snprintf(dir, n, "%s/vela-XXXXXX", base);
@@ -1133,11 +1184,19 @@ bool vela_files_temp_dir(vela_str *out) {
         *out = file_error("cannot make a directory in", (vela_str){NULL, (const uint8_t *)dir, (int64_t)strlen(dir)},
                           strerror(e));
         free(dir);
+#if defined(_WIN32)
+        free(owned_base);
+#endif
         return false;
     }
+#if defined(_WIN32)
+    free(owned_base);
+    for (char *at=dir; *at; at++) if (*at=='\\') *at='/';
+#endif
     *out = str_from(dir, strlen(dir));
     free(dir);
     return true;
+#endif
 }
 
 // ---- os.run, os.env ----
@@ -1157,10 +1216,20 @@ static pthread_mutex_t fork_lock = PTHREAD_MUTEX_INITIALIZER;
 // the program's stdout goes into *captured instead of ours. False, with a
 // message in *err, if it could not be started at all.
 static bool sys_legacy_process(vela_array *, int64_t *, vela_str *, vela_str *, bool *);
+#if defined(_WIN32)
+static bool win_run_program(vela_array *, int64_t *, vela_str *, vela_str *);
+#endif
 static bool run_program(vela_array *command, int64_t *code, vela_str *err, vela_str *captured) {
     bool handled=false;bool fake_ok=sys_legacy_process(command,code,err,captured,&handled);
     if(handled)return fake_ok;
     if (!vela_cap_process(err)) return false;
+#if defined(_WIN32)
+    return win_run_program(command, code, err, captured);
+#elif defined(__wasi__)
+    (void)command; (void)code; (void)captured;
+    *err = str_from("processes are unsupported on WASI", 33);
+    return false;
+#else
     if (command->len == 0) {
         *err = str_from("os.run needs a program to run", 29);
         return false;
@@ -1269,6 +1338,7 @@ static bool run_program(vela_array *command, int64_t *code, vela_str *err, vela_
         return false;
     }
     return true;
+#endif
 }
 
 bool vela_os_run(vela_array *command, int64_t *code, vela_str *err) {
@@ -1365,7 +1435,7 @@ vela_str vela_os_read(int64_t n, const char *loc) {
     }
     vela_cap_require("os");
     fflush(stdout);
-    vela_strobj *obj = vela_alloc(sizeof(vela_strobj) + (size_t)n);
+    vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)n, 1, sizeof(vela_strobj)));
     obj->rc = 1;
     size_t got = 0;
     flockfile(stdin);
@@ -1400,11 +1470,16 @@ bool vela_os_env(vela_str name, vela_str *out) {
     vela_cap_require("os");
     char *n = c_path(name);
     if (!n) return false;
+#if defined(_WIN32)
+    char *text=win_env_text(n);free(n);if(!text)return false;
+    *out=str_from(text,strlen(text));free(text);return true;
+#else
     const char *v = getenv(n);
     free(n);
     if (!v) return false;
     *out = str_from(v, strlen(v));
     return true;
+#endif
 }
 
 // ---- tasks ----
@@ -1441,10 +1516,19 @@ double vela_math_sqrt(double x) {
 int64_t vela_tasks_workers(void) {
     int64_t n = __atomic_load_n(&workers, __ATOMIC_RELAXED);
     if (n > 0) return n;
+#if defined(__wasi__)
+    return 1;
+#endif
     const char *e = getenv("VELA_THREADS");
     n = e ? atoll(e) : 0;
     if (n < 1) {
+#if defined(_WIN32)
+        SYSTEM_INFO info; GetSystemInfo(&info); long cores = (long)info.dwNumberOfProcessors;
+#elif defined(__wasi__)
+        long cores = 1;
+#else
         long cores = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
         n = cores > 0 ? cores : 1;
     }
     if (n > 256) n = 256;
@@ -1649,22 +1733,22 @@ uint64_t vela_hash_value(const vela_type *type, const void *value) {
 }
 
 // Raw C storage (M21): ownership and bounds are the unsafe caller's contract.
-_Static_assert(sizeof(void *) == 8 && sizeof(long) == 8 && sizeof(size_t) == 8,
-               "Vela C interop currently requires the LP64 ABI");
-_Static_assert(sizeof(vela_c_fn) == 8 && sizeof(float) == 4 && sizeof(double) == 8,
-               "Vela C interop requires 64-bit function pointers and IEEE float widths");
+_Static_assert(sizeof(void *) <= 8 && sizeof(size_t) == sizeof(void *),
+               "Vela requires pointers of at most 64 bits");
+_Static_assert(sizeof(vela_c_fn) <= 8 && sizeof(float) == 4 && sizeof(double) == 8,
+               "Vela C interop requires function pointers of at most 64 bits and IEEE float widths");
 static void vela_c_nonnull(const void *p, const char *loc) {
     if (!p) vela_panic(loc, "null C pointer");
 }
 void *vela_c_alloc(int64_t n, const char *loc) {
     if (n < 0) vela_panic(loc, "negative C allocation size");
-    return vela_alloc(n ? (size_t)n : 1);
+    return vela_alloc(checked_bytes(n ? (uint64_t)n : 1, 1, 0));
 }
 void vela_c_free(void *p) { free(p); }
 void *vela_c_data(vela_str s) { return (void *)(uintptr_t)s.data; }
 void *vela_c_cstr(vela_str s, const char *loc) {
     if (s.len && memchr(s.data, 0, (size_t)s.len)) vela_panic(loc, "embedded NUL in C string");
-    uint8_t *p = vela_alloc((size_t)s.len + 1);
+    uint8_t *p = vela_alloc(checked_bytes((uint64_t)s.len, 1, 1));
     if (s.len) memcpy(p, s.data, (size_t)s.len);
     p[s.len] = 0;
     return p;
@@ -1677,7 +1761,7 @@ vela_str vela_c_bytes(const void *p, int64_t n, const char *loc) {
     if (n < 0) vela_panic(loc, "negative C byte count");
     if (!n) return VELA_STR("", 0);
     vela_c_nonnull(p, loc);
-    return str_from(p, (size_t)n);
+    return str_from(p, checked_bytes((uint64_t)n, 1, 0));
 }
 uint64_t vela_c_load(const void *p, int64_t size, const char *loc) {
     vela_c_nonnull(p, loc);
@@ -1715,8 +1799,8 @@ void vela_c_store_float32(void *p, double value, const char *loc) {
 double vela_c_float32(double value) { return (float)value; }
 void *vela_c_offset(void *p, int64_t offset) { return (void *)((uintptr_t)p + (uint64_t)offset); }
 uint64_t vela_c_fn_bits(vela_c_fn fn) {
-    uint64_t bits;
-    memcpy(&bits, &fn, sizeof bits);
+    uint64_t bits = 0;
+    memcpy(&bits, &fn, sizeof fn);
     return bits;
 }
 vela_c_fn vela_c_fn_from_bits(uint64_t bits) {
@@ -1772,7 +1856,11 @@ int64_t vela_memory_signed(uint64_t bits, int64_t width, const char *loc) {
 
 #include "vela_sys.inc"
 
+#if defined(__wasi__) || defined(_WIN32)
+#include "vela_policy_portable.inc"
+#else
 #include "vela_policy.inc"
+#endif
 
 // Native backends share the runtime's immortal/shared reference-count rules.
 void vela_native_rc_inc(int64_t *rc) { vela_rc_inc(rc); }

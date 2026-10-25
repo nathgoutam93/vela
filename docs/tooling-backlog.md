@@ -16,7 +16,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-001: Host-aware test selection
 
-- **Status:** deferred; discovered during M17 on macOS ARM64.
+- **Status:** in progress during M26; native-host selection is implemented,
+  while the complete Windows fixture inventory remains VAL-005. Discovered
+  during M17 on macOS ARM64.
 - **Evidence:** `python3 run_tests.py --backend c` still invokes native-only
   cases in `tests/native_test.py`, `tests/cache_test.py`, and
   `tests/bench_test.py`. The native backend emits Linux x86-64 assembly, which
@@ -27,6 +29,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M19 recurrence:** manual host-specific filters also require a coverage
   inventory. The M17 filter list omitted 15 supported dump tests. M19 adds
   `tests/dump/` explicitly because literal parsing and AST dumps change.
+- **M26 recurrence:** Windows has C execution support but no native emitter.
+  Platform selections must retain C fixtures and explicitly report unavailable
+  native execution instead of invoking native-only scripts.
 - **M26a recurrence:** milestone scripts gated native execution on Linux x86-64
   and cross-assembly probes assumed asm always meant that target. Introduce a
   shared supported-native-host predicate and request the x86 target explicitly
@@ -46,7 +51,11 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-002: Relative compiler overrides fail in fixture directories
 
-- **Status:** deferred; discovered during M17.
+- **Status:** resolved during M26; discovered during M17.
+- **Resolution:** the runner resolves a relative compiler executable before
+  changing working directories. M26 core runs with `--compiler build/vela-m26`
+  exercise 251 fixtures successfully; final complete C runs pass 305 checks.
+  Focused PATH-command and quoted-space executable overrides also pass.
 - **Evidence:** `python3 run_tests.py --compiler build/vela --backend c`
   passes the relative executable path into subprocesses whose working
   directories are test fixtures or temporary directories. They fail with
@@ -63,7 +72,13 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-003: Control test concurrency and improve timeout evidence
 
-- **Status:** deferred; discovered during M17.
+- **Status:** resolved during M26; discovered during M17.
+- **Resolution:** `--jobs N` controls outer workers (default four), rejects
+  nonpositive values, and documents nested integration workers. Timeout reports
+  retain the actual command, configured duration, worker count and partial
+  stdout/stderr. A real deliberately timed-out compiler preserves its partial
+  stdout, command and worker count while returning a failure; core runs use
+  the checked-in option instead of temporary executor wrappers.
 - **Evidence:** while validation jobs overlapped, one supported C run reported
   263 passes and six runtime timeouts, including `print_int.vl`. All six passed
   on retry with four outer workers, and a complete supported run with four
@@ -111,6 +126,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M26a extension:** include the native host target in the runtime key. The
   cache regression confirms C/native on one host reuse a matching object;
   systems/policy include invalidation also runs through the ARM64 backend.
+- **M26 extension:** target/sysroot/driver selection and all Windows/thread/
+  portable-policy includes enter the runtime key. The M26 oracle changes only
+  vela_threads.h and verifies a new entry and subsequent reuse.
 - **Acceptance:** a change to the included header creates a new cache entry;
   unchanged sources and flags reuse the previous entry on both backends.
 
@@ -417,6 +435,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   estimate); M17/M21/M22 guide checks pass. Actual tokenizer work remains VAL-003.
 - **Validation:** the final M22 guide is 28,599 bytes (about 7,149 tokens by
   bytes/4). M17 compiles and tests all its examples in the 295-check suite.
+
+- **M26 recurrence/resolution:** the first platform reference reached 32,048
+  bytes. Compact platform prose while retaining target/data-model/WASI-limit
+  information; final generated guide is 31,975 bytes (7,994 estimated tokens).
+  This does not close the actual tokenizer measurement in VAL-003.
 
 ### TL-018: Select benchmark input generators by name
 
@@ -891,6 +914,159 @@ the same entry. Close it with a commit or validation result; keep its history.
   not certified from a true result or empty effect set alone. Test pure proven
   and unproven cases separately on both backends as part of M28.
 
+### TL-038: Target selection forced the native backend and LP64 C aliases
+
+- **Status:** resolved for the implemented target profiles during M26; native
+  Windows full-suite acceptance remains VAL-005.
+- **Resolution:** backend/target selection is independent, target ABI aliases
+  and editor metadata follow the selected profile, cross-toolchain options
+  reach every tool phase, and target/header cache oracles pass. Strict WASI
+  compilation also exposed an unused POSIX-only timing helper; gate that helper
+  to its actual profiles rather than weakening the warning flags. Independent C
+  ABI oracles execute on macOS, Linux/Rosetta, Windows/Wine and WASI/wasmtime.
+- **Evidence:** `stage1/main.vl:build_from` selected native whenever `--target`
+  was supplied, even under `VELA_BACKEND=c`. `targets.require_host` rejected
+  cross-linking. `stage1/cffi.vl:type_id` and runtime static assertions assumed
+  64-bit pointers and `long` for every target.
+- **Impact:** C cross-compilation cannot be selected; Windows LLP64 and WASI
+  ILP32 C declarations would have the wrong integer aliases.
+- **Workaround:** emit C manually and invoke a target compiler; avoid C aliases
+  whose widths differ. This does not establish target correctness.
+- **Proposed work:** select backend and target independently, pass target flags
+  consistently to compilation/assembly/linking, check aliases against the target
+  data model, and key runtime objects by target/toolchain/options.
+- **Acceptance:** independent C ABI oracles verify `long`, `size_t`, callbacks
+  and pointers for each target; C/native local regressions and cross-link tests
+  pass, including cache isolation and unsupported native-target diagnostics.
+
+### TL-039: Runtime size and function-pointer assumptions fail on wasm32
+
+- **Status:** resolved during M26; confirmed with wasmtime ABI and oversized-
+  allocation oracles.
+- **Resolution:** check sizes before size_t narrowing/product/header arithmetic,
+  copy actual function-pointer widths, and use target-sized pointer accesses.
+  Integer stores preserve all 64 bits on wasm32. The independent oracle passes
+  and a 4-GiB raw allocation panics before its size can truncate.
+- **Evidence:** `runtime/vela_rt.c:check_size` casts the 2^48 length limit to
+  `size_t`; on 32-bit targets that truncates to zero. C function-pointer bit
+  conversion copies eight bytes regardless of pointer size. The raw C ABI
+  assertions reject all non-LP64 targets.
+- **Execution evidence:** the independent WASI ABI oracle initially read back
+  4294967295 after storing 18446744073709551615u64. `codegen.c_builtin` cast
+  every store through uintptr_t, truncating integer payloads on wasm32. Pointer
+  loads/stores also hardcoded eight bytes. The oracle passes after using the
+  correct integer and target pointer widths.
+- **Impact:** allocations could panic, wide stores lost bits, and pointer
+  conversions/accesses could read or write outside the actual pointer object.
+- **Workaround:** retain the supported 64-bit targets until the checks and
+  pointer conversion honor the target width.
+- **Proposed work:** use width-safe comparisons, check allocation products
+  against SIZE_MAX, and copy the actual pointer representation with zero-fill.
+- **Acceptance:** execute wasm32 allocation/container/fixed-integer and C pointer
+  round-trip oracles in wasmtime; retain 64-bit runtime and sanitizer coverage.
+
+### TL-040: Wine requires a UTF-8 Unix locale for Unicode filesystem tests
+
+- **Status:** resolved with an execution-environment workaround; discovered in M26.
+- **Evidence:** the Windows Unicode file oracle failed with ENOENT under Wine 8
+  in Debian's default C locale. An independent `_wfopen`/`CreateFileW` C oracle
+  failed identically, while the directory existed and ASCII names worked.
+  Both oracles and the complete Windows systems oracle pass with `LANG=C.UTF-8`.
+- **Impact:** a Wine locale failure can be misattributed to Vela path encoding.
+- **Workaround/resolution:** set `LANG=C.UTF-8` for Wine execution; retain the
+  independent C comparison. No compiler workaround is needed.
+- **Proposed work:** include the locale with emulator evidence; native Windows
+  execution remains a separate acceptance requirement.
+- **Acceptance:** Unicode read/write/list/remove and the same independent Win32
+  calls pass under the recorded UTF-8 locale. Native Windows is not inferred.
+
+### TL-041: POSIX spawn can hide failure to execute behind status 127
+
+- **Status:** resolved during M26.
+- **Resolution:** bounded communication uses a close-on-exec startup error pipe,
+  retaining the existing group/nonblocking/timeout cleanup. Full M23 oracles
+  pass C/native on macOS and Linux/Rosetta; missing commands are Err while a
+  real shell exit 127 remains Ok.
+- **Evidence:** `tests/m23_test.py` fails its missing-command expectation on
+  Debian bookworm amd64 through Rosetta. An independent C `posix_spawnp` call
+  for `/definitely/missing/vela-command` returns 0 and a child exiting 127.
+  A separate Vela reproduction shows successful pipe pressure/timeout/limit
+  checks and the missing command returning Ok. This is reproducible alone.
+- **Impact:** `processes.run` loses its specified launch-error result and cannot
+  distinguish that error from an executable deliberately returning 127.
+- **Workaround:** no reliable status-only workaround; callers must not classify
+  every 127 as a launch failure.
+- **Proposed work:** use the existing fork/exec error-pipe protocol for bounded
+  process communication, retaining process groups, nonblocking parent pipes,
+  timeout cleanup and closed-standard-descriptor handling.
+- **Acceptance:** missing commands return Err and real status 127 remains Ok;
+  M23 passes optimized/unoptimized C/native on Linux and macOS, including pipe
+  pressure, limits, timeouts and inherited closed stdin. Run sanitizer checks.
+
+### TL-042: LP64 example conversions do not follow target C aliases
+
+- **Status:** deferred improvement; the M26 example blocker is fixed.
+- **Discovery:** M26 Windows C data-model inspection.
+- **Evidence:** examples/ffi/zlib.vl used explicit u64 conversions for C
+  unsigned-long parameters. On Windows, c.ULong correctly resolves to u32, so
+  those arguments are different types. Existing primitive conversion calls
+  name fixed widths; C scalar aliases have no conversion-call entry points.
+- **Impact:** otherwise ordinary C bindings need a target-independent checked
+  conversion strategy to remain source-compatible across LP64 and LLP64.
+- **Workaround/resolution:** the example constructs its nonnegative c.ULong
+  size with existing checked integer operations, in at most 63 iterations.
+  No syntax or additional numeric API is introduced. Size overflow remains a
+  checked failure. External libraries must still match the target.
+- **Proposed work:** consider C scalar alias conversion helpers after M30;
+  recording this proposal does not authorize a language/API expansion.
+- **Acceptance:** Vela C/native zlib binary round trips retain their independent
+  Python oracle; Windows-host checking accepts the same binding with u32
+  unsigned long, and native Windows library execution remains VAL-005.
+
+### TL-043: Windows adapters must preserve legacy streams and resolved paths
+
+- **Status:** resolved for the implemented adapter; native Windows validation
+  remains VAL-005. Discovered during M26 port review.
+- **Evidence:** source inspection of the initial Windows adapter found that
+  legacy os.output reused bounded communication with empty stdin, while POSIX
+  os.output inherits stdin/stderr. Its job close also terminated successful
+  descendants, whereas POSIX only kills the group on error/timeout. The initial
+  executable-path adapter returned GetModuleFileNameW's spelling without
+  resolving symlinks; stripping a Win32 UNC prefix also lost the network root.
+  These are inspected adapter differences, not inferred native-host failures.
+- **Impact:** observable platform differences in legacy process I/O/lifetimes
+  and executable-relative installation lookup.
+- **Workaround/resolution:** legacy capture inherits stdin/stderr, redirects only
+  stdout and uses no bounded-process job. Bounded jobs terminate descendants
+  on error/timeout; normal completion preserves their lifetime. Executable and
+  canonical path lookup use a final file handle and retain UNC roots.
+- **M26 execution evidence:** the Windows systems oracle passes under Wine,
+  including inherited stdin, Unicode argv/env and timeout/limit cleanup.
+  A container-local symlink installation emits the same 31,975-byte guide
+  without VELA_ROOT. A host-created bind-mount symlink returned EINVAL from
+  Linux readlink before Wine could open it; the local-filesystem rerun avoids
+  that observed Docker file-sharing limitation.
+- **Acceptance:** Windows systems oracle checks inherited stdin and legacy
+  capture as well as bounded pipe pressure, quoting, timeouts and limits. Check
+  executable-relative guide lookup through a symlink and retain native-host
+  handle/descendant tests in VAL-005.
+
+### TL-044: Overlapping fixture placeholders corrupt generated C-alias tests
+
+- **Status:** resolved during M26 test-harness acceptance.
+- **Evidence:** strengthening `tests/m26_test.py:source` with ULONGTYPE made
+  its earlier LONGTYPE replacement turn that token into Ui64/Ui32. The cross
+  oracle stopped at E3027 before execution, rather than testing the C ABI.
+- **Impact:** a template-generation error obscures the intended max-value and
+  adjacent-pointer-slot regressions.
+- **Workaround/resolution:** delimit every placeholder with @ markers; replacing
+  @LONGTYPE@ cannot match inside @ULONGTYPE@. Generate each profile and reject
+  leftover markers before repeating execution.
+- **Proposed work:** retain disjoint tokens when extending these fixtures;
+  no new general-purpose harness/template feature is needed.
+- **Acceptance:** local and cross target oracles execute max-size/unsigned-long
+  round trips and pointer-slot guard checks for the corresponding widths.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
@@ -960,6 +1136,17 @@ the same entry. Close it with a commit or validation result; keep its history.
   runtime C compiles on Darwin and as a Linux x86 object. These are local Mac
   execution and cross-compilation proofs, not Linux execution or ASan/TSan.
   Source/image hashes and commands are in bench/m25-validation.json.
+- **M26 evidence:** Debian bookworm amd64 runs through Rosetta in Docker
+  Desktop 28.3.2 (LinuxKit 6.10.14, GCC 12.2). Both C/native core selections
+  pass 251 checks, both bootstrap fixed points execute, and M19–M26a
+  integrations pass except the initially reproduced M23 startup issue; after
+  TL-041 its complete C/native integration passes. Both C and native-runtime
+  ASan/UBSan selections pass all 117 runtime fixtures (assembly itself is not
+  instrumented). TSan task fixtures fail before user code with unexpected
+  memory mapping and exit 66. Final complete C/native runs each have 303 passes
+  and one M24 seccomp-installation failure, with no skips. Native Linux
+  kernel-policy execution remains VAL-004, and native Linux M25 timing has
+  not been established.
 - **Workaround:** retain the host-supported results and these explicit limits.
 - **Required work:** on Linux x86-64, run both bootstrap fixed points and the
   applicable C/native suites under ASan and TSan. See
@@ -1007,6 +1194,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M25 evidence:** eval/m25-static.json retains 373/373 coded diagnostics
   and 21 with edits. The guide remains within its estimate budget. No new
   model-driven agent trial was performed.
+- **M26 evidence:** eval/m26-static.json retains 373/373 coded diagnostics and
+  21 with edits. No model-driven agent comparison was run.
 - **Workaround:** use the static metrics and seeded repair checks as
   implementation evidence; do not claim measured agent improvements.
 - **Required work:** compare the guide and prior documentation conditions on
@@ -1039,6 +1228,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M25 measurement:** guide output remains 31,988 bytes (7,997 tokens by
   bytes/4); complete suites and static evaluation pass. The model-specific
   tokenizer measurement is still outstanding.
+- **M26 measurement:** guide output is 31,975 bytes, about 7,994 tokens by
+  bytes/4; actual model-specific counting remains outstanding.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.
@@ -1053,6 +1244,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   Wall/Wextra/Werror, pedantic and Wshadow using Debian bookworm libc/kernel
   headers. This verifies compilation only. The macOS C integration passes
   policy/constructor/file confinement and rejects unsupported unsafe+deny-net.
+- **M26 execution attempt:** Docker Desktop 28.3.2 runs Debian bookworm amd64
+  through Rosetta on this Apple Silicon host. C/native core execution and both
+  bootstraps pass, but `python3 tests/m24_test.py /work/build/vela` stops in
+  `basic` at `run --deny clock`, exit 126 with `seccomp enforcement failed
+  [E6011]`. This is an observed fail-closed result; Rosetta syscall mediation
+  is a suspected cause. It does not close Linux kernel-policy acceptance.
 - **Workaround:** use the tested macOS strict profile with its explicit
   fail-closed limitations; do not claim C socket denial was executed on Linux.
 - **Required work:** on Linux x86-64 with Landlock ABI 3+ enabled, run
@@ -1064,3 +1261,24 @@ the same entry. Close it with a commit or validation result; keep its history.
   restrictions. Exercise coverage under denied fs and the sanitizer selections.
 - **Acceptance:** retain kernel/ABI/toolchain/commit and actual commands/results.
   A cross-compiled object or successful safe wrapper is not the C syscall proof.
+
+### VAL-005: Complete native Windows platform acceptance
+
+- **Status:** open; discovered during M26.
+- **Evidence:** Windows x86-64 executables and the compiler cross-link with Zig
+  0.17.0. Under Wine 8 with LANG=C.UTF-8, independent C ABI and full Windows
+  systems oracles execute; the compiler checks itself and emits C identical
+  to the macOS compiler. These are emulator results, not native Windows tests.
+- **Impact:** Windows-host bootstrap, the complete supported suite and external
+  tool/editor integration cannot be inferred from cross-linking or Wine.
+- **Workaround:** retain the explicit Wine results and Windows CI core/system
+  job without claiming complete Windows acceptance. Restricted OS policies
+  are unsupported and fail closed; standalone builds are unrestricted.
+- **Required work:** run on Windows x86-64 with clang/MinGW, record toolchain
+  and source identities, both C bootstrap generations and supported full-suite
+  results. Port any remaining POSIX-specific fixture assumptions explicitly,
+  retaining equivalent C and systems coverage. Validate Unicode argv/env,
+  inherited handles, closure of process trees, full-duplex sockets and coverage.
+- **Acceptance:** retained native Windows commands/results and a complete
+  passing supported-suite inventory, with unavailable native-emitter/kernel
+  profiles named separately.

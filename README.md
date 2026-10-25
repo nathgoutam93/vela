@@ -203,3 +203,11 @@ fn main() {
     }
 }
 ```
+
+Platform work in progress: `vela build --target` selects Linux x86-64, macOS
+ARM64, Windows x86-64 (clang/MinGW), or WASI through the C backend.
+`VELA_TARGET_CC=zig` supplies a cross-toolchain; `VELA_SYSROOT` configures an
+SDK/sysroot for other clang toolchains. Windows restricted OS policies fail
+closed; WASI preview 1 runs tasks sequentially and returns unsupported errors
+for real process/socket APIs. See [M26](docs/m26-platforms.md) for commands,
+validated execution profiles and remaining acceptance work.

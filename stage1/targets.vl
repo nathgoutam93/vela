@@ -1,18 +1,65 @@
-// Native formats currently implemented. Cross-linking is a later M26 slice.
+// Target selection is independent of the backend. C toolchains own their ABI;
+// the native emitter supports only the two implemented assembly formats.
 import arm64
 import ir
 import os
 import x64
 pub fn host() -> Str uses os {
+    match os.env("OS") { Some(s) => { if s == "Windows_NT" { return "x86_64-w64-windows-gnu" } }, None => {} }
     match os.output(["uname", "-sm"]) { Ok(s) => { if s == "Darwin arm64\n" { return "aarch64-apple-darwin" }; if s == "Linux x86_64\n" { return "x86_64-unknown-linux-gnu" } }, Err(_) => {} }; return "unsupported"
 }
 pub fn normalize(name: Str) -> Str uses os {
     if name == "" || name == "native" { let h = host(); if h != "unsupported" { return h } }
     if name == "arm64-apple-darwin" || name == "aarch64-apple-darwin" { return "aarch64-apple-darwin" }
     if name == "x86_64-unknown-linux-gnu" || name == "x86_64-linux-gnu" { return "x86_64-unknown-linux-gnu" }
-    fail("unsupported native target '" + name + "'; use aarch64-apple-darwin or x86_64-unknown-linux-gnu")
+    if name == "x86_64-w64-windows-gnu" || name == "x86_64-windows-gnu" { return "x86_64-w64-windows-gnu" }
+    if name == "wasm32-wasi" || name == "wasm32-wasip1" { return "wasm32-wasi" }
+    fail("unsupported target '" + name + "'; use aarch64-apple-darwin, x86_64-unknown-linux-gnu, x86_64-w64-windows-gnu or wasm32-wasi")
     return ""
 }
-pub fn require_host(name: Str) uses os { let target = normalize(name); if target != host() { fail("cross-linking target '" + target + "' is not implemented; use asm --target to emit assembly") } }
-pub fn program(p: ir.Program, name: Str) -> Str uses os { let target = normalize(name); if target == "aarch64-apple-darwin" { return arm64.program(p) }; return x64.program(p) }
+pub fn selected(name: Str) -> Str uses os { if name == "" { return host() }; return normalize(name) }
+pub fn native_supported(name: Str) -> Bool { return name == "aarch64-apple-darwin" || name == "x86_64-unknown-linux-gnu" }
+pub fn require_native(name: Str) uses os { let target = normalize(name); if !native_supported(target) { fail("unsupported native target '" + target + "'; use the C backend") } }
+pub fn program(p: ir.Program, name: Str) -> Str uses os { let target = normalize(name); require_native(target); if target == "aarch64-apple-darwin" { return arm64.program(p) }; return x64.program(p) }
+// VELA_TARGET_CC is one executable, never shell text. A wrapper can supply
+// arbitrary toolchain arguments; zig is the supported multiword driver.
+pub fn compiler(name: Str) -> [Str] uses os {
+    let mut cc = "cc"
+    if name != "" && selected(name) != host() { cc = "clang" }
+    match os.env("VELA_CC") { Some(value) => cc = value, None => {} }
+    if name != "" { match os.env("VELA_TARGET_CC") { Some(value) => cc = value, None => {} } }
+    if cc == "zig" { return [cc, "cc"] }
+    return [cc]
+}
+pub fn assembly_flags(name: Str) -> [Str] uses os {
+    let target = selected(name)
+    let mut out: [Str] = []
+    let cc = compiler(name)[0]
+    if name != "" && (target != host() || cc == "zig") {
+        let mut triple = target
+        if cc == "zig" {
+            if target == "aarch64-apple-darwin" { triple = "aarch64-macos" }
+            if target == "x86_64-unknown-linux-gnu" { triple = "x86_64-linux-gnu" }
+            if target == "x86_64-w64-windows-gnu" { triple = "x86_64-windows-gnu" }
+        }
+        push(mut out, "--target=" + triple)
+    }
+    match os.env("VELA_SYSROOT") { Some(root) => { if root != "" { push(mut out, "--sysroot=" + root) } }, None => {} }
+    return out
+}
+pub fn flags(name: Str) -> [Str] uses os {
+    let mut out = assembly_flags(name)
+    if selected(name) != "wasm32-wasi" { push(mut out, "-pthread") }
+    return out
+}
+pub fn libraries(name: Str) -> [Str] uses os {
+    if selected(name) == "x86_64-w64-windows-gnu" { return ["-lws2_32", "-lshell32"] }
+    return []
+}
 fn fail(s: Str) uses os { os.eprint("vela: " + s + " [E6001]"); os.exit(1) }
+
+test "C data models are target-specific" {
+    assert(native_supported("aarch64-apple-darwin"))
+    assert(native_supported("x86_64-unknown-linux-gnu"))
+    assert(!native_supported("wasm32-wasi"))
+}

@@ -2672,18 +2672,25 @@ fn c_builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
             let mut size = 8
             if types.is_integer(t) { size = types.integer_width(t) / 8 }
             if t == types.BOOL() { size = 1 }
-            let raw = "vela_c_load(" + a + ", " + strings.from_int(size) + ", " + loc + ")"
+            let mut width = strings.from_int(size)
+            if t == cffi.PTR() { width = "sizeof(void *)" }
+            if t == cffi.FN() { width = "sizeof(vela_c_fn)" }
+            let raw = "vela_c_load(" + a + ", " + width + ", " + loc + ")"
             if t == cffi.PTR() { call = "(void *)(uintptr_t)" + raw } else if t == cffi.FN() { call = "vela_c_fn_from_bits(" + raw + ")" } else if t == types.BOOL() { call = "(" + raw + " != 0)" } else { call = fixed_decoded(g, t, raw) }
         }
     } else if name == "store" {
         let value_type = ty(g, args[1])
         if value_type == types.FLOAT() { call = "vela_c_store_double(" + a + ", " + b + ", " + loc + ")" } else {
             let mut size = 8
-            let mut raw = "(uint64_t)(uintptr_t)" + b
+            let mut raw = "(uint64_t)" + b
+            if value_type == cffi.PTR() { raw = "(uint64_t)(uintptr_t)" + b }
             if types.is_integer(value_type) { size = types.integer_width(value_type) / 8 }
             if value_type == types.BOOL() { size = 1 }
             if value_type == cffi.FN() { raw = "vela_c_fn_bits(" + b + ")" }
-            call = "vela_c_store(" + a + ", " + raw + ", " + strings.from_int(size) + ", " + loc + ")"
+            let mut width = strings.from_int(size)
+            if value_type == cffi.PTR() { width = "sizeof(void *)" }
+            if value_type == cffi.FN() { width = "sizeof(vela_c_fn)" }
+            call = "vela_c_store(" + a + ", " + raw + ", " + width + ", " + loc + ")"
         }
     } else {
         if b != "" { call = call + ", " + b }

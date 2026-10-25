@@ -414,21 +414,33 @@ fn last_slash(path: Str) -> Int {
     return i
 }
 
-pub fn dirname(path: Str) -> Str {
+// Absolute Windows paths may arrive from editors or Python on Windows.
+fn windows_spelling(path: Str) -> Str {
+    if !(len(path) > 2 && path[1] == ':' || len(path) > 1 && path[0] == '\\' && path[1] == '\\') { return path }
+    let mut out = strings.builder()
+    for b in path { if b == '\\' { strings.add_byte(mut out, '/') } else { strings.add_byte(mut out, b) } }
+    return strings.build(out)
+}
+pub fn rooted(path: Str) -> Bool {
+    return len(path) > 0 && path[0] == '/' || len(path) > 2 && path[1] == ':' && (path[2] == '/' || path[2] == '\\')
+}
+pub fn dirname(input: Str) -> Str {
+    let path = windows_spelling(input)
     let i = last_slash(path)
     if i < 0 {
         return ""
     }
     let mut end = i + 1
     // Trailing slashes go, unless the directory is the root.
-    for end > 1 && path[end - 1] == '/' {
+    for end > 1 && !(end == 3 && path[1] == ':') && path[end - 1] == '/' {
         end = end - 1
     }
     return path[0..end]
 }
 
-pub fn join(dir: Str, name: Str) -> Str {
-    if len(name) > 0 && name[0] == '/' || dir == "" {
+pub fn join(directory: Str, filename: Str) -> Str {
+    let dir = windows_spelling(directory); let name = windows_spelling(filename)
+    if rooted(name) || dir == "" {
         return name
     }
     if dir[len(dir) - 1] == '/' {
@@ -438,7 +450,8 @@ pub fn join(dir: Str, name: Str) -> Str {
 }
 
 // The file name without its last extension: "main" for "src/main.vl".
-pub fn stem(path: Str) -> Str {
+pub fn stem(input: Str) -> Str {
+    let path = windows_spelling(input)
     let name = path[last_slash(path) + 1..len(path)]
     let mut dot = len(name) - 1
     for dot > 0 && name[dot] != '.' {
@@ -452,18 +465,22 @@ pub fn stem(path: Str) -> Str {
 
 // The same path with `.` parts and `x/..` pairs gone, so two spellings of
 // one file give one key.
-pub fn normpath(path: Str) -> Str {
-    let absolute = len(path) > 0 && path[0] == '/'
+pub fn normpath(input: Str) -> Str {
+    let path = windows_spelling(input)
+    let absolute = rooted(path)
+    let drive = len(path) > 2 && path[1] == ':' && path[2] == '/'
+    let unc = len(path) > 1 && path[0] == '/' && path[1] == '/'
     let mut parts: [Str] = []
     let mut start = 0
-    for i in 0..len(path) + 1 {
+    if drive { start = 3 }
+    for i in start..len(path) + 1 {
         if i == len(path) || path[i] == '/' {
             let part = path[start..i]
             start = i + 1
             if part == "" || part == "." {
                 continue
             }
-            if part == ".." && len(parts) > 0 && parts[len(parts) - 1] != ".." {
+            if part == ".." && len(parts) > 0 && (!unc || len(parts) > 2) && parts[len(parts) - 1] != ".." {
                 parts = parts[0..len(parts) - 1]
             } else if part == ".." && absolute {
                 continue
@@ -473,6 +490,8 @@ pub fn normpath(path: Str) -> Str {
         }
     }
     let mut b = strings.builder()
+    if drive { strings.add(mut b, path[0..2]) }
+    if unc { strings.add_byte(mut b, '/') }
     if absolute {
         strings.add_byte(mut b, '/')
     }
@@ -500,4 +519,12 @@ test "paths" {
 
 pub fn builtin_modules() -> [Str] {
     return ["sysio", "clock", "memory", "maps", "files", "os", "strings", "tasks", "math", "ints", "c"]
+}
+
+test "Windows absolute paths retain their roots" {
+    assert(dirname("C:/main.vl") == "C:/")
+    assert(dirname("C:\\src\\main.vl") == "C:/src")
+    assert(join("a", "C:/src/main.vl") == "C:/src/main.vl")
+    assert(normpath("C:/../src/./main.vl") == "C:/src/main.vl")
+    assert(normpath("\\\\server\\share\\main.vl") == "//server/share/main.vl")
 }

@@ -1,15 +1,29 @@
-// LP64 zlib binding. Sizes and return codes follow https://zlib.net/manual.html.
+// Platform C ABI zlib binding. Sizes and return codes follow https://zlib.net/manual.html.
 import c
 extern fn compressBound(source_len: c.ULong) -> c.ULong uses unsafe
 extern fn compress2(dest: c.Ptr, dest_len: mut c.ULong, source: c.Ptr, source_len: c.ULong, level: c.Int) -> c.Int uses unsafe
 extern fn uncompress(dest: c.Ptr, dest_len: mut c.ULong, source: c.Ptr, source_len: c.ULong) -> c.Int uses unsafe
 
+// C unsigned long is u64 on LP64 and u32 on Windows. Build the checked value
+// using existing integer operations, without assuming an alias cast function.
+fn ulong(value: Int) -> c.ULong requires value >= 0 {
+    let mut remaining = value
+    let mut result: c.ULong = 0
+    let mut bit: c.ULong = 1
+    for remaining > 0 {
+        if remaining & 1 == 1 { result = result | bit }
+        remaining = remaining >> 1
+        if remaining > 0 { bit = bit * 2 }
+    }
+    return result
+}
+
 // The result owns a copy; no C pointer or unsafe effect escapes this wrapper.
 pub fn compress(data: Str, level: c.Int) -> Result[Str, Int] {
     unsafe {
-        let mut size = compressBound(u64(len(data)))
+        let mut size = compressBound(ulong(len(data)))
         let dest = c.alloc(int(size))
-        let code = compress2(dest, mut size, c.data(data), u64(len(data)), level)
+        let code = compress2(dest, mut size, c.data(data), ulong(len(data)), level)
         let mut result: Result[Str, Int] = Err(int(code))
         if code == 0 { result = Ok(c.bytes(dest, int(size))) }
         c.free(dest)
@@ -21,8 +35,8 @@ pub fn decompress(data: Str, expected_size: Int) -> Result[Str, Int] {
     if expected_size < 0 { return Err(-2) }
     unsafe {
         let dest = c.alloc(expected_size)
-        let mut size = u64(expected_size)
-        let code = uncompress(dest, mut size, c.data(data), u64(len(data)))
+        let mut size = ulong(expected_size)
+        let code = uncompress(dest, mut size, c.data(data), ulong(len(data)))
         let mut result: Result[Str, Int] = Err(int(code))
         if code == 0 { result = Ok(c.bytes(dest, int(size))) }
         c.free(dest)

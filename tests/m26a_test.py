@@ -22,11 +22,11 @@ def target(c,w,env):
     x86=command(c,env,'asm',p,'--target',X86).stdout
     assert '__TEXT,__text' in arm and 'stp x29, x30' in arm and '.globl _main' in arm
     assert '.intel_syntax' in x86 and '.globl main' in x86
-    for value in ('missing-target','aarch64-unknown-linux-gnu','wasm32-wasi'):
-        r=command(c,env,'asm','--target',value,p,code=1);assert 'E6001' in r.stderr and 'unsupported native target' in r.stderr
+    for value in ('missing-target','aarch64-unknown-linux-gnu'):
+        r=command(c,env,'asm','--target',value,p,code=1);assert 'E6001' in r.stderr and 'unsupported target' in r.stderr
     if (platform.system(),platform.machine())==('Darwin','arm64'):
-        r=command(c,env,'build','--target',X86,p,'-o',w/'cross',code=1)
-        assert 'cross-linking' in r.stderr and 'E6001' in r.stderr and not (w/'cross').exists()
+        r=command(c,{**env,'VELA_TARGET_CC':str(w/'missing-toolchain')},'build','--target',X86,p,'-o',w/'cross',code=1)
+        assert 'could not be run' in r.stderr and 'E6001' in r.stderr and not (w/'cross').exists()
         for name in (ARM,'arm64-apple-darwin','native'):
             command(c,{**env,'VELA_BACKEND':'c'},'build','--target',name,p,'-o',w/'target')
             r=subprocess.run([str(w/'target')],capture_output=True,text=True);assert (r.returncode,r.stdout)==(0,'target\n'),r

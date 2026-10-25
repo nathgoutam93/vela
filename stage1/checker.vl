@@ -72,6 +72,7 @@ type ClosureCtx = struct {
 }
 
 pub type Checked = struct {
+    target: Str
     errors: [errors.CompileError]  // sorted
     warnings: [errors.CompileError]  // sorted; they do not stop the program from compiling
     table: types.Table
@@ -112,6 +113,7 @@ type BoundUse = struct { module: Int, line: Int, col: Int, owner: Str, param: In
 type KeyUse = struct { module: Int, line: Int, col: Int, actual: Int }
 
 type Checker = struct {
+    target: Str
     library: Bool
     unsafe_depth: Int
     escaped: Map[Int, Bool]
@@ -160,6 +162,10 @@ pub fn check_program(loaded: modules.Loaded, for_tests: Bool) -> Checked {
 // The program checked as for its tests, noting what is in scope where the
 // name `name` is (see Completion).
 pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> Checked {
+    return check_target(loaded, for_tests, name, "")
+}
+
+pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: Str) -> Checked {
     let mut ty: [Int] = []
     let mut refs: [Ref] = []
     let mut breaks: [Bool] = []
@@ -171,7 +177,7 @@ pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> C
         push(mut targs, [])
     }
     let mut c = Checker {
-        library: for_tests, unsafe_depth: 0, escaped: [:], signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
+        target: target, library: for_tests, unsafe_depth: 0, escaped: [:], signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
         undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
@@ -196,6 +202,7 @@ pub fn check_completing(loaded: modules.Loaded, for_tests: Bool, name: Str) -> C
     program(mut c, for_tests)
     validate_fixed(mut c)
     return Checked {
+        target: target,
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
         locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
         completion: c.completion, escaped: c.escaped,
@@ -627,7 +634,7 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
     if t.module == "c" {
         let module = module_in_type(mut c, t.line, t.col, "c")
         if module < 0 { return types.ERROR() }
-        let id = cffi.type_id(t.name)
+        let id = cffi.type_id_for(t.name, c.target)
         if id < 0 || len(t.args) != 0 { report(mut c, t.line, t.col, "E3202", "unknown or parameterized C type c." + t.name); return types.ERROR() }
         return id
     }

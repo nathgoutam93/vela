@@ -8,6 +8,7 @@ Rust, built with small sizes, must print the same. No timing; run
 import subprocess
 import sys
 from pathlib import Path
+from hosts import native_supported
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -15,7 +16,8 @@ ROOT = Path(__file__).resolve().parent.parent
 def main() -> int:
     compiler = sys.argv[1:] or [str(ROOT / "build" / "vela")]
     ran = subprocess.run([sys.executable, str(ROOT / "bench" / "run.py"), "--quick", "--check", "--compiler",
-                          str(Path(compiler[0]).resolve())], capture_output=True, text=True)
+                          str(Path(compiler[0]).resolve()), "--languages",
+                          *(["c", "rust", "vela", "vela-native"] if native_supported() else ["c", "rust", "vela"])], capture_output=True, text=True)
     sys.stdout.write(ran.stdout)
     sys.stderr.write(ran.stderr)
     return ran.returncode

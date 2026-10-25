@@ -216,7 +216,7 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
         push(mut out, Item { name: name, kind: "module", detail: "import " + name, doc: doc })
     }
     for name in ["print", "len", "push", "int", "float", "byte", "assert"] {
-        push(mut out, builtin_item(name, name))
+        push(mut out, builtin_item(name, name, k.target))
     }
     for name in ["Int", "Float", "Bool", "Byte", "Str", "Option", "Result", "Map", "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "Eq", "Ord", "Key"] {
         push(mut out, Item { name: name, kind: "built-in", detail: name, doc: "A built-in type." })
@@ -235,8 +235,8 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
     return out
 }
 
-fn builtin_item(name: Str, written: Str) -> Item {
-    let info = index.builtin_info(written)
+fn builtin_item(name: Str, written: Str, target: Str) -> Item {
+    let info = index.builtin_info_for(written, target)
     if len(info) == 2 {
         return Item { name: name, kind: "function", detail: info[0], doc: info[1] }
     }
@@ -267,7 +267,7 @@ fn module_items(k: checker.Checked, target: Int) -> [Item] {
     }
     if m.is_std {
         for f in m.std {
-            push(mut out, builtin_item(f, m.name + "." + f))
+            push(mut out, builtin_item(f, m.name + "." + f, k.target))
         }
         if m.name == "sysio" { push(mut out, Item { name: "Handle", kind: "type", detail: "sysio.Handle", doc: "Owning external I/O resource; copies alias the connection." }) }
         if m.name == "strings" {

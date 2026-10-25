@@ -1,4 +1,4 @@
-// The current C ABI profile: LP64 POSIX (macOS ARM64 and Linux x86-64).
+// C scalar aliases for LP64 POSIX, Windows LLP64 and WASI ILP32.
 // Pointer types are nominal; numeric aliases keep their Vela representation.
 pub fn PTR() -> Int { return 14 }
 pub fn FN() -> Int { return 15 }
@@ -6,7 +6,13 @@ pub fn pointer(t: Int) -> Bool { return t == PTR() || t == FN() }
 pub fn type_names() -> [Str] {
     return ["Int", "UInt", "Short", "UShort", "Long", "ULong", "LongLong", "ULongLong", "Size", "SSize", "Char", "SChar", "UChar", "Bool", "Float", "Double", "Ptr", "Fn"]
 }
-pub fn type_id(name: Str) -> Int {
+pub fn type_id(name: Str) -> Int { return type_id_for(name, "") }
+pub fn type_id_for(name: Str, target: Str) -> Int {
+    if target == "x86_64-w64-windows-gnu" && (name == "Long" || name == "ULong") { if name == "Long" { return 10 }; return 12 }
+    if target == "wasm32-wasi" {
+        if name == "Long" || name == "SSize" { return 10 }
+        if name == "ULong" || name == "Size" { return 12 }
+    }
     return match name {
         "Int" => 10, "UInt" => 12, "Short" => 9, "UShort" => 11,
         "Long" => 1, "ULong" => 13, "LongLong" => 1, "ULongLong" => 13,
@@ -48,4 +54,14 @@ pub fn signature(name: Str) -> Str {
         "callback" => "c.callback(top_level_function) -> c.Fn uses unsafe",
         _ => "",
     }
+}
+
+test "target C integer widths" {
+    assert(type_id_for("Long", "x86_64-w64-windows-gnu") == 10)
+    assert(type_id_for("ULong", "x86_64-w64-windows-gnu") == 12)
+    assert(type_id_for("Size", "x86_64-w64-windows-gnu") == 13)
+    assert(type_id_for("Size", "wasm32-wasi") == 12)
+    assert(type_id_for("SSize", "wasm32-wasi") == 10)
+    assert(type_id_for("LongLong", "wasm32-wasi") == 1)
+    assert(type_id_for("Long", "aarch64-apple-darwin") == 1)
 }

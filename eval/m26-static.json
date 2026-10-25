@@ -1,0 +1,87 @@
+{
+  "diagnostics": {
+    "diagnostics": 373,
+    "with_code": 373,
+    "with_fix": 21
+  },
+  "reading": {
+    "README": {
+      "bytes": 12194,
+      "tokens": 3048
+    },
+    "README and walkthroughs": {
+      "bytes": 678357,
+      "tokens": 169589
+    },
+    "std": {
+      "bytes": 42033,
+      "tokens": 10508
+    },
+    "vela guide": {
+      "bytes": 31975,
+      "tokens": 7993
+    }
+  },
+  "questions": [
+    {
+      "question": "What is the type of this name?",
+      "answered": "yes",
+      "how": "vela query type"
+    },
+    {
+      "question": "Where is it defined?",
+      "answered": "yes",
+      "how": "vela query def"
+    },
+    {
+      "question": "Where is it used?",
+      "answered": "yes",
+      "how": "vela query refs"
+    },
+    {
+      "question": "What can go here?",
+      "answered": "yes",
+      "how": "vela query complete"
+    },
+    {
+      "question": "Rename it without changing what any other name means",
+      "answered": "yes",
+      "how": "vela query rename"
+    },
+    {
+      "question": "What is declared in this file?",
+      "answered": "yes",
+      "how": "vela query symbols"
+    },
+    {
+      "question": "What does this function touch and promise?",
+      "answered": "yes",
+      "how": "vela query type: signature with uses, requires, ensures"
+    },
+    {
+      "question": "Who calls this function?",
+      "answered": "partly",
+      "how": "query impact lists conservative transitive dependents, including possible indirect callers"
+    },
+    {
+      "question": "What is this module's public API?",
+      "answered": "yes",
+      "how": "vela query summary: public signatures, effects, contracts and types"
+    },
+    {
+      "question": "Which tests cover this function?",
+      "answered": "yes",
+      "how": "vela query coverage TARGET --report REPORT uses measured Vela entry hits; without a report it lists static possibilities"
+    },
+    {
+      "question": "What breaks if I change this signature?",
+      "answered": "partly",
+      "how": "vela query impact lists potential dependencies; the proposed signature still needs type checking"
+    },
+    {
+      "question": "What does this error mean, and how do I fix it?",
+      "answered": "yes",
+      "how": "vela explain CODE; vela check --json includes edits; vela fix applies them"
+    }
+  ]
+}

@@ -29,10 +29,12 @@ done
 cd "$(dirname "$0")/.."
 cc=${VELA_CC:-cc}
 build=build
+platform_libs=
+case "${OS:-}" in Windows_NT) platform_libs="-lws2_32 -lshell32" ;; esac
 mkdir -p "$build"
 
 compile() {  # compile C_FILE EXE
-    $cc -std=c11 -O2 -pthread -I runtime "$1" runtime/vela_rt.c -lm -o "$2"
+    $cc -std=c11 -O2 -pthread -I runtime "$1" runtime/vela_rt.c -lm $platform_libs -o "$2"
 }
 
 echo "generation 1: the seed, compiled by $cc"

@@ -172,8 +172,14 @@ def real_processes(c,w,env):
     script='import sys; data=sys.stdin.buffer.read(); sys.stdout.buffer.write(data[::-1]); sys.stderr.buffer.write(b"e"*90000); sys.exit(7)'
     source='import processes\nimport text\n'+HELPER+'\nfn main(){let input=text.repeat("abc",50000);let p=get(processes.run(['+quote(sys.executable)+',"-c",'+quote(script)+'],input));assert(p.status==7 && len(p.stdout)==150000 && p.stdout[0..3]=="cba" && len(p.stderr)==90000);'
     source+='bad(processes.run(["/definitely/missing/vela-command"],""));bad(processes.communicate(["/bin/sh","-c","sleep 10"],"",1024,30));bad(processes.communicate(["/bin/sh","-c","printf 12345"],"",4,1000));'
+    source+='assert(get(processes.run(["/bin/sh","-c","exit 127"],"")).status==127);'
     source+='let early=get(processes.run(["/bin/sh","-c","exec 0<&-; printf done"],input));assert(early.stdout=="done");}\n'
+    if os.name == "nt":
+        source=source.replace("/bin/sh",str(Path(shutil.which("sh")).resolve()).replace("\\","/"))
     program(c,w,env,source)
+    if os.name == "nt":
+        print("M23: POSIX closed-descriptor spawn oracle unavailable on Windows",flush=True)
+        return
     # Inherited closed stdin must not make pipe source descriptors collide with
     # the child standard descriptors used by posix_spawn's dup2/close actions.
     _,exe=build(c,w,env,'import processes\n'+HELPER+'\nfn main(){assert(get(processes.run(["/bin/cat"],"input")).stdout=="input")}')

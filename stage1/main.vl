@@ -187,10 +187,9 @@ fn target_command(command: Str, words: [Str], root: Str) uses fs, os {
         } else { if path != "" || len(word) > 0 && word[0] == '-' { usage() }; path = word }
     }
     if path == "" { usage() }
-    if command == "asm" { let out = targets.program(lowered(path, native_program(path, checked(path, root), false)), target); print(out[0..len(out) - 1]); return }
+    if command == "asm" { targets.require_native(target); let out = targets.program(lowered(path, native_program(path, checked_target(path, root, false, target), false)), target); print(out[0..len(out) - 1]); return }
     if output == "" { output = default_output(path) }
-    if target != "" { targets.require_host(target) }
-    build_from(path, output, root, false, checked(path, root), link_flags(path), target)
+    build_from(path, output, root, false, checked_target(path, root, false, target), link_flags(path), target)
 }
 
 fn usage() uses os {
@@ -269,11 +268,15 @@ fn checked(path: Str, root: Str) -> checker.Checked uses fs, os {
 }
 
 fn checked_mode(path: Str, root: Str, library: Bool) -> checker.Checked uses fs, os {
+    return checked_target(path, root, library, "")
+}
+
+fn checked_target(path: Str, root: Str, library: Bool, target: Str) -> checker.Checked uses fs, os {
     let loaded = load(path, read(path), root)
     if len(loaded.errors) > 0 {
         fail(path, loaded.errors)
     }
-    let result = checker.check_program(loaded, library)
+    let result = checker.check_target(loaded, library, "", targets.selected(target))
     if len(result.errors) > 0 {
         fail(path, errors.merged(result.errors, result.warnings))
     }
@@ -438,13 +441,13 @@ fn build(path: Str, exe: Str, root: Str, quick: Bool) uses fs, os {
 }
 // Admission and generation use the same immutable source/link snapshot.
 fn build_from(path: Str, exe: Str, root: Str, quick: Bool, k: checker.Checked, libraries: [Str], target: Str) uses fs, os {
-    if target != "" || native(quick) {
-        targets.require_host(target)
+    if native(quick) {
+        targets.require_native(target)
         let p = lowered(path, native_program(path, k, false))
-        assemble(targets.program(p, target), modules.stem(path), exe, root, "-O2", libraries)
+        assemble(targets.program(p, target), modules.stem(path), exe, root, "-O2", libraries, target)
         return
     }
-    compile(c_code(path, codegen.generate(k)), modules.stem(path), exe, root, "-O2", libraries)
+    compile(c_code(path, codegen.generate(k)), modules.stem(path), exe, root, "-O2", libraries, target)
 }
 
 // VELA_BACKEND=c or VELA_BACKEND=native picks the backend. Otherwise `vela
@@ -459,7 +462,7 @@ fn native(quick: Bool) -> Bool uses os {
     if !quick {
         return false
     }
-    return targets.host() != "unsupported"
+    return targets.native_supported(targets.host())
 }
 
 // The IR, optimized (opt.vl) unless VELA_OPT=0.
@@ -501,20 +504,17 @@ fn lowered(path: Str, made: Result[ir.Program, [errors.CompileError]]) -> ir.Pro
 
 // Assembly into a scratch directory, assembled by the C compiler at the
 // same time as it compiles the runtime (optimizing at `opt`), then linked.
-fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]) uses fs, os {
+fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str], target: Str) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
         Err(e) => driver_error(e)
     }
-    let mut cc = "cc"
-    match os.env("VELA_CC") {
-        Some(name) => cc = name
-        None => {}
-    }
-    let mut flags: [Str] = []
+    let compiler = targets.compiler(target)
+    let cc = compiler[0]
+    let mut flags = targets.flags(target)
     match os.env("VELA_CFLAGS") {
-        Some(f) => flags = split_flags(f)
+        Some(f) => { for word in split_flags(f) { push(mut flags, word) } }
         None => {}
     }
     let runtime = modules.join(root, "runtime")
@@ -525,7 +525,8 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]
     }
     let program_o = modules.join(tmp, "program.o")
     let mut runtime_o = modules.join(tmp, "runtime.o")
-    let mut rt = [cc, "-std=c11", opt, "-pthread"]
+    let mut rt = compiler
+    for word in ["-std=c11", opt] { push(mut rt, word) }
     for f in flags {
         push(mut rt, f)
     }
@@ -533,12 +534,13 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]
         push(mut rt, word)
     }
     // The runtime from the cache when it is there (M16b).
-    let cached = cached_runtime(root, cc, opt, flags)
+    let cached = cached_runtime(root, join_words(compiler), opt, flags, target)
     let have = cached != "" && exists(cached)
-    let mut commands = [[cc, "-c", source, "-o", program_o], rt]
-    if have {
-        commands = [[cc, "-c", source, "-o", program_o]]
-    }
+    let mut assembler = compiler
+    for f in targets.assembly_flags(target) { push(mut assembler, f) }
+    for word in ["-c", source, "-o", program_o] { push(mut assembler, word) }
+    let mut commands = [assembler, rt]
+    if have { commands = [assembler] }
     let codes = tasks.map(commands, fn(command) {
         match os.run(command) {
             Ok(code) => return code
@@ -562,10 +564,11 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]
         runtime_o = cached
     }
     if len(failed) == 0 {
-        let mut link = [cc, "-pthread"]
+        let mut link = compiler
         for f in flags {
             push(mut link, f)
         }
+        for f in targets.libraries(target) { push(mut link, f) }
         for word in [program_o, runtime_o, "-lm", "-o", exe] {
             push(mut link, word)
         }
@@ -588,6 +591,7 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]
     files.remove(tmp)
     if len(failed) > 0 {
         if linking_failed { driver_error("linker rejected the program; check extern symbols and link entries in vela.mod\ncommand: " + join_words(failed)) }
+        if target != "" && targets.selected(target) != targets.host() { driver_error("target toolchain rejected assembly/runtime for " + targets.selected(target) + "; check VELA_TARGET_CC, VELA_SYSROOT and VELA_CFLAGS\ncommand: " + join_words(failed)) }
         internal_error("the assembler or linker rejected the generated code\ncommand: " + join_words(failed))
     }
 }
@@ -608,25 +612,23 @@ fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str uses 
 // where the C may be cut, and every part starts with what all of them
 // need (types, memory functions, prototypes). Building the compiler takes
 // a third of the time on four cores.
-fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]) uses fs, os {
+fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str], target: Str) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
         Err(e) => driver_error(e)
     }
-    let mut cc = "cc"
-    match os.env("VELA_CC") {
-        Some(name) => cc = name
-        None => {}
-    }
-    let mut flags: [Str] = []
+    let compiler = targets.compiler(target)
+    let cc = compiler[0]
+    let mut flags = targets.flags(target)
     match os.env("VELA_CFLAGS") {
-        Some(f) => flags = split_flags(f)
+        Some(f) => { for word in split_flags(f) { push(mut flags, word) } }
         None => {}
     }
     let runtime = modules.join(root, "runtime")
     // -pthread: the runtime runs tasks on threads.
-    let mut base = [cc, "-std=c11", opt, "-pthread"]
+    let mut base = compiler
+    for word in ["-std=c11", opt] { push(mut base, word) }
     for f in flags {
         push(mut base, f)
     }
@@ -636,7 +638,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [
     let mut written: [Str] = []
     let mut objects: [Str] = []
     // The runtime once per set of flags, from the cache when it is there.
-    let cached = cached_runtime(root, cc, opt, flags)
+    let cached = cached_runtime(root, join_words(compiler), opt, flags, target)
     let have = cached != "" && exists(cached)
     // About 400 KB of C per unit before another is worth starting.
     let units = c_parts(c_source, tasks.workers(), 400000)
@@ -677,7 +679,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [
             failed = commands[i]
         }
     }
-    let mut link = [cc, "-pthread"]
+    let mut link = compiler
     for f in flags {
         push(mut link, f)
     }
@@ -685,6 +687,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [
         push(mut link, o)
     }
     for library in libraries { push(mut link, library) }
+    for f in targets.libraries(target) { push(mut link, f) }
     push(mut link, "-lm")  // math.sqrt
     push(mut link, "-o")
     push(mut link, exe)
@@ -714,6 +717,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [
     files.remove(tmp)
     if len(failed) > 0 {
         if linking_failed { driver_error("linker rejected the program; check extern symbols and link entries in vela.mod\ncommand: " + join_words(failed)) }
+        if target != "" && targets.selected(target) != targets.host() { driver_error("target toolchain rejected C/runtime for " + targets.selected(target) + "; check VELA_TARGET_CC, VELA_SYSROOT and VELA_CFLAGS\ncommand: " + join_words(failed)) }
         internal_error("the C compiler rejected the generated code\ncommand: " + join_words(failed))
     }
 }
@@ -771,14 +775,14 @@ fn text_hash(text: Str, base: Int, modulus: Int) -> Int {
 
 // Where the runtime compiled with these flags is kept, named by a hash of
 // the flags and of the runtime's source; "" when there is no cache.
-fn cached_runtime(root: Str, cc: Str, opt: Str, flags: [Str]) -> Str uses fs, os {
+fn cached_runtime(root: Str, cc: Str, opt: Str, flags: [Str], target: Str) -> Str uses fs, os {
     let dir = cache_dir()
     if dir == "" {
         return ""
     }
     let mut b = strings.builder()
-    strings.add(mut b, targets.host() + "\n" + cc + "\n" + opt + "\n" + join_words(flags) + "\n")
-    for name in ["vela_rt.c", "vela_rt.h", "vela_int.h", "vela_sys.inc", "vela_policy.inc"] {
+    strings.add(mut b, targets.selected(target) + "\n" + cc + "\n" + opt + "\n" + join_words(flags) + "\n")
+    for name in ["vela_rt.c", "vela_rt.h", "vela_int.h", "vela_sys.inc", "vela_policy.inc", "vela_threads.h", "vela_policy_portable.inc", "vela_windows.h", "vela_windows_net.h", "vela_windows_process.inc"] {
         match files.read(modules.join(modules.join(root, "runtime"), name)) {
             Ok(t) => strings.add(mut b, t)
             Err(_) => return ""
@@ -978,7 +982,7 @@ fn check_json(path: Str, root: Str) uses fs, os {
             }
             errs = loaded.errors
             if len(errs) == 0 {
-                let k = checker.check_program(loaded, true)
+                let k = checker.check_target(loaded, true, "", targets.host())
                 failed = len(k.errors) > 0
                 errs = errors.merged(k.errors, k.warnings)
             } else {
@@ -1059,7 +1063,7 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
     if len(loaded.errors) > 0 {
         fail(path, loaded.errors)
     }
-    let k = checker.check_program(loaded, true)
+    let k = checker.check_target(loaded, true, "", targets.host())
     if len(k.errors) > 0 {
         fail(path, errors.merged(k.errors, k.warnings))
     }
@@ -1096,11 +1100,11 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
     if native(true) {
         let mut made = native_program(path, k, true)
         if options.coverage != "" { made = coverage_program(k) }
-        assemble(targets.program(lowered(path, made), ""), modules.stem(path) + "_tests", exe, root, "-O0", libraries)
+        assemble(targets.program(lowered(path, made), ""), modules.stem(path) + "_tests", exe, root, "-O0", libraries, "")
     } else {
         let mut made = codegen.generate_tests(k)
         if options.coverage != "" { made = codegen.generate_coverage_tests(k) }
-        compile(c_code(path, made), modules.stem(path) + "_tests", exe, root, "-O0", libraries)
+        compile(c_code(path, made), modules.stem(path) + "_tests", exe, root, "-O0", libraries, "")
     }
     let mut results: [json.Json] = []
     let mut failed = 0

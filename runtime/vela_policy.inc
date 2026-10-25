@@ -2,7 +2,13 @@
 #include <sys/resource.h>
 #include <limits.h>
 #if defined(__APPLE__)
+#if __has_include(<sandbox.h>)
 #include <sandbox.h>
+#else
+// Public ABI from the macOS SDK; Zig ships libSystem stubs without this header.
+int sandbox_init(const char *profile, uint64_t flags, char **errorbuf);
+void sandbox_free_error(char *errorbuf);
+#endif
 #elif defined(__linux__) && defined(__x86_64__)
 #include <sys/prctl.h>
 #include <sys/syscall.h>

@@ -67,6 +67,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from tests.hosts import native_supported
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -87,6 +88,7 @@ M23_TEST = TESTS / "m23_test.py"
 M24_TEST = TESTS / "m24_test.py"
 M26A_TEST = TESTS / "m26a_test.py"
 M25_TEST = TESTS / "m25_test.py"
+M26_TEST = TESTS / "m26_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -151,6 +153,18 @@ def read_expectations(path: Path) -> Expectations:
     return expect
 
 
+def timeout_details(label: str, exc: subprocess.TimeoutExpired, env: dict[str, str]) -> list[str]:
+    command = shlex.join(map(str, exc.cmd)) if isinstance(exc.cmd, (list, tuple)) else str(exc.cmd)
+    lines = [f"{label} timed out after {exc.timeout}s (outer workers: {env.get('VELA_TEST_JOBS', 'unspecified')})",
+             f"command: {command}"]
+    for name, value in (("stdout", exc.stdout), ("stderr", exc.stderr)):
+        if value:
+            if isinstance(value, bytes):
+                value = value.decode("utf-8", errors="replace")
+            lines += [f"partial {name}:", *value.splitlines()]
+    return lines
+
+
 def compare(what: str, expected: list[str], actual: str) -> list[str]:
     actual_lines = actual.splitlines()
     if actual_lines == expected:
@@ -177,6 +191,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(M17_TEST, compiler, env)
     if path == M26A_TEST:
         return run_script(M26A_TEST, compiler, env)
+    if path == M26_TEST:
+        return run_script(M26_TEST, compiler, env)
     if path == M25_TEST:
         return run_script(M25_TEST, compiler, env)
     if path == M24_TEST:
@@ -209,8 +225,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
                 cwd=path.parent, env=env, capture_output=True, text=True,
                 timeout=COMPILE_TIMEOUT,
             )
-        except subprocess.TimeoutExpired:
-            return [f"compiler took longer than {COMPILE_TIMEOUT}s"]
+        except subprocess.TimeoutExpired as exc:
+            return timeout_details("subprocess", exc, env)
 
         if kind == "fail":
             problems = []
@@ -232,8 +248,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
                 [str(exe), *expect.args], cwd=workdir, env=env, capture_output=True, text=True,
                 input="".join(line + "\n" for line in expect.stdin), timeout=RUN_TIMEOUT,
             )
-        except subprocess.TimeoutExpired:
-            return [f"program ran longer than {RUN_TIMEOUT}s"]
+        except subprocess.TimeoutExpired as exc:
+            return timeout_details("subprocess", exc, env)
         problems = compare("stdout", expect.out, ran.stdout)
         problems += compare("stderr", expect.err, ran.stderr)
         if ran.returncode != expect.exit:
@@ -251,8 +267,8 @@ def run_dump_test(compiler: list[str], path: Path, expect: Expectations,
             cwd=path.parent, env=env, capture_output=True, text=True,
             timeout=COMPILE_TIMEOUT,
         )
-    except subprocess.TimeoutExpired:
-        return [f"compiler took longer than {COMPILE_TIMEOUT}s"]
+    except subprocess.TimeoutExpired as exc:
+        return timeout_details("subprocess", exc, env)
     if dumped.returncode != 0:
         return [f"compiler exited with {dumped.returncode}:", *dumped.stderr.splitlines()]
     return compare(f"{expect.dump} dump", expect.out, dumped.stdout)
@@ -278,8 +294,8 @@ def run_cli_test(compiler: list[str], path: Path, expect: Expectations,
         try:
             ran = subprocess.run([*compiler, *words], cwd=workdir, env=env, capture_output=True, text=True,
                                  stdin=subprocess.DEVNULL, timeout=COMPILE_TIMEOUT + RUN_TIMEOUT)
-        except subprocess.TimeoutExpired:
-            return ["the command took too long"]
+        except subprocess.TimeoutExpired as exc:
+            return timeout_details("subprocess", exc, env)
         problems = []
         if expected_file.exists():
             expected_text = expected_file.read_text()
@@ -305,8 +321,8 @@ def run_vela_tests(compiler: list[str], path: Path, env: dict[str, str]) -> list
     try:
         ran = subprocess.run([*compiler, "test", "--allow", "unsafe", str(path.relative_to(ROOT))], cwd=ROOT, env=env,
                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=VELA_TEST_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return [f"vela test took longer than {VELA_TEST_TIMEOUT}s"]
+    except subprocess.TimeoutExpired as exc:
+        return timeout_details("subprocess", exc, env)
     if ran.returncode != 0:
         return [f"vela test exited with {ran.returncode}:", *ran.stdout.splitlines(), *ran.stderr.splitlines()]
     return []
@@ -317,8 +333,8 @@ def run_script(script: Path, compiler: list[str], env: dict[str, str]) -> list[s
     try:
         ran = subprocess.run([sys.executable, str(script), *compiler], env=env, stdin=subprocess.DEVNULL,
                              capture_output=True, text=True, timeout=VELA_TEST_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return [f"{script.name} took longer than {VELA_TEST_TIMEOUT}s"]
+    except subprocess.TimeoutExpired as exc:
+        return timeout_details("subprocess", exc, env)
     if ran.returncode != 0:
         return [*ran.stdout.splitlines(), *ran.stderr.splitlines()]
     return []
@@ -331,8 +347,8 @@ def run_nvim_test(compiler: list[str], env: dict[str, str]) -> list[str]:
     try:
         ran = subprocess.run(command, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True,
                              timeout=VELA_TEST_TIMEOUT)
-    except subprocess.TimeoutExpired:
-        return [f"the Neovim test took longer than {VELA_TEST_TIMEOUT}s"]
+    except subprocess.TimeoutExpired as exc:
+        return timeout_details("subprocess", exc, env)
     if ran.returncode != 0 or ran.stdout.strip() != "ok":
         return [f"nvim exited with {ran.returncode}:", *ran.stdout.splitlines(), *ran.stderr.splitlines()]
     return []
@@ -360,6 +376,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(M24_TEST)
     tests.append(M26A_TEST)
     tests.append(M25_TEST)
+    tests.append(M26_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:
@@ -385,17 +402,25 @@ def main() -> int:
                     help="compile every program with this backend (VELA_BACKEND); by default `vela build` uses C "
                          "and `vela run` and `vela test` the native backend")
     ap.add_argument("--native", action="store_true", help="the same as --backend native")
+    ap.add_argument("--jobs", type=int, default=4, metavar="N",
+                    help="outer test workers (default: 4; integration scripts may start their own workers)")
     args = ap.parse_args()
+    if args.jobs < 1:
+        ap.error("--jobs must be positive")
     global RUN_TIMEOUT
 
     if args.compiler:
         compiler = shlex.split(args.compiler)
+        # The compiler also runs from fixture and temporary directories.
+        if compiler and (Path(compiler[0]).exists() or os.sep in compiler[0]):
+            compiler[0] = str(Path(compiler[0]).resolve())
     else:
         compiler = [str(ROOT / "build" / "vela")]
         if not Path(compiler[0]).exists():
             print("build/vela does not exist yet; build it with: sh bootstrap/bootstrap.sh")
             return 1
     env = dict(os.environ)
+    env["VELA_TEST_JOBS"] = str(args.jobs)
     env.setdefault("VELA_CFLAGS", STRICT_CFLAGS)
     if args.sanitize:
         env["VELA_CFLAGS"] += SANITIZE_CFLAGS
@@ -405,6 +430,8 @@ def main() -> int:
     if args.native:
         args.backend = "native"
     if args.backend:
+        if args.backend == "native" and not native_supported():
+            ap.error("native execution is unavailable on this host; use --backend c")
         env["VELA_BACKEND"] = args.backend
     if args.tsan:
         env["VELA_CFLAGS"] += TSAN_CFLAGS
@@ -417,8 +444,14 @@ def main() -> int:
         print("no tests found")
         return 1
 
+    skipped = []
+    if not native_supported() and NATIVE_TEST in tests:
+        tests.remove(NATIVE_TEST)
+        skipped.append((NATIVE_TEST, "native execution is unavailable on this host"))
+    for path, reason in skipped:
+        print(f"SKIP  {path.relative_to(ROOT)}: {reason}", flush=True)
     failed = 0
-    with concurrent.futures.ThreadPoolExecutor() as pool:
+    with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
         results = pool.map(lambda t: run_test(compiler, t, env), tests)
         for test, problems in zip(tests, results):
             name = test.relative_to(ROOT)
@@ -431,7 +464,7 @@ def main() -> int:
                 print(f"ok    {name}")
 
     passed = len(tests) - failed
-    print(f"{passed} passed, {failed} failed  (compiler: {shlex.join(compiler)})")
+    print(f"{passed} passed, {failed} failed, {len(skipped)} skipped  (compiler: {shlex.join(compiler)})")
     return 1 if failed else 0
 
 

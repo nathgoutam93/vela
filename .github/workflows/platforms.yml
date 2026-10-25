@@ -1,0 +1,71 @@
+name: Platforms
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  posix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    env:
+      VELA_THREADS: 4
+      VELA_CACHE: ${{ github.workspace }}/build/cache-ci
+      XDG_STATE_HOME: ${{ github.workspace }}/build/xdg/state
+      XDG_CACHE_HOME: ${{ github.workspace }}/build/xdg/cache
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang libsqlite3-dev zlib1g-dev
+      - name: Bootstrap both backends
+        run: sh bootstrap/bootstrap.sh --native
+      - name: Complete C suite
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 4
+      - name: Complete native suite
+        run: python3 -u run_tests.py --compiler build/vela --backend native --jobs 4
+      - name: Linux address and undefined-behavior sanitizers
+        if: runner.os == 'Linux'
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --sanitize tests/run/ m23_test
+      - name: Linux thread sanitizer
+        if: runner.os == 'Linux'
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --tsan tests/run/tasks
+  windows:
+    runs-on: windows-2022
+    env:
+      VELA_M26_UNICODE: 'hé😀\value'
+      VELA_CC: clang
+      VELA_BACKEND: c
+      VELA_THREADS: 4
+      VELA_CACHE: build/cache-ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            git
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-python
+            mingw-w64-clang-x86_64-zlib
+            mingw-w64-clang-x86_64-sqlite3
+      - name: C bootstrap
+        shell: msys2 {0}
+        run: sh bootstrap/bootstrap.sh
+      - name: Core C fixtures and target ABI/cache oracles
+        shell: msys2 {0}
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ tests/fail/ tests/dump/ m26_test
+      - name: Windows systems oracle
+        shell: msys2 {0}
+        run: |
+          clang tests/fixtures/m26/process_helper.c -o build/process-helper.exe
+          build/vela build tests/fixtures/m26/windows_systems.vl -o build/windows-systems.exe
+          printf 'parent input' | build/windows-systems.exe "$PWD/build/process-helper.exe" "hé😀"

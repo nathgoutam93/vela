@@ -1,0 +1,29 @@
+import net
+import os
+import tasks
+import files
+import paths
+import processes
+import clock
+import text
+fn get[T](r:Result[T,Str])->T{match r{Ok(v)=>return v,Err(e)=>{print(e);assert(false);for{}}}}
+fn bad[T](r:Result[T,Str]){match r{Ok(_)=>assert(false),Err(e)=>assert(len(e)>0)}}
+fn main(){
+assert(get(clock.monotonic_ns())>0);get(clock.sleep_ns(1000))
+let root=get(files.temp_dir());let path=root+"/hé😀.txt";get(files.write(path,"hé😀"));assert(get(files.read(path))=="hé😀");assert(get(paths.list(root))[0]=="hé😀.txt");get(files.remove(path));get(files.remove(root))
+let listener=get(net.listen("127.0.0.1",0));let port=get(listener.port())
+let answers=tasks.map([0,1],fn(i){
+if i==0{let peer=get(listener.accept());assert(get(peer.read(10))=="ping");get(peer.write("pong"));get(peer.close());return 0}
+let peer=get(net.connect("127.0.0.1",port));get(peer.write("ping"));assert(get(peer.read(10))=="pong");get(peer.close());return 1
+});assert(answers[0]==0 && answers[1]==1);get(listener.close())
+let udp=get(net.udp_bind("127.0.0.1",0));let udpport=get(udp.port());get(udp.send("127.0.0.1",udpport,"payload"));assert(get(udp.receive(20)).data=="payload");get(udp.close())
+let helper=os.args()[1]
+assert(os.args()[2]=="hé😀")
+match os.env("VELA_M26_UNICODE"){Some(value)=>assert(value=="hé😀\\value"),None=>assert(false)}
+let p=get(processes.run([helper,"args","a b","","quote\"here","back\\","\\\""],""));assert(p.stdout=="a b\n\nquote\"here\nback\\\n\\\"\n")
+assert(get(os.output([helper,"args","legacy arg"]))=="legacy arg\n")
+assert(get(os.output([helper,"stdin"]))=="parent input")
+let input=text.repeat("abc",50000);let captured=get(processes.run([helper],input));assert(captured.status==7 && captured.stdout==input && captured.stderr==input)
+bad(processes.communicate([helper,"sleep"],"",1024,30));bad(processes.communicate([helper],input,10,5000));assert(get(processes.run([helper,"close"],input)).stdout=="done")
+print("Windows systems passed")
+}

@@ -1,14 +1,26 @@
 // M23 POSIX implementation; included by vela_rt.c and included in its cache key.
+#if !defined(_WIN32)
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#endif
 #include <time.h>
+#if !defined(__wasi__) && !defined(_WIN32)
 #include <signal.h>
 #include <spawn.h>
+#endif
 #include <dirent.h>
 #include <sys/stat.h>
+#if !defined(_WIN32)
 extern char **environ;
+#endif
+#if defined(_WIN32)
+#include "vela_windows_net.h"
+#else
+typedef int sys_fd;
+#define sys_close close
+#endif
 static bool sys_error(vela_str *e, const char *s) {
     *e = str_from(s, strlen(s));
     return false;
@@ -16,11 +28,13 @@ static bool sys_error(vela_str *e, const char *s) {
 static bool sys_errno(vela_str *e) {
     return sys_error(e, strerror(errno));
 }
+#if !defined(__wasi__)
 static int64_t sys_now(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts)) vela_panic("systems I/O", "monotonic clock unavailable");
     return (int64_t)ts.tv_sec*1000+ts.tv_nsec/1000000;
 }
+#endif
 static bool sys_timeout(int64_t n, vela_str *e) {
     return (n>=0 && n<=86400000) || sys_error(e,"timeout must be between 0 and 86400000 milliseconds");
 }
@@ -43,7 +57,8 @@ static void sys_push(vela_array *a, vela_str s) {
     vela_str_retain(s);
     vela_array_push(a,&s);
 }
-static bool sys_wait(int fd, short events, int64_t deadline, vela_str *e) {
+#if !defined(__wasi__)
+static bool sys_wait(sys_fd fd, short events, int64_t deadline, vela_str *e) {
     for (; ; ) {
         int64_t left=deadline-sys_now();
         if (left<0) left=0;
@@ -60,7 +75,10 @@ static bool sys_wait(int fd, short events, int64_t deadline, vela_str *e) {
     }
 }
 // Block SIGPIPE in this thread only; consume only the signal this write generated.
-static ssize_t sys_write_fd(int fd,const void *p,size_t n) {
+static ssize_t sys_write_fd(sys_fd fd,const void *p,size_t n) {
+#if defined(_WIN32)
+    return win_send(fd,p,n);
+#else
     sigset_t set,old,pending;
     sigemptyset(&set);
     sigaddset(&set,SIGPIPE);
@@ -79,7 +97,9 @@ static ssize_t sys_write_fd(int fd,const void *p,size_t n) {
     pthread_sigmask(SIG_SETMASK,&old,NULL);
     errno=saved;
     return r;
+#endif
 }
+#endif
 // Fakes are protected by fake_lock; a scope owns one reference, each socket another.
 typedef struct sys_fake {
     int64_t refs;
@@ -213,13 +233,14 @@ bool vela_sys_sleep_ns(int64_t n,vela_unit *o,vela_str *e) {
 struct vela_io_handle {
     int64_t rc;
     pthread_mutex_t lock;
-    int fd,kind,family;
+    sys_fd fd;
+    int kind,family;
     bool closed;
     int64_t timeout,port,row,pos;
     vela_str host;
     sys_fake *fake;
 };
-static vela_io_handle *sys_handle(int fd,int kind,int family,int64_t port,vela_str host,sys_fake *fake,int64_t row,int64_t timeout) {
+static vela_io_handle *sys_handle(sys_fd fd,int kind,int family,int64_t port,vela_str host,sys_fake *fake,int64_t row,int64_t timeout) {
     vela_io_handle *h=vela_alloc(sizeof *h);
     *h=(vela_io_handle) {
         .rc=1,.fd=fd,.kind=kind,.family=family,.port=port,.host=host,.fake=fake,.row=row,.timeout=timeout
@@ -237,7 +258,7 @@ void vela_handle_share(vela_io_handle *h) {
 }
 void vela_handle_release(vela_io_handle *h) {
     if (h && vela_rc_dec(&h->rc)) {
-        if (h->fd>=0) close(h->fd);
+        if (h->fd>=0) sys_close(h->fd);
         lock_fakes();
         sys_fake_drop(h->fake);
         unlock_fakes();
@@ -280,24 +301,26 @@ static int64_t sys_claim(sys_fake *f,const char *kind,vela_str host,int64_t port
     vela_str_release(p);
     return found;
 }
-static int sys_socket(int family,int type) {
+#if !defined(__wasi__)
+static sys_fd sys_socket(int family,int type) {
     pthread_mutex_lock(&fork_lock);
-    int fd=socket(family,type,0);
+    sys_fd fd=socket(family,type,0);
     if (fd>=0 && (fcntl(fd,F_SETFD,FD_CLOEXEC)<0 || fcntl(fd,F_SETFL,O_NONBLOCK)<0)) {
         int e=errno;
-        close(fd);
+        sys_close(fd);
         fd=-1;
         errno=e;
     }
     pthread_mutex_unlock(&fork_lock);
     return fd;
 }
-static int64_t sys_bound_port(int fd) {
+static int64_t sys_bound_port(sys_fd fd) {
     struct sockaddr_storage s;
     socklen_t n=sizeof s;
     if (getsockname(fd,(struct sockaddr*)&s,&n)) return -1;
     return s.ss_family==AF_INET?ntohs(((struct sockaddr_in*)&s)->sin_port):ntohs(((struct sockaddr_in6*)&s)->sin6_port);
 }
+#endif
 static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io_handle **out,vela_str *e) {
     if (!sys_timeout(timeout,e)||!sys_port(port,kind!=1,e)) return false;
     char *name=c_path(host);
@@ -330,6 +353,10 @@ static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io
     }
     unlock_fakes();
     if (!vela_cap_check("net",VELA_STR("",0),e)) {free(name);return false;}
+#if defined(__wasi__)
+    free(name);
+    return sys_error(e,"network sockets are unsupported on WASI preview 1");
+#else
     char service[16];
     snprintf(service,sizeof service,"%lld",(long long)port);
     struct addrinfo hints= {
@@ -340,7 +367,8 @@ static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io
     int code=getaddrinfo(name,service,&hints,&list);
     free(name);
     if (code) return sys_error(e,gai_strerror(code));
-    int fd=-1,family=0,saved=ECONNREFUSED;
+    sys_fd fd=-1;
+    int family=0,saved=ECONNREFUSED;
     int64_t deadline=sys_now()+timeout;
     for (struct addrinfo *a=list; a; a=a->ai_next) {
         fd=sys_socket(a->ai_family,a->ai_socktype);
@@ -369,7 +397,7 @@ static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io
             if (bind(fd,a->ai_addr,a->ai_addrlen)==0 && (kind==3 || listen(fd,128)==0)) break;
             saved=errno;
         }
-        close(fd);
+        sys_close(fd);
         fd=-1;
     }
     freeaddrinfo(list);
@@ -379,6 +407,7 @@ static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io
     }
     *out=sys_handle(fd,kind,family,sys_bound_port(fd),host,NULL,-1,timeout);
     return true;
+#endif
 }
 bool vela_sys_tcp_connect(vela_str h,int64_t p,int64_t t,vela_io_handle **o,vela_str *e) {
     return sys_open(h,p,t,1,o,e);
@@ -392,12 +421,14 @@ bool vela_sys_udp_bind(vela_str h,int64_t p,vela_io_handle **o,vela_str *e) {
 // Pin the open file description for an operation, then release the handle lock.
 // This permits full duplex I/O and prevents close/reuse races. Closing an alias
 // rejects subsequent operations; an already-running operation finishes/times out.
-static int sys_borrow_fd(vela_io_handle *h) {
+#if !defined(__wasi__)
+static sys_fd sys_borrow_fd(vela_io_handle *h) {
     pthread_mutex_lock(&fork_lock);
-    int fd=fcntl(h->fd,F_DUPFD_CLOEXEC,3);
+    sys_fd fd=fcntl(h->fd,F_DUPFD_CLOEXEC,3);
     pthread_mutex_unlock(&fork_lock);
     return fd;
 }
+#endif
 bool vela_sys_accept(vela_io_handle *h,vela_io_handle **o,vela_str *e) {
     pthread_mutex_lock(&h->lock);
     lock_fakes();
@@ -411,7 +442,11 @@ bool vela_sys_accept(vela_io_handle *h,vela_io_handle **o,vela_str *e) {
         return ok;
     }
     unlock_fakes();
-    int fd=-1;
+#if defined(__wasi__)
+    pthread_mutex_unlock(&h->lock);
+    return sys_error(e,"network sockets are unsupported on WASI preview 1");
+#else
+    sys_fd fd=-1;
     int64_t timeout=h->timeout;
     if (ok) {
         fd=sys_borrow_fd(h);
@@ -420,7 +455,7 @@ bool vela_sys_accept(vela_io_handle *h,vela_io_handle **o,vela_str *e) {
     pthread_mutex_unlock(&h->lock);
     if (ok) {
         int64_t deadline=sys_now()+timeout;
-        int accepted=-1;
+        sys_fd accepted=-1;
         for (; ; ) {
             if (!sys_wait(fd,POLLIN,deadline,e)) {
                 ok=false;
@@ -430,7 +465,7 @@ bool vela_sys_accept(vela_io_handle *h,vela_io_handle **o,vela_str *e) {
             accepted=accept(fd,NULL,NULL);
             if (accepted>=0 && (fcntl(accepted,F_SETFD,FD_CLOEXEC)<0 || fcntl(accepted,F_SETFL,O_NONBLOCK)<0)) {
                 int saved=errno;
-                close(accepted);
+                sys_close(accepted);
                 accepted=-1;
                 errno=saved;
             }
@@ -443,8 +478,9 @@ bool vela_sys_accept(vela_io_handle *h,vela_io_handle **o,vela_str *e) {
         }
         if (ok) *o=sys_handle(accepted,1,h->family,sys_bound_port(accepted),h->host,NULL,-1,timeout);
     }
-    if (fd>=0)close(fd);
+    if (fd>=0)sys_close(fd);
     return ok;
+#endif
 }
 bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {
     if (!sys_size(max,e)) return false;
@@ -462,7 +498,11 @@ bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {
         return true;
     }
     unlock_fakes();
-    int fd=-1;
+#if defined(__wasi__)
+    pthread_mutex_unlock(&h->lock);
+    return sys_error(e,"network sockets are unsupported on WASI preview 1");
+#else
+    sys_fd fd=-1;
     int64_t timeout=h->timeout;
     if (ok) {
         fd=sys_borrow_fd(h);
@@ -489,8 +529,9 @@ bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {
         }
         free(buf);
     }
-    if (fd>=0)close(fd);
+    if (fd>=0)sys_close(fd);
     return ok;
+#endif
 }
 bool vela_sys_net_write(vela_io_handle *h,vela_str data,int64_t *o,vela_str *e) {
     pthread_mutex_lock(&h->lock);
@@ -509,7 +550,11 @@ bool vela_sys_net_write(vela_io_handle *h,vela_str data,int64_t *o,vela_str *e) 
         return ok;
     }
     unlock_fakes();
-    int fd=-1;
+#if defined(__wasi__)
+    pthread_mutex_unlock(&h->lock);
+    return sys_error(e,"network sockets are unsupported on WASI preview 1");
+#else
+    sys_fd fd=-1;
     int64_t timeout=h->timeout;
     if (ok) {
         fd=sys_borrow_fd(h);
@@ -532,8 +577,9 @@ bool vela_sys_net_write(vela_io_handle *h,vela_str data,int64_t *o,vela_str *e) 
         }
         if (ok)*o=pos;
     }
-    if (fd>=0)close(fd);
+    if (fd>=0)sys_close(fd);
     return ok;
+#endif
 }
 bool vela_sys_net_close(vela_io_handle *h,vela_unit *o,vela_str *e) {
     pthread_mutex_lock(&h->lock);lock_fakes();
@@ -542,7 +588,7 @@ bool vela_sys_net_close(vela_io_handle *h,vela_unit *o,vela_str *e) {
         ok=sys_error(e,"socket does not belong to the active network scope");
     } else if (!h->closed) {
         h->closed=true;
-        if (h->fd>=0) {close(h->fd);h->fd=-1;}
+        if (h->fd>=0) {sys_close(h->fd);h->fd=-1;}
     }
     unlock_fakes();pthread_mutex_unlock(&h->lock);*o=0;return ok;
 }
@@ -587,7 +633,12 @@ bool vela_sys_udp_send(vela_io_handle *h,vela_str host,int64_t port,vela_str dat
         return ok;
     }
     unlock_fakes();
-    int fd=-1;
+#if defined(__wasi__)
+    pthread_mutex_unlock(&h->lock);
+    free(name);
+    return sys_error(e,"network sockets are unsupported on WASI preview 1");
+#else
+    sys_fd fd=-1;
     int64_t timeout=h->timeout;
     if (ok) {
         fd=sys_borrow_fd(h);
@@ -625,8 +676,9 @@ bool vela_sys_udp_send(vela_io_handle *h,vela_str host,int64_t port,vela_str dat
         }
     }
     free(name);
-    if (fd>=0)close(fd);
+    if (fd>=0)sys_close(fd);
     return ok;
+#endif
 }
 bool vela_sys_udp_receive(vela_io_handle *h,int64_t max,vela_array **o,vela_str *e) {
     if (!sys_size(max,e))return false;
@@ -647,7 +699,11 @@ bool vela_sys_udp_receive(vela_io_handle *h,int64_t max,vela_array **o,vela_str 
         return ok;
     }
     unlock_fakes();
-    int fd=-1;
+#if defined(__wasi__)
+    pthread_mutex_unlock(&h->lock);
+    return sys_error(e,"network sockets are unsupported on WASI preview 1");
+#else
+    sys_fd fd=-1;
     int64_t timeout=h->timeout;
     if (ok) {
         fd=sys_borrow_fd(h);
@@ -691,10 +747,14 @@ bool vela_sys_udp_receive(vela_io_handle *h,int64_t max,vela_array **o,vela_str 
         }
         free(buf);
     }
-    if (fd>=0)close(fd);
+    if (fd>=0)sys_close(fd);
     return ok;
+#endif
 }
 // Communicate on all three pipes concurrently. Limits apply to combined output.
+#if defined(_WIN32)
+#include "vela_windows_process.inc"
+#endif
 static bool sys_process_fake(vela_array *args,vela_str input,int64_t limit,vela_array **out,vela_str *e,bool *handled) {
     lock_fakes();
     sys_fake *f=sys_processes;
@@ -732,12 +792,14 @@ static bool sys_process_fake(vela_array *args,vela_str input,int64_t limit,vela_
     unlock_fakes();
     return sys_error(e,"unexpected fake process");
 }
-static void sys_close_pipes(int p[3][2]) {
-    for (int i=0; i<3; i++)for (int j=0; j<2; j++)if (p[i][j]>=0) {
+#if !defined(__wasi__) && !defined(_WIN32)
+static void sys_close_pipes(int p[4][2]) {
+    for (int i=0; i<4; i++)for (int j=0; j<2; j++)if (p[i][j]>=0) {
         close(p[i][j]);
         p[i][j]=-1;
     }
 }
+#endif
 bool vela_sys_process(vela_array *args,vela_str input,int64_t limit,int64_t timeout,vela_array **out,vela_str *e) {
     if (!sys_size(limit,e)||!sys_timeout(timeout,e))return false;
     if (args->len==0 || sys_word(args,0).len==0)return sys_error(e,"process needs a program");
@@ -765,49 +827,56 @@ bool vela_sys_process(vela_array *args,vela_str input,int64_t limit,int64_t time
         return ok;
     }
     if (!vela_cap_process(e)) {for(int64_t i=0;i<args->len;i++)free(argv[i]);free(argv);return false;}
-    int pipes[3][2]= {
-        {
-            -1,-1
-        }, {
-            -1,-1
-        }, {
-            -1,-1
-        }
-    },err=0;
+#if defined(_WIN32)
+    for (int64_t i=0; i<args->len; i++)free(argv[i]);
+    free(argv);
+    return win_process(args,input,limit,timeout,out,e);
+#elif defined(__wasi__)
+    for (int64_t i=0; i<args->len; i++)free(argv[i]);
+    free(argv);
+    return sys_error(e,"processes are unsupported on WASI");
+#else
+    // An exec-error pipe distinguishes failure to launch from a real status
+    // 127. POSIX permits posix_spawnp to report the former only through the
+    // child's status; that behavior is observed under Linux/Rosetta.
+    int pipes[4][2]={{-1,-1},{-1,-1},{-1,-1},{-1,-1}},err=0;
     pid_t pid=-1;
-    posix_spawn_file_actions_t actions;
-    posix_spawnattr_t attrs;
-    bool actions_ready=false,attrs_ready=false;
     pthread_mutex_lock(&fork_lock);
-    for (int i=0; i<3 && !err; i++) {
-        if (pipe(pipes[i]))err=errno;
-        else for (int j=0; j<2; j++) {
-            // Keep child sources away from 0/1/2 even if Vela inherited a
-            // closed standard descriptor; later close actions must not undo dup2.
-            if (pipes[i][j]<3) {
+    for (int i=0;i<4 && !err;i++) {
+        if(pipe(pipes[i]))err=errno;
+        else for(int j=0;j<2;j++) {
+            if(pipes[i][j]<3) {
                 int moved=fcntl(pipes[i][j],F_DUPFD_CLOEXEC,3);
-                if (moved<0) {err=errno;break;}
+                if(moved<0){err=errno;break;}
                 close(pipes[i][j]);pipes[i][j]=moved;
             }
-            if (fcntl(pipes[i][j],F_SETFD,FD_CLOEXEC)<0)err=errno;
+            if(fcntl(pipes[i][j],F_SETFD,FD_CLOEXEC)<0)err=errno;
         }
     }
-    if (!err) {
-        err=posix_spawn_file_actions_init(&actions);
-        actions_ready=err==0;
+    if(!err) {
+        fflush(stdout);fflush(stderr);
+        pid=fork();
+        if(pid<0)err=errno;
+        else if(pid==0) {
+            close(pipes[3][0]);
+            int failed=setpgid(0,0)<0?errno:0;
+            for(int i=0;i<3 && !failed;i++)if(dup2(pipes[i][i==0?0:1],i)<0)failed=errno;
+            for(int i=0;i<3;i++)for(int j=0;j<2;j++)close(pipes[i][j]);
+            if(!failed){execvp(argv[0],argv);failed=errno;}
+            ssize_t sent;
+            do {sent=write(pipes[3][1],&failed,sizeof failed);}while(sent<0 && errno==EINTR);
+            _exit(127);
+        }
     }
-    if (!err) {
-        err=posix_spawnattr_init(&attrs);
-        attrs_ready=err==0;
-    }
-    if (!err)err=posix_spawnattr_setflags(&attrs,POSIX_SPAWN_SETPGROUP);
-    if (!err)err=posix_spawnattr_setpgroup(&attrs,0);
-    for (int i=0; i<3 && !err; i++)err=posix_spawn_file_actions_adddup2(&actions,pipes[i][i==0?0:1],i);
-    for (int i=0; i<3 && !err; i++)for (int j=0; j<2 && !err; j++)err=posix_spawn_file_actions_addclose(&actions,pipes[i][j]);
-    if (!err)err=posix_spawnp(&pid,argv[0],&actions,&attrs,argv,environ);
-    if (actions_ready)posix_spawn_file_actions_destroy(&actions);
-    if (attrs_ready)posix_spawnattr_destroy(&attrs);
     pthread_mutex_unlock(&fork_lock);
+    if(pid>0) {
+        close(pipes[3][1]);pipes[3][1]=-1;
+        ssize_t got;
+        do {got=read(pipes[3][0],&err,sizeof err);}while(got<0 && errno==EINTR);
+        close(pipes[3][0]);pipes[3][0]=-1;
+        if(got<0 || (got>0 && got!=(ssize_t)sizeof err))err=EIO;
+        if(err){kill(pid,SIGKILL);while(waitpid(pid,NULL,0)<0 && errno==EINTR){}}
+    }
     for (int64_t i=0; i<args->len; i++)free(argv[i]);
     free(argv);
     if (err) {
@@ -908,6 +977,7 @@ bool vela_sys_process(vela_array *args,vela_str input,int64_t limit,int64_t time
     vela_array_release(data[0]);
     vela_array_release(data[1]);
     return ok;
+#endif
 }
 // Legacy os.run/output share the process fake rather than escaping its scope.
 static bool sys_legacy_process(vela_array *args,int64_t *code,vela_str *e,vela_str *captured,bool *handled) {
@@ -984,6 +1054,16 @@ bool vela_sys_kind(vela_str path,int64_t *o,vela_str *e) {
         return true;
     }
     if (!vela_cap_check("fs",path,e)) {free(p);return false;}
+#if defined(_WIN32)
+    wchar_t *wide=win_wide(p);free(p);
+    if (!wide)return sys_errno(e);
+    DWORD flags=GetFileAttributesW(wide);DWORD code=GetLastError();free(wide);
+    if (flags==INVALID_FILE_ATTRIBUTES) {
+        if (code==ERROR_FILE_NOT_FOUND || code==ERROR_PATH_NOT_FOUND) { *o=0;return true; }
+        win_errno(code);return sys_errno(e);
+    }
+    *o=(flags&FILE_ATTRIBUTE_REPARSE_POINT)?3:(flags&FILE_ATTRIBUTE_DIRECTORY)?2:1;return true;
+#else
     struct stat s;
     int r=lstat(p,&s);
     free(p);
@@ -996,6 +1076,7 @@ bool vela_sys_kind(vela_str path,int64_t *o,vela_str *e) {
     }
     *o=S_ISDIR(s.st_mode)?2:S_ISLNK(s.st_mode)?3:1;
     return true;
+#endif
 }
 bool vela_sys_list(vela_str path,vela_array **o,vela_str *e) {
     char *p=c_path(path);
@@ -1032,6 +1113,26 @@ bool vela_sys_list(vela_str path,vela_array **o,vela_str *e) {
         unlock_fakes();
     }else {
         if (!vela_cap_check("fs",path,e)) {free(p);vela_array_release(out);return false;}
+#if defined(_WIN32)
+        wchar_t *wide=win_wide(p);free(p);
+        if(!wide){vela_array_release(out);return sys_errno(e);}
+        DWORD attr=GetFileAttributesW(wide);
+        if(attr==INVALID_FILE_ATTRIBUTES || !(attr&FILE_ATTRIBUTE_DIRECTORY)){free(wide);vela_array_release(out);return sys_error(e,"not a directory");}
+        size_t length=wcslen(wide);wchar_t *pattern=vela_alloc((length+3)*sizeof(wchar_t));
+        memcpy(pattern,wide,length*sizeof(wchar_t));memcpy(pattern+length,L"\\*",3*sizeof(wchar_t));free(wide);
+        WIN32_FIND_DATAW entry;HANDLE find=FindFirstFileW(pattern,&entry);free(pattern);
+        if(find==INVALID_HANDLE_VALUE){DWORD code=GetLastError();if(code!=ERROR_FILE_NOT_FOUND){vela_array_release(out);win_errno(code);return sys_errno(e);}}
+        else {
+            bool valid=true;
+            do {
+                if(!wcscmp(entry.cFileName,L".")||!wcscmp(entry.cFileName,L".."))continue;
+                char *name=win_utf8(entry.cFileName);if(!name){valid=false;break;}
+                vela_str text=str_from(name,strlen(name));free(name);sys_push(out,text);vela_str_release(text);
+            }while(FindNextFileW(find,&entry));
+            DWORD code=GetLastError();FindClose(find);
+            if(!valid || code!=ERROR_NO_MORE_FILES){vela_array_release(out);if(valid)win_errno(code);return sys_errno(e);}
+        }
+#else
         DIR *d=opendir(p);
         free(p);
         if (!d) {
@@ -1053,6 +1154,7 @@ bool vela_sys_list(vela_str path,vela_array **o,vela_str *e) {
             errno=saved;
             return sys_errno(e);
         }
+#endif
     }
     qsort(out->data,(size_t)out->len,sizeof(vela_str),sys_str_cmp);
     *o=out;
@@ -1091,7 +1193,12 @@ bool vela_sys_mkdir(vela_str path,vela_unit *o,vela_str *e) {
         return true;
     }
     if (!vela_cap_check("fs",path,e)) {free(p);return false;}
+#if defined(_WIN32)
+    wchar_t *wide=win_wide(p);
+    int r=wide?_wmkdir(wide):-1;free(wide);
+#else
     int r=mkdir(p,0777);
+#endif
     free(p);
     return r==0 || sys_errno(e);
 }

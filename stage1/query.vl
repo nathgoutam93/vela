@@ -37,6 +37,7 @@ import os
 import packages
 import parser
 import strings
+import targets
 
 // A program loaded and, unless it has syntax errors, checked.
 pub type Analysis = struct {
@@ -68,7 +69,7 @@ pub fn analyze_completing(path: Str, source: Str, std_dir: Str, open: Map[Str, S
     if len(loaded.errors) > 0 {
         return Analysis { loaded: loaded, checked: None, errors: errors.merged(loaded.errors, loaded.warnings) }
     }
-    let k = checker.check_completing(loaded, true, completing)
+    let k = checker.check_target(loaded, true, completing, targets.host())
     return Analysis { loaded: loaded, checked: Some(k), errors: errors.merged(k.errors, k.warnings) }
 }
 

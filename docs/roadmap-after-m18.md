@@ -188,8 +188,12 @@ Windows, WASI, general cross-linking and Linux execution proofs remain separate.
 
 ## M26: Platforms
 
-**Status:** partially implemented through [M26a](m26a-macos-arm64.md). Windows,
-WASI, general cross-linking and remaining platform validation are still open.
+**Status:** in progress; [M26a](m26a-macos-arm64.md) supplies native macOS ARM64.
+[M26 platform work](m26-platforms.md) adds target/toolchain selection, Windows
+C and WASI runtime profiles, cross-linking and execution oracles. Native
+Windows full-suite and Linux kernel-policy acceptance remain open; see
+VAL-004/VAL-005 in the tooling backlog. Cross-linking and emulator evidence
+do not substitute for those execution gates.
 
 **Needs:** M23 (std on every OS) and M25 (the native backend to port).
 

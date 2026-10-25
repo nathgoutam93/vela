@@ -309,7 +309,7 @@ fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
     }
     let mut detail = name
     let mut doc = "A built-in " + what + "."
-    let info = builtin_info(name)
+    let info = builtin_info_for(name, b.k.target)
     if len(info) == 2 {
         detail = info[0]
         doc = info[1]
@@ -322,14 +322,15 @@ fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
 // A built-in function's signature and what it does, as [detail, doc]; []
 // for a name that is not one. The checker has the rules (checker.builtin);
 // this is how hover and completion show them.
-pub fn builtin_info(name: Str) -> [Str] {
+pub fn builtin_info(name: Str) -> [Str] { return builtin_info_for(name, "") }
+pub fn builtin_info_for(name: Str, target: Str) -> [Str] {
     if name == "sysio.Handle" { return ["sysio.Handle", "Owning external I/O resource. Copies alias the resource; final release closes it."] }
     if len(name) > 6 && (name[0..6] == "sysio." || name[0..6] == "clock.") { return [sysops.signature(name[0..5], name[6..len(name)]), "Blocking systems I/O with test fakes, bounds and explicit effects."] }
     if len(name) > 7 && name[0..7] == "memory." { return [memops.signature(name[7..len(name)]), "Checked contiguous storage; views retain snapshots and writes use copy-on-write."] }
     if len(name) > 2 && name[0..2] == "c." {
         let short = name[2..len(name)]
-        let t = cffi.type_id(short)
-        if t >= 0 { return [name + " = " + types.get(types.new_table(), t).name + " (LP64 C ABI)", "A C scalar alias or nominal raw pointer. c.Float uses binary32 at extern boundaries and Float storage in Vela."] }
+        let t = cffi.type_id_for(short, target)
+        if t >= 0 { let mut abi = "LP64"; if target == "x86_64-w64-windows-gnu" { abi = "LLP64" }; if target == "wasm32-wasi" { abi = "ILP32" }; return [name + " = " + types.get(types.new_table(), t).name + " (" + abi + " C ABI)", "A C scalar alias or nominal raw pointer. c.Float uses binary32 at extern boundaries and Float storage in Vela."] }
         let signature = cffi.signature(short)
         if signature != "" { return [signature, "Raw C interop. Unsafe operations require uses unsafe or an audited unsafe block; callers own pointer lifetime, bounds, and C signature correctness."] }
     }
