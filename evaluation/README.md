@@ -16,11 +16,11 @@ Write fresh run output under ignored `build/` (or outside the repository).
 ## Running one task
 
 ```
-python3 eval/prepare.py 04-rpn /tmp/run/04       # a fresh workspace
+python3 evaluation/prepare.py 04-rpn /tmp/run/04       # a fresh workspace
 export PATH="/tmp/run/04/_vela/bin:$PATH"         # its own vela
 # give your agent /tmp/run/04/TASK.md, with /tmp/run/04 as its working directory
-python3 eval/grade.py 04-rpn /tmp/run/04 --results results.jsonl --agent NAME --meta turns=12 --meta tokens=48000
-python3 eval/summary.py results.jsonl --by category
+python3 evaluation/grade.py 04-rpn /tmp/run/04 --results results.jsonl --agent NAME --meta turns=12 --meta tokens=48000
+python3 evaluation/summary.py results.jsonl --by category
 ```
 
 - **The workspace** holds the task's starting files, `TASK.md` (the
@@ -28,8 +28,8 @@ python3 eval/summary.py results.jsonl --by category
   compiler of its own, with its runtime and standard library, and the
   documentation the agent may read. The agent needs nothing outside the
   workspace.
-- **Keep this repository away from the agent.** `eval/tasks/*/hidden`
-  holds the checks and `eval/tasks/*/solution` the answers.
+- **Keep this repository away from the agent.** `evaluation/tasks/*/hidden`
+  holds the checks and `evaluation/tasks/*/solution` the answers.
 - **`--context`** on prepare.py chooses the documentation in `_vela/`:
   - `guide` (the default): the compiler-generated `GUIDE.md` and std;
   - `docs`: README, the walkthroughs, std and the examples;
@@ -93,12 +93,12 @@ run and its repair cost must be recorded separately.
 
 ## Checking the evaluation
 
-`python3 eval/selftest.py` checks that every task fails as given and
+`python3 evaluation/selftest.py` checks that every task fails as given and
 passes with its solution, so a check that grades nothing, or a task that
 cannot be done, shows up. It is in the default suite as
 `tests/eval_test.py`.
 
-`python3 eval/static.py` measures what can be measured without an agent:
+`python3 evaluation/static.py` measures what can be measured without an agent:
 
 - how many diagnostics have a stable code and a mechanical fix;
 - how much there is to read, including `vela guide` (bytes/4 token estimate);
@@ -106,8 +106,8 @@ cannot be done, shows up. It is in the default suite as
 
 `vela check --json` includes stable diagnostic codes and byte-offset edits;
 `vela explain CODE` explains a code and `vela fix FILE` applies available
-fixes. These tools are included in the evaluation prompt. `eval/results/m17-static.json`
-records the static result after M17; `eval/results/static.json` keeps the M16 baseline.
+fixes. These tools are included in the evaluation prompt. `evaluation/results/m17-static.json`
+records the static result after M17; `evaluation/results/static.json` keeps the M16 baseline.
 
 ## What to record
 

@@ -84,7 +84,7 @@ def inventory(c):
     assert files == {p['file'] for p in manifest['programs']}
     for name, digest in manifest['frozen_sources'].items():
         assert hashlib.sha256((FIXTURES/'v1'/name).read_bytes()).hexdigest() == digest, name
-    ast = (ROOT/'stage1/ast.vl').read_text(encoding='utf-8')
+    ast = (ROOT/'compiler/src/ast.vl').read_text(encoding='utf-8')
     actual = set()
     for enum in ('ExprKind', 'StmtKind', 'PatternKind', 'Else'):
         body = re.search(r'pub type '+enum+r' = enum \{(.*?)^\}', ast, re.S | re.M).group(1)
@@ -92,11 +92,11 @@ def inventory(c):
     assert actual == set(manifest['constructs']), (actual-set(manifest['constructs']), set(manifest['constructs'])-actual)
     for record in [*manifest['constructs'].values(), *manifest['features'].values()]:
         assert record['section'] in anchors and record['program'] in files, record
-    lexer = (ROOT/'stage1/lexer.vl').read_text(encoding='utf-8')
+    lexer = (ROOT/'compiler/src/lexer.vl').read_text(encoding='utf-8')
     keyword_names = re.search(r'pub fn keywords\(\).*?return \[(.*?)\]', lexer, re.S).group(1)
     spellings = dict(re.findall(r'Kind\.(\w+) => "([^"\n]+)"', lexer.split('pub fn is_keyword', 1)[0]))
     assert {spellings[k] for k in re.findall(r'Kind\.(\w+)', keyword_names)} == set(manifest['keywords'])
-    parser = (ROOT/'stage1/parser.vl').read_text(encoding='utf-8')
+    parser = (ROOT/'compiler/src/parser.vl').read_text(encoding='utf-8')
     powers = parser.split('fn left_power', 1)[1].split('fn is_comparison', 1)[0]
     operators = {spellings[k] for k in re.findall(r'lexer.Kind\.(\w+) => \d+', powers)}
     assert operators == set(manifest['binary_operators'])
@@ -141,7 +141,7 @@ def documents(c, manifest):
     for word in manifest['keywords']+manifest['binary_operators']:
         assert word in guide
     # Exact shared prelude declarations are normative in the spec and generated guide.
-    interface_source = (ROOT/'stage1/interfaces.vl').read_text(encoding='utf-8')
+    interface_source = (ROOT/'compiler/src/interfaces.vl').read_text(encoding='utf-8')
     for name, signature in [('Eq', 'fn eq(a: Self, b: Self) -> Bool'),
                             ('Ord', 'fn compare(a: Self, b: Self) -> Int'),
                             ('Key', 'fn hash(value: Self) -> u64')]:

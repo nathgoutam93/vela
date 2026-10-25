@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Grade an agent's work on one evaluation task, with the task's hidden checks.
 
-    python3 eval/grade.py TASK DIR [--vela PATH] [--results FILE --agent NAME
+    python3 evaluation/grade.py TASK DIR [--vela PATH] [--results FILE --agent NAME
                                      --condition NAME --meta KEY=VALUE ...]
 
-DIR is the workspace eval/prepare.py made and the agent worked in. It is
+DIR is the workspace evaluation/prepare.py made and the agent worked in. It is
 not changed: the checks run on a copy. Prints one JSON object:
 
     {"task": ..., "passed": true|false, "score": 0.0-1.0,
@@ -42,7 +42,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EVAL = ROOT / "eval"
+EVAL = ROOT / "evaluation"
 sys.path.insert(0, str(EVAL))
 from prepare import task_dir  # noqa: E402
 

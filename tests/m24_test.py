@@ -138,7 +138,7 @@ test "indirect"{let f=leaf;assert(f(2)==3)}
     for what in ('summary','impact','coverage'):
         samples=[]
         for _ in range(3):
-            start=time.perf_counter();command(c,env,'query',what,ROOT/'stage1/main.vl');samples.append(time.perf_counter()-start)
+            start=time.perf_counter();command(c,env,'query',what,ROOT/'compiler/src/main.vl');samples.append(time.perf_counter()-start)
         times[what]={'best':min(samples),'samples':samples};assert min(samples)<1,(what,samples)
     print('compiler query seconds: '+json.dumps(times),flush=True)
 

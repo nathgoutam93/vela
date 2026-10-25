@@ -59,7 +59,7 @@ offset. Iteration keeps an ordinary value snapshot, so a loop's writes cannot
 change the sequence it is visiting. Managed fixed values retain/release/share
 their fields through the existing descriptor machinery.
 
-`stage1/memops.vl` supplies the safe memory primitive registry shared by module
+`compiler/src/memops.vl` supplies the safe memory primitive registry shared by module
 loading and editor metadata. The checker validates expected array types,
 mutation markers and byte storage. The C and native backends lower those
 operations to checked runtime helpers. Fill copies/retains each value; truncate
@@ -154,12 +154,12 @@ UBSan passes **121 selected checks**: the 117 runtime fixtures and the four
 M19–M22 integrations, with `-fsanitize=undefined -fno-sanitize-recover=all`.
 The runtime compiles separately with C11, Wall/Wextra/Werror and pedantic.
 The C bootstrap reaches a **120,858-line fixed point**, and the checked-in seed
-and build/vela are refreshed. Native bootstrap/execution, ASan and TSan remain
+and build/vela are refreshed. Native compiler/bootstrap/execution, ASan and TSan remain
 open rather than inferred from C/UBSan.
 
 The generated guide is **28,599 bytes**, about **7,149 tokens** under the
 existing bytes/4 estimate. All **373/373** negative-test diagnostics have codes;
-21 have fixes. `eval/results/m22-static.json` records the static metrics. Actual tokenizer
+21 have fixes. `evaluation/results/m22-static.json` records the static metrics. Actual tokenizer
 and new agent-driven evaluation remain VAL-003 and VAL-002 respectively.
 
 The suite uses the existing absolute-compiler and four-outer-worker workarounds,
@@ -168,9 +168,9 @@ native_test.py, cache_test.py and bench_test.py remain excluded on this host;
 the full twelve-benchmark C/Vela quick output check is run separately.
 
 ```
-VELA_CACHE="$PWD/build/cache-m22" sh bootstrap/bootstrap.sh --update
+VELA_CACHE="$PWD/build/cache-m22" sh compiler/bootstrap/bootstrap.sh --update
 # run_tests.py with four outer workers and --compiler "$PWD/build/vela":
-# --backend c examples/ stage1/ std/ packages/ tests/run/ tests/fail/
+# --backend c examples/ compiler/src/ std/ packages/ tests/run/ tests/fail/
 # tests/dump/ tests/cli/ lsp_client pkg_test eval_test m17_test m19_test
 # m20_test m21_test m22_test nvim_test
 # UBSan selection: tests/run/ m19_test m20_test m21_test m22_test

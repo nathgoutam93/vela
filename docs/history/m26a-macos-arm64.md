@@ -16,7 +16,7 @@ build/vela asm --target aarch64-apple-darwin hello.vl
 build/vela asm --target x86_64-unknown-linux-gnu hello.vl
 build/vela run hello.vl
 build/vela test hello.vl
-sh bootstrap/bootstrap.sh --native
+sh compiler/bootstrap/bootstrap.sh --native
 ```
 
 Builds still default to C. Run/test automatically choose native on macOS ARM64
@@ -36,8 +36,8 @@ selection and general cross-linking belong to the remaining M26 work.
 
 ## Backend and ABI
 
-stage1/targets.vl selects the native format, while stage1/arm64.vl consumes the
-same IR and optimizer as stage1/x64.vl. Mach-O output has Darwin symbol names,
+compiler/src/targets.vl selects the native format, while compiler/src/arm64.vl consumes the
+same IR and optimizer as compiler/src/x64.vl. Mach-O output has Darwin symbol names,
 TEXT/const and relocated DATA sections, page-relative local addresses and GOT
 loads for external addresses. Frames preserve x29/x30, keep sp aligned to 16,
 and probe large allocations in page-sized steps. The emitter leaves x18 alone.
@@ -121,14 +121,14 @@ of ARM64 assembly**. The checked-in C seed is current. The ARM64-built compiler
 passes **236 runtime/negative fixtures**, plus the M26a target, packed C ABI,
 callback/variadic/NaN and large-frame oracles. Its generated C exactly matches
 the checked-in seed, and its assembly exactly matches the C-built compiler's
-assembly for stage1/main.vl. The assembly SHA-256 is
+assembly for compiler/src/main.vl. The assembly SHA-256 is
 240778e0eaa37a2543b90de91e5549618ea378eefa80b368fa94c02d59c637b4.
 
 The runtime compiles separately with C11, Wall/Wextra/Werror, pedantic and
 Wshadow both on macOS and as a Linux x86-64 object. Linux cross-compilation is
 not an execution result. The generated guide is **31,988 bytes** (7,997 tokens
 by bytes/4); actual tokenizer validation stays VAL-003. Static evaluation in
-[eval/results/m26a-static.json](../../eval/results/m26a-static.json) retains 373/373 coded negative
+[evaluation/results/m26a-static.json](../../evaluation/results/m26a-static.json) retains 373/373 coded negative
 diagnostics and 21 with edits. No model-driven agent trial was run (VAL-002).
 
 M25 performance criteria are not part of this correctness milestone. The
@@ -181,7 +181,7 @@ execution.
 ## Reproduction
 
 ```sh
-VELA_CACHE="$PWD/build/cache-m26a" sh bootstrap/bootstrap.sh --native
+VELA_CACHE="$PWD/build/cache-m26a" sh compiler/bootstrap/bootstrap.sh --native
 python3 tests/m26a_test.py "$PWD/build/vela"
 python3 tests/m26a_test.py "$PWD/build/vela-native"
 VELA_CACHE="$PWD/build/cache-m26a" python3 run_tests.py --compiler "$PWD/build/vela" --backend c
@@ -190,7 +190,7 @@ VELA_OPT=0 python3 tests/m23_test.py "$PWD/build/vela"
 VELA_OPT=0 python3 tests/m24_test.py "$PWD/build/vela"
 python3 bench/run.py --quick --check --languages c vela vela-native
 python3 bench/run.py varints arena_trees sha256 crc32 --runs 7 --languages c vela
-python3 eval/static.py --vela "$PWD/build/vela" --json eval/results/m26a-static.json
+python3 evaluation/static.py --vela "$PWD/build/vela" --json evaluation/results/m26a-static.json
 ```
 
 The broad runs use TL-003's four-outer-worker wrapper and writable Neovim XDG
@@ -200,7 +200,7 @@ uses the runner's STRICT_CFLAGS plus -fsanitize=undefined
 -fno-sanitize-recover=all, native backend, tests/run/ and M19–M24/M26a scripts.
 The ARM64-built compiler's 236-case selection is tests/run/ plus tests/fail/.
 
-To compare the compiler images directly, emit C for stage1/main.vl with
-build/vela-native and cmp it against bootstrap/vela1.c. Emit asm for the same
+To compare the compiler images directly, emit C for compiler/src/main.vl with
+build/vela-native and cmp it against compiler/bootstrap/vela1.c. Emit asm for the same
 relative source path using each compiler and compare those files. Both
 comparisons must use the same checkout, target, optimization flags and root.

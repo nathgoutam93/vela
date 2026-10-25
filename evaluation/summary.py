@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Summarize evaluation results: the lines grade.py --results appended.
 
-    python3 eval/summary.py RESULTS.jsonl [--by task|category]
+    python3 evaluation/summary.py RESULTS.jsonl [--by task|category]
 
 For each agent and condition: how many tasks passed, the mean score, the
 mean warnings, and the mean of every numeric --meta field (turns, tokens,

@@ -11,7 +11,7 @@ Run commands from the repository root after building `build/vela`.
 | [profile.py](profile.py) | Attribute time with platform-specific profiling tools or `vela profile` |
 | [m29-budgets.json](m29-budgets.json) | Active acceptance thresholds, consumed by `real_programs.py` |
 | `NAME/main.vl`, `main.c`, `main.rs` | Algorithm implementations compared operation for operation |
-| [real/](real/) | Real-program workloads and independent C references |
+| [real/](real) | Real-program workloads and independent C references |
 | [results/](results/README.md) | Retained measurements, experiments and validation records |
 
 Start with output correctness at small sizes:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Agent-friendliness that can be measured without an agent (M16).
 
-    python3 eval/static.py [--json FILE]
+    python3 evaluation/static.py [--json FILE]
 
 - Diagnostics: `vela check --json` on every test in tests/fail, counting
   how many diagnostics carry a stable code and an edit that fixes them

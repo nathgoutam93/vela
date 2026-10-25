@@ -226,7 +226,7 @@ fn main(){}
     assert '[E6010]' in run([c,'test','--properties','--cases','257',p],env,1).stderr
 
 def repair(c,w,env):
-    sys.path.insert(0,str(ROOT/'eval'))
+    sys.path.insert(0,str(ROOT/'evaluation'))
     from prepare import prepare, task_dir
     workspace=w/'repair'
     prepare(task_dir('21'),workspace,c,'guide')

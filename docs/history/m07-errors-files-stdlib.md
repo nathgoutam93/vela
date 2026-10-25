@@ -370,7 +370,7 @@ Recorded in the roadmap:
 
 ## 11. Questions for you before M8
 
-M8 is the big one: the compiler rewritten in Vela, `stage1/`, module by
+M8 is the big one: the compiler rewritten in Vela, `compiler/src/`, module by
 module, checked against Stage 0's output on every test. My plan is the
 lexer first (identical `tokens` dumps), then the parser (identical `ast`
 dumps), then the checker (identical error messages), then the code

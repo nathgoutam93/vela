@@ -32,16 +32,16 @@ answer agents in JSON. A program fetches json from GitHub with
 
 | File | What |
 | --- | --- |
-| `stage1/rename.vl` (new) | renaming: the edits, checking them, `vela rename` and `vela query rename` |
-| `stage1/complete.vl` (new) | completion: the half-typed line, what is in scope, `vela query complete` |
-| `stage1/checker.vl` | `check_completing`: notes what is in scope where the completed name is |
-| `stage1/index.vl` | signatures and descriptions of the built-in functions, for hover and completion |
-| `stage1/lsp.vl` | `textDocument/completion`, `prepareRename`, `rename` |
-| `stage1/query.vl`, `main.vl` | the new commands |
+| `compiler/src/rename.vl` (new) | renaming: the edits, checking them, `vela rename` and `vela query rename` |
+| `compiler/src/complete.vl` (new) | completion: the half-typed line, what is in scope, `vela query complete` |
+| `compiler/src/checker.vl` | `check_completing`: notes what is in scope where the completed name is |
+| `compiler/src/index.vl` | signatures and descriptions of the built-in functions, for hover and completion |
+| `compiler/src/lsp.vl` | `textDocument/completion`, `prepareRename`, `rename` |
+| `compiler/src/query.vl`, `main.vl` | the new commands |
 | `packages/json/` (moved from `std/json.vl`) | the json package |
-| `stage1/vela.mod` (new) | the compiler uses `packages/json` as a directory package |
-| `stage1/packages.vl` | packages in a directory of a repository (`URL//DIR`); the files `vela new` makes |
-| `stage1/modules.vl` | `import json` without the package says how to get it |
+| `compiler/src/vela.mod` (new) | the compiler uses `packages/json` as a directory package |
+| `compiler/src/packages.vl` | packages in a directory of a repository (`URL//DIR`); the files `vela new` makes |
+| `compiler/src/modules.vl` | `import json` without the package says how to get it |
 | `editors/` | rename and completion in the docs; Neovim's `<C-x><C-o>` |
 | `tests/` | `lsp_client.py`, `nvim_test.lua` and `pkg_test.py` extended; four new `cli` tests |
 
@@ -96,7 +96,7 @@ repositories locally, one of them with two packages in directories.
 
 **The compiler itself uses json.** The language server parses JSON and
 `vela query` writes it. The compiler is now a program with a
-`stage1/vela.mod`:
+`compiler/src/vela.mod`:
 
 ```
 package vela
@@ -353,7 +353,7 @@ and `Int | Byte | Float | Bool | Str` for `print`.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh` | fixed point, 71,466 lines; the seed is up to date |
+| `sh compiler/bootstrap/bootstrap.sh` | fixed point, 71,466 lines; the seed is up to date |
 | `python3 run_tests.py` (gcc) | 254 passed |
 | `VELA_CC=clang python3 run_tests.py` | 254 passed |
 | `python3 run_tests.py --sanitize` | 254 passed |
@@ -361,7 +361,7 @@ and `Int | Byte | Float | Bool | Str` for `print`.
 | The suite with a compiler built with ASan + UBSan + LSan, and with one built with ThreadSanitizer | 254 passed each |
 | `python3 run_tests.py --stage0` | 188 passed |
 | `python3 compare_stages.py tokens ast check` | 644 same, 0 different |
-| `vela fmt -l` on `stage1/`, `std/`, `packages/` and `examples/` | nothing to format |
+| `vela fmt -l` on `compiler/src/`, `std/`, `packages/` and `examples/` | nothing to format |
 | 120 completions and renames at random places in five compiler files, by the ASan-built compiler | no crash, no memory error |
 
 **New tests:**

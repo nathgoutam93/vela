@@ -83,7 +83,7 @@ The gate builds fresh C/native compiler images from the same sources before
 timing them, retains binary/source fingerprints and raw timing samples, and
 checks that sources stay unchanged. It requires all twelve normal workloads,
 matching outputs, a native/C geometric mean at most 1.5, and faster native
-compiler check **and** C emission on stage1/main.vl. Quick, output-only or
+compiler check **and** C emission on compiler/src/main.vl. Quick, output-only or
 partial selections cannot pass it. Earlier M19/M22 C-backend thresholds remain
 separate preservation checks. Performance runs do not overlap broad suites.
 
@@ -130,8 +130,8 @@ and 1.85 times C respectively.
 
 | Compiler operation | C built | Native built | Native time reduction |
 | --- | --- | --- | --- |
-| check stage1/main.vl | 0.1766 s | 0.1675 s | 5.2% |
-| emit C for stage1/main.vl | 0.4388 s | 0.3999 s | 8.9% |
+| check compiler/src/main.vl | 0.1766 s | 0.1675 s | 5.2% |
+| emit C for compiler/src/main.vl | 0.4388 s | 0.3999 s | 8.9% |
 
 C-backend preservation ratios are 1.081 for varints and 1.050 for arena_trees
 (limits 1.1), 1.046 for SHA-256 and 0.911 for CRC-32 (limits 1.2).
@@ -150,14 +150,14 @@ Validation confirms those compiler/benchmark sources are unchanged.
 | Complete supported native suite | 304 passed, 0 failed |
 | Native runtime and M19–M26a integrations, including M25, under UBSan | 125 passed, 0 failed |
 | Native-built compiler: runtime/negative fixtures plus M25/M26a | 238 passed, 0 failed |
-| C/native compiler emission | Byte-identical C and ARM64 assembly for stage1/main.vl |
+| C/native compiler emission | Byte-identical C and ARM64 assembly for compiler/src/main.vl |
 | M23/M24 with optimization disabled | Both C/native pass, including policy and measured coverage |
 | Strict runtime C | C11, Wall/Wextra/Werror, pedantic and Wshadow pass on Darwin and Linux x86 cross-compilation |
 | Linux x86 assembly | Eleven objects assemble: varints, arena_trees, nbody, SHA-256 and CRC-32 opt=1/0, plus the compiler opt=1 |
 | Static agent diagnostics | 373/373 coded diagnostics, 21 with edits |
 | Generated guide | 31,988 bytes; 7,997 tokens under bytes/4 estimate |
 
-The native-built compiler emits C matching bootstrap/vela1.c and assembly
+The native-built compiler emits C matching compiler/bootstrap/vela1.c and assembly
 matching the C-built compiler for the same relative source path. All three
 compiler-graph queries return identical JSON across compiler images and stay
 below one second in three samples after a warmup:
@@ -170,7 +170,7 @@ below one second in three samples after a warmup:
 
 [m25-validation.json](../../bench/results/m25-validation.json) retains source/image/seed
 fingerprints, commands, log hashes, query samples and explicit platform limits.
-[m25-static.json](../../eval/results/m25-static.json) retains the static evaluation.
+[m25-static.json](../../evaluation/results/m25-static.json) retains the static evaluation.
 No model-driven agent trial or actual tokenizer measurement was performed;
 VAL-002/VAL-003 remain open. UBSan instruments C runtime/helpers and generated
 C cases; emitted assembly is not sanitizer-instrumented. Linux objects were
@@ -186,7 +186,7 @@ design; deferred M28 diagnostics/contract-guide work is TL-036/TL-037.
 Bootstrap updates build/vela and build/vela-native to the selected sources:
 
 ```sh
-VELA_CACHE="$PWD/build/cache-m25" VELA_BACKEND=c sh bootstrap/bootstrap.sh --native
+VELA_CACHE="$PWD/build/cache-m25" VELA_BACKEND=c sh compiler/bootstrap/bootstrap.sh --native
 ```
 
 TL-003's temporary four-worker wrapper avoids oversubscribing this host.
@@ -215,7 +215,7 @@ python3 -u build/m25-tests.py --compiler "$PWD/build/vela" --backend c
 python3 -u build/m25-tests.py --compiler "$PWD/build/vela" --backend native
 python3 -u build/m25-tests.py --compiler "$PWD/build/vela-native" --backend native \
   tests/run/ tests/fail/ m25_test m26a_test
-python3 eval/static.py --vela "$PWD/build/vela" --json eval/results/m25-static.json
+python3 evaluation/static.py --vela "$PWD/build/vela" --json evaluation/results/m25-static.json
 ```
 
 Run these sequentially. Policy and loopback tests need a host execution context

@@ -25,11 +25,11 @@ walkthrough had measured 2.95 in an earlier run.
 | --- | --- |
 | `runtime/vela_rt.h` | inline fast paths: `vela_at`, `vela_unique`, `vela_push`, `vela_byte_at`, `vela_unique_map`; a count of 0 for objects never freed |
 | `runtime/vela_rt.c` | `vela_array_grow`; maps keep each entry's hash; strings hashed and compared a word at a time |
-| `stage1/codegen.vl` | uses the fast paths; match bindings borrowed from variables that cannot change |
-| `stage1/layout.vl` | one shared box for each variant that carries no values |
-| `stage1/main.vl` | the runtime cache |
+| `compiler/src/codegen.vl` | uses the fast paths; match bindings borrowed from variables that cannot change |
+| `compiler/src/layout.vl` | one shared box for each variant that carries no values |
+| `compiler/src/main.vl` | the runtime cache |
 | `tests/cache_test.py` | the cache, in the default suite |
-| `eval/grade.py` | a timed-out check is killed with everything it started |
+| `evaluation/grade.py` | a timed-out check is killed with everything it started |
 | `bench/profile.py` | `--compiler` |
 | `bench/results/after-m16b.json`, `bench/results/profile-m16b.json` | the numbers below |
 
@@ -221,7 +221,7 @@ it.
 ## 6. Found on the way
 
 **The grader left processes running.** When a hidden check timed out,
-`eval/grade.py` killed `vela test`, but not the test program it had
+`evaluation/grade.py` killed `vela test`, but not the test program it had
 started: the slow version of the performance task kept a core busy for
 minutes. Checks now run in a process group of their own, killed whole.
 If you have run the evaluation already, look for stray `tests` processes.
@@ -265,7 +265,7 @@ Each of these is M18 or M20 work, not a quick win:
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh --native` | fixed point, 89,917 lines of C in the seed; native fixed point, 636,701 lines of assembly |
+| `sh compiler/bootstrap/bootstrap.sh --native` | fixed point, 89,917 lines of C in the seed; native fixed point, 636,701 lines of assembly |
 | `python3 run_tests.py` (native) | 265 passed |
 | `python3 run_tests.py --backend c`, and with `VELA_CC=clang` | 265 passed each |
 | `--backend c --sanitize`, `--backend c --tsan` | 265 passed each |

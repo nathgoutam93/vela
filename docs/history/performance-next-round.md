@@ -9,7 +9,7 @@ They cannot establish that the original 1.16× baseline has reached 1.05×.
 
 ## Changes
 
-- `stage1/ranges.vl` tracks mutable locals at each program point. Branches
+- `compiler/src/ranges.vl` tracks mutable locals at each program point. Branches
   refine intervals; loop back edges, breaks and continues contribute to
   widened invariants. Mutable parameter invariants include entry arguments,
   assignments, and mutable call results. Function values have unrestricted
@@ -21,12 +21,12 @@ They cannot establish that the original 1.16× baseline has reached 1.05×.
   Short-circuit tests supply facts only on the path where they hold.
   There is no separate pass to hoist array length or data loads; the C
   compiler optimizes the resulting direct accesses.
-- `stage1/codegen.vl` emits direct accesses and plain arithmetic only for
+- `compiler/src/codegen.vl` emits direct accesses and plain arithmetic only for
   proved operations. Unknown cases retain their runtime checks. Conditions
   with mutation, assignment evaluation order, stale lengths within an
   expression, and the distinction between an exact endpoint and an upper
   bound have regression tests.
-- `stage1/layout.vl` represents boxes of enums with exactly one empty and
+- `compiler/src/layout.vl` represents boxes of enums with exactly one empty and
   one carrying variant using NULL for the empty variant and a box containing
   only the carrying payload otherwise. Stack values retain their existing
   tagged representation. Enums used in boxed struct fields keep addressable

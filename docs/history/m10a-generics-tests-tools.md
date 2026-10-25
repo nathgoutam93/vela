@@ -39,7 +39,7 @@ top customers:
   linus       65.00
   ada         62.50
 
-$ build/vela fmt -l stage1/*.vl std/*.vl examples/*/*.vl     # lists nothing
+$ build/vela fmt -l compiler/src/*.vl std/*.vl examples/*/*.vl     # lists nothing
 $ python3 run_tests.py
 216 passed, 0 failed  (compiler: /home/user/vela/build/vela)
 ```
@@ -48,14 +48,14 @@ What changed:
 
 | File | What |
 | --- | --- |
-| `stage1/types.vl` | type parameters, instances of generic types, substitution |
-| `stage1/parser.vl`, `ast.vl` | `[T: Ord]` after a function's or type's name; `test` declarations; expressions back to source text |
-| `stage1/checker.vl` | bounds, inferring type arguments, generic structs, enums and patterns; tests; `assert` |
-| `stage1/mono.vl` (new, 254 lines) | finds the copies of generic functions a program needs |
-| `stage1/codegen.vl`, `layout.vl` | one C function per copy, one C struct per instance; `assert`; test builds |
-| `stage1/format.vl` (new, 349 lines) | `vela fmt` |
-| `stage1/lexer.vl` | the `test` keyword; comments are kept for the formatter |
-| `stage1/main.vl` | `test`, `fmt`, `check --json` |
+| `compiler/src/types.vl` | type parameters, instances of generic types, substitution |
+| `compiler/src/parser.vl`, `ast.vl` | `[T: Ord]` after a function's or type's name; `test` declarations; expressions back to source text |
+| `compiler/src/checker.vl` | bounds, inferring type arguments, generic structs, enums and patterns; tests; `assert` |
+| `compiler/src/mono.vl` (new, 254 lines) | finds the copies of generic functions a program needs |
+| `compiler/src/codegen.vl`, `layout.vl` | one C function per copy, one C struct per instance; `assert`; test builds |
+| `compiler/src/format.vl` (new, 349 lines) | `vela fmt` |
+| `compiler/src/lexer.vl` | the `test` keyword; comments are kept for the formatter |
+| `compiler/src/main.vl` | `test`, `fmt`, `check --json` |
 | `runtime/vela_rt.c` | assertion failures |
 | `std/lists.vl` (new) | generic `contains`, `index_of`, `reverse`, `sort`, `sort_by`, `order`, `unique`, `count`, `max`, `min`, ... |
 | `examples/orders/` (new) | the example: `csv.vl`, `orders.vl`, `report.vl`, `main.vl`, `orders.csv` |
@@ -245,7 +245,7 @@ once per test, with the test's number as its argument. So:
 source can use only what the seed compiles, so this took two commits. The
 first added `test` to the compiler and regenerated the seed. The second
 gave the compiler's own modules tests: the formatter's rules, type
-substitution and path handling. `vela test stage1/main.vl` runs them, and so
+substitution and path handling. `vela test compiler/src/main.vl` runs them, and so
 does `run_tests.py`.
 
 ## 3. `vela fmt`
@@ -289,7 +289,7 @@ fn add_user(table: mut Table, is_struct: Bool, name: Str, module: Str, public: B
 
 The formatter indents them one level instead. Alignment breaks every time
 the function is renamed, and a one-level indent is what gofmt, rustfmt and
-black do. `stage1/`, `std/` and `examples/` are formatted, and
+black do. `compiler/src/`, `std/` and `examples/` are formatted, and
 `run_tests.py` keeps them so. Long lines are not wrapped; see question 3.
 
 ## 4. `vela check --json`
@@ -419,13 +419,13 @@ Result: 898 comparisons, 0 different.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh` | fixed point, 39,555 lines; the seed is up to date |
+| `sh compiler/bootstrap/bootstrap.sh` | fixed point, 39,555 lines; the seed is up to date |
 | `python3 run_tests.py` (gcc) | 216 passed |
 | `VELA_CC=clang python3 run_tests.py` | 216 passed |
 | `python3 run_tests.py --sanitize` | 216 passed |
 | `python3 run_tests.py --stage0` | 199 passed (the rest are Stage 1 only) |
 | `python3 compare_stages.py tokens ast check c` | 898 same, 0 different |
-| The seed built with ASan + UBSan + LeakSanitizer compiling `stage1/` | clean, identical to the seed |
+| The seed built with ASan + UBSan + LeakSanitizer compiling `compiler/src/` | clean, identical to the seed |
 | The suite run with that sanitizer-built compiler | 215 of 215 passed (before the last test was added) |
 | The new compiler compiling itself, before the first seed update | identical C |
 | C for the 104 programs without generics, old compiler against new | identical |

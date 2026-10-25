@@ -12,7 +12,7 @@ You need gcc or clang and Python 3.10+. The compiler itself has no Python
 build dependency; Python runs the development and validation scripts.
 
 ```sh
-sh bootstrap/bootstrap.sh
+sh compiler/bootstrap/bootstrap.sh
 python3 run_tests.py --backend c --jobs 4
 ```
 
@@ -20,17 +20,17 @@ The first command checks the C bootstrap fixed point. To build the native
 compiler and check its fixed point too:
 
 ```sh
-sh bootstrap/bootstrap.sh --native
+sh compiler/bootstrap/bootstrap.sh --native
 ```
 
-After changing `stage1/`, refresh the generated seed and check both
+After changing `compiler/src/`, refresh the generated seed and check both
 bootstrap generations with:
 
 ```sh
-sh bootstrap/bootstrap.sh --update
+sh compiler/bootstrap/bootstrap.sh --update
 ```
 
-Commit the regenerated `bootstrap/vela1.c` with compiler source changes.
+Commit the regenerated `compiler/bootstrap/vela1.c` with compiler source changes.
 Edit the Vela source rather than the generated seed. If new compiler source
 uses a feature the seed does not yet understand, first implement the feature
 and update the seed, then use the feature in a second change.
@@ -52,13 +52,13 @@ broad suites on a busy host. Automatic push/PR CI is currently paused; the
 
 ## Where to work
 
-- Compiler behavior and tools: [stage1 map](../stage1/README.md).
+- Compiler behavior and tools: [compiler map](../compiler/README.md).
 - Library and runtime behavior: `std/`, `packages/` and `runtime/`; add
   executable coverage in the relevant module or `tests/`.
 - Language/API contracts: [specification](specification.md),
   [agent JSON contracts](agent-json.md) and [compatibility policy](compatibility.md).
 - Performance: [benchmark guide](../bench/README.md).
-- Agent tasks and measurements: [evaluation guide](../eval/README.md).
+- Agent tasks and measurements: [evaluation guide](../evaluation/README.md).
 
 Read the relevant [walkthrough](history/README.md) when you need the rationale
 or acceptance commands for a feature. It is not necessary to read the full
@@ -68,10 +68,10 @@ history before making a small change.
 
 `build/` holds local compilers, scratch programs, logs and fresh reports; it
 is ignored by Git. Python caches and `.DS_Store` files are ignored too.
-`bootstrap/vela1.c` is generated but deliberately tracked: it is required
+`compiler/bootstrap/vela1.c` is generated but deliberately tracked: it is required
 to build Vela without an existing Vela compiler.
 
-`bench/results/` and `eval/results/` retain earlier measurements and
+`bench/results/` and `evaluation/results/` retain earlier measurements and
 validation records. Keep these reports intact, including their original
 paths, commands and source digests. Such paths describe the checkout at the
 time of the run. Put new experimental output under `build/` and retain it
@@ -89,3 +89,5 @@ not actually exercised.
 
 The repository cleanup's reading-inventory fix and validation are recorded in
 [TL-065](tooling-backlog.md#tl-065-static-reading-inventory-assumes-flat-documentation).
+The compiler/evaluation directory migration and its acceptance checks are
+recorded in [TL-066](tooling-backlog.md#tl-066-repository-tools-assume-the-bootstrap-era-compiler-layout).

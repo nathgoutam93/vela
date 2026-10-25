@@ -29,7 +29,7 @@ and through symlinks. The evaluation installer no longer needs a wrapper.
 
 Every compiler diagnostic carries a stable code assigned at its reporting
 site. Wording and source positions do not determine the code. The registry
-in `stage1/diagnostics.vl` contains 240 explanations, including command and
+in `compiler/src/diagnostics.vl` contains 240 explanations, including command and
 I/O failures. Codes should not be renumbered or reused when a message changes.
 
 Human-readable diagnostics retain their message and append `[CODE]`.
@@ -88,12 +88,12 @@ The generated reference is about 17 KB, estimated at 4,200 tokens by M16's
 bytes/4 measure. The integration test enforces the 8,000-token estimate
 budget. This estimate is not a model-specific tokenizer measurement.
 
-`eval/prepare.py` defaults to `--context guide`, installs `GUIDE.md` and std,
+`evaluation/prepare.py` defaults to `--context guide`, installs `GUIDE.md` and std,
 and omits the walkthroughs. The old `docs`, `readme`, and `none` conditions
 remain available. The prompt describes module checking and the new tools.
 The stack task no longer claims that builtin names are forbidden in modules.
 
-`eval/results/static.json` preserves the M16 baseline. `eval/results/m17-static.json` records:
+`evaluation/results/static.json` preserves the M16 baseline. `evaluation/results/m17-static.json` records:
 
 | Measure | M16 | M17 |
 | --- | ---: | ---: |
@@ -114,7 +114,7 @@ still require running the agent evaluation harness.
 
 ## Validation
 
-- The C bootstrap reaches a fixed point; `bootstrap/vela1.c` is refreshed.
+- The C bootstrap reaches a fixed point; `compiler/bootstrap/vela1.c` is refreshed.
 - The 269 host-supported checks cover golden tests, compiler and std tests,
   examples, package behavior, LSP/Neovim, the twenty-task evaluation self-test,
   and the new M17 integration checks.

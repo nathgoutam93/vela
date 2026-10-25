@@ -31,12 +31,12 @@ ordinary names except at the start of a signature's clause.
 
 | File | What |
 | --- | --- |
-| `stage1/types.vl` | function types (tag `Func`, with a `result`) |
-| `stage1/parser.vl`, `ast.vl`, `lexer.vl` | `fn(...) -> T` types; `uses`; `requires` / `ensures`; the `with` statement; keywords `uses` and `with` |
-| `stage1/checker.vl` | function values and indirect calls; effects; contracts and `result`; `with`; warnings and the stale-copy check |
-| `stage1/codegen.vl`, `layout.vl`, `mono.vl` | function pointers; contract checks at entry and at every return; `with` blocks that always put the real things back |
-| `stage1/errors.vl`, `main.vl` | warnings: printed in order with errors, not fatal, `severity` in JSON |
-| `stage1/format.vl` | `fn(` hugs; `uses` / `requires` / `ensures` lines are indented under the signature |
+| `compiler/src/types.vl` | function types (tag `Func`, with a `result`) |
+| `compiler/src/parser.vl`, `ast.vl`, `lexer.vl` | `fn(...) -> T` types; `uses`; `requires` / `ensures`; the `with` statement; keywords `uses` and `with` |
+| `compiler/src/checker.vl` | function values and indirect calls; effects; contracts and `result`; `with`; warnings and the stale-copy check |
+| `compiler/src/codegen.vl`, `layout.vl`, `mono.vl` | function pointers; contract checks at entry and at every return; `with` blocks that always put the real things back |
+| `compiler/src/errors.vl`, `main.vl` | warnings: printed in order with errors, not fatal, `severity` in JSON |
+| `compiler/src/format.vl` | `fn(` hugs; `uses` / `requires` / `ensures` lines are indented under the signature |
 | `runtime/vela_rt.c` | the fakes; contract failures |
 | `std/lists.vl` | `map`, `filter`, `any`, `all`, `fold`; `sort_by(xs, key)` takes a function |
 | `examples/orders/` | the whole example: effects, contracts, function values, a test of `main` itself |
@@ -292,15 +292,15 @@ time, which is the price of checking them.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh` | fixed point, 43,181 lines; the seed is up to date |
+| `sh compiler/bootstrap/bootstrap.sh` | fixed point, 43,181 lines; the seed is up to date |
 | `python3 run_tests.py` (gcc) | 221 passed |
 | `VELA_CC=clang python3 run_tests.py` | 221 passed |
 | `python3 run_tests.py --sanitize` | 221 passed in each of the last six runs; one earlier run had one failure whose output I did not keep, and it has not come back |
 | The suite run with a compiler built with ASan + UBSan + LSan | 221 passed |
-| That compiler compiling `stage1/` | clean, identical to the seed |
+| That compiler compiling `compiler/src/` | clean, identical to the seed |
 | `python3 run_tests.py --stage0` | 191 passed (the rest are Stage 1 only) |
 | `python3 compare_stages.py tokens ast check c` | 864 same, 0 different |
-| `vela fmt -l` on `stage1/`, `std/` and `examples/` | nothing to format |
+| `vela fmt -l` on `compiler/src/`, `std/` and `examples/` | nothing to format |
 | The compiler's own `vela check` | no warnings |
 
 Six tests are new:
@@ -364,7 +364,7 @@ both marked optional.
    split lines and parse numbers. `std/strings.vl` cannot be added beside
    the built-in `strings`, so I suggest `std/text.vl`: `split`, `trim`,
    `parse_int`, `join`, `contains`, `starts_with`. Standard modules are
-   found before a program's own files, so the compiler's `stage1/text.vl`
+   found before a program's own files, so the compiler's `compiler/src/text.vl`
    would be renamed. Fine?
 
 **Answered after M10b:** M10c, then M12; add closures; wait on effects

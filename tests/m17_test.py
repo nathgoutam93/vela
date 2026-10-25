@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / 'eval'))
+sys.path.insert(0, str(ROOT / 'evaluation'))
 from prepare import prepare, task_dir  # noqa: E402
 
 
@@ -163,11 +163,11 @@ pub fn read() -> Str { return match files.read("x") { Ok(x) => x, Err(_) => "" }
 
 
 def catalog(c: Checks):
-    registry = (ROOT / 'stage1/diagnostics.vl').read_text()
+    registry = (ROOT / 'compiler/src/diagnostics.vl').read_text()
     codes = re.findall(r'Entry \{ code: "(E[0-9]{4})"', registry)
     assert len(codes) == len(set(codes)) and len(codes) > 200
     referenced = set()
-    for source in (ROOT / 'stage1').glob('*.vl'):
+    for source in (ROOT / 'compiler/src').glob('*.vl'):
         if source.name != 'diagnostics.vl':
             referenced.update(re.findall(r'\bE[0-9]{4}\b', source.read_text()))
     assert referenced <= set(codes), referenced - set(codes)

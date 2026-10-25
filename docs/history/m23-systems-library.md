@@ -36,7 +36,7 @@ findings and platform validation remain in [the backlog](../tooling-backlog.md).
 
 ## Library and runtime boundary
 
-`stage1/sysops.vl` describes system-operation arguments, results and effects.
+`compiler/src/sysops.vl` describes system-operation arguments, results and effects.
 The checker validates these calls and both generators use the same audited
 runtime ABI: a success flag plus owned success/error outputs. `clock` and
 `sysio` are builtin modules; the public libraries are ordinary Vela code.
@@ -221,14 +221,14 @@ unchanged workloads, not network-throughput measurements.
 [after-m23.json](../../bench/results/after-m23.json) retains machine/toolchain, timings,
 thresholds and compiler/source fingerprints. Its baseline commit is M22's
 18204b0 and its dirty-tree flag identifies this measurement before commit.
-[eval/results/m23-static.json](../../eval/results/m23-static.json) records static evaluation:
+[evaluation/results/m23-static.json](../../evaluation/results/m23-static.json) records static evaluation:
 373/373 negative diagnostics have codes and 21 have edits. No new agent-driven
 trial or actual model-tokenizer measurement is claimed.
 
 Reproduction from the repository root:
 
 ```sh
-VELA_CACHE="$PWD/build/cache-m23" sh bootstrap/bootstrap.sh --update
+VELA_CACHE="$PWD/build/cache-m23" sh compiler/bootstrap/bootstrap.sh --update
 python3 tests/m23_test.py "$PWD/build/vela"
 VELA_CFLAGS="-fsanitize=undefined -fno-sanitize-recover=all" \
     python3 tests/m23_test.py "$PWD/build/vela"
@@ -239,7 +239,7 @@ VELA_CACHE="$PWD/build/cache-m23" python3 bench/run.py varints arena_trees sha25
 
 The 298-check supported selection uses the TL-003 four-outer-worker wrapper,
 an absolute compiler override, C backend, and Neovim XDG paths under build/.
-It includes examples/, stage1/, std/, packages/, tests/run/, tests/fail/,
+It includes examples/, compiler/src/, std/, packages/, tests/run/, tests/fail/,
 tests/dump/, tests/cli/, LSP/Neovim, package/evaluation scripts and all milestone
 integrations. The UBSan selection is tests/run/ plus M19–M23 integrations.
 The native-forcing native_test/cache_test/bench_test scripts remain excluded

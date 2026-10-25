@@ -160,14 +160,14 @@ def compiler_times(compiler: Path, runs: int, native: Path | None = None) -> dic
             continue
         out[name] = {"sha256": hashlib.sha256(exe.read_bytes()).hexdigest()}
         for what in ["check", "c"]:
-            samples = timing_samples([str(exe), what, str(ROOT / "stage1" / "main.vl")], runs)
+            samples = timing_samples([str(exe), what, str(ROOT / "compiler/src" / "main.vl")], runs)
             out[name][what] = samples["best"]
             out[name][what + "_timing"] = samples
     return out
 
 
 def source_identity() -> dict[str, str]:
-    paths = [*ROOT.glob('stage1/*'), *ROOT.glob('runtime/*'), *ROOT.glob('std/*.vl'),
+    paths = [*ROOT.glob('compiler/src/*'), *ROOT.glob('runtime/*'), *ROOT.glob('std/*.vl'),
              *ROOT.glob('packages/json/*'),
              ROOT / 'bench/run.py']
     for bench in BENCHES:
@@ -213,7 +213,7 @@ def main() -> int:
             # sources. An older adjacent vela-native cannot satisfy the gate.
             for backend in ('c', 'native'):
                 exe = work / ('compiler-' + backend)
-                done = run([str(driver), 'build', str(ROOT / 'stage1/main.vl'), '-o', str(exe)],
+                done = run([str(driver), 'build', str(ROOT / 'compiler/src/main.vl'), '-o', str(exe)],
                            env={**os.environ, 'VELA_BACKEND': backend, 'VELA_ROOT': str(ROOT)})
                 if done.returncode:
                     raise SystemExit(f'building paired {backend} compiler failed:\n{done.stderr.decode(errors="replace")}')

@@ -41,7 +41,7 @@ stored with the interface's identity, so equal short names in different
 modules do not merge. Inheritance walks track visited interfaces; cycles and
 conflicting inherited signatures are diagnostics.
 
-`stage1/interfaces.vl` supplies the three prelude declarations through the
+`compiler/src/interfaces.vl` supplies the three prelude declarations through the
 ordinary lexer/parser/checker path. Primitive operations provide intrinsic
 implementations, which can also satisfy user interfaces with the same method
 signatures. Ord and Key inherit Eq through interface metadata; the old
@@ -68,7 +68,7 @@ only through a descriptor. Adapters are generated only for actual map-key uses;
 an array type can have ordinary functions named eq/hash without implementing
 Key. Equal hashes need not mean equal values; collision lookup calls eq.
 
-The compiler uses a user-defined Named interface in `stage1/types.vl`.
+The compiler uses a user-defined Named interface in `compiler/src/types.vl`.
 FieldInfo and Variant supply label methods, and both field_index and
 variant_index delegate to one generic named_index implementation. This removes
 two copies of the same lookup loop through the same interface machinery used
@@ -148,7 +148,7 @@ marked as text because they are already defined by the compiler.
 `vela guide` is 24,475 bytes, approximately 6,118 tokens under the harness's
 bytes/4 estimate, within the current 8,000-token estimate gate. All 373
 negative-test diagnostics have codes and 21 carry applicable fixes. These
-measurements are retained in `eval/results/m20-static.json`; actual tokenizer and
+measurements are retained in `evaluation/results/m20-static.json`; actual tokenizer and
 agent-run validation remain separate.
 
 
@@ -177,7 +177,7 @@ flag identifies the uncommitted M20 sources measured here. Rust is not
 installed on this host, so this run compares C and Vela only.
 
 ```
-VELA_CACHE="$PWD/build/cache-m20" sh bootstrap/bootstrap.sh --update
+VELA_CACHE="$PWD/build/cache-m20" sh compiler/bootstrap/bootstrap.sh --update
 VELA_CACHE="$PWD/build/cache-m20" python3 bench/run.py --quick --check --languages c vela
 VELA_CACHE="$PWD/build/cache-m20" python3 bench/run.py sha256 crc32 --runs 7 \
     --languages c vela --json bench/results/after-m20.json
@@ -187,6 +187,6 @@ The broad and UBSan runs used the runner's existing filters, with four outer
 workers set by a temporary Python wrapper. The UBSan selection was
 `tests/run/ m19_test m20_test` with
 `VELA_CFLAGS="-fsanitize=undefined -fno-sanitize-recover=all"`. The broad
-selection was `examples/ stage1/ std/ packages/ tests/run/ tests/fail/
+selection was `examples/ compiler/src/ std/ packages/ tests/run/ tests/fail/
 tests/dump/ tests/cli/ lsp_client pkg_test eval_test m17_test m19_test m20_test
 nvim_test`. TL-003 tracks making the worker limit a normal runner option.

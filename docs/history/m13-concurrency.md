@@ -34,11 +34,11 @@ with it. All three hold:
 | File | What |
 | --- | --- |
 | `runtime/vela_rt.h`, `vela_rt.c` | reference counts that are atomic only for shared objects; marking values shared; the thread pool; locks for fakes, printing, stdin and `os.run` |
-| `stage1/checker.vl` | `tasks.map`, `tasks.each`, `tasks.workers`; effects through a function given straight to them; no `with` in a function value |
-| `stage1/codegen.vl`, `layout.vl` | share functions for every type and closure environment; the call thunks; marks where the C may be cut; no code after a `for` with no `break` |
-| `stage1/main.vl` | the C compiled in parts with `tasks.map`, then linked |
-| `stage1/modules.vl`, `format.vl` | the `tasks` module; a Float literal counts as a value |
-| `bootstrap/bootstrap.sh` | generations 2 and 3 built with `vela build` |
+| `compiler/src/checker.vl` | `tasks.map`, `tasks.each`, `tasks.workers`; effects through a function given straight to them; no `with` in a function value |
+| `compiler/src/codegen.vl`, `layout.vl` | share functions for every type and closure environment; the call thunks; marks where the C may be cut; no code after a `for` with no `break` |
+| `compiler/src/main.vl` | the C compiled in parts with `tasks.map`, then linked |
+| `compiler/src/modules.vl`, `format.vl` | the `tasks` module; a Float literal counts as a value |
+| `compiler/bootstrap/bootstrap.sh` | generations 2 and 3 built with `vela build` |
 | `stage0/c_layout.py`, `stage0/main.py` | bug fixes so Stage 0 keeps working with the new runtime |
 | `run_tests.py` | `--tsan` |
 | `examples/mandelbrot/` (new) | rows rendered in parallel |
@@ -246,9 +246,9 @@ and the closures written for it. The driver then:
 
 | | one file | parts |
 | --- | --- | --- |
-| `vela build stage1/main.vl` (-O2) | 25.0 s | 7.2 s |
-| `vela test stage1/main.vl` (-O0) | 4.7 s | 1.6 s |
-| `sh bootstrap/bootstrap.sh` | about 80 s | 39 s |
+| `vela build compiler/src/main.vl` (-O2) | 25.0 s | 7.2 s |
+| `vela test compiler/src/main.vl` (-O0) | 4.7 s | 1.6 s |
+| `sh compiler/bootstrap/bootstrap.sh` | about 80 s | 39 s |
 | the built compiler compiling itself | 0.276 s | 0.257 s |
 
 Across parts gcc cannot inline one function into another, but the
@@ -293,16 +293,16 @@ identical C.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh` | fixed point, 61,300 lines; the seed is up to date |
+| `sh compiler/bootstrap/bootstrap.sh` | fixed point, 61,300 lines; the seed is up to date |
 | `python3 run_tests.py` (gcc) | 247 passed |
 | `VELA_CC=clang python3 run_tests.py` | 247 passed |
 | `python3 run_tests.py --sanitize` | 247 passed |
 | `python3 run_tests.py --tsan` | 247 passed |
-| The suite with a compiler built with ASan + UBSan + LSan | 247 passed; that compiler compiles `stage1/` to C identical to the seed |
-| The suite with a compiler built with ThreadSanitizer | 247 passed; that compiler compiles `stage1/` to C identical to the seed |
+| The suite with a compiler built with ASan + UBSan + LSan | 247 passed; that compiler compiles `compiler/src/` to C identical to the seed |
+| The suite with a compiler built with ThreadSanitizer | 247 passed; that compiler compiles `compiler/src/` to C identical to the seed |
 | `python3 run_tests.py --stage0` | 188 passed |
 | `python3 compare_stages.py tokens ast check` | 646 same, 0 different |
-| `vela fmt -l` on `stage1/`, `std/` and `examples/` | nothing to format |
+| `vela fmt -l` on `compiler/src/`, `std/` and `examples/` | nothing to format |
 | ThreadSanitizer on a runtime that skips the marking | the race is reported |
 
 New tests:
@@ -324,7 +324,7 @@ New tests:
   below.
 - `examples/mandelbrot`, with a test that the parallel picture is the
   one-by-one picture.
-- A test of how the C is cut into parts, in `stage1/main.vl`.
+- A test of how the C is cut into parts, in `compiler/src/main.vl`.
 
 Two older messages mention the new exception for functions given to
 `tasks`.

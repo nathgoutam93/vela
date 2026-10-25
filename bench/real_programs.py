@@ -118,7 +118,7 @@ def compiler_images(driver,work,env,full):
     images={'c':driver};builds={}
     for backend in (['c','native'] if full and native_host() else ['native'] if native_host() else []):
         exe=work/('compiler-'+backend+('.exe' if os.name=='nt' else ''))
-        sample,_=measure([str(driver),'build','stage1/main.vl','-o',str(exe)],{**env,'VELA_BACKEND':backend})
+        sample,_=measure([str(driver),'build','compiler/src/main.vl','-o',str(exe)],{**env,'VELA_BACKEND':backend})
         images[backend]=exe;builds[backend]=sample
     return images,builds
 
@@ -221,12 +221,12 @@ def main():
             print(name+': outputs agree; '+str({k:round(v['timing']['median'],4) for k,v in rows.items()}),flush=True)
         # The compiler's C reference is the same compiler built through C;
         # the two application references above are handwritten independent C.
-        reference=run([str(images['c']),'c','stage1/main.vl'],env).stdout
+        reference=run([str(images['c']),'c','compiler/src/main.vl'],env).stdout
         rows={};samples={k:[] for k in languages}
         for trial in range(1 if opts.check else opts.runs):
             for language in languages[trial%len(languages):]+languages[:trial%len(languages)]:
                 exe=images['native'] if language=='vela-native' else images['c']
-                sample,actual=measure([str(exe),'c','stage1/main.vl'],env)
+                sample,actual=measure([str(exe),'c','compiler/src/main.vl'],env)
                 assert actual==reference,'compiler C output differs';samples[language].append(sample)
         for language in languages:
             exe=images['native'] if language=='vela-native' else images['c']

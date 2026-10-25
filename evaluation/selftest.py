@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the evaluation itself: every task is solvable and its checks bite.
 
-    python3 eval/selftest.py [TASK...] [--vela PATH]
+    python3 evaluation/selftest.py [TASK...] [--vela PATH]
 
 For each task: the starting workspace must fail its hidden checks (or the
 task would grade nothing), and the workspace with the reference solution

@@ -131,6 +131,6 @@ Saving it as build/design-review-m30.vl and running
 `{"ok": true, "errors": []}` on 2026-10-25. This observes acceptance of an
 unacknowledged Result call, an explicit discard, and a printing contract
 predicate. It is a static check, not execution or a performance measurement.
-stage1/checker.vl explicitly allows ignored call results and checks contract
-clauses as Bool in the enclosing effect context; stage1/guide.vl currently
+compiler/src/checker.vl explicitly allows ignored call results and checks contract
+clauses as Bool in the enclosing effect context; compiler/src/guide.vl currently
 describes those clauses as pure. These gaps belong to M28, not M25.

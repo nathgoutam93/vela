@@ -133,7 +133,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-004: Runtime cache omitted an included header
 
 - **Status:** resolved in M19, extended through M24; native execution remains in VAL-001.
-- **Evidence:** `cached_runtime` in `stage1/main.vl` hashed only `vela_rt.c` and
+- **Evidence:** `cached_runtime` in `compiler/src/main.vl` hashed only `vela_rt.c` and
   `vela_rt.h`. M19 adds `vela_int.h`, included by the public runtime header.
   Changes to that file alone would leave a cached native runtime object stale.
 - **Impact:** C inline operations and the native runtime could disagree after
@@ -164,7 +164,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-005: Unsigned native branch folding assumed a nonnegative operand
 
 - **Status:** resolved in M19; native execution validation remains in VAL-001.
-- **Evidence:** `branch_holds` in `stage1/opt.vl` modeled unsigned `<` with
+- **Evidence:** `branch_holds` in `compiler/src/opt.vl` modeled unsigned `<` with
   `a >= 0 && (b < 0 || a < b)`. It incorrectly treats the u64 bit patterns
   -2 and -1 as not ordered by `<`. Existing array bounds used a nonnegative
   length, so that assumption did not cover the new u64 pattern ranges.
@@ -723,7 +723,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-027: Native IR omits target ABI argument layout metadata
 
 - **Status:** resolved during M26a; Linux execution remains VAL-001.
-- **Evidence:** foreign_call/callback in stage1/lower.vl pass scalar class and
+- **Evidence:** foreign_call/callback in compiler/src/lower.vl pass scalar class and
   float32 kind, but ir.Inst lacks scalar widths/variadic fixed-argument count;
   ir.Func lacks C callback parameter widths. The x86 emitter uses 8-byte stack
   argument slots, while Apple's ABI packs narrow fixed scalars and puts unnamed
@@ -745,9 +745,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-028: An unavailable default cache leaks mkdir stderr
 
 - **Status:** resolved in the pre-M30 tooling follow-up; observed during the initial M26a intermediate build.
-- **Evidence:** build/vela build stage1/main.vl -o build/vela-m26a succeeded
+- **Evidence:** build/vela build compiler/src/main.vl -o build/vela-m26a succeeded
   while printing mkdir: /Users/nathgoutam93/.cache/vela: Operation not permitted
-  under the workspace sandbox. cached_runtime in stage1/main.vl attempts to
+  under the workspace sandbox. cached_runtime in compiler/src/main.vl attempts to
   create the default cache through os.run before falling back without caching.
 - **Impact:** a successful compilation emits a low-level permission message,
   which can be mistaken for a compiler failure.
@@ -917,7 +917,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-034: Native immutable projections copy whole aggregates
 
 - **Status:** resolved in M25; discovered during M25 profiling and research experiments.
-- **Evidence:** `stage1/checker.vl` method lookup binds an immutable function
+- **Evidence:** `compiler/src/checker.vl` method lookup binds an immutable function
   record from an array; native let/foreach lowering previously materialized
   whole aggregate values and retained their managed fields. Four-second
   `/usr/bin/sample` profiles of compiler C emission observed 320 native
@@ -950,7 +950,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-035: ARM allocation spills a frequently used loop state pointer
 
 - **Status:** resolved in M25; discovered during M25 performance acceptance.
-- **Evidence:** `build/vela-m25 asm stage1/main.vl`, lexer_identifier, reloads
+- **Evidence:** `build/vela-m25 asm compiler/src/main.vl`, lexer_identifier, reloads
   its Lexer pointer from a stack spill before several loads/stores in the
   character loop. regalloc.allocate chooses the farthest-ending active
   interval without considering use frequency. The 1.461-times-C program
@@ -1033,7 +1033,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   during the M25 pause's design review on 2026-10-25. This does not expand M25.
 - **Evidence:** the same
   [baseline program](design-baseline-to-m30.md#current-behavior-evidence)
-  passes check with a requires predicate that prints. stage1/guide.vl says
+  passes check with a requires predicate that prints. compiler/src/guide.vl says
   clauses are pure Bool; checker.function checks them as Bool in the enclosing
   effect context. Printing is intentionally effect-free. The M10b walkthrough
   already describes calls in contracts and propagation of their effects.
@@ -1067,9 +1067,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   compilation also exposed an unused POSIX-only timing helper; gate that helper
   to its actual profiles rather than weakening the warning flags. Independent C
   ABI oracles execute on macOS, Linux/Rosetta, Windows/Wine and WASI/wasmtime.
-- **Evidence:** `stage1/main.vl:build_from` selected native whenever `--target`
+- **Evidence:** `compiler/src/main.vl:build_from` selected native whenever `--target`
   was supplied, even under `VELA_BACKEND=c`. `targets.require_host` rejected
-  cross-linking. `stage1/cffi.vl:type_id` and runtime static assertions assumed
+  cross-linking. `compiler/src/cffi.vl:type_id` and runtime static assertions assumed
   64-bit pointers and `long` for every target.
 - **Impact:** C cross-compilation cannot be selected; Windows LLP64 and WASI
   ILP32 C declarations would have the wrong integer aliases.
@@ -1392,7 +1392,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-054: Evaluation installation did not preserve the Windows executable suffix
 
 - **Status:** corrected during M28; actual Windows execution remains VAL-005.
-- **Observed source:** eval/prepare.py installed every compiler as bin/vela
+- **Observed source:** evaluation/prepare.py installed every compiler as bin/vela
   and used that path for guide/counterexample subprocesses. M28 adds installed
   counterexample preparation to its acceptance script, including Windows CI.
   Native Windows execution of this path has not been observed on this host.
@@ -1433,7 +1433,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-056: Byte-balanced C partitions invalidate unrelated objects
 
 - **Status:** resolved during M29; local acceptance and build budgets pass.
-- **Observed source:** stage1/main.vl:c_parts chooses boundaries from total
+- **Observed source:** compiler/src/main.vl:c_parts chooses boundaries from total
   C byte length. Editing one function body changes the byte shares and can
   move otherwise unchanged functions between translation units.
 - **Impact:** object caching alone cannot reliably reuse unaffected units
@@ -1612,8 +1612,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 - **Status:** resolved during repository cleanup after the M30 candidate;
   discovered while organizing the milestone walkthroughs.
-- **Evidence:** `eval/static.py` used `docs.glob("*.md")`, while
-  `eval/prepare.py --context docs` copies the whole documentation tree.
+- **Evidence:** `evaluation/static.py` used `docs.glob("*.md")`, while
+  `evaluation/prepare.py --context docs` copies the whole documentation tree.
   Moving the 40 walkthroughs into `docs/history/` would exclude them from
   the reading inventory despite still supplying them to evaluated agents.
   This is an observed enumeration mismatch, not a measured agent improvement.
@@ -1624,11 +1624,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   checkout and condition for comparisons; the shortened README also changes
   the current reading condition independently of the directory moves.
 - **Resolution:** use `docs.rglob("*.md")` to count the recursively copied
-  documentation. Keep earlier snapshots byte-identical in `eval/results/`,
+  documentation. Keep earlier snapshots byte-identical in `evaluation/results/`,
   and retain benchmark/validation evidence in `bench/results/`. The current
   reference index and contributor/compiler/test maps point newcomers to
   active material without removing milestone history or required tests.
-- **Acceptance:** run `python3 eval/static.py --json build/cleanup-static.json`
+- **Acceptance:** run `python3 evaluation/static.py --json build/cleanup-static.json`
   and compare its `README and walkthroughs` byte count to the README plus
   all recursively copied Markdown files. Prepare a task with `--context docs`
   and verify nested walkthroughs are included. Check relative Markdown links,
@@ -1641,6 +1641,55 @@ the same entry. Close it with a commit or validation result; keep its history.
   40 walkthroughs. All local relative Markdown links resolve; the 61 moved JSON
   reports and active benchmark budgets are byte-identical to the prior
   checkout. The reading inventory is checked against the recursive file sum.
+
+### TL-066: Repository tools assume the bootstrap-era compiler layout
+
+- **Status:** resolved during folder naming cleanup after the M30 candidate.
+- **Evidence:** at `0516fd9`, `run_tests.py` discovers `stage1/main.vl`,
+  benchmark scripts check/translate that path, and evaluation callers import
+  tools from `eval/`. The compiler manifest uses `../packages/json`, and the
+  M27 copied-compiler fixture recreates that relative layout. Inspect with
+  `git show 0516fd9:run_tests.py` and `git show 0516fd9:stage1/vela.mod`.
+  These are observed path assumptions, not an observed compiler semantic bug.
+- **Impact:** renaming folders without updating these references would break
+  bootstrap, test discovery, offline compiler imports, evaluation preparation
+  and copied-compiler debugging. The comparison tool must also keep working
+  against older checkouts that still have `stage1/main.vl`.
+- **Workaround:** run commands against the matching historical checkout until
+  its scripts and paths are migrated together; do not add duplicate source
+  trees or rely on local directory symlinks.
+- **Resolution:** group sources and the generated seed under
+  `compiler/src/` and `compiler/bootstrap/`, and rename the agent task kit to
+  `evaluation/`. Update script working directories, manifests, test discovery,
+  CI, documentation links and evaluation callers. Resolve each comparison
+  checkout's compiler source independently, including the historical layout.
+  Regenerate the seed because generated source metadata records file paths.
+- **Acceptance:** both bootstrap fixed points; complete C/native suites;
+  copied-compiler panic/debug coverage; evaluation task preparation and static
+  inventory; a paired comparison with an old-layout checkout; byte-identical
+  compiler Vela sources, pinned compatibility corpus and historical reports;
+  valid documentation links. Foreign native-host and model/tokenizer
+  acceptance remain separate below.
+- **Validation:** `sh compiler/bootstrap/bootstrap.sh --update --native`
+  reaches both C and native fixed points and refreshes the generated seed.
+  With host access, `python3 -u run_tests.py --compiler build/vela --backend c
+  --jobs 4` and the same command with `--backend native` each pass 311/311
+  with no failures or skips. An earlier managed-sandbox C run passed 305 and
+  failed six checks because local socket binding, nested OS sandbox setup,
+  Clang's external module cache and Neovim's external log path were denied;
+  the same checks pass in the host-access run. The permission errors do not
+  establish a compiler regression.
+- **Focused validation:** `VELA_M27_COMPILER_PANIC=1 python3 -u
+  tests/m27_test.py build/vela` passes copied-compiler trace/profile/source
+  checks with C and native. A quick single-run `bench/compare.py` invocation
+  against an archived `0516fd9` checkout resolves and translates both old
+  `stage1/main.vl` and current `compiler/src/main.vl`; its timings are only a
+  path check, not a performance claim. `python3 evaluation/static.py --json
+  build/folder-rename-static.json` retains 373/373 coded diagnostics and 21
+  fixes; `python3 evaluation/prepare.py 04-rpn build/folder-rename-evaluation
+  --context docs` succeeds. Relocated compiler `.vl` source bytes, pinned M30
+  fixture bytes and historical JSON report bytes match the prior checkout;
+  all current relative Markdown links resolve.
 
 ## Outstanding validation
 
@@ -1799,18 +1848,18 @@ the same entry. Close it with a commit or validation result; keep its history.
   self-test. Static checks find codes on 374 of 374 negative-test diagnostics,
   with edits on 21. No new model-driven agent runs were performed.
 - **M23 evidence:** the evaluation reference checks pass in the supported
-  suite; eval/results/m23-static.json records 373/373 coded diagnostics and 21 with
+  suite; evaluation/results/m23-static.json records 373/373 coded diagnostics and 21 with
   edits. No new model-driven agent trials were run.
-- **M24 evidence:** eval/results/m24-static.json retains 373/373 coded diagnostics
+- **M24 evidence:** evaluation/results/m24-static.json retains 373/373 coded diagnostics
   and 21 with edits; the inventory now credits API summary/measured coverage
   and conservative impact. This is not a model-driven agent trial.
-- **M26a evidence:** eval/results/m26a-static.json retains 373/373 coded diagnostics
+- **M26a evidence:** evaluation/results/m26a-static.json retains 373/373 coded diagnostics
   and 21 with edits; the guide stays within its estimate gate. No new agent
   trial was performed.
-- **M25 evidence:** eval/results/m25-static.json retains 373/373 coded diagnostics
+- **M25 evidence:** evaluation/results/m25-static.json retains 373/373 coded diagnostics
   and 21 with edits. The guide remains within its estimate budget. No new
   model-driven agent trial was performed.
-- **M26 evidence:** eval/results/m26-static.json retains 373/373 coded diagnostics and
+- **M26 evidence:** evaluation/results/m26-static.json retains 373/373 coded diagnostics and
   21 with edits. No model-driven agent comparison was run.
 - **M28 scope:** task 21 prepares fresh typed JSON counterexamples for three
   broken contracts. Hidden checks require unchanged contracts/signatures;
@@ -1818,7 +1867,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   validation is not an actual agent trial. Run agents with COUNTEREXAMPLES.json
   as the supplied failure feedback and retain graded repairs, model/condition,
   turns and tokens before claiming M28’s agent-repair acceptance.
-- **Pre-M30 follow-up:** eval/README.md specifies an agent-neutral kit; no
+- **Pre-M30 follow-up:** evaluation/README.md specifies an agent-neutral kit; no
   evaluation model or harness has been selected in the repository. Actual
   trials remain open while that choice is pending. Local compiler/guide
   regressions do not count as model-driven trials.
@@ -1829,9 +1878,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   Record repair-tool use, pass rate, turns, and token use; add observed friction
   here. Use repeated runs before drawing performance conclusions.
 - **Acceptance:** retain run metadata and graded results through the
-  [evaluation harness](../eval/README.md), with claims limited to what was run.
+  [evaluation harness](../evaluation/README.md), with claims limited to what was run.
 
-- **M28 local evidence:** the five stage1 contracts are proved and receive
+- **M28 local evidence:** the five compiler/src contracts are proved and receive
   bounded property checks. Four imported std contracts remain unknown in the
   scalar proof report; the report’s overall unknown status is retained.
   The expanded acceptance and custom Generator checks pass locally. The

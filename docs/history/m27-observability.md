@@ -126,7 +126,7 @@ VELA_M27_DEBUGGER=1 VELA_M27_COMPILER_PANIC=1 \
   python3 tests/m27_test.py build/vela
 VELA_M27_CROSS=1 VELA_TARGET_CC=zig WASMTIME=/path/to/wasmtime \
   python3 tests/m27_test.py build/vela
-VELA_BACKEND=c sh bootstrap/bootstrap.sh --update --native
+VELA_BACKEND=c sh compiler/bootstrap/bootstrap.sh --update --native
 python3 -u run_tests.py --compiler build/vela --backend c --jobs 4
 python3 -u run_tests.py --compiler build/vela --backend native --jobs 4
 ```
@@ -200,7 +200,7 @@ mean the underlying operation has no cost. See the measurement limits above.
 
 [The validation record](../../bench/results/m27-validation.json) retains host/compiler
 identities, source hashes, results and open validation IDs.
-[The static report](../../eval/results/m27-static.json) retains diagnostics/guide metrics.
+[The static report](../../evaluation/results/m27-static.json) retains diagnostics/guide metrics.
 The Platforms workflow now includes actual POSIX debugger acceptance and
 copied-compiler panic, M27 sanitizer coverage and Windows C observation checks;
 these configured CI jobs are not claims of native-host execution here.

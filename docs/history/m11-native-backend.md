@@ -21,7 +21,7 @@ Three checks show it:
 - **Every test natively:** every test also passes with its programs
   compiled natively (`run_tests.py --native`).
 
-`sh bootstrap/bootstrap.sh --native` checks the fixed point.
+`sh compiler/bootstrap/bootstrap.sh --native` checks the fixed point.
 
 The C backend stays the default. The native one is new, its code is 1 to
 22% slower than gcc -O2's (section 8), and the sanitizers cannot look
@@ -29,11 +29,11 @@ inside it.
 
 | File | What |
 | --- | --- |
-| `stage1/ir.vl` (new) | the IR: instructions on virtual registers, stack slots, labels; `vela ir` |
-| `stage1/lower.vl` (new) | a checked program as IR: codegen.vl's scheme, with memory layout, calls and the functions C used to get from layout.vl |
-| `stage1/x64.vl` (new) | register allocation by linear scan, and x86-64 assembly; `vela asm` |
-| `stage1/main.vl` | `VELA_BACKEND=native` for build, run and test; `vela ir`, `vela asm` |
-| `bootstrap/bootstrap.sh` | `--native`: the native fixed point |
+| `compiler/src/ir.vl` (new) | the IR: instructions on virtual registers, stack slots, labels; `vela ir` |
+| `compiler/src/lower.vl` (new) | a checked program as IR: codegen.vl's scheme, with memory layout, calls and the functions C used to get from layout.vl |
+| `compiler/src/x64.vl` (new) | register allocation by linear scan, and x86-64 assembly; `vela asm` |
+| `compiler/src/main.vl` | `VELA_BACKEND=native` for build, run and test; `vela ir`, `vela asm` |
+| `compiler/bootstrap/bootstrap.sh` | `--native`: the native fixed point |
 | `run_tests.py` | `--native`; a longer timeout under `--sanitize` |
 | `tests/native_test.py`, `tests/cli/native_ir.vl`, `tests/cli/native_asm.vl` (new) | the tests in the default suite |
 
@@ -56,7 +56,7 @@ way.
 
 ## 2. The IR
 
-`stage1/ir.vl`. A function is a flat list of instructions on numbered
+`compiler/src/ir.vl`. A function is a flat list of instructions on numbered
 virtual registers, `%0`, `%1`, …, as many as it needs.
 
 **Registers.** Each holds a 64-bit integer or a Float, its class.
@@ -144,7 +144,7 @@ L3:
 
 ## 3. Lowering
 
-`stage1/lower.vl` is `codegen.vl` again, function for function, writing
+`compiler/src/lower.vl` is `codegen.vl` again, function for function, writing
 IR where codegen writes C. It keeps the same rules:
 
 - owned and borrowed values;
@@ -202,7 +202,7 @@ codegen.vl is now done here:
 
 ## 4. Register allocation
 
-`stage1/x64.vl` allocates by linear scan (Poletto and Sarkar, 1999):
+`compiler/src/x64.vl` allocates by linear scan (Poletto and Sarkar, 1999):
 
 1. **Intervals.** Each register lives from its first appearance to its
    last, as positions in the list of instructions. Loops stretch these
@@ -295,7 +295,7 @@ f_count:
 | `VELA_BACKEND=native vela build/run/test FILE` | through the native backend |
 | `vela ir FILE`, `vela asm FILE` | print the IR, or the assembly |
 | `python3 run_tests.py --native` | every test, with programs compiled natively |
-| `sh bootstrap/bootstrap.sh --native` | the native fixed point; leaves `build/vela-native` |
+| `sh compiler/bootstrap/bootstrap.sh --native` | the native fixed point; leaves `build/vela-native` |
 
 `VELA_CFLAGS` still applies to the runtime and to the link. With
 `--sanitize`, AddressSanitizer checks the runtime, and LeakSanitizer
@@ -306,7 +306,7 @@ native code's own memory accesses, which it did not compile.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh --native` | fixed point, 89,817 lines of C in the seed; native fixed point, 493,279 lines of assembly |
+| `sh compiler/bootstrap/bootstrap.sh --native` | fixed point, 89,817 lines of C in the seed; native fixed point, 493,279 lines of assembly |
 | `python3 run_tests.py` (gcc) | 257 passed |
 | `VELA_CC=clang python3 run_tests.py` | 257 passed |
 | `python3 run_tests.py --native` | 257 passed |
@@ -317,7 +317,7 @@ native code's own memory accesses, which it did not compile.
 | The suite with compilers built with ASan + UBSan + LSan, and with ThreadSanitizer | 257 passed each |
 | `python3 run_tests.py --stage0` | 188 passed |
 | `python3 compare_stages.py tokens ast check` | 644 same, 0 different |
-| `vela fmt -l` on `stage1/`, `std/`, `packages/` and `examples/` | nothing to format |
+| `vela fmt -l` on `compiler/src/`, `std/`, `packages/` and `examples/` | nothing to format |
 
 `tests/native_test.py` is in the default suite. It builds nine programs
 both ways and checks that they print the same and exit the same:
@@ -351,8 +351,8 @@ Each time is the best of three runs, on one thread, on this machine
 | fib(35) | 0.067 s | 0.076 s | 1.14 |
 | `examples/mandelbrot` 400×200, 3,000 steps | 0.175 s | 0.214 s | 1.22 |
 | `tests/run/allocation_heavy.vl` | 0.418 s | 0.478 s | 1.14 |
-| The compiler checking itself (`vela check stage1/main.vl`) | 0.254 s | 0.264 s | 1.04 |
-| The compiler writing its C (`vela c stage1/main.vl`) | 0.443 s | 0.449 s | 1.01 |
+| The compiler checking itself (`vela check compiler/src/main.vl`) | 0.254 s | 0.264 s | 1.04 |
+| The compiler writing its C (`vela c compiler/src/main.vl`) | 0.443 s | 0.449 s | 1.01 |
 
 **Speed of the code.**
 
@@ -368,7 +368,7 @@ compile:
 | | C | Native |
 | --- | --- | --- |
 | Building the compiler | 12.0 s | 1.9 s |
-| `vela test stage1/main.vl` | 2.5 s | 2.0 s |
+| `vela test compiler/src/main.vl` | 2.5 s | 2.0 s |
 | The compiler's executable | 3.1 MB | 2.3 MB |
 
 In `vela test` the tests' own C is already compiled at -O0, so the gap

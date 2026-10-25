@@ -15,7 +15,7 @@ It gives:
   module makes public, after `Shape.` an enum's variants, and otherwise the
   names in scope, with their types and comments.
 
-Build the compiler first (`sh bootstrap/bootstrap.sh`), and put `build/vela`
+Build the compiler first (`sh compiler/bootstrap/bootstrap.sh`), and put `build/vela`
 on your PATH, or give its full path in the settings below.
 
 A file is checked as part of the program of the `main.vl` next to it, when

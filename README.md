@@ -15,7 +15,7 @@ You need a C compiler (gcc or clang) and Python 3.10+ for the development
 scripts. Linux and macOS bootstrap with:
 
 ```sh
-sh bootstrap/bootstrap.sh
+sh compiler/bootstrap/bootstrap.sh
 build/vela run examples/orders/main.vl examples/orders/orders.csv
 build/vela guide
 ```
@@ -56,16 +56,15 @@ x86-64 and macOS ARM64. Use `VELA_BACKEND=c` to select C explicitly.
 | Location | Purpose |
 | --- | --- |
 | [docs/](docs/README.md) | Reading paths, specifications, current plans and historical walkthroughs |
-| [stage1/](stage1/README.md) | Compiler source and a map of its passes and tools |
-| [runtime/](runtime/) | C runtime, platform adapters and public headers |
-| [std/](std/) | Standard library modules written in Vela |
-| [packages/](packages/) | In-repository packages, including JSON used by the compiler |
-| [examples/](examples/) | Programs using modules, packages, concurrency, C interop and systems APIs |
+| [compiler/](compiler/README.md) | Self-hosted compiler: `src/` for source, `bootstrap/` for the generated seed and build script |
+| [runtime/](runtime) | C runtime, platform adapters and public headers |
+| [std/](std) | Standard library modules written in Vela |
+| [packages/](packages) | In-repository packages, including JSON used by the compiler |
+| [examples/](examples) | Programs using modules, packages, concurrency, C interop and systems APIs |
 | [tests/](tests/README.md) | Golden fixtures, integration suites and retained compatibility corpus |
 | [bench/](bench/README.md) | Benchmark tools, workloads and retained measurement reports |
-| [eval/](eval/README.md) | Agent task preparation, grading and static measurements |
+| [evaluation/](evaluation/README.md) | Agent task preparation, grading and static measurements |
 | [editors/](editors/README.md) | Language-server integrations |
-| [bootstrap/](bootstrap/) | Generated C seed and bootstrap script |
 
 To change the project, start with the [contributor guide](docs/contributing.md)
 and [AGENTS.md](AGENTS.md). For language use, start with `vela guide` and the

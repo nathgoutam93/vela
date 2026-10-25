@@ -24,12 +24,12 @@ $ python3 run_tests.py
 
 | File | What |
 | --- | --- |
-| `stage1/parser.vl`, `ast.vl` | `fn(x: T) -> R { ... }` and `fn(x) => e` expressions; Float literals |
-| `stage1/checker.vl` | closures: captures, parameter types from the context, returns, limits; Float rules |
-| `stage1/codegen.vl`, `layout.vl`, `mono.vl` | function values as {code, environment} pairs; closure bodies and environments; wrappers for named functions; Float arithmetic; no code after branches that all end |
-| `stage1/lexer.vl`, `types.vl` | Float literals; the `Float` type |
-| `stage1/modules.vl`, `stage0/modules.py` | a program's own module before a standard one |
-| `stage1/chars.vl` | was `stage1/text.vl`; renamed so the name is free for the standard module |
+| `compiler/src/parser.vl`, `ast.vl` | `fn(x: T) -> R { ... }` and `fn(x) => e` expressions; Float literals |
+| `compiler/src/checker.vl` | closures: captures, parameter types from the context, returns, limits; Float rules |
+| `compiler/src/codegen.vl`, `layout.vl`, `mono.vl` | function values as {code, environment} pairs; closure bodies and environments; wrappers for named functions; Float arithmetic; no code after branches that all end |
+| `compiler/src/lexer.vl`, `types.vl` | Float literals; the `Float` type |
+| `compiler/src/modules.vl`, `stage0/modules.py` | a program's own module before a standard one |
+| `compiler/src/chars.vl` | was `compiler/src/text.vl`; renamed so the name is free for the standard module |
 | `runtime/vela_rt.c`, `.h` | `vela_env`; Float printing and conversion |
 | `std/text.vl` (new) | `split`, `lines`, `join`, `trim`, `replace`, `parse_int`, `pad_left`, ... |
 | `examples/orders/` | csv.vl over `text`; report.vl ranks with a closure |
@@ -250,15 +250,15 @@ line, using a function value (`lists.map(..., text.trim)`) or a closure.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh` | fixed point, 45,900 lines; the seed is up to date |
+| `sh compiler/bootstrap/bootstrap.sh` | fixed point, 45,900 lines; the seed is up to date |
 | `python3 run_tests.py` (gcc) | 228 passed |
 | `VELA_CC=clang python3 run_tests.py` | 228 passed |
 | `python3 run_tests.py --sanitize` | 228 passed; every run's output is now kept, and in M10c there were no unexplained failures |
 | The suite run with a compiler built with ASan + UBSan + LSan | 228 passed |
-| That compiler compiling `stage1/` | clean, identical to the seed |
+| That compiler compiling `compiler/src/` | clean, identical to the seed |
 | `python3 run_tests.py --stage0` | 187 passed |
 | `python3 compare_stages.py tokens ast check` | 641 same, 0 different |
-| `vela fmt -l` on `stage1/`, `std/` and `examples/` | nothing to format |
+| `vela fmt -l` on `compiler/src/`, `std/` and `examples/` | nothing to format |
 
 New tests:
 

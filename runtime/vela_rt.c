@@ -65,7 +65,7 @@ void vela_assert_failed_values(const char *loc, const char *what, const char *te
 
 // No string, array or map may hold more than VELA_MAX_LEN bytes or
 // elements (M18): the compiler relies on it to prove that arithmetic on
-// lengths and indexes cannot overflow (stage1/ranges.vl). No machine has
+// lengths and indexes cannot overflow (compiler/src/ranges.vl). No machine has
 // that much memory, so the check changes nothing a program can do.
 #define VELA_MAX_LEN ((int64_t)1 << 48)
 

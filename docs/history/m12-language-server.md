@@ -47,12 +47,12 @@ $ build/vela query type examples/orders/main.vl:35:20
 
 | File | What |
 | --- | --- |
-| `stage1/index.vl` (new) | after checking, every name in the program with what it refers to; file outlines |
-| `stage1/query.vl` (new) | which program a file belongs to; `vela query` |
-| `stage1/lsp.vl` (new) | `vela lsp`: messages, checking on change, the requests, positions |
-| `stage1/modules.vl` | modules keep their file and text; editor buffers instead of files; the hiding warning |
-| `stage1/checker.vl`, `codegen.vl`, `runtime/` | `os.read_line`, `os.read`, `os.write`, `with stdin`, `strings.parse_float` |
-| `stage1/main.vl` | the `query` and `lsp` commands |
+| `compiler/src/index.vl` (new) | after checking, every name in the program with what it refers to; file outlines |
+| `compiler/src/query.vl` (new) | which program a file belongs to; `vela query` |
+| `compiler/src/lsp.vl` (new) | `vela lsp`: messages, checking on change, the requests, positions |
+| `compiler/src/modules.vl` | modules keep their file and text; editor buffers instead of files; the hiding warning |
+| `compiler/src/checker.vl`, `codegen.vl`, `runtime/` | `os.read_line`, `os.read`, `os.write`, `with stdin`, `strings.parse_float` |
+| `compiler/src/main.vl` | the `query` and `lsp` commands |
 | `std/json.vl` (new) | JSON in Vela |
 | `editors/nvim/`, `editors/vscode/`, `editors/README.md` (new) | editor support |
 | `tests/lsp_client.py`, `tests/nvim_test.lua` (new) | a scripted editor, and Neovim |
@@ -96,7 +96,7 @@ first. Prompts work for the same reason.
 
 **`with stdin = "..."`** fakes stdin in a test, as `with files` fakes the
 files (M10b). The server's message reading is tested with it, in
-`stage1/lsp.vl`:
+`compiler/src/lsp.vl`:
 
 ```
 test "messages are framed" {
@@ -191,7 +191,7 @@ what does the name at this position refer to?
 The checker already knows, but not by position. `Checked.refs` says what
 each node refers to (local 12, function 40, variant 2 of type 31), by node
 id. `Checked.ty` gives each expression's type. Neither says where in the
-file a name is written. `stage1/index.vl` walks every module's syntax
+file a name is written. `compiler/src/index.vl` walks every module's syntax
 tree once more, after checking, and records two things:
 
 - a **Def** for each declaration: its name, kind and position, a one-line
@@ -340,7 +340,7 @@ fn changed(s: mut Server, path: Str, text: Str) uses fs {
 - **A crash ends the server.** It runs the checker in its own process,
   so a checker panic stops it, and the editor has to restart it. The
   sanitizer runs found none: the scripted editor ran against an ASan
-  build of the compiler, and every name in `stage1/` and `std/` was asked
+  build of the compiler, and every name in `compiler/src/` and `std/` was asked
   about.
 
 ## 8. Editors
@@ -430,16 +430,16 @@ notification the server handles:
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh` | fixed point, 56,145 lines; the seed is up to date |
+| `sh compiler/bootstrap/bootstrap.sh` | fixed point, 56,145 lines; the seed is up to date |
 | `python3 run_tests.py` (gcc) | 239 passed |
 | `VELA_CC=clang python3 run_tests.py` | 239 passed |
 | `python3 run_tests.py --sanitize` | 239 passed |
 | The suite with a compiler built with ASan + UBSan + LSan (the language server included, in both the scripted editor and Neovim) | 239 passed |
-| That compiler compiling `stage1/` | clean, identical to the seed |
+| That compiler compiling `compiler/src/` | clean, identical to the seed |
 | `python3 run_tests.py --stage0` | 187 passed |
 | `python3 compare_stages.py tokens ast check` | 643 same, 0 different |
-| `vela fmt -l` on `stage1/`, `std/` and `examples/` | nothing to format |
-| Hover and definition at every name of `stage1/` and `std/` through the server (a one-off script, not in the suite) | 37,556 of 37,556 answered; no crash |
+| `vela fmt -l` on `compiler/src/`, `std/` and `examples/` | nothing to format |
+| Hover and definition at every name of `compiler/src/` and `std/` through the server (a one-off script, not in the suite) | 37,556 of 37,556 answered; no crash |
 
 New tests:
 
@@ -449,7 +449,7 @@ New tests:
   `query_refs`, `query_symbols`, `query_errors`, `hides_std/` and
   `fake_stdin`;
 - `tests/run`: `std_stdin.vl` and `parse_float.vl`;
-- the tests in `std/json.vl` and `stage1/lsp.vl` (framing, bad messages,
+- the tests in `std/json.vl` and `compiler/src/lsp.vl` (framing, bad messages,
   URIs, UTF-16).
 
 Two messages in `tests/fail/effect_errors.vl` now list `stdin` and the new
@@ -500,7 +500,7 @@ No keywords were added; there are still 17.
      `editors/README.md`. It has never run in VS Code, so please tell me
      whether it starts, and what you see.
 
-   Point at names in `examples/orders/` or `stage1/` and see whether the
+   Point at names in `examples/orders/` or `compiler/src/` and see whether the
    hover text is what you want to read.
 2. **Completion and rename.** Rename is close to free now, since the
    index has every use. Completion after `orders.` or `p.` is more work,

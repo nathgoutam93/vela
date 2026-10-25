@@ -8,7 +8,7 @@ milestone can be judged by a number:
 1. **Performance:** eight benchmarks, each written in Vela, C and Rust,
    and timed (`bench/`); then where Vela's time goes.
 2. **Agents:** twenty tasks with hidden checks, for you to run with other
-   agents (`eval/`); and what can be measured without an agent.
+   agents (`evaluation/`); and what can be measured without an agent.
 
 Nothing was optimized. One thing was added: `math.sqrt`, without which
 n-body could not be written fairly.
@@ -20,9 +20,9 @@ n-body could not be written fairly.
 | `bench/profile.py` | Vela's instructions under callgrind, by kind of work |
 | `bench/words.py` | the generated text word-frequency reads |
 | `bench/results/baseline.json`, `bench/results/profile.json` | the numbers below |
-| `eval/` | the agent evaluation: `README.md`, prepare, grade, summary, selftest, static, 20 tasks |
+| `evaluation/` | the agent evaluation: `README.md`, prepare, grade, summary, selftest, static, 20 tasks |
 | `tests/bench_test.py`, `tests/eval_test.py` | in the default suite: the benchmarks still agree, the tasks still work |
-| `stage1/*`, `runtime/*` | `math.sqrt` (`import math`), and `-lm` when linking |
+| `compiler/src/*`, `runtime/*` | `math.sqrt` (`import math`), and `-lm` when linking |
 
 ## 1. The benchmarks
 
@@ -180,8 +180,8 @@ nothing else, and matches C.
 
 ## 4. The agent evaluation
 
-`eval/` is a kit for you to run with your own agents and harness. See
-`eval/README.md`.
+`evaluation/` is a kit for you to run with your own agents and harness. See
+`evaluation/README.md`.
 
 **The tasks.** There are twenty:
 
@@ -222,7 +222,7 @@ tasks keep working as the language changes.
 
 ### What was measured without an agent
 
-`eval/static.py`:
+`evaluation/static.py`:
 
 | Measure | M16 |
 | --- | --- |
@@ -268,12 +268,12 @@ them.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh --native` | fixed point; native fixed point (632,220 lines of assembly) |
+| `sh compiler/bootstrap/bootstrap.sh --native` | fixed point; native fixed point (632,220 lines of assembly) |
 | `python3 run_tests.py` (native) | 264 passed |
 | `python3 run_tests.py --backend c` | 264 passed |
 | `python3 run_tests.py --backend c --sanitize` | 264 passed |
 | `python3 bench/run.py` | all 32 builds print what C prints |
-| `python3 eval/selftest.py` | 20 tasks fail as given, pass with their solutions |
+| `python3 evaluation/selftest.py` | 20 tasks fail as given, pass with their solutions |
 
 ## 6. What this means for the plan
 

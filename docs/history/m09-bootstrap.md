@@ -2,14 +2,14 @@
 
 M9 makes Vela build itself with nothing but a C compiler. Stage 1, the
 compiler written in Vela, now drives the C compiler itself. The C it
-writes for its own source is committed as a seed, `bootstrap/vela1.c`.
+writes for its own source is committed as a seed, `compiler/bootstrap/vela1.c`.
 A shell script grows three generations of the compiler from that seed
 and checks that the last two write the same C, byte for byte.
 
 Done when: generations 2 and 3 write byte-identical C. Run it:
 
 ```
-$ sh bootstrap/bootstrap.sh
+$ sh compiler/bootstrap/bootstrap.sh
 generation 1: the seed, compiled by cc
 generation 2: built from generation 1's C
 generation 3: built from generation 2's C
@@ -26,12 +26,12 @@ What changed:
 | File | What |
 | --- | --- |
 | `runtime/vela_rt.c`, `.h` | `os.run`, `os.env`, `files.temp_dir`, `files.remove` |
-| `stage0/`, `stage1/` (checker, codegen, modules) | the four built-ins, in both stages |
-| `stage1/main.vl` | `build` and `run` commands: Stage 1 calls the C compiler itself |
-| `bootstrap/vela1.c` | the seed: 31,562 lines of C, Stage 1 compiled by itself |
-| `bootstrap/bootstrap.sh` | builds generations 1 to 3, checks the fixed point and the seed |
+| `stage0/`, `compiler/src/` (checker, codegen, modules) | the four built-ins, in both stages |
+| `compiler/src/main.vl` | `build` and `run` commands: Stage 1 calls the C compiler itself |
+| `compiler/bootstrap/vela1.c` | the seed: 31,562 lines of C, Stage 1 compiled by itself |
+| `compiler/bootstrap/bootstrap.sh` | builds generations 1 to 3, checks the fixed point and the seed |
 | `run_tests.py` | uses `build/vela` by default; `--stage0` for the Python compiler |
-| `stage1/vela1` | removed: the M8 shell script that called `cc` |
+| `compiler/src/vela1` | removed: the M8 shell script that called `cc` |
 | `tests/run/std_os_run.vl` | the new built-ins |
 
 ## 1. Four built-ins
@@ -84,7 +84,7 @@ temporary directory.
 
 ## 2. Stage 1 builds and runs programs
 
-`stage1/main.vl` grew from 114 lines to 250. It now has every command
+`compiler/src/main.vl` grew from 114 lines to 250. It now has every command
 Stage 0's `main.py` has:
 
 ```
@@ -119,10 +119,10 @@ The seed is C. Compiling it gives a working compiler, generation 1. Why
 build two more?
 
 The problem is what generation 1 really is. Its *behaviour* is whatever
-compiler logic the seed holds. After a change to `stage1/`, the seed
+compiler logic the seed holds. After a change to `compiler/src/`, the seed
 still holds the *old* logic, and so does generation 1.
 
-| Generation | Built from | Its logic | What it writes for `stage1/` |
+| Generation | Built from | Its logic | What it writes for `compiler/src/` |
 | --- | --- | --- | --- |
 | 1 | the seed, by `cc` | the old compiler's | new source, compiled the old way: `gen1.c` |
 | 2 | `gen1.c`, by `cc` | the new source's | new source, compiled the new way: `gen2.c` |
@@ -142,7 +142,7 @@ If the two differ, one of these happened:
 - the output depends on something other than the source;
 - a change to code generation has not settled yet.
 
-With an unchanged `stage1/`, the three C files are all the same as the
+With an unchanged `compiler/src/`, the three C files are all the same as the
 seed. That is because M8 made Stage 1 write exactly the C Stage 0
 writes. Stage 0's C for Stage 1 is the seed, and Stage 1 reproduces it.
 The fixed point was really reached at generation 1. M9 makes it
@@ -160,7 +160,7 @@ Some numbers:
 
 The first run of the script failed: the seed and `gen3.c` differed. The
 generated C records source positions for panics, like
-`"stage1/lexer.vl:12:5"`. Stage 0 had been given a relative path. The
+`"compiler/src/lexer.vl:12:5"`. Stage 0 had been given a relative path. The
 first version of the script gave absolute ones, so the C depended on
 where the repository was checked out.
 
@@ -186,20 +186,20 @@ bit. They found the same culprits: embedded paths, timestamps
 
 ## 5. The seed
 
-`bootstrap/vela1.c` is committed, as you agreed. It is generated, and
+`compiler/bootstrap/vela1.c` is committed, as you agreed. It is generated, and
 says so on its first line. Anyone with gcc or clang can build Vela
 from a fresh checkout. They need no Python and no earlier Vela binary.
 
 The script keeps the seed honest:
 
-- `sh bootstrap/bootstrap.sh` fails if the seed is not exactly
-  `gen3.c`. This catches a change to `stage1/` that was committed
+- `sh compiler/bootstrap/bootstrap.sh` fails if the seed is not exactly
+  `gen3.c`. This catches a change to `compiler/src/` that was committed
   without a new seed.
-- `sh bootstrap/bootstrap.sh --update` replaces the seed with `gen3.c`.
+- `sh compiler/bootstrap/bootstrap.sh --update` replaces the seed with `gen3.c`.
 
-A change to `stage1/` is then:
+A change to `compiler/src/` is then:
 
-1. Edit `stage1/`.
+1. Edit `compiler/src/`.
 2. Run `bootstrap.sh --update`.
 3. Commit both.
 
@@ -252,7 +252,7 @@ binaries carried it.
 
 A seed is exactly this kind of binary-like thing: 31,000 lines nobody
 will read. What makes Vela's seed checkable is the fixed point. The seed
-must equal what the readable compiler in `stage1/` writes for itself,
+must equal what the readable compiler in `compiler/src/` writes for itself,
 and anyone can check that with any C compiler.
 
 Vela also has a second, independent compiler: Stage 0, in Python. It
@@ -267,7 +267,7 @@ known answer to Thompson's attack:
 3. Compare the result with the suspect binary.
 
 Keeping Stage 0 frozen keeps this check available. For the M9
-language, `compare_stages.py c` on `stage1/*.vl` is the check.
+language, `compare_stages.py c` on `compiler/src/*.vl` is the check.
 
 ## 8. What real compilers do differently
 
@@ -287,7 +287,7 @@ language, `compare_stages.py c` on `stage1/*.vl` is the check.
   compiler written in C++, exists partly to rebuild that chain from
   source, which is the diverse double-compiling idea again.
 - **Zig** commits a seed, like Vela, but as WebAssembly:
-  `stage1/zig1.wasm`, a few megabytes. A small C program (`wasm2c`) turns
+  `compiler/src/zig1.wasm`, a few megabytes. A small C program (`wasm2c`) turns
   it into C, a C compiler builds it, and that compiler builds the real
   one. Zig chose WebAssembly over C because it is smaller, works on
   every machine, and the build can regenerate it.
@@ -314,15 +314,15 @@ language, `compare_stages.py c` on `stage1/*.vl` is the check.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh`, gcc | fixed point; the seed is up to date |
-| `VELA_CC=clang sh bootstrap/bootstrap.sh` | fixed point; same seed |
-| gcc-built and clang-built compilers compile `stage1/` | identical C |
+| `sh compiler/bootstrap/bootstrap.sh`, gcc | fixed point; the seed is up to date |
+| `VELA_CC=clang sh compiler/bootstrap/bootstrap.sh` | fixed point; same seed |
+| gcc-built and clang-built compilers compile `compiler/src/` | identical C |
 | `python3 run_tests.py` (build/vela, gcc) | 199 passed |
 | `VELA_CC=clang python3 run_tests.py` | 199 passed |
 | `python3 run_tests.py --sanitize` | 199 passed |
 | `python3 run_tests.py --stage0` | 199 passed |
 | `python3 compare_stages.py tokens ast check c` | 924 same, 0 different |
-| The seed built with ASan + UBSan + LeakSanitizer, compiling `stage1/` | clean, and identical to the seed |
+| The seed built with ASan + UBSan + LeakSanitizer, compiling `compiler/src/` | clean, and identical to the seed |
 | That sanitizer build, building and running a program, and reporting errors | clean, correct output |
 
 ## 10. Decisions made in M9
@@ -333,7 +333,7 @@ Recorded in the roadmap:
 | --- | --- |
 | `os.run(command: [Str]) -> Result[Int, Str]`: a list of words, no shell; 128 + signal for a signal | Your decision after M8; no quoting problems, no shell injection |
 | `os.env`, `files.temp_dir`, `files.remove` (my judgement, for the driver) | `build` needs settings, private scratch space and cleanup |
-| The seed `bootstrap/vela1.c` is committed; `bootstrap.sh` checks gen 2 = gen 3 and seed = gen 3 | Your decision after M8; builds with only a C compiler, and a stale seed fails loudly |
+| The seed `compiler/bootstrap/vela1.c` is committed; `bootstrap.sh` checks gen 2 = gen 3 and seed = gen 3 | Your decision after M8; builds with only a C compiler, and a stale seed fails loudly |
 | The bootstrap runs from the repository root with relative paths | The C must not depend on where the checkout is |
 | Stage 0 frozen at M9 as the readable reference; new features go to Stage 1 only | Your decision after M8; also a second compiler for checking the seed |
 | `run_tests.py` uses `build/vela` by default, with `--stage0` and `--compiler` | Stage 1 is the compiler now |

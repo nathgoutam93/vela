@@ -1,10 +1,10 @@
 # Working on Vela
 
 Start with `README.md` and `docs/contributing.md` for build/test commands.
-Use `stage1/README.md` and `tests/README.md` to locate active implementation
+Use `compiler/README.md` and `tests/README.md` to locate active implementation
 and coverage. `docs/README.md` indexes current references; milestone
 walkthroughs live in `docs/history/`, with retained measurement reports in
-`bench/results/` and `eval/results/`. Milestone tests and the generated
+`bench/results/` and `evaluation/results/`. Milestone tests and the generated
 bootstrap seed remain active, required files.
 
 Read `docs/roadmap-after-m18.md` and `docs/tooling-backlog.md` before starting

@@ -9,7 +9,7 @@ Use [the evaluation guide](../README.md) to prepare and grade actual tasks.
 For a fresh static snapshot, run from the repository root:
 
 ```sh
-python3 eval/static.py --json build/eval-static.json
+python3 evaluation/static.py --json build/eval-static.json
 ```
 
 Documentation sizes change when reference material changes or moves. The

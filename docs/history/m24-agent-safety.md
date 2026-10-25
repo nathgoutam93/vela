@@ -108,8 +108,8 @@ until they have an enforcement implementation.
 ## Agent queries
 
 ```sh
-build/vela query summary stage1/main.vl
-build/vela query impact stage1/main.vl
+build/vela query summary compiler/src/main.vl
+build/vela query impact compiler/src/main.vl
 build/vela query impact path/to/module.vl:12:8
 build/vela query coverage path/to/module.vl:12:8
 build/vela test --coverage build/coverage.json path/to/main.vl
@@ -186,7 +186,7 @@ including actual C socket rejection, remains VAL-004; native/ASan/TSan remain
 VAL-001. M24's runner executes both C/native on Linux x86-64; repeat with
 VELA_OPT=0 there.
 
-Isolated queries on stage1/main.vl, one warmup and seven samples each:
+Isolated queries on compiler/src/main.vl, one warmup and seven samples each:
 
 | Query | Best | Median | Limit |
 | --- | --- | --- | --- |
@@ -198,7 +198,7 @@ Isolated queries on stage1/main.vl, one warmup and seven samples each:
 compiler/source fingerprints. The timed coverage query is static; it is not a
 timing of executing all compiler tests. The generated guide is **31,989 bytes**,
 about **7,997 tokens** under the existing bytes/4 estimate. Actual tokenizer
-validation remains VAL-003. [Static evaluation](../../eval/results/m24-static.json) records
+validation remains VAL-003. [Static evaluation](../../evaluation/results/m24-static.json) records
 373/373 coded negative diagnostics and 21 with edits. The question inventory
 now credits summary and measured coverage; signature impact remains partly
 answered because a proposed change still needs checking. No agent trial was
@@ -237,7 +237,7 @@ thresholds, machine/toolchain and compiler/source identity. The baseline is
 M23 commit de1594b, with dirty_worktree identifying measurement before commit.
 
 ```sh
-VELA_CACHE="$PWD/build/cache-m24" sh bootstrap/bootstrap.sh
+VELA_CACHE="$PWD/build/cache-m24" sh compiler/bootstrap/bootstrap.sh
 VELA_BACKEND=c python3 tests/m24_test.py "$PWD/build/vela"
 # Use the runner's generated-C warning exclusions for sanitizer builds.
 export VELA_CFLAGS="$(python3 -c 'import run_tests; print(run_tests.STRICT_CFLAGS)') -fsanitize=undefined -fno-sanitize-recover=all"
@@ -245,13 +245,13 @@ VELA_BACKEND=c python3 tests/m24_test.py "$PWD/build/vela"
 unset VELA_CFLAGS
 python3 bench/run.py --quick --check --languages c vela
 python3 bench/run.py varints arena_trees sha256 crc32 --runs 7 --languages c vela
-python3 eval/static.py --vela "$PWD/build/vela" --json eval/results/m24-static.json
+python3 evaluation/static.py --vela "$PWD/build/vela" --json evaluation/results/m24-static.json
 ```
 
 OS-policy tests need a host that permits installing the child sandbox; macOS
 cannot apply this profile inside Codex's existing Seatbelt sandbox. The
 supported broad run uses TL-003's four-worker wrapper and absolute compiler,
-C backend, Neovim XDG directories under build/, and filters examples/, stage1/,
+C backend, Neovim XDG directories under build/, and filters examples/, compiler/src/,
 std/, packages/, tests/run/, tests/fail/, tests/dump/, tests/cli/, lsp_client,
 pkg_test, eval_test, m17_test, m19_test through m24_test, and nvim_test.
 The native-forcing native_test/cache_test/bench_test scripts remain excluded

@@ -32,11 +32,11 @@ fn lengths(words: [Str]) -> [Int] {
 
 | File | What changed |
 | --- | --- |
-| `stage1/types.vl` | a function type's `effects` and its `plain` form; `func_with`; `erase_all` |
-| `stage1/ast.vl`, `stage1/parser.vl` | `effects` in a TypeName; `uses` after a function type; types in parentheses |
-| `stage1/checker.vl` | effect variables for `uses f`; what fits where; closures' effects; charging calls; `erased` |
-| `stage1/codegen.vl`, `stage1/lower.vl`, `stage1/layout.vl` | they take the program erased |
-| `stage1/index.vl` | `uses f` is a use of the parameter f (hover, refs, rename) |
+| `compiler/src/types.vl` | a function type's `effects` and its `plain` form; `func_with`; `erase_all` |
+| `compiler/src/ast.vl`, `compiler/src/parser.vl` | `effects` in a TypeName; `uses` after a function type; types in parentheses |
+| `compiler/src/checker.vl` | effect variables for `uses f`; what fits where; closures' effects; charging calls; `erased` |
+| `compiler/src/codegen.vl`, `compiler/src/lower.vl`, `compiler/src/layout.vl` | they take the program erased |
+| `compiler/src/index.vl` | `uses f` is a use of the parameter f (hover, refs, rename) |
 | `std/lists.vl` | `uses` on map, filter, any, all, fold and sort_by |
 | tests | `run/effect_params.vl`, `run/effect_types.vl`, `fail/effect_param_errors.vl`, `cli/query_effect_param.vl`; three fail tests updated |
 
@@ -317,7 +317,7 @@ Three old tests expected the old rule. Their expectations are updated:
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh --native` | fixed point, 89,310 lines of C in the seed; native fixed point, 631,516 lines of assembly |
+| `sh compiler/bootstrap/bootstrap.sh --native` | fixed point, 89,310 lines of C in the seed; native fixed point, 631,516 lines of assembly |
 | `python3 run_tests.py` (native, the default) | 261 passed |
 | `python3 run_tests.py --backend c` (gcc) | 261 passed |
 | `VELA_CC=clang python3 run_tests.py --backend c` | 261 passed |
@@ -327,8 +327,8 @@ Three old tests expected the old rule. Their expectations are updated:
 | The suite with compilers built with ASan + UBSan + LSan, and with ThreadSanitizer | 261 passed each |
 | `python3 run_tests.py --stage0` | 188 passed |
 | `python3 compare_stages.py tokens ast check` | 644 same, 0 different |
-| `vela fmt -l` on `stage1/`, `std/`, `packages/` and `examples/` | nothing to format |
-| `vela test stage1/main.vl` | 33 passed |
+| `vela fmt -l` on `compiler/src/`, `std/`, `packages/` and `examples/` | nothing to format |
+| `vela test compiler/src/main.vl` | 33 passed |
 
 ## 12. What other languages do
 

@@ -35,10 +35,10 @@ callgrind's instruction counts, which do not move, and timed at the end.
 
 | File | What changed |
 | --- | --- |
-| `stage1/ranges.vl` | new: the ranges of Int values, and which operations cannot overflow |
-| `stage1/codegen.vl` | copy-on-write once per variable and before loops; plain C arithmetic where it cannot overflow; map writes after a lookup; builders with room; inline string slices |
-| `stage1/layout.vl` | boxes from the free lists |
-| `stage1/lower.vl` | builders with room (native backend) |
+| `compiler/src/ranges.vl` | new: the ranges of Int values, and which operations cannot overflow |
+| `compiler/src/codegen.vl` | copy-on-write once per variable and before loops; plain C arithmetic where it cannot overflow; map writes after a lookup; builders with room; inline string slices |
+| `compiler/src/layout.vl` | boxes from the free lists |
+| `compiler/src/lower.vl` | builders with room (native backend) |
 | `runtime/vela_rt.h` | the free lists; `vela_slice`; the array's `size`; the map functions below |
 | `runtime/vela_rt.c` | one allocation per array; arrays from the free lists; `vela_map_find_hashed`, `vela_map_set_found`; key hashing and comparing without calls; lengths at most 2^48 |
 | `tests/run/cow_after_write.vl`, `cow_hoisted.vl`, `map_found.vl`, `panic_range_*.vl` | the cases each change must get right |
@@ -99,7 +99,7 @@ checks that a copy never sees the later write.
 
 ## 3. Overflow checks that cannot fail
 
-`stage1/ranges.vl` works out the smallest and largest value of Int
+`compiler/src/ranges.vl` works out the smallest and largest value of Int
 expressions, and an operation whose range fits strictly inside the Int
 range is written as plain C:
 
@@ -354,7 +354,7 @@ runtime; the runtime ones (free lists, maps, arrays) help it too.
   `--sanitize` and `--tsan` on both backends, and with the compiler built
   natively, with ASan and with TSan. Stage 0: 188 of 188.
   `compare_stages.py`: 644 the same. `vela fmt`: nothing to change.
-- `sh bootstrap/bootstrap.sh --update --native`: the seed is refreshed,
+- `sh compiler/bootstrap/bootstrap.sh --update --native`: the seed is refreshed,
   and both fixed points hold (93,673 lines of C, 663,020 of assembly).
 - Every benchmark's output is the same as C's (`bench/run.py` checks it).
 

@@ -91,7 +91,7 @@ closed-standard-descriptor behavior are retained.
 ## Reproducing validation
 
 ```sh
-VELA_BACKEND=c sh bootstrap/bootstrap.sh --native
+VELA_BACKEND=c sh compiler/bootstrap/bootstrap.sh --native
 python3 -u run_tests.py --compiler build/vela --backend c --jobs 4
 python3 -u run_tests.py --compiler build/vela --backend native --jobs 4
 VELA_TARGET_CC=zig VELA_M26_CROSS=1 WASMTIME=/path/to/wasmtime \
@@ -114,7 +114,7 @@ TCP/UDP, tasks, inherited legacy stdin, pipe pressure, argument quoting, output
 limits and timeouts. Wine additionally needs LANG=C.UTF-8;
 the independent Win32 C oracle fails on Unicode paths in the C locale too.
 
-The checked-in Platforms workflow runs POSIX bootstrap/full suites and Linux
+The checked-in Platforms workflow runs POSIX compiler/bootstrap/full suites and Linux
 sanitizers. Its Windows job covers C bootstrap, core fixtures and target/system
 oracles. The complete native Windows inventory is still an explicit gate;
 adding the workflow is not evidence that a hosted run occurred.

@@ -10,7 +10,7 @@
                                                fails a test with a data race
     python3 run_tests.py --compiler "./vela1"  any other compiler
 
-build/vela is made from the seed by `sh bootstrap/bootstrap.sh`.
+build/vela is made from the seed by `sh compiler/bootstrap/bootstrap.sh`.
 
 A test is one .vl file, or a directory holding a program of several files
 whose main file is main.vl. Comment lines at the very top of the .vl file
@@ -44,7 +44,7 @@ The directory a test lives in decides what is checked:
                   runs in a scratch copy of the test. For `fmt`, formatting
                   NAME.expected again must change nothing
 
-Besides these, the compiler (stage1/main.vl), every examples/*/main.vl and
+Besides these, the compiler (compiler/src/main.vl), every examples/*/main.vl and
 every std/*.vl and packages/*/*.vl with tests in it must pass `vela test`, and the language
 server must pass tests/lsp_client.py, a scripted editor, and, if Neovim is
 installed, tests/nvim_test.lua, which drives it from Neovim; packages must
@@ -373,7 +373,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests = []
     tests += sorted((ROOT / "examples").glob("*/main.vl"))
     tests += [p for p in sorted((ROOT / "examples").glob("*.vl")) if 'test "' in p.read_text()]
-    tests.append(ROOT / "stage1" / "main.vl")  # the compiler's own tests
+    tests.append(ROOT / "compiler/src" / "main.vl")  # the compiler's own tests
     tests += [p for p in sorted((ROOT / "std").glob("*.vl")) if 'test "' in p.read_text()]
     tests += [p for p in sorted((ROOT / "packages").glob("*/*.vl")) if 'test "' in p.read_text()]
     tests.append(LSP_CLIENT)
@@ -437,7 +437,7 @@ def main() -> int:
     else:
         compiler = [str(ROOT / "build" / "vela")]
         if not Path(compiler[0]).exists():
-            print("build/vela does not exist yet; build it with: sh bootstrap/bootstrap.sh")
+            print("build/vela does not exist yet; build it with: sh compiler/bootstrap/bootstrap.sh")
             return 1
     env = dict(os.environ)
     env["VELA_TEST_JOBS"] = str(args.jobs)

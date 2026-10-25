@@ -57,13 +57,13 @@ assembly lines. Final checks on macOS ARM64 pass:
 
 Exact commands, compiler/source identities, host/toolchain and result summaries
 are retained in [the validation record](../../bench/results/tooling-followup-validation.json).
-The [static snapshot](../../eval/results/tooling-followup-static.json) records reading and
+The [static snapshot](../../evaluation/results/tooling-followup-static.json) records reading and
 query metrics. Historical M29 measurements remain unchanged.
 
 The guide is 31,989 bytes, or 7,997.25 tokens under bytes/4. This remains an
 estimate: [VAL-003](../tooling-backlog.md#val-003-check-the-guide-with-the-evaluation-models-tokenizer)
 requires the chosen evaluation model's actual tokenizer/version. The kit in
-[eval/README.md](../../eval/README.md) specifies no model or harness, so actual
+[evaluation/README.md](../../evaluation/README.md) specifies no model or harness, so actual
 agent trials remain [VAL-002](../tooling-backlog.md#val-002-measure-m17-with-agents).
 Reference-solution self-tests and static metrics do not close those items.
 Foreign native-host validation remains VAL-001/004/005/006.

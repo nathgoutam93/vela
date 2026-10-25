@@ -42,7 +42,7 @@ Discoveries and outstanding validation are recorded in
 
 ## Implementation
 
-`stage1/integers.vl` is the shared width, signedness, literal, and arithmetic
+`compiler/src/integers.vl` is the shared width, signedness, literal, and arithmetic
 metadata. The lexer validates radix and separators; decoding uses two 32-bit
 halves held in Int, so bootstrapping does not require the new u64 type. A
 wide literal preserves its bit pattern and its explicit suffix independently.
@@ -200,4 +200,4 @@ The generated guide is 23,138 bytes, about 5,784 tokens using the harness's
 bytes/4 estimate, within its current 8,000-token budget check. Actual tokenizer
 validation remains VAL-003. All 373 negative-test diagnostics carry codes,
 and 21 carry applicable fixes; these are static metrics, not a new agent
-study. See `eval/results/m19-static.json` and VAL-002.
+study. See `evaluation/results/m19-static.json` and VAL-002.

@@ -43,12 +43,12 @@ best effort; coverage-event file creation now checks its write result.
 
 ## Proof boundary
 
-`stage1/contract_checks.vl` recognizes total primitive scalar tautologies and
+`compiler/src/contract_checks.vl` recognizes total primitive scalar tautologies and
 literal-return ranges, including scalar matches with literal arms. It does
 not execute calls or infer purity from an empty effect set. Printing remains
 intentionally effect-free; the guide now describes the implemented semantics.
 
-`stage1/verification.vl` translates a bounded subset to QF_BV: immutable
+`compiler/src/verification.vl` translates a bounded subset to QF_BV: immutable
 integer/Bool parameters, scalar locals and assignments, branches, returns,
 assertions, literal/wildcard matches, checked arithmetic/conversions, bit
 operations and explicit wrapping arithmetic. Widths come from the checked
@@ -94,7 +94,7 @@ Bits generator mixes boundary samples and seeded raw bits; user generators
 use the existing static interface machinery. No reflection, new type system
 or generator syntax is introduced.
 
-`stage1/properties.vl` decodes those bits into source values and appends
+`compiler/src/properties.vl` decodes those bits into source values and appends
 wrappers in existing syntax, then rechecks them before C/native generation.
 Automatic domains include exact-width scalars, Bool, Float, Str, arrays,
 small fixed arrays, maps, records and bounded enum constructors. Generic
@@ -137,9 +137,9 @@ capability policy and nontermination. Solver checks state explicitly when
 Z3 is absent. Linux CI installs Z3 for that acceptance step.
 
 Five meaningful contracts in the compiler cover IR type constants, range
-limits and integer widths. All five stage1 contracts are proved. The report also lists four imported
+limits and integer widths. All five compiler/src contracts are proved. The report also lists four imported
 std contracts as unknown in the scalar subset; that overall unknown status is
-retained in the validation artifacts, alongside bounded property evidence. `eval/tasks/21-contract-counterexamples` prepares three
+retained in the validation artifacts, alongside bounded property evidence. `evaluation/tasks/21-contract-counterexamples` prepares three
 fresh JSON failures and grades repaired code while requiring unchanged
 signatures/contracts. Starting code fails, and the reference solution passes.
 That validates the fixture, not the roadmap's actual agent-repair criterion.

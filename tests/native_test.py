@@ -66,7 +66,7 @@ def main() -> int:
             for p in pool.map(lambda prog: both(compiler, prog, Path(tmp)), PROGRAMS):
                 problems += p
         env = {**os.environ, "VELA_BACKEND": "native"}
-        ran = run([*compiler, "test", "stage1/main.vl"], env, ROOT)
+        ran = run([*compiler, "test", "compiler/src/main.vl"], env, ROOT)
         if ran.returncode != 0:
             problems += ["the compiler's tests, built natively, failed:", *ran.stdout.splitlines()[-5:],
                          *ran.stderr.splitlines()[-5:]]

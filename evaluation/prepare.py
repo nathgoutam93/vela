@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Make a fresh workspace for one evaluation task.
 
-    python3 eval/prepare.py TASK DIR [--vela PATH] [--context guide|docs|readme|none]
+    python3 evaluation/prepare.py TASK DIR [--vela PATH] [--context guide|docs|readme|none]
 
 DIR gets the task's starting files, TASK.md (the prompt to give the agent:
 the common preamble, AGENT_PROMPT.md, then the task), and `_vela/`: a
@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EVAL = ROOT / "eval"
+EVAL = ROOT / "evaluation"
 
 
 def task_dir(name: str) -> Path:
@@ -35,7 +35,7 @@ def task_dir(name: str) -> Path:
         return exact
     matches = sorted(p for p in (EVAL / "tasks").iterdir() if p.name.startswith(name) or p.name.split("-", 1)[-1] == name)
     if len(matches) != 1:
-        raise SystemExit(f"no single task called {name!r}; see eval/tasks/")
+        raise SystemExit(f"no single task called {name!r}; see evaluation/tasks/")
     return matches[0]
 
 
@@ -103,7 +103,7 @@ def main() -> int:
     prepare(task, out, Path(opts.vela).resolve(), opts.context)
     print(f"{task.name}: ready in {out}")
     print(f'  export PATH="{out}/_vela/bin:$PATH"')
-    print(f"  give the agent {out}/TASK.md; afterwards: python3 eval/grade.py {task.name} {out}")
+    print(f"  give the agent {out}/TASK.md; afterwards: python3 evaluation/grade.py {task.name} {out}")
     return 0
 
 

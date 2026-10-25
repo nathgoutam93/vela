@@ -58,7 +58,7 @@ Tooling findings and outstanding platform validation are recorded in
 
 ## Implementation and examples
 
-`stage1/cffi.vl` owns the type aliases and builtin API metadata. Both code
+`compiler/src/cffi.vl` owns the type aliases and builtin API metadata. Both code
 paths use that profile, with binary32 conversion at extern/callback boundaries.
 C prototypes use unique internal names and assembler symbol labels so included
 libc headers cannot conflict with Vela's pointer spelling. Native lowering
@@ -156,7 +156,7 @@ Linux native execution, its bootstrap, ASan and TSan remain open in VAL-001.
 
 The generated guide is **30,819 bytes**, about **7,704 tokens** under the
 existing bytes/4 estimate. All **373/373** negative-test diagnostics have codes;
-21 carry fixes. `eval/results/m21-static.json` retains these static measurements.
+21 carry fixes. `evaluation/results/m21-static.json` retains these static measurements.
 An actual tokenizer count and new model-driven agent trials remain separate
 validation items; these numbers do not establish agent-performance gains.
 
@@ -164,9 +164,9 @@ The broad selection uses the same four-worker, absolute-compiler and Neovim XDG
 workarounds as M20 (TL-001–TL-003):
 
 ```
-VELA_CACHE="$PWD/build/cache-m21" sh bootstrap/bootstrap.sh --update
+VELA_CACHE="$PWD/build/cache-m21" sh compiler/bootstrap/bootstrap.sh --update
 # run_tests.py, with four outer workers and --compiler "$PWD/build/vela":
-# --backend c examples/ stage1/ std/ packages/ tests/run/ tests/fail/
+# --backend c examples/ compiler/src/ std/ packages/ tests/run/ tests/fail/
 # tests/dump/ tests/cli/ lsp_client pkg_test eval_test m17_test m19_test
 # m20_test m21_test nvim_test
 # UBSan selection: tests/run/ m19_test m20_test m21_test

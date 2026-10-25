@@ -95,7 +95,7 @@ wrapper precondition clarification. The default suite includes M30.
 
 The [validation record](../../bench/results/m30-validation.json) retains exact commands,
 source/compiler identities, host/toolchain, the initial broad failure and
-final outcomes. The [static snapshot](../../eval/results/m30-static.json) retains 373/373
+final outcomes. The [static snapshot](../../evaluation/results/m30-static.json) retains 373/373
 coded negative diagnostics, 21 mechanical edits and a 31,997-byte guide
 (7,999.25 by bytes/4). Native instructions are not UBSan-instrumented; the
 native portions of the corpus run against its instrumented C runtime.

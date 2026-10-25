@@ -142,12 +142,12 @@ def deep_compiler(c, w, env):
     # Controlled fault in a copied compiler, without adding a product fault flag.
     root=w/'fault-compiler'
     if not root.exists():
-        shutil.copytree(ROOT/'stage1',root/'stage1')
+        shutil.copytree(ROOT/'compiler/src',root/'compiler/src')
         shutil.copytree(ROOT/'packages/json',root/'packages/json')
-        lexer=root/'stage1/lexer.vl'
+        lexer=root/'compiler/src/lexer.vl'
         lexer.write_text(lexer.read_text().replace('fn identifier(lx: mut Lexer) {','fn identifier(lx: mut Lexer) { assert(false)',1))
     exe=w/'fault-compiler-exe'
-    run([c,'build','--debug',root/'stage1/main.vl','-o',exe],env,timeout=600)
+    run([c,'build','--debug',root/'compiler/src/main.vl','-o',exe],env,timeout=600)
     p=source(w,'input','fn main(){}\n')
     r=run([exe,'check',p],{**env,'VELA_PANIC':'json'},101)
     doc=json.loads(r.stderr); names=[f['function'] for f in doc['frames']]

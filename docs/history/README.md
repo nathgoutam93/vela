@@ -7,7 +7,7 @@ and generated `vela guide`; for current acceptance, use the
 [roadmap](../roadmap-after-m18.md) and [backlog](../tooling-backlog.md).
 
 Read the relevant feature's walkthrough as needed. See the
-[contributor guide](../contributing.md) and [compiler map](../../stage1/README.md)
+[contributor guide](../contributing.md) and [compiler map](../../compiler/README.md)
 for day-to-day work.
 
 | Walkthrough | Topic |
@@ -54,5 +54,5 @@ for day-to-day work.
 | [tooling-followup-before-m30](tooling-followup-before-m30.md) | Tooling follow-up before M30 |
 
 Retained reports live in [bench/results/](../../bench/results/README.md) and
-[eval/results/](../../eval/results/README.md). Their embedded paths and source
+[evaluation/results/](../../evaluation/results/README.md). Their embedded paths and source
 identities are preserved as historical provenance.

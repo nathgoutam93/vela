@@ -19,6 +19,15 @@ import time
 from run import BENCHES, ROOT, build, inputs, machine, run
 
 
+def compiler_source(root: Path) -> Path:
+    # Earlier revisions keep the same compiler at stage1/main.vl.
+    for relative in ("compiler/src/main.vl", "stage1/main.vl"):
+        source = root / relative
+        if source.is_file():
+            return source
+    raise SystemExit(f"no compiler source found in {root}")
+
+
 def elapsed(cmd: list[str], env: dict[str, str] | None = None) -> float:
     import subprocess
     start = time.perf_counter()
@@ -82,7 +91,7 @@ def main() -> int:
     for trial in range(opts.runs):
         order = list(compilers) if trial % 2 == 0 else list(reversed(compilers))
         for side in order:
-            source = roots[side] / "stage1/main.vl"
+            source = compiler_source(roots[side])
             env = {**os.environ, "VELA_ROOT": str(roots[side])}
             compiler[side].append(elapsed([str(compilers[side]), "c", str(source)], env))
     means = {side: statistics.geometric_mean(r["best"][side] / r["best"]["c"] for r in results.values())

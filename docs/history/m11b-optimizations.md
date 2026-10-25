@@ -8,20 +8,20 @@ came of that:
 - Parameters are borrowed, in both backends: a function no longer owns
   its arguments.
 - An optimizer works on the IR between lowering and register
-  allocation (`stage1/opt.vl`).
+  allocation (`compiler/src/opt.vl`).
 
 Together they make the compiler about 30% faster than M11's C build,
 when it is built natively.
 
 | File | What changed |
 | --- | --- |
-| `stage1/main.vl` | `native(quick)` decides the backend; the optimizer runs on the IR unless `VELA_OPT=0` |
-| `stage1/opt.vl` | new: inlining, copy propagation, folding, jump threading, dead code |
-| `stage1/codegen.vl`, `stage1/lower.vl` | borrowed parameters |
-| `stage1/ast.vl` | `has_mut`, moved here from lower.vl, now used by both backends |
-| `stage1/x64.vl` | copies of up to 256 bytes unrolled, `rep movsb` above that |
+| `compiler/src/main.vl` | `native(quick)` decides the backend; the optimizer runs on the IR unless `VELA_OPT=0` |
+| `compiler/src/opt.vl` | new: inlining, copy propagation, folding, jump threading, dead code |
+| `compiler/src/codegen.vl`, `compiler/src/lower.vl` | borrowed parameters |
+| `compiler/src/ast.vl` | `has_mut`, moved here from lower.vl, now used by both backends |
+| `compiler/src/x64.vl` | copies of up to 256 bytes unrolled, `rep movsb` above that |
 | `run_tests.py` | `--backend c\|native` (`--native` stays as another name); longer timeouts under the sanitizers |
-| `bootstrap/bootstrap.sh` | unchanged in use: `--native` still checks the native fixed point |
+| `compiler/bootstrap/bootstrap.sh` | unchanged in use: `--native` still checks the native fixed point |
 
 ## 1. Which backend
 
@@ -155,8 +155,8 @@ compiler of M11, built through gcc -O2.
 
 | Measure | M11 C | M11b C | M11b native |
 | --- | --- | --- | --- |
-| `vela check stage1/main.vl` | 0.246 s | 0.209 s | 0.172 s |
-| `vela c stage1/main.vl` | 0.448 s | 0.328 s | 0.295 s |
+| `vela check compiler/src/main.vl` | 0.246 s | 0.209 s | 0.172 s |
+| `vela c compiler/src/main.vl` | 0.448 s | 0.328 s | 0.295 s |
 | fib(35) | 0.063 s | 0.064 s | 0.076 s |
 | Mandelbrot 400×200, 3,000 steps | 0.177 s | 0.176 s | 0.217 s |
 | `tests/run/allocation_heavy.vl` | 0.365 s | 0.359 s | 0.398 s |

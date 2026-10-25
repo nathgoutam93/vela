@@ -73,7 +73,7 @@ measurements and remaining platform validation.
 
 **Concepts:** Diagnostic design, machine-applicable fixes, documentation generated from the implementation, measuring agents.
 
-**Done when:** Every error has a code and an explanation; vela fix repairs the most common mistakes seen in eval runs; vela guide fits in 8,000 tokens and replaces the 94,000 tokens of docs in eval/prepare.py; the M16 findings are closed.
+**Done when:** Every error has a code and an explanation; vela fix repairs the most common mistakes seen in eval runs; vela guide fits in 8,000 tokens and replaces the 94,000 tokens of docs in evaluation/prepare.py; the M16 findings are closed.
 
 ## M19: Fixed-width integers and bit operations
 

@@ -1,6 +1,6 @@
 # M8: Stage 1, the compiler in Vela
 
-M8 rewrites the compiler in Vela itself. `stage1/` holds a module for each
+M8 rewrites the compiler in Vela itself. `compiler/src/` holds a module for each
 module of `stage0/`. Built by Stage 0, it is a second compiler that turns
 the same programs into the same C, byte for byte.
 
@@ -8,8 +8,8 @@ Done when: Stage 1 passes the full test suite with output identical to
 Stage 0. Run it:
 
 ```
-$ python3 run_tests.py --compiler stage1/vela1      # also VELA_CC=clang, and --sanitize
-198 passed, 0 failed  (compiler: /home/user/vela/stage1/vela1)
+$ python3 run_tests.py --compiler compiler/src/vela1      # also VELA_CC=clang, and --sanitize
+198 passed, 0 failed  (compiler: /home/user/vela/compiler/src/vela1)
 
 $ python3 compare_stages.py tokens ast check c
 920 same, 0 different
@@ -24,16 +24,16 @@ it, which is most of M9's fixed point.
 
 | Stage 1 | Lines | Port of | Lines |
 | --- | --- | --- | --- |
-| `stage1/lexer.vl`, `text.vl`, `errors.vl` | 605 + 146 + 74 | `lexer.py`, `errors.py` | 307 + 58 |
-| `stage1/parser.vl` | 956 | `parser.py` | 704 |
-| `stage1/ast.vl` | 560 | `ast_nodes.py` | 661 |
-| `stage1/modules.vl` | 290 | `modules.py` | 157 |
-| `stage1/types.vl` | 319 | `typesys.py` | 199 |
-| `stage1/match_check.vl` | 398 | `exhaustiveness.py` | 194 |
-| `stage1/checker.vl` | 2,243 | `checker.py` | 1,325 |
-| `stage1/layout.vl` | 532 | `c_layout.py` | 359 |
-| `stage1/codegen.vl` | 1,305 | `codegen_c.py` | 874 |
-| `stage1/main.vl`, `stage1/vela1` | 114 + 48 | `main.py` | 194 |
+| `compiler/src/lexer.vl`, `text.vl`, `errors.vl` | 605 + 146 + 74 | `lexer.py`, `errors.py` | 307 + 58 |
+| `compiler/src/parser.vl` | 956 | `parser.py` | 704 |
+| `compiler/src/ast.vl` | 560 | `ast_nodes.py` | 661 |
+| `compiler/src/modules.vl` | 290 | `modules.py` | 157 |
+| `compiler/src/types.vl` | 319 | `typesys.py` | 199 |
+| `compiler/src/match_check.vl` | 398 | `exhaustiveness.py` | 194 |
+| `compiler/src/checker.vl` | 2,243 | `checker.py` | 1,325 |
+| `compiler/src/layout.vl` | 532 | `c_layout.py` | 359 |
+| `compiler/src/codegen.vl` | 1,305 | `codegen_c.py` | 874 |
+| `compiler/src/main.vl`, `compiler/src/vela1` | 114 + 48 | `main.py` | 194 |
 
 About 7,500 lines of Vela for about 5,000 of Python. Other new files:
 `compare_stages.py`, the differential tester, and a `check` command in
@@ -252,8 +252,8 @@ C. That C is committed as a seed, and Python is retired.
 1. **Committing the seed.** The seed is the C of Stage 1, about 31,000
    lines, regenerated whenever Stage 1 changes. With it, anyone can
    build Vela with only a C compiler. Fine to commit it, as
-   `bootstrap/vela1.c`?
-2. **Running the C compiler.** Today `stage1/vela1` is a shell script that
+   `compiler/bootstrap/vela1.c`?
+2. **Running the C compiler.** Today `compiler/src/vela1` is a shell script that
    calls `cc`, because Vela cannot start a program. To retire Python
    completely and keep `build` and `run` in Vela, I suggest adding
    `os.run(command: [Str]) -> Result[Int, Str]` to the `os` module. Add it,

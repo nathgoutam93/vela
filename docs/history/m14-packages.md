@@ -29,11 +29,11 @@ then builds and tests the programs again.
 
 | File | What |
 | --- | --- |
-| `stage1/packages.vl` (new) | `vela.mod` and `vela.lock`; choosing versions; fetching with git; the packages of a program, for building |
-| `stage1/modules.vl` | each module knows whose file it is; imports looked up in the importer's own directory, then its packages, then `std/`; package modules named `greet.util`; two files with one module name are an error |
-| `stage1/layout.vl` | C names for package modules |
-| `stage1/main.vl`, `query.vl`, `lsp.vl` | `vela get`; every command loads a program with its packages |
-| `runtime/`, `stage1/checker.vl`, `codegen.vl` | `os.output`, which runs a program and returns what it prints |
+| `compiler/src/packages.vl` (new) | `vela.mod` and `vela.lock`; choosing versions; fetching with git; the packages of a program, for building |
+| `compiler/src/modules.vl` | each module knows whose file it is; imports looked up in the importer's own directory, then its packages, then `std/`; package modules named `greet.util`; two files with one module name are an error |
+| `compiler/src/layout.vl` | C names for package modules |
+| `compiler/src/main.vl`, `query.vl`, `lsp.vl` | `vela get`; every command loads a program with its packages |
+| `runtime/`, `compiler/src/checker.vl`, `codegen.vl` | `os.output`, which runs a program and returns what it prints |
 | `examples/receipt/` (new) | a program using a package in a directory |
 | `tests/pkg_test.py`, `tests/run/std_os_output.vl` (new) | the tests |
 
@@ -234,15 +234,15 @@ In each, fetching a package already lets it run code.
 
 | Check | Result |
 | --- | --- |
-| `sh bootstrap/bootstrap.sh` | fixed point, 65,751 lines; the seed is up to date |
+| `sh compiler/bootstrap/bootstrap.sh` | fixed point, 65,751 lines; the seed is up to date |
 | `python3 run_tests.py` (gcc) | 250 passed |
 | `VELA_CC=clang python3 run_tests.py` | 250 passed |
 | `python3 run_tests.py --sanitize` | 250 passed |
 | `python3 run_tests.py --tsan` | 250 passed |
-| The suite with a compiler built with ASan + UBSan + LSan, and with one built with ThreadSanitizer | 250 passed each; both compile `stage1/` to C identical to the seed |
+| The suite with a compiler built with ASan + UBSan + LSan, and with one built with ThreadSanitizer | 250 passed each; both compile `compiler/src/` to C identical to the seed |
 | `python3 run_tests.py --stage0` | 188 passed |
 | `python3 compare_stages.py tokens ast check` | 644 same, 0 different |
-| `vela fmt -l` on `stage1/`, `std/` and `examples/` | nothing to format |
+| `vela fmt -l` on `compiler/src/`, `std/` and `examples/` | nothing to format |
 
 `tests/pkg_test.py` runs from `run_tests.py`. With git repositories it
 makes itself, it checks:
@@ -259,7 +259,7 @@ makes itself, it checks:
 - the warning for a file hiding a package;
 - `vela query` going into a fetched package.
 
-The unit tests in `stage1/packages.vl` cover reading `vela.mod` and
+The unit tests in `compiler/src/packages.vl` cover reading `vela.mod` and
 `vela.lock`, versions, choosing, `git ls-remote` output and editing
 `vela.mod`. `examples/receipt` runs its tests and its package's with
 `vela test`.
