@@ -257,11 +257,15 @@ def main():
         for backend in ('c','native'):
             if backend=='native' and not ((platform.system()=='Linux' and platform.machine()=='x86_64') or (platform.system()=='Darwin' and platform.machine()=='arm64')): continue
             env = {**os.environ,'VELA_ROOT':str(ROOT),'VELA_BACKEND':backend}
-            traces(c,w,env); profiling(c,w,env); returns(c,w,env); callback(c,w,env); debugger(c,w,env)
+            for check in (traces, profiling, returns, callback, debugger):
+                check(c,w,env)
+                print(f'M27: {backend} {check.__name__} passed.',flush=True)
             if env.get("VELA_M27_COMPILER_PANIC") == "1": deep_compiler(c,w,env)
             print(f'M27: {backend} trace/profile/source checks passed.',flush=True)
         cache_modes(c,w,os.environ.copy())
+        print('M27: cache modes passed.',flush=True)
         runtime_boundaries(w,os.environ.copy())
+        print('M27: runtime boundaries passed.',flush=True)
         if os.environ.get('VELA_M27_CROSS')=='1': cross(c,w,os.environ.copy())
     print('M27 observation checks passed.',flush=True)
 

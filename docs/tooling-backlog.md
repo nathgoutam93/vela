@@ -1788,7 +1788,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-071: Linux readelf filename assertion checked the wrong DWARF section
 
-- **Status:** in progress after M30; local fix applied, CI rerun pending.
+- **Status:** resolved after M30.
 - **Evidence:** Linux [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142669)
   fails M27 at `assert 'step.vl' in info`, where `info` is only
   `readelf --debug-dump=info`. The isolated x86-64 ELF contains
@@ -1800,11 +1800,13 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Resolution:** make the assertion read the appropriate sections. The
   focused Linux debugger check passes in the isolated x86-64 container.
 - **Acceptance:** Linux CI M27 passes, including its requested GDB step.
+- **Validation:** Linux [run 40215742923](https://github.com/nathgoutam93/vela/actions/runs/40215742923/job/121236368385)
+  passes both complete 310-check suites and the separate M27 debugger step.
 
 ### TL-072: Windows temporary executables lack the suffix needed by CreateProcess
 
-- **Status:** in progress after M30; source fix and cross-compilation pass,
-  native Windows rerun pending.
+- **Status:** resolved for the temporary executable launch after M30; other
+  Windows validation remains below.
 - **Evidence:** Windows [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142674)
   bootstraps but `vela run` and `vela test` report `No such file or directory
   [E6010]` for generated temporary programs. The driver names them `program`,
@@ -1816,7 +1818,12 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Workaround:** use explicit `.exe` output paths for Windows builds.
 - **Resolution:** add `.exe` to driver-owned temporary executable names on
   Windows and to integration test executables that run directly.
-- **Acceptance:** Windows M27/M28/M30 integrations and supported suite pass.
+- **Acceptance:** Windows compiler-managed `run`, `test`, profile and property
+  launches advance past the prior `E6010`; full suite acceptance remains
+  VAL-005 and the M27 timeout remains TL-076.
+- **Validation:** Windows [run 40215742923](https://github.com/nathgoutam93/vela/actions/runs/40215742923/job/121236368837)
+  executes M28 and advances M30 through its corpus and query checks without
+  the earlier `E6010` launch error. M27 instead times out; see TL-076.
 
 ### TL-073: Windows fixture output needs byte-exact UTF-8 and OS error expectations
 
@@ -1840,11 +1847,15 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** affected fixtures and the full Windows core suite pass;
   local affected fixtures pass and the Windows runtime cross-compiles with
   strict warnings as errors.
+- **Run 40215742923 recurrence:** UTF-8 output and the process error text no
+  longer fail. `tests/run/files_io/main.vl` alone still differs in its first
+  line: `data.txt` is 20 bytes on Windows versus the intended 18 LF bytes.
+  `.gitattributes` did not pin that text fixture; it now does. The remaining
+  native Windows result is outstanding.
 
 ### TL-074: MSYS2 Clang modules fail inside its own malloc header
 
-- **Status:** in progress after M30; harness change applied, Windows rerun
-  pending.
+- **Status:** resolved as a test-harness issue after M30.
 - **Evidence:** Windows [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142674)
   fails the M29 cache oracle's intentionally opaque `-fmodules` build because
   MSYS2 Clang reports `_MarkAllocaS` and `_freea` redefinitions in `malloc.h`.
@@ -1858,6 +1869,41 @@ the same entry. Close it with a commit or validation result; keep its history.
   requiring the disabled-cache reason in the report.
 - **Acceptance:** M29 cache correctness and the external-state refusal check
   pass on Windows CI.
+- **Validation:** Windows [run 40215742923](https://github.com/nathgoutam93/vela/actions/runs/40215742923/job/121236368837)
+  reports no M29 failure in its core selection; the Clang mode itself remains
+  unsuitable for a successful-build oracle on that host.
+
+### TL-075: M30 hash check uses an extensionless Windows compiler path
+
+- **Status:** in progress after M30; local fix applied, native Windows check
+  pending.
+- **Evidence:** Windows [run 40215742923](https://github.com/nathgoutam93/vela/actions/runs/40215742923/job/121236368837)
+  passes M30 corpus, guide, diagnostics and query checks, then fails while
+  hashing `build/vela`: the actual compiler file is `build/vela.exe`.
+- **Impact:** evidence-context acceptance stops despite successful compiler
+  execution and cannot validate the later M30 checks.
+- **Workaround:** pass the full `.exe` compiler path to `tests/m30_test.py`.
+- **Resolution:** resolve a missing `.exe` suffix when the M30 harness starts,
+  as the M28 harness already does.
+- **Acceptance:** M30 evidence and full integration pass on native Windows;
+  local M30 integration remains passing.
+
+### TL-076: Windows M27 integration exceeds the outer timeout
+
+- **Status:** open after M30; native-host isolation pending.
+- **Evidence:** Windows [run 40215742923](https://github.com/nathgoutam93/vela/actions/runs/40215742923/job/121236368837)
+  reports `tests/m27_test.py` timed out after 600 seconds under four outer
+  workers. Its script emitted no intermediate progress, so the stuck or slow
+  phase is unknown. This is an observed timeout, not a diagnosed deadlock.
+- **Impact:** the Windows core selection cannot complete M27 observation
+  acceptance; repeated whole-suite attempts give no useful phase detail.
+- **Workaround:** run `python3 -u tests/m27_test.py build/vela.exe` alone on
+  native Windows and capture partial stdout/stderr on timeout.
+- **Proposed improvement:** emit a flushed progress line after each M27 phase;
+  this is now applied to the harness. Diagnose the first phase that stalls
+  before changing timeouts or runtime behavior.
+- **Acceptance:** the standalone M27 check passes on native Windows, or a
+  phase-specific reproducer identifies and fixes the cause.
 
 ## Outstanding validation
 
@@ -1893,6 +1939,17 @@ the same entry. Close it with a commit or validation result; keep its history.
   best-of-three `<1` gate. The next run serializes M24 after the worker pool
   drains, preserving the threshold and separating contention from a genuine
   isolated slowdown. The macOS matrix job was cancelled by the user.
+- **Run 40215742923:** Linux C and native suites each pass 310/310, including
+  the serialized M24 latency check. The M29 real-program geometric means pass
+  (1.077 C backend, 1.158 native versus the 1.2 ceiling), but its separate
+  100k-line `query impact` median still fails the 1-second budget. Retain
+  the raw [M29 artifact](https://github.com/nathgoutam93/vela/actions/runs/40215742923/artifacts/12607262926)
+  and measure on the intended native Linux host before changing the threshold
+  or claiming a compiler regression. The user requested no more workflow runs.
+- **Native Linux handoff:** after `sh compiler/bootstrap/bootstrap.sh --native`,
+  run `python3 -u bench/real_programs.py --compiler build/vela --gate --runs 3
+  --json build/m29-real-programs-native-linux.json` on the intended host.
+  Retain that report, source commit, CPU, kernel and C compiler version.
 
 ### VAL-001: Linux native and sanitizer validation
 
@@ -2195,6 +2252,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   harness uses explicit UTF-8, .exe names and LF attributes including manifests.
   These are source-level preparations, not a Windows pass. The retained
   workflow includes M30 but is manual-only while automatic runs are paused.
+- **Post-CI native handoff:** after `sh compiler/bootstrap/bootstrap.sh`, run
+  `python3 -u tests/m27_test.py build/vela.exe` alone to locate TL-076 from
+  its new phase logs. Then run `python3 -u run_tests.py --compiler
+  build/vela.exe --backend c --jobs 2 tests/run/ tests/fail/ tests/dump/
+  m26_test m27_test m28_test m29_test m30_test`, retaining the full output,
+  toolchain identity and source commit. No further workflow run is requested.
 
 ### VAL-006: Native-host M27 debugging and observability acceptance
 

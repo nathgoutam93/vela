@@ -390,7 +390,10 @@ def properties(c):
 
 def main():
     compiler = sys.argv[1:] or [str(ROOT/'build/vela')]
-    compiler[0] = str(Path(compiler[0]).resolve())
+    selected = Path(compiler[0]).resolve()
+    if os.name == 'nt' and not selected.is_file() and selected.with_suffix('.exe').is_file():
+        selected = selected.with_suffix('.exe')
+    compiler[0] = str(selected)
     with tempfile.TemporaryDirectory(prefix='vela-m30-') as tmp:
         c = Checks(compiler, Path(tmp))
         manifest = inventory(c)
