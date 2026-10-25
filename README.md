@@ -77,7 +77,7 @@ tests/fail/  programs and the exact errors they must produce
 tests/dump/  expected token and syntax-tree dumps
 tests/cli/   commands such as test, fmt, query and check --json, and their output
 tests/lsp_client.py, tests/nvim_test.lua  the language server, driven by a script and by Neovim
-docs/        one walkthrough per milestone
+docs/        language/JSON specifications, compatibility policy and walkthroughs
 run_tests.py the golden-test runner
 ```
 
@@ -230,3 +230,11 @@ domains, budgets, evidence freshness and remaining agent/platform validation.
 M29 adds a real-program performance matrix, a 100k-line scale fixture and
 incremental backend compilation. See [the walkthrough](docs/m29-scale.md) for
 cache granularity, compilation/query budgets and reproducible measurements.
+
+M30 defines the [1.0 candidate language specification](docs/specification.md),
+[compatibility policy](docs/compatibility.md) and
+[agent JSON contracts](docs/agent-json.md), checked against retained 1.0
+programs and the generated guide. See [M30](docs/m30-specification.md) for
+validation and the outstanding acceptance before a final 1.0 release.
+Automatic GitHub Actions push/PR runs are temporarily paused; the platform
+workflow remains available through manual dispatch.

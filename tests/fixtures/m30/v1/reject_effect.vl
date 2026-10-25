@@ -1,0 +1,2 @@
+import files
+fn read() -> Result[Str, Str] { return files.read("missing") }

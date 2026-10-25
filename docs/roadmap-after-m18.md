@@ -274,6 +274,14 @@ toolchains. See the [baseline](design-baseline-to-m30.md#m29-measure-all-relevan
 
 ## M30: Vela 1.0
 
+**Status:** implemented and locally validated as a 1.0 candidate: language
+specification, compatibility policy, agent JSON contracts, retained corpus,
+both bootstrap fixed points and local regression checks. See
+[M30](m30-specification.md). This does
+not close the inherited agent/tokenizer/native-host acceptance gaps or
+declare a final 1.0 release. Automatic push/PR workflows are temporarily
+paused at the user's request; platform jobs remain manually dispatchable.
+
 **Needs:** everything above.
 
 **What gets built:** Vela 1.0: a written specification checked against the compiler, a stability policy (programs written for 1.0 build on every 1.x), and vela guide and the specification kept in step by tests.

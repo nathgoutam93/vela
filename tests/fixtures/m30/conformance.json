@@ -1,0 +1,425 @@
+{
+  "format": "vela.language.conformance",
+  "version": 1,
+  "language": "1.0-candidate",
+  "specification": "docs/specification.md",
+  "frozen_sources": {
+    "contracts.vl": "84cba665500a01d53da41484c8268006b84549d1d1ecda56439c24f5fe5315c7",
+    "core.vl": "1e48384c3f83a288dfcb817e95413a7777ad16f7da5e806b82a59642a5949788",
+    "fakes.vl": "bab586038dfd3697c0945514cad8f1709a6f56e5e9fd685bf1d7f6ae3faea978",
+    "ffi.vl": "a1535d6541edf572144a165e80e648a52e1ab2de5a638de284c696d76c507523",
+    "interfaces.vl": "6e95cd1dea7f3ba3eccfd308a5aa89aac91ff44177f7fac98cc20685b271964d",
+    "model.vl": "9b232bc03914d9f31888892b47b9e76fbbe1cb11e58d314e563493fa9b66e6b8",
+    "panic_overflow.vl": "1265a066606f8c8141a18caa5946b11b4dd7386e9acc8f7335d769a70fc9a428",
+    "reject_effect.vl": "f763ed0d487ac47045f1baa9844475d41c7a1b89970c0ce44bd6d266610bc86d",
+    "reject_result_equality.vl": "160b6636f322ddfd9b3bbe8853cf4cfaf228b6741e10b3ef2f9617ced463c2d5",
+    "systems.vl": "b9a637f18814ccc0749ad259f3365669880ca1a546c32ab3ff9cb9f88c5225ea",
+    "package/app/main.vl": "9108709cd9b96dc2c05fe00a5b18c0a28091d465b65521de0a894276915eedb4",
+    "package/app/vela.mod": "cd668dc1ae04f7d2349df6a3db9dcb69d22e1fc4ce77d6d9702c0ea4404074bf",
+    "package/dependency/dependency.vl": "7051b6bfb1449cf16c38ef1801b3676757f6f5293cbc79e05a1097e2dfdb8ce3",
+    "package/dependency/vela.mod": "81be027bd5a10351ef899d31510f9b7f3766f4a981e47b135367419e6df0cade"
+  },
+  "programs": [
+    {
+      "file": "contracts.vl",
+      "kind": "program",
+      "exit": 0,
+      "stdout": "contract observed\ncontracts ok\n"
+    },
+    {
+      "file": "core.vl",
+      "kind": "program",
+      "exit": 0,
+      "stdout": "core ok\n"
+    },
+    {
+      "file": "fakes.vl",
+      "kind": "program",
+      "exit": 0,
+      "stdout": "fakes ok\n"
+    },
+    {
+      "file": "ffi.vl",
+      "kind": "program",
+      "exit": 0,
+      "stdout": "ffi ok\n"
+    },
+    {
+      "file": "interfaces.vl",
+      "kind": "program",
+      "exit": 0,
+      "stdout": "interfaces ok\n"
+    },
+    {
+      "file": "model.vl",
+      "kind": "module",
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "file": "panic_overflow.vl",
+      "kind": "panic",
+      "exit": 101,
+      "stdout": ""
+    },
+    {
+      "file": "reject_effect.vl",
+      "kind": "rejected",
+      "exit": 1,
+      "stdout": "",
+      "code": "E3036"
+    },
+    {
+      "file": "reject_result_equality.vl",
+      "kind": "rejected",
+      "exit": 1,
+      "stdout": "",
+      "code": "E3099"
+    },
+    {
+      "file": "systems.vl",
+      "kind": "program",
+      "exit": 0,
+      "stdout": "systems ok\n"
+    },
+    {
+      "file": "package/app/main.vl",
+      "kind": "program",
+      "exit": 0,
+      "stdout": "package ok\n"
+    },
+    {
+      "file": "package/app/vela.mod",
+      "kind": "manifest",
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "file": "package/dependency/dependency.vl",
+      "kind": "module",
+      "exit": 0,
+      "stdout": ""
+    },
+    {
+      "file": "package/dependency/vela.mod",
+      "kind": "manifest",
+      "exit": 0,
+      "stdout": ""
+    }
+  ],
+  "constructs": {
+    "ExprKind.IntLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.FixedIntLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.FloatLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.ByteLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.BoolLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.StrLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.UnitLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Name": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Unary": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Binary": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Call": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Field": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Index": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Try": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.MutArg": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Slice": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.ArrayLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.MapLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.StructLit": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Match": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "ExprKind.Closure": {
+      "section": "expressions-and-operators",
+      "program": "core.vl"
+    },
+    "StmtKind.Block": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.ExprStmt": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.Let": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.Assign": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.If": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.For": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.ForRange": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.ForEach": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.Break": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.Continue": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.Return": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.MatchStmt": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "StmtKind.Unsafe": {
+      "section": "c-interoperability-and-targets",
+      "program": "ffi.vl"
+    },
+    "StmtKind.With": {
+      "section": "effects-contracts-and-tests",
+      "program": "fakes.vl"
+    },
+    "PatternKind.Wild": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "PatternKind.Bind": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "PatternKind.Lit": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "PatternKind.Range": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "PatternKind.Variant": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "Else.NoElse": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "Else.ElseBlock": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    },
+    "Else.ElseIf": {
+      "section": "statements-and-matching",
+      "program": "core.vl"
+    }
+  },
+  "features": {
+    "lexical-separators": {
+      "section": "source-and-tokens",
+      "program": "core.vl"
+    },
+    "grouped-types": {
+      "section": "types-and-values",
+      "program": "core.vl"
+    },
+    "integers": {
+      "section": "integer-arithmetic",
+      "program": "core.vl"
+    },
+    "floating-point": {
+      "section": "floating-point",
+      "program": "core.vl"
+    },
+    "fixed-arrays": {
+      "section": "collections-and-records",
+      "program": "core.vl"
+    },
+    "recursive-values": {
+      "section": "collections-and-records",
+      "program": "core.vl"
+    },
+    "generic-structs-and-enums": {
+      "section": "functions-generics-and-interfaces",
+      "program": "core.vl"
+    },
+    "closures-and-effect-parameters": {
+      "section": "functions-generics-and-interfaces",
+      "program": "core.vl"
+    },
+    "interface-parents-and-static-methods": {
+      "section": "functions-generics-and-interfaces",
+      "program": "interfaces.vl"
+    },
+    "custom-key-and-ordering": {
+      "section": "functions-generics-and-interfaces",
+      "program": "interfaces.vl"
+    },
+    "modules-and-public-visibility": {
+      "section": "programs-and-declarations",
+      "program": "interfaces.vl"
+    },
+    "value-snapshots": {
+      "section": "bindings-and-mutation",
+      "program": "systems.vl"
+    },
+    "views-buffers-and-arenas": {
+      "section": "memory-and-concurrency",
+      "program": "systems.vl"
+    },
+    "tasks-and-effect-propagation": {
+      "section": "memory-and-concurrency",
+      "program": "systems.vl"
+    },
+    "all-effect-fakes": {
+      "section": "effects-contracts-and-tests",
+      "program": "fakes.vl"
+    },
+    "contracts-and-observable-calls": {
+      "section": "effects-contracts-and-tests",
+      "program": "contracts.vl"
+    },
+    "extern-symbols-varargs-and-callbacks": {
+      "section": "c-interoperability-and-targets",
+      "program": "ffi.vl"
+    },
+    "checked-overflow-panic": {
+      "section": "integer-arithmetic",
+      "program": "panic_overflow.vl"
+    },
+    "undeclared-effects-rejected": {
+      "section": "effects-contracts-and-tests",
+      "program": "reject_effect.vl"
+    },
+    "result-equality-rejected": {
+      "section": "statements-and-matching",
+      "program": "reject_result_equality.vl"
+    },
+    "package-resolution": {
+      "section": "modules-packages-and-execution",
+      "program": "package/app/main.vl"
+    }
+  },
+  "keywords": [
+    "fn",
+    "let",
+    "mut",
+    "if",
+    "else",
+    "match",
+    "for",
+    "in",
+    "return",
+    "break",
+    "continue",
+    "type",
+    "import",
+    "pub",
+    "test",
+    "uses",
+    "with"
+  ],
+  "contextual_words": [
+    "struct",
+    "enum",
+    "interface",
+    "extern",
+    "unsafe",
+    "requires",
+    "ensures",
+    "Self",
+    "result"
+  ],
+  "binary_operators": [
+    "||",
+    "&&",
+    "==",
+    "!=",
+    "<",
+    "<=",
+    ">",
+    ">=",
+    "|",
+    "^",
+    "&",
+    "<<",
+    ">>",
+    "+",
+    "-",
+    "*",
+    "/",
+    "%"
+  ],
+  "unary_operators": [
+    "-",
+    "!",
+    "~"
+  ]
+}

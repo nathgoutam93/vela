@@ -1,0 +1,7 @@
+fn good() -> Int ensures result == 2 { return 2 }
+fn bad() -> Int ensures false { return 1 }
+fn unknown(n: Int) -> Int ensures result >= 0 {
+    let mut total = 0
+    for i in 0..n { total = total + 1 }
+    return total
+}

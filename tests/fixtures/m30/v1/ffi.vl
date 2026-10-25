@@ -1,0 +1,26 @@
+import c
+
+extern fn absolute(value: c.Int) -> c.Int uses unsafe = "abs"
+extern fn snprintf(buffer: c.Ptr, size: c.Size, format: c.Ptr, ...) -> c.Int uses unsafe
+fn increment(value: c.Int) -> c.Int { return value + 1i32 }
+fn safe_absolute(value: c.Int) -> c.Int requires value != -2147483648i32 { unsafe { return absolute(value) } }
+fn main() {
+    assert(safe_absolute(-7i32) == 7i32)
+    unsafe {
+        let memory = c.alloc(128)
+        let format = c.cstr("v:%d")
+        assert(snprintf(memory, 128, format, 7i8) == 3i32)
+        assert(c.string(memory) == "v:7")
+        c.free(format)
+        c.free(memory)
+        let mut value: i32 = 5i32
+        let pointer = c.addr(mut value)
+        c.store(pointer, 6i32)
+        let loaded: i32 = c.load(pointer)
+        assert(loaded == 6i32 && value == 6i32)
+        let callback = c.callback(increment)
+        assert(!c.is_null(callback))
+    }
+    print("ffi ok")
+}
+test "safe wrapper" { assert(safe_absolute(-2i32) == 2i32) }

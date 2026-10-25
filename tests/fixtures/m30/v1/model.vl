@@ -1,0 +1,12 @@
+pub type Named = interface: Eq { fn name(value: Self) -> Str }
+pub type Item = struct { n: Int }
+pub fn Item.eq(a: Item, b: Item) -> Bool { return a.n == b.n }
+pub fn Item.hash(value: Item) -> u64 { return u64(value.n) }
+pub fn Item.compare(a: Item, b: Item) -> Int {
+    if a.n < b.n { return -1 }
+    if a.n > b.n { return 1 }
+    return 0
+}
+pub fn Item.name(value: Item) -> Str { return "item" }
+pub fn len(value: Item) -> Int { return value.n }
+pub fn own(value: Item) -> Int { return len(value) }

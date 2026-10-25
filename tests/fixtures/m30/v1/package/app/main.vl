@@ -1,0 +1,3 @@
+import dependency
+fn main() { assert(dependency.value() == 42); print("package ok") }
+test "dependency" { assert(dependency.value() == 42) }

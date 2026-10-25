@@ -1,0 +1,38 @@
+import clock
+import files
+import net
+import os
+import processes
+import strings
+import time
+
+fn get[T](value: Result[T, Str]) -> T {
+    match value { Ok(v) => return v, Err(_) => { assert(false); for {} } }
+}
+fn main() { print("fakes ok") }
+test "environment and IO fakes" {
+    with args = ["program", "arg"], env = ["KEY": "value"], stdin = "input\n" {
+        assert(os.args()[1] == "arg")
+        match os.env("KEY") { Some(v) => assert(v == "value"), None => assert(false) }
+        match os.read_line() { Some(v) => assert(v == "input"), None => assert(false) }
+    }
+    let mut output = strings.builder()
+    with stdout = mut output { print("captured") }
+    assert(strings.build(output) == "captured\n")
+    with files = ["file": "data"] { assert(get(files.read("file")) == "data") }
+    with clock = [100, 20] {
+        assert(get(time.wall_ns()) == 100)
+        get(time.sleep_ns(7))
+        assert(get(time.monotonic_ns()) == 27)
+    }
+    with net = [net.reply("host", 80, "ping", "pong")] {
+        let socket = get(net.connect("host", 80))
+        assert(get(socket.write("ping")) == 4)
+        assert(get(socket.read(4)) == "pong")
+        get(socket.close())
+    }
+    with processes = [processes.reply(["fake", "arg"], "in", 3, "out", "err")] {
+        let result = get(processes.run(["fake", "arg"], "in"))
+        assert(result.status == 3 && result.stdout == "out" && result.stderr == "err")
+    }
+}

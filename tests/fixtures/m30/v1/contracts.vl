@@ -1,0 +1,14 @@
+fn step(value: Int) -> Int requires value >= 0 && value < 100 ensures result == value + 1 {
+    return value + 1
+}
+fn update(value: mut Int) ensures value == 4 { value = 4 }
+fn observed() -> Bool { print("contract observed"); return true }
+fn effectful() -> Int requires observed() ensures result == 2 { return 2 }
+fn main() {
+    assert(step(2) == 3)
+    let mut value = 0
+    update(mut value)
+    assert(value == 4 && effectful() == 2)
+    print("contracts ok")
+}
+test "contract calls" { assert(step(0) == 1) }

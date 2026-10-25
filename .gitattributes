@@ -1,3 +1,5 @@
 *.vl text eol=lf
 # Deliberately uses Windows line endings.
 tests/run/crlf.vl -text
+# The 1.0 compatibility corpus pins exact bytes, including package manifests.
+tests/fixtures/m30/v1/** text eol=lf

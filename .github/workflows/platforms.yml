@@ -1,7 +1,7 @@
 name: Platforms
 on:
-  push:
-  pull_request:
+  # Automatic CI is paused at the user's request during M30 work.
+  # Manual dispatch retains the platform validation jobs for later use.
   workflow_dispatch:
 permissions:
   contents: read
@@ -55,7 +55,7 @@ jobs:
             build/m29-release-parity.json
       - name: Linux address and undefined-behavior sanitizers
         if: runner.os == 'Linux'
-        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --sanitize tests/run/ m23_test m27_test m28_test m29_test
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --sanitize tests/run/ m23_test m27_test m28_test m29_test m30_test
       - name: Linux thread sanitizer
         if: runner.os == 'Linux'
         run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --tsan tests/run/tasks
@@ -84,7 +84,7 @@ jobs:
         run: sh bootstrap/bootstrap.sh
       - name: Core C fixtures and target ABI/cache oracles
         shell: msys2 {0}
-        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ tests/fail/ tests/dump/ m26_test m27_test m28_test m29_test
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ tests/fail/ tests/dump/ m26_test m27_test m28_test m29_test m30_test
       - name: Windows systems oracle
         shell: msys2 {0}
         run: |

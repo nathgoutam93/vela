@@ -1,0 +1,5 @@
+fn main() {
+    let a: Result[Int, Str] = Ok(1)
+    let b: Result[Int, Str] = Ok(1)
+    assert(a == b)
+}

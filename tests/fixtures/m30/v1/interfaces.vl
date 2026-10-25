@@ -1,0 +1,24 @@
+import lists
+import maps
+import model
+
+fn describe[T: model.Named](value: T) -> Str { return value.name() }
+fn largest[T: Ord](a: T, b: T) -> T { if a > b { return a }; return b }
+fn store[T: Key](value: T) -> Map[T, Int] { return [value: 7] }
+type Handler = struct { apply: fn(Int) -> Int }
+fn Handler.apply(value: Handler, n: Int) -> Int { return 999 }
+fn main() {
+    let one = model.Item { n: 1 }
+    let two = model.Item { n: 2 }
+    assert(one != two && one < two && largest(one, two).n == 2)
+    assert(describe(one) == "item" && model.Item.name(one) == "item")
+    let map = store(one)
+    assert(map[model.Item { n: 1 }] == 7 && maps.has(map, one))
+    assert(model.own(two) == 2 && model.len(two) == 2)
+    let values = lists.sort([two, one])
+    assert(values[0].n == 1 && values[1].n == 2)
+    let handler = Handler { apply: fn(n) => n + 1 }
+    assert(handler.apply(2) == 3)
+    print("interfaces ok")
+}
+test "custom key" { assert(store(model.Item { n: 3 })[model.Item { n: 3 }] == 7) }

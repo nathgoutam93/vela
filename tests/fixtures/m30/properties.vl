@@ -1,0 +1,3 @@
+fn identity(n: i8) -> i8 ensures result == n { return n }
+fn wrong(n: i8) -> i8 ensures result == n { return 0i8 }
+test "ordinary mode sentinel" { assert(false) }

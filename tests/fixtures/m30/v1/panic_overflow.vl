@@ -1,0 +1,1 @@
+fn main() { let n = 127i8; print(n + 1i8) }

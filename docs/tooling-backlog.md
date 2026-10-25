@@ -49,6 +49,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   unsupported native checks; Linux x86-64 retains native coverage. A genuine
   failure must not be converted into a skip.
 
+- **M30 fixture audit:** the new hashed compatibility corpus fixes LF checkout
+  bytes through .gitattributes; its harness reads/writes UTF-8 explicitly and
+  uses platform executable suffixes. This is source-level fixture preparation,
+  not native Windows acceptance. Run the M30 check on Windows under VAL-005.
+
 ### TL-002: Relative compiler overrides fail in fixture directories
 
 - **Status:** resolved during M26; discovered during M17.
@@ -112,6 +117,18 @@ the same entry. Close it with a commit or validation result; keep its history.
   a distinct entry-index mismatch; earlier timeout causes remain unestablished
   and earlier compiler-property successes were invalidated. Production defaults
   remain bounded, and timeout outcomes remain unknown.
+
+- **M30 recurrence:** the first complete run passed 310/311 checks; the new
+  M30 property fixture failed its expected per-function status map after its
+  overall failed outcome was correctly reported. Isolated strict-flags runs
+  pass. The first response was not retained, so the unexpected row state and
+  its cause are unestablished; short case/budget limits under contention are
+  only suspected. Preserve subsequent full JSON in build/m30/test-failure.json,
+  include nonmatching status details, and use the established M28 integration
+  limits (5 s/case, 60 s overall), with unknown still a failing expectation.
+  Production defaults are unchanged. The broad rerun passes 311/311; native selection 280 and UBSan 119 also
+  pass. The first mismatch cause remains unestablished; the retained history
+  is not proof of a specific timeout mechanism.
 
 ### TL-004: Runtime cache omitted an included header
 
@@ -1365,6 +1382,13 @@ the same entry. Close it with a commit or validation result; keep its history.
   binary; stale source/target/compiler reports are rejected and claims are
   always recomputed, never loaded as authority to erase checks.
 
+- **M30 recurrence:** coverage v1 also includes `<prelude>` in its source
+  fingerprint list, without the proof report's virtual_source field. The
+  initial conformance checker tried to open it and got FileNotFoundError.
+  Document the existing virtual identity, compare its fingerprint against
+  the specified prelude bytes, and never assume every source label is a file.
+  Coverage retains its existing format; M30 conformance validates this path.
+
 ### TL-054: Evaluation installation did not preserve the Windows executable suffix
 
 - **Status:** corrected during M28; actual Windows execution remains VAL-005.
@@ -1511,6 +1535,78 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Verify:** quick real-program bytes agree with Python/C on native Windows,
   including NUL/Unicode payloads. Local C/native oracle coverage passes; do not
   infer Windows-host execution from this conditional source change (VAL-005).
+
+### TL-062: Existing JSON routes have different version and identity contracts
+
+- **Status:** resolved during M30; local acceptance passes.
+- **Observed:** `build/vela check --json tests/fixtures/m30/api.vl` has no
+  format/version fields; query summary has only a query discriminator;
+  verification/properties have explicit format/version. Query locations use
+  col while proof function locations use column. Coverage uses decimal
+  FNV-1a source fingerprints; proof context uses SHA-256 and compiler/target
+  identity. query.fail emits an E6003 JSON error on stdout with exit 1.
+  These are observed serializer/CLI behaviors, not inferred common schemas.
+- **Impact:** an agent client assuming one envelope, coordinate convention
+  or durable function ID can misread results or accept stale evidence.
+- **Workaround:** select by command/format, check outcome/required fields,
+  retain the matching source snapshot and distinguish conservative, measured
+  and proved results. Do not infer missing format/version members.
+- **M30 resolution:** docs/agent-json.md and docs/compatibility.md document
+  the existing legacy v1 routes and explicit versioned artifacts without
+  changing their wire shapes. tests/m30_test.py checks byte positions/edits,
+  required fields, query error shape, static/measured coverage, source
+  freshness, proof recomputation, status exits and typed property failures.
+- **Verify:** run the M30 check with both compiler images and the complete
+  supported suite; retain source hashes and results in bench/m30-validation.json.
+  Final local validation is recorded below. No new AST/type-graph SDK is proposed.
+- **Final validation:** both bootstrap fixed points pass. The complete C run
+  passes 311 checks, the native-built compiler selection 280 and UBSan 119.
+  Final affected M30 checks exercise the retained corpus with both backends
+  and optimization modes; evidence is in bench/m30-validation.json and the
+  [M30 walkthrough](m30-specification.md). Release host/agent gaps stay open.
+
+### TL-063: The guide's stdout fake recipe used the wrong collection type
+
+- **Status:** resolved during M30; local acceptance passes.
+- **Observed:** the M30 conformance fixture copied the generated guide's
+  `let mut out: [Str] = []; with stdout = mut out { print("captured") }`.
+  `build/vela check tests/fixtures/m30/v1/fakes.vl` initially reported E3041/E3142:
+  stdout requires strings.Builder. Existing checker.with_block and CLI/M23
+  fixtures already require/use a Builder; no language change is needed.
+- **Impact:** following the guide's capture recipe fails before a test runs.
+  Existing guide checks compiled fenced examples, not this prose recipe.
+- **Workaround:** create `strings.builder()`, pass it with `stdout = mut out`,
+  and read `strings.build(out)`.
+- **M30 resolution:** correct the generated recipe, specify the actual type,
+  and execute all effect fakes in the retained 1.0 corpus. M30 also asserts
+  the corrected guide text and retains its existing reading-budget gate.
+- **Verify:** both compiler bootstrap fixed points, M30 C/native optimized/
+  unoptimized corpus and the complete supported suite. Final local validation is recorded below.
+- **Final validation:** both bootstrap fixed points pass. The complete C run
+  passes 311 checks, the native-built compiler selection 280 and UBSan 119.
+  Final affected M30 checks exercise the retained corpus with both backends
+  and optimization modes; evidence is in bench/m30-validation.json and the
+  [M30 walkthrough](m30-specification.md). Release host/agent gaps stay open.
+
+### TL-064: Some constant contract violations stay unknown without a solver
+
+- **Status:** deferred; observed during M30 conformance authoring.
+- **Reproduction:** `fn bad() -> Int ensures result == 2 { return 1 }`;
+  `build/vela verify --json FILE` reports unknown (exit 3), with reason
+  "solver was not requested". A literal ensures false is refuted without a
+  solver. verification.binary retains the bit-vector equality expression;
+  the exact cause of missed constant simplification beyond that is unproven.
+- **Impact:** an agent cannot assume every visibly constant mismatch receives
+  a refutation in ordinary solver-free verification. This is conservative,
+  not an unsound proved result or a lost runtime contract check.
+- **Workaround:** request the bounded solver explicitly, run contract tests,
+  and keep unknown distinct from success. The solver-free M30 status fixture
+  uses a literal false clause to exercise the actual constant-refutation path.
+- **Proposed improvement:** consider bounded, width-correct constant reduction
+  after M30; preserve overflow/definedness and observable-call behavior.
+- **Verify:** mismatching constant values refute with a concrete empty argument
+  vector; matching values prove; overflow, effects and unsupported domains
+  never become false proofs. Keep C/native runtime contract checks unchanged.
 
 ## Outstanding validation
 
@@ -1706,6 +1802,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   scalar proof report; the report’s overall unknown status is retained.
   The expanded acceptance and custom Generator checks pass locally. The
   generated task-21 report is not an actual agent repair result.
+- **M30 follow-up:** the candidate JSON specification and conformance tests
+  validate diagnostic/query/proof/property shapes, not actual agent repair
+  cost. The evaluation kit still has 21 tasks and no selected model/harness;
+  actual model-driven comparisons remain required.
 
 ### VAL-003: Check the guide with the evaluation model's tokenizer
 
@@ -1745,6 +1845,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   agent evaluation and record the tokenizer/version with the result.
 - **Acceptance:** verify the roadmap's 8,000-token budget using that tokenizer;
   update the budget check if the estimate proves inadequate.
+- **M30 measurement:** correcting the stdout-capture recipe produces a
+  31,997-byte guide (7,999.25 by bytes/4). Its examples and actual Builder
+  recipe are executable conformance checks. Actual model-tokenizer counting
+  remains open; the estimate is not final 1.0 tokenizer acceptance.
 
 ### VAL-004: Execute M24 Linux kernel capability policies
 
@@ -1802,6 +1906,11 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** retained native Windows commands/results and a complete
   passing supported-suite inventory, with unavailable native-emitter/kernel
   profiles named separately.
+- **M30 follow-up:** execute tests/m30_test.py on native Windows to validate
+  the unchanged 1.0 corpus, C ABI/fakes and JSON/report contracts. The fixture
+  harness uses explicit UTF-8, .exe names and LF attributes including manifests.
+  These are source-level preparations, not a Windows pass. The retained
+  workflow includes M30 but is manual-only while automatic runs are paused.
 
 ### VAL-006: Native-host M27 debugging and observability acceptance
 

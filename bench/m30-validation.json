@@ -1,0 +1,207 @@
+{
+  "milestone": "M30",
+  "status": "implemented_locally_release_acceptance_pending",
+  "language_specification": "1.0-candidate",
+  "local_acceptance_passed": true,
+  "milestone_acceptance_passed": false,
+  "release_acceptance_passed": false,
+  "acceptance_scope": "macOS ARM64 specification, compatibility corpus and local conformance; inherited actual agent/tokenizer/foreign-host gates remain open",
+  "validated_at_utc": "2026-10-25T14:16:09.669594+00:00",
+  "baseline_commit": "ff2c8a8c89c04955e40bf509df555074e0042098",
+  "dirty_worktree": true,
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.8",
+    "cc": "Apple clang version 17.0.0 (clang-1700.3.19.1)",
+    "rustc_available": false
+  },
+  "source_trees": {
+    "stage1": {
+      "sha256": "edcfdac3e1d9fb89eb387a302cf10bd6d0963af4117ceefc5cf8444b3f815c90",
+      "files": 54,
+      "method": "sorted relative path UTF-8, NUL, bytes, NUL"
+    },
+    "runtime": {
+      "sha256": "faba61ac2acef74b2ec95c0f4c0f2560b38bcaa69ee33ad3c6c726a137b380bd",
+      "files": 11,
+      "method": "sorted relative path UTF-8, NUL, bytes, NUL"
+    },
+    "std": {
+      "sha256": "7657ec43fe7320e693df767acdf54d66bdc1702b8d01325d72c3b3f23bed8eca",
+      "files": 14,
+      "method": "sorted relative path UTF-8, NUL, bytes, NUL"
+    }
+  },
+  "source_sha256": {
+    ".gitattributes": "f8d3d80a860a516acc6bbf76fe3789118ea96ba23f0e932ba5bd597d30c09396",
+    ".github/workflows/platforms.yml": "0f3522a271749cf19af1c3971e1df70be76d4679feb10a4e5502bbaf789da5a6",
+    "README.md": "1fbda53ca5e82a6f8a3e7b00c260beb55272928c7d35fcdf1059e1d6e1cad38d",
+    "bootstrap/vela1.c": "7a98a8b9d909c8ae28ad8edaf68631291bcf80afa14d358767847eb54a17c052",
+    "docs/agent-json.md": "929fa4b0a345f6ad89975f046a8c055965b03f8668ca1d5ba604d6085ca39c04",
+    "docs/compatibility.md": "f21062db6d9e1006d1c492455279ba5b02e27a4200073d267bd432971b2eeb3a",
+    "docs/m30-specification.md": "2970e4d74d0e02d860bccdf22dc35d7886a836f8d3a0f43970abf122692be986",
+    "docs/roadmap-after-m18.md": "7ff8466516a51a2c7ac3b1cc4bc2062e9d39db2c0ec964a2460320450e908357",
+    "docs/specification.md": "2999b17d40e5b85f171596a1ed0dd07151e7a19d22961c8390641284061df704",
+    "docs/tooling-backlog.md": "9df1ab2a8e867fc6a9e99d357f7c32a3a9b9e96e847c5262386fe62c44534759",
+    "eval/m30-static.json": "06efad6fc69f7bf473d43b5141bb4289e0fd59e5ffb687aaeec4930c37c5a726",
+    "run_tests.py": "c780c3bfc7fc79f47cc2aea9d459c3ad8062b3ee3d293d2e7892c38390cdf73f",
+    "stage1/guide.vl": "d1fbc5b6f3dd28d3fd5ee479d777321922b9bb220964e583d0f078e166220245",
+    "tests/fixtures/m30/api.vl": "d323ee0addac93cb9a687bdbf51d3692b1d44256ea76411ec9f8773f782b0184",
+    "tests/fixtures/m30/conformance.json": "b4adf14a3468c19c2a89b1316f8edcc6130bc28026596ad8657f970b1720f9f7",
+    "tests/fixtures/m30/proofs.vl": "fb3783805b39c8199d98716413e61ade44661a48a462bed38ebc1d8274e2361b",
+    "tests/fixtures/m30/properties.vl": "48630bf6bc26a174a5ddd816602586404431c09d7b3768a10b49dcd980b19240",
+    "tests/fixtures/m30/v1/contracts.vl": "84cba665500a01d53da41484c8268006b84549d1d1ecda56439c24f5fe5315c7",
+    "tests/fixtures/m30/v1/core.vl": "1e48384c3f83a288dfcb817e95413a7777ad16f7da5e806b82a59642a5949788",
+    "tests/fixtures/m30/v1/fakes.vl": "bab586038dfd3697c0945514cad8f1709a6f56e5e9fd685bf1d7f6ae3faea978",
+    "tests/fixtures/m30/v1/ffi.vl": "a1535d6541edf572144a165e80e648a52e1ab2de5a638de284c696d76c507523",
+    "tests/fixtures/m30/v1/interfaces.vl": "6e95cd1dea7f3ba3eccfd308a5aa89aac91ff44177f7fac98cc20685b271964d",
+    "tests/fixtures/m30/v1/model.vl": "9b232bc03914d9f31888892b47b9e76fbbe1cb11e58d314e563493fa9b66e6b8",
+    "tests/fixtures/m30/v1/package/app/main.vl": "9108709cd9b96dc2c05fe00a5b18c0a28091d465b65521de0a894276915eedb4",
+    "tests/fixtures/m30/v1/package/app/vela.mod": "cd668dc1ae04f7d2349df6a3db9dcb69d22e1fc4ce77d6d9702c0ea4404074bf",
+    "tests/fixtures/m30/v1/package/dependency/dependency.vl": "7051b6bfb1449cf16c38ef1801b3676757f6f5293cbc79e05a1097e2dfdb8ce3",
+    "tests/fixtures/m30/v1/package/dependency/vela.mod": "81be027bd5a10351ef899d31510f9b7f3766f4a981e47b135367419e6df0cade",
+    "tests/fixtures/m30/v1/panic_overflow.vl": "1265a066606f8c8141a18caa5946b11b4dd7386e9acc8f7335d769a70fc9a428",
+    "tests/fixtures/m30/v1/reject_effect.vl": "f763ed0d487ac47045f1baa9844475d41c7a1b89970c0ce44bd6d266610bc86d",
+    "tests/fixtures/m30/v1/reject_result_equality.vl": "160b6636f322ddfd9b3bbe8853cf4cfaf228b6741e10b3ef2f9617ced463c2d5",
+    "tests/fixtures/m30/v1/systems.vl": "b9a637f18814ccc0749ad259f3365669880ca1a546c32ab3ff9cb9f88c5225ea",
+    "tests/m30_test.py": "8ab810e4307bb64edec5b96f0b66c0727b63aa7a087fbc44a3bc696cb2bbf815"
+  },
+  "compiler_sha256": {
+    "build/vela": "d2b41b2a08cc47d98b9328776dea45b3a79dcbb6d4e92687ca17530b2201e3ab",
+    "build/vela-native": "aba382ba0dfc44892cf581a1912c9144600008f02e716553020bd7aa78fbb946"
+  },
+  "corpus": {
+    "manifest": "tests/fixtures/m30/conformance.json",
+    "source_files": 14,
+    "construct_variants": 43,
+    "additional_features": 21,
+    "keywords": 17,
+    "binary_operators": 18,
+    "backends": [
+      "c",
+      "native"
+    ],
+    "optimization_modes": [
+      "1",
+      "0"
+    ],
+    "source_bytes_pinned": true
+  },
+  "guide": {
+    "bytes": 31997,
+    "sha256": "1761522749a30639c6f872d2392d241d15698997f3d6f501373acd5aebfa03ae",
+    "estimated_tokens_bytes_div_4": 7999.25,
+    "actual_model_tokens": null,
+    "tokenizer": null
+  },
+  "ci": {
+    "automatic_triggers_paused": true,
+    "triggers": [
+      "workflow_dispatch"
+    ],
+    "remote_workflow_execution_requested": false,
+    "release_tag_created": false
+  },
+  "validation": [
+    {
+      "name": "bootstrap",
+      "command": "VELA_CACHE=$PWD/build/m30/cache sh bootstrap/bootstrap.sh --update --native",
+      "exit_code": 0,
+      "passed": null,
+      "log": "build/m30-bootstrap.log",
+      "output": "generation 1: the seed, compiled by cc\ngeneration 2: built by generation 1\ngeneration 3: built by generation 2\nfixed point: generations 2 and 3 write identical C (  156427 lines)\nthe seed is updated\nbuilt build/vela\nnative 1: built by build/vela with VELA_BACKEND=native\nnative 2: built by native 1\nnative fixed point: natives 1 and 2 write identical assembly ( 2407543 lines)\nbuilt build/vela-native\n"
+    },
+    {
+      "name": "complete_c",
+      "command": "VELA_CACHE=$PWD/build/m30/cache python3 -u run_tests.py --compiler build/vela --backend c --jobs 4",
+      "exit_code": 0,
+      "passed": 311,
+      "log": "build/m30-full-c-final.log",
+      "output": "311 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n"
+    },
+    {
+      "name": "native_compiler_selection",
+      "command": "VELA_CACHE=$PWD/build/m30/cache python3 -u run_tests.py --compiler build/vela-native --backend native --jobs 4 tests/run/ tests/fail/ tests/dump/ tests/cli/ stage1/ cache_test m17_test m20_test long_literals_test m30_test",
+      "exit_code": 0,
+      "passed": 280,
+      "log": "build/m30-native.log",
+      "output": "280 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela-native)\n"
+    },
+    {
+      "name": "ubsan_selection",
+      "command": "python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ long_literals_test m30_test",
+      "exit_code": 0,
+      "passed": 119,
+      "log": "build/m30-ubsan.log",
+      "output": "119 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n",
+      "environment": {
+        "VELA_CACHE": "$PWD/build/m30/cache",
+        "VELA_CFLAGS": "-Wall -Wextra -Werror -pedantic -Wno-unused-variable -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-tautological-compare -Wno-self-assign -g -fsanitize=undefined -fno-sanitize-recover=all",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      },
+      "scope": "C runtime fixtures, long literals and all M30 checks. The native corpus portions use the instrumented C runtime; native instructions are not instrumented."
+    },
+    {
+      "name": "final_affected_c",
+      "command": "VELA_CACHE=$PWD/build/m30/cache python3 -u run_tests.py --compiler build/vela --backend c --jobs 1 m30_test",
+      "exit_code": 0,
+      "passed": 1,
+      "log": "build/m30-focused-final.log",
+      "output": "1 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n",
+      "scope": "Final retained corpus and contracts, including the final C-wrapper precondition clarification, run using the normal C-built compiler with both backends and optimization modes."
+    },
+    {
+      "name": "static",
+      "command": "python3 eval/static.py --vela build/vela --json eval/m30-static.json",
+      "exit_code": 0,
+      "passed": null,
+      "log": "build/m30-static.log",
+      "output": "Diagnostics in tests/fail: 373; with a code: 373; with a fix an agent can apply: 21\nTo read, README: 13,953 bytes, about 3,488 tokens\nTo read, README and walkthroughs: 818,307 bytes, about 204,576 tokens\nTo read, std: 44,567 bytes, about 11,141 tokens\nTo read, vela guide: 31,997 bytes, about 7,999 tokens\nQuestions vela query answers in one call: 10 of 12; partly 2; not at all 0\n  yes    What is the type of this name? (vela query type)\n  yes    Where is it defined? (vela query def)\n  yes    Where is it used? (vela query refs)\n  yes    What can go here? (vela query complete)\n  yes    Rename it without changing what any other name means (vela query rename)\n  yes    What is declared in this file? (vela query symbols)\n  yes    What does this function touch and promise? (vela query type: signature with uses, requires, ensures)\n  partly Who calls this function? (query impact lists conservative transitive dependents, including possible indirect callers)\n  yes    What is this module's public API? (vela query summary: public signatures, effects, contracts and types)\n  yes    Which tests cover this function? (vela query coverage TARGET --report REPORT uses measured Vela entry hits; without a report it lists static possibilities)\n  partly What breaks if I change this signature? (vela query impact lists potential dependencies; the proposed signature still needs type checking)\n  yes    What does this error mean, and how do I fix it? (vela explain CODE; vela check --json includes edits; vela fix applies them)\n"
+    }
+  ],
+  "initial_failed_attempt": {
+    "command": "VELA_CACHE=$PWD/build/m30/cache python3 -u run_tests.py --compiler build/vela --backend c --jobs 4",
+    "exit_code": 1,
+    "passed": 310,
+    "failed": 1,
+    "log": "build/m30-full-c.log",
+    "output": "FAIL  tests/m30_test.py\n      m30: frozen inventory passed\n      m30: frozen corpus c optimization 1 passed\n      m30: frozen corpus c optimization 0 passed\n      m30: frozen corpus native optimization 1 passed\n      m30: frozen corpus native optimization 0 passed\n      m30: specification and guide passed\n      m30: diagnostics passed\n      m30: queries passed\n      m30: evidence passed\n      Traceback (most recent call last):\n        File \"/Users/nathgoutam93/Documents/vela/tests/m30_test.py\", line 400, in <module>\n          raise SystemExit(main())\n                           ~~~~^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m30_test.py\", line 394, in main\n          test(c)\n          ~~~~^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m30_test.py\", line 360, in properties\n          assert {r['function']['name']: r['status'] for r in doc['results']} == {'identity': 'passed', 'wrong': 'failed'}\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n      AssertionError\n310 passed, 1 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n",
+    "observed": "M30 property per-function status map differed from expectation; the initial response was not retained. Isolated strict-flags runs pass.",
+    "cause": "unestablished; short integration budgets under contention are suspected only",
+    "resolution": "retain subsequent last JSON responses and match existing M28 integration limits (5 s/case, 60 s overall); production limits unchanged; final full/affected checks pass"
+  },
+  "resolved_tooling": [
+    "TL-062",
+    "TL-063"
+  ],
+  "recurring_tooling": [
+    "TL-001",
+    "TL-003",
+    "TL-053"
+  ],
+  "deferred_tooling": [
+    "TL-019",
+    "TL-042",
+    "TL-064"
+  ],
+  "actual_agent_trials": 0,
+  "outstanding_validation": [
+    "VAL-001",
+    "VAL-002",
+    "VAL-003",
+    "VAL-004",
+    "VAL-005",
+    "VAL-006"
+  ],
+  "fresh_full_performance_matrix": false,
+  "historical_performance": [
+    "bench/after-m29.json",
+    "bench/m29-real-programs.json"
+  ],
+  "limits": [
+    "No final Vela 1.0 release declared.",
+    "Actual agent evaluation and model-specific tokenizer counting remain required.",
+    "Foreign native-host/platform/kernel/sanitizer/debugger acceptance remains open.",
+    "Historical performance measurements are retained without claiming fresh M30 or Rust timings."
+  ]
+}

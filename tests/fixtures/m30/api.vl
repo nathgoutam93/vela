@@ -1,0 +1,9 @@
+pub type Named = interface { fn name(value: Self) -> Str }
+pub type Item = struct { n: Int }
+pub fn Item.name(value: Item) -> Str { return "item" }
+pub fn step(n: Int) -> Int requires n >= 0 && n < 100 ensures result > n { return n + 1 }
+pub fn wrapper(n: Int) -> Int { return step(n) }
+fn unused() -> Int { return 0 }
+fn main() { let text = "é😀"; print(wrapper(1)) }
+test "called" { assert(wrapper(1) == 2) }
+test "dead branch" { if false { let _ = wrapper(1) }; assert(true) }
