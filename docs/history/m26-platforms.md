@@ -121,27 +121,27 @@ adding the workflow is not evidence that a hosted run occurred.
 
 ## Discoveries and remaining acceptance
 
-- [TL-001](tooling-backlog.md#tl-001-host-aware-test-selection): report unavailable
+- [TL-001](../tooling-backlog.md#tl-001-host-aware-test-selection): report unavailable
   native execution explicitly; cache/benchmark scripts retain C coverage.
-- [TL-002](tooling-backlog.md#tl-002-relative-compiler-overrides-fail-in-fixture-directories)
-  and [TL-003](tooling-backlog.md#tl-003-control-test-concurrency-and-improve-timeout-evidence):
+- [TL-002](../tooling-backlog.md#tl-002-relative-compiler-overrides-fail-in-fixture-directories)
+  and [TL-003](../tooling-backlog.md#tl-003-control-test-concurrency-and-improve-timeout-evidence):
   relative compiler resolution, checked-in --jobs and actionable timeout output.
-- [TL-004](tooling-backlog.md#tl-004-runtime-cache-omitted-an-included-header):
+- [TL-004](../tooling-backlog.md#tl-004-runtime-cache-omitted-an-included-header):
   platform include/target cache identity.
-- [TL-017](tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget):
+- [TL-017](../tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget):
   compact platform reference while retaining the existing estimate gate.
-- [TL-038](tooling-backlog.md#tl-038-target-selection-forced-the-native-backend-and-lp64-c-aliases)
-  and [TL-039](tooling-backlog.md#tl-039-runtime-size-and-function-pointer-assumptions-fail-on-wasm32):
+- [TL-038](../tooling-backlog.md#tl-038-target-selection-forced-the-native-backend-and-lp64-c-aliases)
+  and [TL-039](../tooling-backlog.md#tl-039-runtime-size-and-function-pointer-assumptions-fail-on-wasm32):
   target/data-model selection and executed 32-bit correctness fixes.
-- [TL-040](tooling-backlog.md#tl-040-wine-requires-a-utf-8-unix-locale-for-unicode-filesystem-tests):
+- [TL-040](../tooling-backlog.md#tl-040-wine-requires-a-utf-8-unix-locale-for-unicode-filesystem-tests):
   independent evidence for the Wine locale workaround.
-- [TL-041](tooling-backlog.md#tl-041-posix-spawn-can-hide-failure-to-execute-behind-status-127):
+- [TL-041](../tooling-backlog.md#tl-041-posix-spawn-can-hide-failure-to-execute-behind-status-127):
   launch-error handshake and actual status-127 regression.
-- [TL-042](tooling-backlog.md#tl-042-lp64-example-conversions-do-not-follow-target-c-aliases):
+- [TL-042](../tooling-backlog.md#tl-042-lp64-example-conversions-do-not-follow-target-c-aliases):
   portable unsigned-long sizes in the zlib example using existing operations.
-- [TL-043](tooling-backlog.md#tl-043-windows-adapters-must-preserve-legacy-streams-and-resolved-paths):
+- [TL-043](../tooling-backlog.md#tl-043-windows-adapters-must-preserve-legacy-streams-and-resolved-paths):
   legacy stream/lifetime parity and resolved executable/UNC paths.
-- [TL-044](tooling-backlog.md#tl-044-overlapping-fixture-placeholders-corrupt-generated-c-alias-tests):
+- [TL-044](../tooling-backlog.md#tl-044-overlapping-fixture-placeholders-corrupt-generated-c-alias-tests):
   disjoint ABI-fixture template tokens.
 
 | Executed check | Result |
@@ -166,12 +166,12 @@ adding the workflow is not evidence that a hosted run occurred.
 The native-built compiler remains faster for checking and C emission on the
 same source. C-backend ratios are 1.08 for varints and 1.02 for arena_trees
 (limits 1.1), 1.05 for SHA-256 and 0.92 for CRC-32 (limits 1.2). Raw timings and
-same-source compiler identities are in [after-m26.json](../bench/after-m26.json).
+same-source compiler identities are in [after-m26.json](../../bench/results/after-m26.json).
 Initial sandbox-denied macOS loopback/capability/editor attempts and their
 successful host reruns remain distinct in the validation record.
 
 The acceptance evidence and its source/image identities are retained in
-[the validation record](../bench/m26-validation.json). Linux bootstrap,
+[the validation record](../../bench/results/m26-validation.json). Linux bootstrap,
 C/native fixture execution and ASan results use Debian amd64 through Rosetta
 on Docker Desktop, not a physical x86 machine. The kernel-policy attempt fails
 closed with E6011 at seccomp installation; TSan reports an unexpected memory

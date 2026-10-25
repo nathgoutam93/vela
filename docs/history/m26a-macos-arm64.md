@@ -83,12 +83,12 @@ checks the inline index, releases the previous managed element and stores the
 consumed replacement in place. This changes shared native lowering; Linux x86
 execution of the correction is still outstanding.
 
-[TL-027](tooling-backlog.md#tl-027-native-ir-omits-target-abi-argument-layout-metadata)
+[TL-027](../tooling-backlog.md#tl-027-native-ir-omits-target-abi-argument-layout-metadata)
 records the ABI metadata gap and independent provider checks.
-[TL-029](tooling-backlog.md#tl-029-native-direct-fixed-array-assignment-uses-the-growable-array-abi)
+[TL-029](../tooling-backlog.md#tl-029-native-direct-fixed-array-assignment-uses-the-growable-array-abi)
 records the fixed-array defect and execution evidence. The new large-frame
 fixture exercises wide displacements and multi-page stack allocation too.
-[TL-028](tooling-backlog.md#tl-028-an-unavailable-default-cache-leaks-mkdir-stderr)
+[TL-028](../tooling-backlog.md#tl-028-an-unavailable-default-cache-leaks-mkdir-stderr)
 records a deferred noisy cache fallback; validation sets VELA_CACHE under build/.
 
 Existing entries are reused for supported-host test selection and explicit
@@ -128,7 +128,7 @@ The runtime compiles separately with C11, Wall/Wextra/Werror, pedantic and
 Wshadow both on macOS and as a Linux x86-64 object. Linux cross-compilation is
 not an execution result. The generated guide is **31,988 bytes** (7,997 tokens
 by bytes/4); actual tokenizer validation stays VAL-003. Static evaluation in
-[eval/m26a-static.json](../eval/m26a-static.json) retains 373/373 coded negative
+[eval/results/m26a-static.json](../../eval/results/m26a-static.json) retains 373/373 coded negative
 diagnostics and 21 with edits. No model-driven agent trial was run (VAL-002).
 
 M25 performance criteria are not part of this correctness milestone. The
@@ -160,7 +160,7 @@ native compiler has a concrete M25 baseline on this hardware:
 
 The native compiler is currently slower; M25's faster-than-C criterion remains
 unmet. Full native benchmark geometric-mean acceptance is also M25 work.
-[after-m26a.json](../bench/after-m26a.json) records machine/toolchain,
+[after-m26a.json](../../bench/results/after-m26a.json) records machine/toolchain,
 compiler timings, preservation limits and both compiler/source fingerprints.
 The baseline commit is M24's 4f2449c; dirty_worktree identifies pre-commit data.
 
@@ -173,7 +173,7 @@ images and return identical JSON:
 | impact | 0.2526 s | 0.6122 s |
 | coverage (static) | 0.2529 s | 0.6124 s |
 
-[m26a-queries.json](../bench/m26a-queries.json) retains samples: seven measured
+[m26a-queries.json](../../bench/results/m26a-queries.json) retains samples: seven measured
 C-driver runs and three native-driver runs, each after a warmup. Timings run
 without broad test jobs. Coverage timings are for static queries, not test
 execution.
@@ -190,7 +190,7 @@ VELA_OPT=0 python3 tests/m23_test.py "$PWD/build/vela"
 VELA_OPT=0 python3 tests/m24_test.py "$PWD/build/vela"
 python3 bench/run.py --quick --check --languages c vela vela-native
 python3 bench/run.py varints arena_trees sha256 crc32 --runs 7 --languages c vela
-python3 eval/static.py --vela "$PWD/build/vela" --json eval/m26a-static.json
+python3 eval/static.py --vela "$PWD/build/vela" --json eval/results/m26a-static.json
 ```
 
 The broad runs use TL-003's four-outer-worker wrapper and writable Neovim XDG

@@ -3,19 +3,19 @@
 M30 records the implemented language as a **1.0 candidate** and adds a
 compatibility baseline. The final 1.0 release remains pending inherited
 native-host and agent/model validation. This work follows the
-[accepted design baseline](design-baseline-to-m30.md) and adds no language
+[accepted design baseline](../design-baseline-to-m30.md) and adds no language
 architecture, new ownership system, reflection or AST/type-graph SDK.
 
 ## Delivered contracts
 
-- [Language specification](specification.md): lexical/newline rules, all
+- [Language specification](../specification.md): lexical/newline rules, all
   declaration/expression/statement/pattern forms, types, checked arithmetic,
   value semantics, interfaces/generics, effects/contracts, tests/fakes,
   memory/concurrency, C ABI and target profiles, packages and execution.
-- [Compatibility policy](compatibility.md): correct 1.0 programs retain
+- [Compatibility policy](../compatibility.md): correct 1.0 programs retain
   source behavior through 1.x, public API/deprecation rules, diagnostic and
   JSON compatibility, correctness-fix exceptions and release evidence.
-- [Agent JSON contracts](agent-json.md): diagnostic fixes/byte positions,
+- [Agent JSON contracts](../agent-json.md): diagnostic fixes/byte positions,
   semantic queries, conservative impact/static coverage, measured entry
   coverage, proof/property outcomes, protocol versions and source identities.
 
@@ -59,23 +59,23 @@ The new `tests/m30_test.py` is included in the default runner. It:
 
 ## Discoveries
 
-- [TL-062](tooling-backlog.md#tl-062-existing-json-routes-have-different-version-and-identity-contracts):
+- [TL-062](../tooling-backlog.md#tl-062-existing-json-routes-have-different-version-and-identity-contracts):
   the old routes differ in envelope/version, coordinate spellings, hash kind
   and error channel. Document/test those existing contracts explicitly.
-- [TL-063](tooling-backlog.md#tl-063-the-guides-stdout-fake-recipe-used-the-wrong-collection-type):
+- [TL-063](../tooling-backlog.md#tl-063-the-guides-stdout-fake-recipe-used-the-wrong-collection-type):
   the guide recommended an array for stdout capture, which the checker
   rejects. Correct it to strings.Builder and execute that recipe in the
   frozen fake-effects fixture. The guide remains within its estimate gate.
-- [TL-053](tooling-backlog.md#tl-053-checked-source-snapshots-include-a-virtual-prelude):
+- [TL-053](../tooling-backlog.md#tl-053-checked-source-snapshots-include-a-virtual-prelude):
   coverage also contains a `<prelude>` source fingerprint, which is not a
   file to open. The documented coverage/proof identities preserve that
   distinction without a new report shape.
-- [TL-064](tooling-backlog.md#tl-064-some-constant-contract-violations-stay-unknown-without-a-solver):
+- [TL-064](../tooling-backlog.md#tl-064-some-constant-contract-violations-stay-unknown-without-a-solver):
   a constant return-value mismatch can remain unknown without a requested
   solver. This is conservative. Further constant reduction is deferred;
   conformance exercises the actual solver-free literal-false refutation.
 
-- [TL-003](tooling-backlog.md#tl-003-control-test-concurrency-and-improve-timeout-evidence):
+- [TL-003](../tooling-backlog.md#tl-003-control-test-concurrency-and-improve-timeout-evidence):
   the first complete C run passed 310/311 checks; the M30 property-status map
   differed from expectation, while isolated strict runs passed. The first
   response was not retained, so its cause is unestablished. Retain full JSON
@@ -93,9 +93,9 @@ long-literal and M30 checks pass 119. All have zero final failures/skips.
 The final native/UBSan and affected C runs include the last corpus-only C
 wrapper precondition clarification. The default suite includes M30.
 
-The [validation record](../bench/m30-validation.json) retains exact commands,
+The [validation record](../../bench/results/m30-validation.json) retains exact commands,
 source/compiler identities, host/toolchain, the initial broad failure and
-final outcomes. The [static snapshot](../eval/m30-static.json) retains 373/373
+final outcomes. The [static snapshot](../../eval/results/m30-static.json) retains 373/373
 coded negative diagnostics, 21 mechanical edits and a 31,997-byte guide
 (7,999.25 by bytes/4). Native instructions are not UBSan-instrumented; the
 native portions of the corpus run against its instrumented C runtime.

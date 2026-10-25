@@ -57,7 +57,7 @@ rotates execution order for every timing round. The JSON records every
 sample, best times, compiler/runtime hashes, and self-translation timings.
 Self-translation uses each compiler's own source tree.
 
-The paired measurements are in `bench/after-flow-macos.json`. The table
+The paired measurements are in `bench/results/after-flow-macos.json`. The table
 below is generated from that file; timings are seconds, best of seven.
 
 <!-- paired-table -->
@@ -192,7 +192,7 @@ before the loop (`vela_at_in`; `tests/run/loop_cached_arrays.vl`,
 fasta's read-only `cum`, the locals across `next_random`'s calls cost
 more than they saved.
 
-Back to back on the Linux host, best of seven (`bench/after-flow-linux.json`):
+Back to back on the Linux host, best of seven (`bench/results/after-flow-linux.json`):
 
 | Benchmark | M18 | Commit above | Now |
 | --- | --- | --- | --- |

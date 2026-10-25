@@ -9,6 +9,10 @@ It is the agent half of M16's baseline; `bench/` is the performance half.
 The kit works with any agent and any harness: it makes a directory for the
 agent to work in, and grades what is in it afterwards.
 
+The scripts in this directory are active tools; `tasks/` holds the task
+corpus. Historical static snapshots live in [results/](results/README.md).
+Write fresh run output under ignored `build/` (or outside the repository).
+
 ## Running one task
 
 ```
@@ -102,8 +106,8 @@ cannot be done, shows up. It is in the default suite as
 
 `vela check --json` includes stable diagnostic codes and byte-offset edits;
 `vela explain CODE` explains a code and `vela fix FILE` applies available
-fixes. These tools are included in the evaluation prompt. `eval/m17-static.json`
-records the static result after M17; `eval/static.json` keeps the M16 baseline.
+fixes. These tools are included in the evaluation prompt. `eval/results/m17-static.json`
+records the static result after M17; `eval/results/static.json` keeps the M16 baseline.
 
 ## What to record
 

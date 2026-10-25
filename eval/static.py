@@ -73,7 +73,8 @@ def main() -> int:
     guide = subprocess.run([str(Path(opts.vela).resolve()), "guide"], capture_output=True, check=True).stdout
     reading = {
         "README": size([ROOT / "README.md"]),
-        "README and walkthroughs": size([ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]),
+        # Match prepare.py's recursive docs copy, including historical walkthroughs.
+        "README and walkthroughs": size([ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]),
         "std": size(sorted((ROOT / "std").glob("*.vl"))),
         "vela guide": {"bytes": len(guide), "tokens": len(guide) // 4},
     }

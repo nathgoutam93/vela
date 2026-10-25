@@ -53,7 +53,7 @@ calls and interface dispatch. Reachability is separate from the exposed effect:
 a safe wrapper can have no unsafe effect while remaining visible in the audit.
 
 Tooling findings and outstanding platform validation are recorded in
-[the backlog](tooling-backlog.md).
+[the backlog](../tooling-backlog.md).
 
 
 ## Implementation and examples
@@ -133,7 +133,7 @@ Tooling discoveries are retained as TL-008 (pointer evaluation order), TL-009
 (editor metadata), TL-012 (escaped address ranges and native storage), TL-013
 (generated pointer identifiers), TL-014 (user link diagnostics), and TL-015
 (shared prototype parsing) in
-[the backlog](tooling-backlog.md). TL-001 through TL-003 remain deferred harness
+[the backlog](../tooling-backlog.md). TL-001 through TL-003 remain deferred harness
 improvements. VAL-001 retains Linux/native bootstrap and ASan/TSan execution;
 VAL-002 and VAL-003 retain agent trials and the actual evaluation tokenizer.
 
@@ -156,7 +156,7 @@ Linux native execution, its bootstrap, ASan and TSan remain open in VAL-001.
 
 The generated guide is **30,819 bytes**, about **7,704 tokens** under the
 existing bytes/4 estimate. All **373/373** negative-test diagnostics have codes;
-21 carry fixes. `eval/m21-static.json` retains these static measurements.
+21 carry fixes. `eval/results/m21-static.json` retains these static measurements.
 An actual tokenizer count and new model-driven agent trials remain separate
 validation items; these numbers do not establish agent-performance gains.
 
@@ -190,7 +190,7 @@ best-of-seven isolated release runs with matching outputs:
 | CRC-32, 4 MiB / 32 streaming updates | 0.3197 s | 0.2954 s | 0.92 |
 
 Medians are 0.1389/0.1461 seconds for SHA-256 and 0.3229/0.2960 seconds for
-CRC-32 (C/Vela). `bench/after-m21.json` records timings, toolchain/machine,
+CRC-32 (C/Vela). `bench/results/after-m21.json` records timings, toolchain/machine,
 workload sizes, source/compiler fingerprints and individual acceptance checks.
 Its baseline is M20 commit b478952, with a dirty-tree flag for the M21 sources
 measured before commit. Rust is not installed on this host.
@@ -198,7 +198,7 @@ measured before commit. Rust is not installed on this host.
 ```
 VELA_CACHE="$PWD/build/cache-m21" python3 bench/run.py --quick --check --languages c vela
 VELA_CACHE="$PWD/build/cache-m21" python3 bench/run.py sha256 crc32 --runs 7 \
-    --languages c vela --json bench/after-m21.json
+    --languages c vela --json bench/results/after-m21.json
 ```
 
 With the M24 launcher, C examples run or test with explicit permission, for

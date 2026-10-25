@@ -2,7 +2,7 @@
 
 Specification revision: **1.0 candidate, M30**. This document specifies the
 implemented language. Publication of a final 1.0 release still requires the
-outstanding acceptance listed in [M30](m30-specification.md). It does not
+outstanding acceptance listed in [M30](history/m30-specification.md). It does not
 declare unavailable platform or agent validation complete.
 
 The words **must**, **must not**, and **may** describe language requirements.

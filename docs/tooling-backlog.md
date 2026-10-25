@@ -349,8 +349,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Final validation:** both bootstrap fixed points pass; the complete C suite
   passes 310 checks, the native-built compiler selection passes 279, and
   UBSan runtime/long-literal checks pass 118. See the
-  [walkthrough](tooling-followup-before-m30.md) and
-  [source-bound evidence](../bench/tooling-followup-validation.json).
+  [walkthrough](history/tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/results/tooling-followup-validation.json).
 
 ### TL-012: Escaped scalar addresses must not retain range proofs
 
@@ -453,8 +453,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Final validation:** both bootstrap fixed points pass; the complete C suite
   passes 310 checks, the native-built compiler selection passes 279, and
   UBSan runtime/long-literal checks pass 118. See the
-  [walkthrough](tooling-followup-before-m30.md) and
-  [source-bound evidence](../bench/tooling-followup-validation.json).
+  [walkthrough](history/tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/results/tooling-followup-validation.json).
 
 ### TL-017: Keep the expanded memory guide within its reading budget
 
@@ -639,8 +639,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Final validation:** both bootstrap fixed points pass; the complete C suite
   passes 310 checks, the native-built compiler selection passes 279, and
   UBSan runtime/long-literal checks pass 118. See the
-  [walkthrough](tooling-followup-before-m30.md) and
-  [source-bound evidence](../bench/tooling-followup-validation.json).
+  [walkthrough](history/tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/results/tooling-followup-validation.json).
 
 ### TL-024: macOS network denial permits inert socket descriptors
 
@@ -775,8 +775,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Final validation:** both bootstrap fixed points pass; the complete C suite
   passes 310 checks, the native-built compiler selection passes 279, and
   UBSan runtime/long-literal checks pass 118. See the
-  [walkthrough](tooling-followup-before-m30.md) and
-  [source-bound evidence](../bench/tooling-followup-validation.json).
+  [walkthrough](history/tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/results/tooling-followup-validation.json).
 
 ### TL-029: Native direct fixed-array assignment uses the growable-array ABI
 
@@ -802,7 +802,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 - **Status:** resolved during M25; observed in the M25 baseline.
 - **Evidence:** python3 bench/run.py --runs 3 --languages c vela-native
-  --json bench/before-m25.json prints vela/c - for every row and no geometric
+  --json bench/results/before-m25.json prints vela/c - for every row and no geometric
   mean, because the summary only looks for the vela (C backend) key. Native
   samples exist in JSON, but compiler/native acceptance is not evaluated.
 - **Impact:** the natural native-only benchmark command cannot establish M25
@@ -818,10 +818,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   fresh paired compiler images, full-size completeness, matching outputs,
   source fingerprints (including the compiler's JSON package/manifests),
   raw samples and both compiler operations. Focused M25 tests reject quick,
-  partial and missing-native acceptance commands. bench/after-m25.json
-  passes the complete gate at 1.4603; bench/m25-spill-rejected.json retains
+  partial and missing-native acceptance commands. bench/results/after-m25.json
+  passes the complete gate at 1.4603; bench/results/m25-spill-rejected.json retains
   a genuine failed full gate. Final broader local M25 validation also passes;
-  commands and result fingerprints are in bench/m25-validation.json.
+  commands and result fingerprints are in bench/results/m25-validation.json.
 
 ### TL-031: Native lowering omits existing enum memory optimizations
 
@@ -852,7 +852,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   and the runtime box pool are implemented. Final C/native suites pass 304
   checks each, UBSan passes 125, and binarytrees measures 0.80 times C. The
   x64 correction cross-assembles; Linux execution remains VAL-001. See
-  [M25 validation](../bench/m25-validation.json).
+  [M25 validation](../bench/results/m25-validation.json).
 
 
 ### TL-032: Native pushes miss the existing known-size fast path
@@ -879,7 +879,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Resolution/validation:** native pushes and array literals use guarded
   known-size transfers with values frozen before growth. Final C/native
   suites (304 each), UBSan (125) and all full-size benchmark outputs pass,
-  including preserved C thresholds. See [M25 validation](../bench/m25-validation.json).
+  including preserved C thresholds. See [M25 validation](../bench/results/m25-validation.json).
 
 
 ### TL-033: Binary string operands are reread after a mutable right side
@@ -911,7 +911,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Resolution/validation:** binary_left snapshots the left operand before
   a mutable right side in both generators and assertion comparisons. The
   independent C/native opt=1/0 regressions, both complete 304-check suites and
-  the 125-check UBSan selection pass. See [M25 validation](../bench/m25-validation.json).
+  the 125-check UBSan selection pass. See [M25 validation](../bench/results/m25-validation.json).
 
 
 ### TL-034: Native immutable projections copy whole aggregates
@@ -924,7 +924,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   memmove self samples versus 254 for C. Attribution is a hypothesis, not a
   measurement of how much time those specific projections consume.
 - **Impact:** read-only compiler traversals perform avoidable copies and RC
-  operations. The same-source A/B experiment in `bench/m25-borrow-ab.json`
+  operations. The same-source A/B experiment in `bench/results/m25-borrow-ab.json`
   reduces native emission time by 8.4% and checking by 2.5%.
 - **Workaround:** use the C backend or retain the existing owned copies.
 - **Proposed resolution:** borrow immutable projections from an unescaped,
@@ -935,7 +935,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   returned/captured fields, closures outliving iteration, source replacement
   and snapshots in both backends and optimization modes. Focused and quick
   benchmark checks pass; final bootstrap, full suite and UBSan remain pending.
-  See [the experiment log](m25-experiments.md) for the research, profiling
+  See [the experiment log](history/m25-experiments.md) for the research, profiling
   method, source/image fingerprints and limits of the A/B result.
 - **Pause checkpoint:** retain the borrowing change; focused C/native modes
   and the selected final performance gate pass. Final bootstrap, full suite
@@ -944,7 +944,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   elements borrow from their live owner; escaping consumers retain. Both
   bootstrap fixed points, C/native suites (304 each), UBSan (125), and the
   native-built compiler selection (238) pass. The A/B evidence is retained;
-  see [final M25 validation](../bench/m25-validation.json).
+  see [final M25 validation](../bench/results/m25-validation.json).
 
 
 ### TL-035: ARM allocation spills a frequently used loop state pointer
@@ -961,16 +961,16 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Proposed resolution:** test read/write spill costs weighted in back-edge
   regions and normalized for interval occupation, keeping end position as a
   tie breaker. Raw weighted totals improve the compiler but regress SHA-256
-  to 3.06 times C and fail the matrix (bench/m25-spill-rejected.json); reject
+  to 3.06 times C and fail the matrix (bench/results/m25-spill-rejected.json); reject
   that policy. The refined same-source A/B improves checking by 6.0% and
-  emission by 4.1% (bench/m25-density-ab.json). This changes placement only,
+  emission by 4.1% (bench/results/m25-density-ab.json). This changes placement only,
   retaining ABI restrictions, conservative live intervals and spill semantics.
 - **Verification:** focused pressure/ABI/lifetime/arithmetic checks pass in
   both native modes. Emission now keeps the state pointer in x19; the same-source
   interleaved compiler A/B, full workloads, bootstrap and broad suite remain
-  required. See [the experiment log](m25-experiments.md).
+  required. See [the experiment log](history/m25-experiments.md).
 - **Pause checkpoint:** select squared weighted uses divided by lifetime.
-  bench/after-m25.json passes all performance gates at 1.4603 times C;
+  bench/results/after-m25.json passes all performance gates at 1.4603 times C;
   native check is 5.2% faster and C emission 8.9% faster than C-built.
   The raw-cost regression remains recorded and rejected. Final bootstrap,
   broad correctness and UBSan validation remain pending; do not close this
@@ -979,7 +979,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   reject raw weighted totals. Both bootstrap fixed points, complete C/native
   suites (304 each), UBSan (125), native-built compiler checks (238), and the
   full performance gate pass. No further allocation experiment was needed.
-  See [M25 validation](../bench/m25-validation.json); platform limits remain
+  See [M25 validation](../bench/results/m25-validation.json); platform limits remain
   separate in VAL-001/VAL-004.
 
 
@@ -1016,7 +1016,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M29 cost evidence:** normal checking includes the discarded-Result rule;
   the 100,304-line fixture checks at 0.303 s median. Compiler check/emission,
   API/impact queries, ordinary/incremental builds, sizes and requested solver
-  time/RSS are retained in bench/m29-real-programs.json. These are absolute
+  time/RSS are retained in bench/results/m29-real-programs.json. These are absolute
   measurements, not a claim that diagnostic bookkeeping has zero cost.
 
 - **Pre-M30 observation:** `build/vela check std/http.vl` correctly reports
@@ -1277,8 +1277,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Final validation:** both bootstrap fixed points pass; the complete C suite
   passes 310 checks, the native-built compiler selection passes 279, and
   UBSan runtime/long-literal checks pass 118. See the
-  [walkthrough](tooling-followup-before-m30.md) and
-  [source-bound evidence](../bench/tooling-followup-validation.json).
+  [walkthrough](history/tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/results/tooling-followup-validation.json).
 
 ### TL-048: Legacy attribution harness omits later benchmark sizes
 
@@ -1294,7 +1294,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   quick sizes for later entries. Add --instrumented using vela profile, the
   same categories, complete-call checks and independent C output oracles.
 - **Verify:** `python3 bench/profile.py --instrumented --backend c --json
-  bench/m27-attribution-c.json` and the native counterpart cover all twelve
+  bench/results/m27-attribution-c.json` and the native counterpart cover all twelve
   without Valgrind. Instruction counts remain a separate legacy measurement.
 
 ### TL-049: Profile clock-fake acceptance belongs in a runtime fixture
@@ -1557,13 +1557,13 @@ the same entry. Close it with a commit or validation result; keep its history.
   required fields, query error shape, static/measured coverage, source
   freshness, proof recomputation, status exits and typed property failures.
 - **Verify:** run the M30 check with both compiler images and the complete
-  supported suite; retain source hashes and results in bench/m30-validation.json.
+  supported suite; retain source hashes and results in bench/results/m30-validation.json.
   Final local validation is recorded below. No new AST/type-graph SDK is proposed.
 - **Final validation:** both bootstrap fixed points pass. The complete C run
   passes 311 checks, the native-built compiler selection 280 and UBSan 119.
   Final affected M30 checks exercise the retained corpus with both backends
-  and optimization modes; evidence is in bench/m30-validation.json and the
-  [M30 walkthrough](m30-specification.md). Release host/agent gaps stay open.
+  and optimization modes; evidence is in bench/results/m30-validation.json and the
+  [M30 walkthrough](history/m30-specification.md). Release host/agent gaps stay open.
 
 ### TL-063: The guide's stdout fake recipe used the wrong collection type
 
@@ -1585,8 +1585,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Final validation:** both bootstrap fixed points pass. The complete C run
   passes 311 checks, the native-built compiler selection 280 and UBSan 119.
   Final affected M30 checks exercise the retained corpus with both backends
-  and optimization modes; evidence is in bench/m30-validation.json and the
-  [M30 walkthrough](m30-specification.md). Release host/agent gaps stay open.
+  and optimization modes; evidence is in bench/results/m30-validation.json and the
+  [M30 walkthrough](history/m30-specification.md). Release host/agent gaps stay open.
 
 ### TL-064: Some constant contract violations stay unknown without a solver
 
@@ -1607,6 +1607,40 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Verify:** mismatching constant values refute with a concrete empty argument
   vector; matching values prove; overflow, effects and unsupported domains
   never become false proofs. Keep C/native runtime contract checks unchanged.
+
+### TL-065: Static reading inventory assumes flat documentation
+
+- **Status:** resolved during repository cleanup after the M30 candidate;
+  discovered while organizing the milestone walkthroughs.
+- **Evidence:** `eval/static.py` used `docs.glob("*.md")`, while
+  `eval/prepare.py --context docs` copies the whole documentation tree.
+  Moving the 40 walkthroughs into `docs/history/` would exclude them from
+  the reading inventory despite still supplying them to evaluated agents.
+  This is an observed enumeration mismatch, not a measured agent improvement.
+- **Impact:** the reading-size report would undercount supplied documentation
+  and suggest an artificial reduction after a directory-only move.
+- **Workaround:** inventory all nested Markdown files, or use the historical
+  checkout when reproducing an earlier documentation condition. Record the
+  checkout and condition for comparisons; the shortened README also changes
+  the current reading condition independently of the directory moves.
+- **Resolution:** use `docs.rglob("*.md")` to count the recursively copied
+  documentation. Keep earlier snapshots byte-identical in `eval/results/`,
+  and retain benchmark/validation evidence in `bench/results/`. The current
+  reference index and contributor/compiler/test maps point newcomers to
+  active material without removing milestone history or required tests.
+- **Acceptance:** run `python3 eval/static.py --json build/cleanup-static.json`
+  and compare its `README and walkthroughs` byte count to the README plus
+  all recursively copied Markdown files. Prepare a task with `--context docs`
+  and verify nested walkthroughs are included. Check relative Markdown links,
+  report byte identity and affected evaluation/documentation regressions.
+  This does not close VAL-002/VAL-003 or other outstanding release validation.
+- **Validation:** `python3 -u run_tests.py --backend c --jobs 4 m17_test
+  eval_test bench_test m30_test` passes all four integration suites with no
+  failures/skips. Static diagnostics remain 373/373 coded with 21 fixes.
+  A docs-context preparation includes all 49 Markdown files, including all
+  40 walkthroughs. All local relative Markdown links resolve; the 61 moved JSON
+  reports and active benchmark budgets are byte-identical to the prior
+  checkout. The reading inventory is checked against the recursive file sum.
 
 ## Outstanding validation
 
@@ -1676,7 +1710,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   for x86 with opt=1/0 and the compiler with opt=1 (eleven objects); strict
   runtime C compiles on Darwin and as a Linux x86 object. These are local Mac
   execution and cross-compilation proofs, not Linux execution or ASan/TSan.
-  Source/image hashes and commands are in bench/m25-validation.json.
+  Source/image hashes and commands are in bench/results/m25-validation.json.
 - **M26 evidence:** Debian bookworm amd64 runs through Rosetta in Docker
   Desktop 28.3.2 (LinuxKit 6.10.14, GCC 12.2). Both C/native core selections
   pass 251 checks, both bootstrap fixed points execute, and M19–M26a
@@ -1691,8 +1725,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Workaround:** retain the host-supported results and these explicit limits.
 - **Required work:** on Linux x86-64, run both bootstrap fixed points and the
   applicable C/native suites under ASan and TSan. See
-  [the M17 walkthrough](m17-agent-tooling.md#validation) and
-  [the M19 walkthrough](m19-integers.md#validation). Run the M19 oracle,
+  [the M17 walkthrough](history/m17-agent-tooling.md#validation) and
+  [the M19 walkthrough](history/m19-integers.md#validation). Run the M19 oracle,
   boundary, and container cases natively, both optimized and unoptimized;
   run the full u64 pattern and runtime header-cache regressions there too.
   Also run `tests/m20_test.py build/vela` and the interface fixture on Linux
@@ -1740,7 +1774,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 - **M28 release gate:** the unchanged same-source 12-workload macOS gate
   passes at 1.468× C by native geometric mean; native compiler check and C
-  emission are faster. See bench/after-m28.json and bench/m28-validation.json.
+  emission are faster. See bench/results/after-m28.json and bench/results/m28-validation.json.
   This does not close Linux native-host performance acceptance.
 
 - **M29 required follow-up:** run bench/real_programs.py --gate --runs 5
@@ -1765,18 +1799,18 @@ the same entry. Close it with a commit or validation result; keep its history.
   self-test. Static checks find codes on 374 of 374 negative-test diagnostics,
   with edits on 21. No new model-driven agent runs were performed.
 - **M23 evidence:** the evaluation reference checks pass in the supported
-  suite; eval/m23-static.json records 373/373 coded diagnostics and 21 with
+  suite; eval/results/m23-static.json records 373/373 coded diagnostics and 21 with
   edits. No new model-driven agent trials were run.
-- **M24 evidence:** eval/m24-static.json retains 373/373 coded diagnostics
+- **M24 evidence:** eval/results/m24-static.json retains 373/373 coded diagnostics
   and 21 with edits; the inventory now credits API summary/measured coverage
   and conservative impact. This is not a model-driven agent trial.
-- **M26a evidence:** eval/m26a-static.json retains 373/373 coded diagnostics
+- **M26a evidence:** eval/results/m26a-static.json retains 373/373 coded diagnostics
   and 21 with edits; the guide stays within its estimate gate. No new agent
   trial was performed.
-- **M25 evidence:** eval/m25-static.json retains 373/373 coded diagnostics
+- **M25 evidence:** eval/results/m25-static.json retains 373/373 coded diagnostics
   and 21 with edits. The guide remains within its estimate budget. No new
   model-driven agent trial was performed.
-- **M26 evidence:** eval/m26-static.json retains 373/373 coded diagnostics and
+- **M26 evidence:** eval/results/m26-static.json retains 373/373 coded diagnostics and
   21 with edits. No model-driven agent comparison was run.
 - **M28 scope:** task 21 prepares fresh typed JSON counterexamples for three
   broken contracts. Hidden checks require unchanged contracts/signatures;

@@ -189,18 +189,18 @@ separate from the successful UBSan evidence and foreign native-host gaps.
 The same-source release gate passes: native/C geometric mean **1.4604556**
 (limit 1.5); native compiler check **0.181 s** versus C **0.194 s**, and C
 emission **0.418 s** versus **0.463 s**. These are this run's release timings,
-separate from instrumented profiling. See [the performance record](../bench/after-m27.json).
+separate from instrumented profiling. See [the performance record](../../bench/results/after-m27.json).
 
-The [C attribution](../bench/m27-attribution-c.json) and
-[native attribution](../bench/m27-attribution-native.json) retain all twelve
+The [C attribution](../../bench/results/m27-attribution-c.json) and
+[native attribution](../../bench/results/m27-attribution-native.json) retain all twelve
 quick workloads, original function rows and source identities. C reports all
 eleven categories; the native workloads report ten because direct IR element
 accesses remain charged to program code. Missing runtime-boundary rows do not
 mean the underlying operation has no cost. See the measurement limits above.
 
-[The validation record](../bench/m27-validation.json) retains host/compiler
+[The validation record](../../bench/results/m27-validation.json) retains host/compiler
 identities, source hashes, results and open validation IDs.
-[The static report](../eval/m27-static.json) retains diagnostics/guide metrics.
+[The static report](../../eval/results/m27-static.json) retains diagnostics/guide metrics.
 The Platforms workflow now includes actual POSIX debugger acceptance and
 copied-compiler panic, M27 sanitizer coverage and Windows C observation checks;
 these configured CI jobs are not claims of native-host execution here.

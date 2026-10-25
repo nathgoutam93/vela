@@ -5,7 +5,7 @@ Performance acceptance, both bootstrap fixed points, complete regression
 suites and available UBSan checks pass. Linux execution and unrun ASan/TSan
 remain explicitly tracked in VAL-001; M24 Linux kernel policies remain VAL-004.
 The M26a baseline is
-bench/before-m25.json, from commit 59b1b4f, with C/native compiler identities
+bench/results/before-m25.json, from commit 59b1b4f, with C/native compiler identities
 and source fingerprints. Acceptance retains all twelve unchanged workloads,
 a native/C geometric mean at most 1.5 and a native-built compiler faster
 than the C-built compiler on identical compiler operations.
@@ -76,7 +76,7 @@ counts preserve immortal/local/atomic shared behavior.
 VELA_CACHE="$PWD/build/cache-m25" python3 bench/run.py \
   --compiler "$PWD/build/vela" \
   --languages c vela vela-native --runs 7 --require-native-parity \
-  --json bench/after-m25.json
+  --json bench/results/after-m25.json
 ```
 
 The gate builds fresh C/native compiler images from the same sources before
@@ -89,18 +89,18 @@ separate preservation checks. Performance runs do not overlap broad suites.
 
 ## Discoveries and validation
 
-[TL-030](tooling-backlog.md#tl-030-benchmark-summary-omits-native-acceptance)
+[TL-030](../tooling-backlog.md#tl-030-benchmark-summary-omits-native-acceptance)
 records the missing native benchmark gate and stale-pair risk.
-[TL-031](tooling-backlog.md#tl-031-native-lowering-omits-existing-enum-memory-optimizations)
+[TL-031](../tooling-backlog.md#tl-031-native-lowering-omits-existing-enum-memory-optimizations)
 records enum ownership/allocation gaps found while measuring real workloads.
-[TL-032](tooling-backlog.md#tl-032-native-pushes-miss-the-existing-known-size-fast-path)
+[TL-032](../tooling-backlog.md#tl-032-native-pushes-miss-the-existing-known-size-fast-path)
 records known-size container lowering;
-[TL-033](tooling-backlog.md#tl-033-binary-string-operands-are-reread-after-a-mutable-right-side)
+[TL-033](../tooling-backlog.md#tl-033-binary-string-operands-are-reread-after-a-mutable-right-side)
 records and fixes operand-evaluation correctness in both generators, including
 assertions;
-[TL-034](tooling-backlog.md#tl-034-native-immutable-projections-copy-whole-aggregates)
+[TL-034](../tooling-backlog.md#tl-034-native-immutable-projections-copy-whole-aggregates)
 records profiled aggregate copying and the anchored borrowing experiment.
-[TL-035](tooling-backlog.md#tl-035-arm-allocation-spills-a-frequently-used-loop-state-pointer)
+[TL-035](../tooling-backlog.md#tl-035-arm-allocation-spills-a-frequently-used-loop-state-pointer)
 records the observed hot state spill and use-sensitive allocation experiment.
 Existing relative-compiler, concurrency and cache workarounds remain
 TL-002/TL-003/TL-028. Linux x86 execution and unrun sanitizers remain VAL-001;
@@ -114,11 +114,11 @@ The final focused M25 suite passes all eight oracle groups for C/native with
 optimization on and off. Earlier quick output checks pass all twelve
 workloads; the selected final full-size run also matches every output.
 Final bootstrap, complete-suite and UBSan results are recorded below and in
-[m25-validation.json](../bench/m25-validation.json).
+[m25-validation.json](../../bench/results/m25-validation.json).
 
 ## Selected performance result
 
-[after-m25.json](../bench/after-m25.json) records the selected combined
+[after-m25.json](../../bench/results/after-m25.json) records the selected combined
 implementation: anchored borrowing, safe algebraic simplification, destination
 forwarding and lifetime-normalized weighted spills. All twelve unchanged
 full-size workloads have seven timing samples, matching outputs and fresh
@@ -168,9 +168,9 @@ below one second in three samples after a warmup:
 | impact | 0.4660 s | 0.4376 s |
 | coverage (static) | 0.4662 s | 0.4380 s |
 
-[m25-validation.json](../bench/m25-validation.json) retains source/image/seed
+[m25-validation.json](../../bench/results/m25-validation.json) retains source/image/seed
 fingerprints, commands, log hashes, query samples and explicit platform limits.
-[m25-static.json](../eval/m25-static.json) retains the static evaluation.
+[m25-static.json](../../eval/results/m25-static.json) retains the static evaluation.
 No model-driven agent trial or actual tokenizer measurement was performed;
 VAL-002/VAL-003 remain open. UBSan instruments C runtime/helpers and generated
 C cases; emitted assembly is not sanitizer-instrumented. Linux objects were
@@ -215,7 +215,7 @@ python3 -u build/m25-tests.py --compiler "$PWD/build/vela" --backend c
 python3 -u build/m25-tests.py --compiler "$PWD/build/vela" --backend native
 python3 -u build/m25-tests.py --compiler "$PWD/build/vela-native" --backend native \
   tests/run/ tests/fail/ m25_test m26a_test
-python3 eval/static.py --vela "$PWD/build/vela" --json eval/m25-static.json
+python3 eval/static.py --vela "$PWD/build/vela" --json eval/results/m25-static.json
 ```
 
 Run these sequentially. Policy and loopback tests need a host execution context

@@ -194,26 +194,26 @@ Isolated queries on stage1/main.vl, one warmup and seven samples each:
 | impact | 0.2507 s | 0.2509 s | 1 s |
 | coverage (static) | 0.2501 s | 0.2511 s | 1 s |
 
-[The query measurements](../bench/m24-queries.json) retain raw samples and
+[The query measurements](../../bench/results/m24-queries.json) retain raw samples and
 compiler/source fingerprints. The timed coverage query is static; it is not a
 timing of executing all compiler tests. The generated guide is **31,989 bytes**,
 about **7,997 tokens** under the existing bytes/4 estimate. Actual tokenizer
-validation remains VAL-003. [Static evaluation](../eval/m24-static.json) records
+validation remains VAL-003. [Static evaluation](../../eval/results/m24-static.json) records
 373/373 coded negative diagnostics and 21 with edits. The question inventory
 now credits summary and measured coverage; signature impact remains partly
 answered because a proposed change still needs checking. No agent trial was
 performed (VAL-002).
 
-Discoveries reuse [TL-004](tooling-backlog.md#tl-004-runtime-cache-omitted-an-included-header)
+Discoveries reuse [TL-004](../tooling-backlog.md#tl-004-runtime-cache-omitted-an-included-header)
 for include-only cache invalidation,
-[TL-009](tooling-backlog.md#tl-009-new-declarations-need-semantic-editor-metadata)
+[TL-009](../tooling-backlog.md#tl-009-new-declarations-need-semantic-editor-metadata)
 for full type signatures and qualified/interface method selection, and
-[TL-017](tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget)
-for the guide budget. [TL-024](tooling-backlog.md#tl-024-macos-network-denial-permits-inert-socket-descriptors)
+[TL-017](../tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget)
+for the guide budget. [TL-024](../tooling-backlog.md#tl-024-macos-network-denial-permits-inert-socket-descriptors)
 records macOS socket/nested-sandbox behavior;
-[TL-025](tooling-backlog.md#tl-025-filesystem-sandbox-bootstrap-can-abort-before-vela-diagnostics)
+[TL-025](../tooling-backlog.md#tl-025-filesystem-sandbox-bootstrap-can-abort-before-vela-diagnostics)
 records loader bootstrap failures; and
-[TL-026](tooling-backlog.md#tl-026-capability-admission-must-use-the-generated-source-snapshot)
+[TL-026](../tooling-backlog.md#tl-026-capability-admission-must-use-the-generated-source-snapshot)
 records the admission/generation snapshot correction. No unrelated tooling
 features were added. TL-001–TL-003 host/absolute-path/four-worker workarounds
 remain in use. Native/sanitizer, agent-trial, tokenizer and Linux kernel
@@ -232,7 +232,7 @@ retain the M19/M22 limits on unchanged workloads:
 | crc32 | 0.3098 s | 0.2834 s | 0.91 | 1.2 |
 
 C/Vela medians are 0.0488/0.0532, 0.0629/0.0665, 0.1325/0.1395 and
-0.3103/0.2836 seconds. [after-m24.json](../bench/after-m24.json) records timings,
+0.3103/0.2836 seconds. [after-m24.json](../../bench/results/after-m24.json) records timings,
 thresholds, machine/toolchain and compiler/source identity. The baseline is
 M23 commit de1594b, with dirty_worktree identifying measurement before commit.
 
@@ -245,7 +245,7 @@ VELA_BACKEND=c python3 tests/m24_test.py "$PWD/build/vela"
 unset VELA_CFLAGS
 python3 bench/run.py --quick --check --languages c vela
 python3 bench/run.py varints arena_trees sha256 crc32 --runs 7 --languages c vela
-python3 eval/static.py --vela "$PWD/build/vela" --json eval/m24-static.json
+python3 eval/static.py --vela "$PWD/build/vela" --json eval/results/m24-static.json
 ```
 
 OS-policy tests need a host that permits installing the child sandbox; macOS

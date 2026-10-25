@@ -4,7 +4,7 @@ Decision: 2026-10-25. Following the agent-safety design review, accept the
 bounded details below into M28-M30, then freeze further architectural scope
 until M30 is achieved. These are delivery requirements, not implemented
 features. M25 performance and validation are recorded separately in its
-[walkthrough](m25-native-parity.md); these additions do not expand M25.
+[walkthrough](history/m25-native-parity.md); these additions do not expand M25.
 
 ## Architecture freeze
 

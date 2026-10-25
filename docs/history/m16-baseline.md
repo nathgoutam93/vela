@@ -19,7 +19,7 @@ n-body could not be written fairly.
 | `bench/run.py` | builds, checks that all print the same, times, writes JSON |
 | `bench/profile.py` | Vela's instructions under callgrind, by kind of work |
 | `bench/words.py` | the generated text word-frequency reads |
-| `bench/baseline.json`, `bench/profile.json` | the numbers below |
+| `bench/results/baseline.json`, `bench/results/profile.json` | the numbers below |
 | `eval/` | the agent evaluation: `README.md`, prepare, grade, summary, selftest, static, 20 tasks |
 | `tests/bench_test.py`, `tests/eval_test.py` | in the default suite: the benchmarks still agree, the tasks still work |
 | `stage1/*`, `runtime/*` | `math.sqrt` (`import math`), and `-lm` when linking |

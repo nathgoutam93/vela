@@ -32,7 +32,7 @@ Unicode decoding is explicit and rejects invalid encodings.
 Acceptance includes an HTTP fetcher and TCP echo server with deterministic fake
 tests, independent UTF-8/HTTP/process/directory oracles, real loopback network
 checks, supported regressions, bootstrap and benchmark preservation. Tooling
-findings and platform validation remain in [the backlog](tooling-backlog.md).
+findings and platform validation remain in [the backlog](../tooling-backlog.md).
 
 ## Library and runtime boundary
 
@@ -159,8 +159,8 @@ Legacy os.run/output also use the process fake; args/env/stdin/stdout and files
 keep their existing fakes. Raw C calls remain the responsibility of unsafe
 wrappers and are not intercepted.
 
-[http_fetch.vl](../examples/http_fetch.vl) fetches one URL and prints its body.
-[tcp_echo.vl](../examples/tcp_echo.vl) serves one TCP client, up to 1 MiB, and
+[http_fetch.vl](../../examples/http_fetch.vl) fetches one URL and prints its body.
+[tcp_echo.vl](../../examples/tcp_echo.vl) serves one TCP client, up to 1 MiB, and
 closes its resources. Both ship fake-based tests and are included in the
 supported regression runner. Run `vela test examples/http_fetch.vl` and
 `vela test examples/tcp_echo.vl` without contacting an external host.
@@ -187,17 +187,17 @@ include-only cache invalidation. Assembly for the examples and managed-handle
 fixture is cross-assembled with optimization on and off; this does not establish
 native execution correctness.
 
-Discoveries reuse [TL-004](tooling-backlog.md#tl-004-runtime-cache-omitted-an-included-header)
-(cache inputs), [TL-009](tooling-backlog.md#tl-009-new-declarations-need-semantic-editor-metadata)
+Discoveries reuse [TL-004](../tooling-backlog.md#tl-004-runtime-cache-omitted-an-included-header)
+(cache inputs), [TL-009](../tooling-backlog.md#tl-009-new-declarations-need-semantic-editor-metadata)
 (semantic metadata/effect diagnostics) and
-[TL-017](tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget)
-(guide budget). [TL-022](tooling-backlog.md#tl-022-blocking-socket-locks-prevented-full-duplex-io)
+[TL-017](../tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget)
+(guide budget). [TL-022](../tooling-backlog.md#tl-022-blocking-socket-locks-prevented-full-duplex-io)
 records the resolved duplex lock defect.
-[TL-023](tooling-backlog.md#tl-023-long-literals-fail-the-strict-c-warning-gate)
+[TL-023](../tooling-backlog.md#tl-023-long-literals-fail-the-strict-c-warning-gate)
 records a deferred strict-C literal-length issue: the HTTP oversized-header
 fixture now constructs its data with text.repeat while retaining its bounds
 oracle and strict compiler flags. The std self-shadow warning recurs in
-[TL-016](tooling-backlog.md#tl-016-testing-a-std-module-can-warn-that-it-shadows-its-own-dependency)
+[TL-016](../tooling-backlog.md#tl-016-testing-a-std-module-can-warn-that-it-shadows-its-own-dependency)
 and remains deferred. Host selection, absolute compiler paths and outer
 concurrency retain the TL-001–TL-003 workarounds. Native execution/sanitizers,
 agent trials and actual tokenizer measurement remain separate validation in
@@ -218,10 +218,10 @@ retain M19/M22's limits (1.1× C for varints/arena trees; 1.2× for SHA-256/CRC-
 C/Vela medians are 0.0491/0.0531, 0.0630/0.0664, 0.1325/0.1392 and
 0.3102/0.2834 seconds, respectively. These are preservation checks on the
 unchanged workloads, not network-throughput measurements.
-[after-m23.json](../bench/after-m23.json) retains machine/toolchain, timings,
+[after-m23.json](../../bench/results/after-m23.json) retains machine/toolchain, timings,
 thresholds and compiler/source fingerprints. Its baseline commit is M22's
 18204b0 and its dirty-tree flag identifies this measurement before commit.
-[eval/m23-static.json](../eval/m23-static.json) records static evaluation:
+[eval/results/m23-static.json](../../eval/results/m23-static.json) records static evaluation:
 373/373 negative diagnostics have codes and 21 have edits. No new agent-driven
 trial or actual model-tokenizer measurement is claimed.
 
@@ -234,7 +234,7 @@ VELA_CFLAGS="-fsanitize=undefined -fno-sanitize-recover=all" \
     python3 tests/m23_test.py "$PWD/build/vela"
 VELA_CACHE="$PWD/build/cache-m23" python3 bench/run.py --quick --check --languages c vela
 VELA_CACHE="$PWD/build/cache-m23" python3 bench/run.py varints arena_trees sha256 crc32 \
-    --runs 7 --languages c vela --json bench/after-m23.json
+    --runs 7 --languages c vela --json bench/results/after-m23.json
 ```
 
 The 298-check supported selection uses the TL-003 four-outer-worker wrapper,

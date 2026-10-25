@@ -38,7 +38,7 @@ check/C-emission operation for four seconds. Output goes to /dev/null. These
 profiling images are separate from acceptance timing images. The source copy
 renames main to once, adds its fs/os effects, and calls it in a 40-iteration
 main; package-relative imports must still resolve to packages/json.
-[m25-profile.json](../bench/m25-profile.json) retains the host, sampling
+[m25-profile.json](../../bench/results/m25-profile.json) retains the host, sampling
 commands, image/instrumented-source hashes, report hashes and top self counts.
 The complete sampling reports remain locally in build/m25-profile-*.txt.
 
@@ -69,7 +69,7 @@ borrowed fields, mutable source replacement during iteration, returned values,
 snapshots, growth, both optimization modes and both backends. All twelve quick
 benchmark outputs also agree.
 
-[m25-borrow-ab.json](../bench/m25-borrow-ab.json) records seven interleaved
+[m25-borrow-ab.json](../../bench/results/m25-borrow-ab.json) records seven interleaved
 samples, identical emitted-C hashes and unchanged-source verification:
 
 | Operation | C built | Native borrowing off | Native borrowing on |
@@ -93,7 +93,7 @@ SSA implementation. ARM constants also load directly into their allocated
 destination when one exists.
 
 Focused tests pass for both backends and optimization modes; all twelve quick
-benchmark outputs agree. [m25-identity-ab.json](../bench/m25-identity-ab.json)
+benchmark outputs agree. [m25-identity-ab.json](../../bench/results/m25-identity-ab.json)
 retains the same-source, seven-sample interleaved comparison:
 
 | Operation | C built | Native identities off | Native identities on |
@@ -119,14 +119,14 @@ retain their failure paths. Do this after value simplification. This is a
 small copy/coalescing experiment informed by the register-allocation paper,
 not interval splitting. Control: build/vela-m25-forward-off. Correctness and
 performance measurements follow in
-[m25-forward-program-ab.json](../bench/m25-forward-program-ab.json).
+[m25-forward-program-ab.json](../../bench/results/m25-forward-program-ab.json).
 Seven interleaved full-size samples improve spectralnorm by 31.7% (median
 31.8%) and SHA-256 by 2.5% (median 2.6%). Varints, arena_trees, nbody and
 CRC-32 change by less than 0.6%, with mixed signs: no convincing gain there.
 All output hashes match. Focused tests pass in both backends/modes, and all
 twelve quick outputs agree. Keep the change and rerun the complete gate.
 
-[m25-forward-ab.json](../bench/m25-forward-ab.json) compares same-source
+[m25-forward-ab.json](../../bench/results/m25-forward-ab.json) compares same-source
 compiler images too. Checking and emission change by less than 0.2% in best
 time with mixed median results, so this experiment does not establish a
 compiler speed improvement. Both native images remain faster than C. Edge
@@ -154,7 +154,7 @@ estimates, not measured execution frequencies. x64 allocation is unchanged.
 This tests a Vela-specific smaller step toward the paper's use-sensitive
 allocation; it does not implement its interval splitting. Control:
 build/vela-m25-spill-off. The focused suite passes for C/native opt=1/0.
-[m25-spill-ab.json](../bench/m25-spill-ab.json) records seven interleaved
+[m25-spill-ab.json](../../bench/results/m25-spill-ab.json) records seven interleaved
 samples with identical emitted C and unchanged sources. Both native images
 and the C control are built from the same absolute-path compiler source.
 
@@ -165,7 +165,7 @@ and the C control are built from the same absolute-path compiler source.
 
 Checking improves by 7.0% (median 6.4%); emission improves by 5.3% (median
 5.0%). The weighted image beats C on both operations. However,
-[m25-spill-rejected.json](../bench/m25-spill-rejected.json) rejects it on the
+[m25-spill-rejected.json](../../bench/results/m25-spill-rejected.json) rejects it on the
 complete matrix: SHA-256 slows from about 1.5 to 3.06 times C, fannkuch also
 regresses, and the geometric mean is 1.567. Do not keep this raw-cost policy.
 
@@ -174,19 +174,19 @@ against occupation. The ordering is equivalent to weighted uses divided by
 the square root of lifetime. This is a heuristic hypothesis, not a theorem
 about spill count. Test it against the original end-based control and retain
 the rejected result. Focused tests pass for C/native opt=1/0.
-[m25-density-ab.json](../bench/m25-density-ab.json) records the same-source
+[m25-density-ab.json](../../bench/results/m25-density-ab.json) records the same-source
 compiler A/B: check 0.1748 to 0.1643 s (6.0% better; median 5.4%); emission
 0.4146 to 0.3976 s (4.1% better; median 4.1%). The C controls measure 0.1744
 and 0.4392 s. Both native operations beat C. Program measurements remain
 required because the preceding raw-cost policy regressed them.
-[m25-density-program-ab.json](../bench/m25-density-program-ab.json) checks
+[m25-density-program-ab.json](../../bench/results/m25-density-program-ab.json) checks
 six unchanged full-size workloads in seven interleaved samples. SHA-256
 returns to 0.358 s versus the original allocator's 0.359 s; spectralnorm is
 unchanged at 0.282 s. All six output hashes match. The full gate follows.
 
 ## Selection and pause
 
-The final [full gate](../bench/after-m25.json) exits zero: native/C geometric
+The final [full gate](../../bench/results/after-m25.json) exits zero: native/C geometric
 mean 1.4603, checking 0.1675 versus C 0.1766 s, and C emission 0.3999 versus
 C 0.4388 s. All twelve full-size outputs match, both compiler images are
 fresh and same-source, and all four C-backend preservation limits pass.

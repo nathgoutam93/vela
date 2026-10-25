@@ -3,7 +3,7 @@
 M28 adds bounded verification, contract property tests and warnings for
 unhandled Results. Implementation and local acceptance are recorded below;
 actual counterexample-only agent repair trials and foreign native-host runs
-remain outstanding. This work follows the [accepted baseline](design-baseline-to-m30.md).
+remain outstanding. This work follows the [accepted baseline](../design-baseline-to-m30.md).
 
 ## Commands and outcomes
 
@@ -145,25 +145,25 @@ signatures/contracts. Starting code fails, and the reference solution passes.
 That validates the fixture, not the roadmap's actual agent-repair criterion.
 
 Local commands/results and performance measurements are in
-[the validation record](../bench/m28-validation.json). Both refreshed seed fixed points pass. Complete C and native suites each passed all 308
+[the validation record](../../bench/results/m28-validation.json). Both refreshed seed fixed points pass. Complete C and native suites each passed all 308
 checks, and 121 selected checks passed UBSan, before the final TL-055 property
 entry correction. Both fixed points and affected M28/compiler/generator checks
 were rerun normally and under UBSan after that fix; the record distinguishes
 those runs. The unchanged 12-workload release gate passes at **1.468× C**
 (native geometric mean); native compiler check/C emission are faster too.
-See [the benchmark data](../bench/after-m28.json).
+See [the benchmark data](../../bench/results/after-m28.json).
 
-Tooling discoveries/resolutions: [TL-036](tooling-backlog.md#tl-036-result-returning-calls-can-silently-discard-failures),
-[TL-037](tooling-backlog.md#tl-037-guide-contract-purity-exceeds-the-implemented-check),
-[TL-050](tooling-backlog.md#tl-050-bounded-property-capture-and-capability-launch-use-separate-apis),
-[TL-051](tooling-backlog.md#tl-051-generated-vela-strings-must-use-vela-quoting),
-[TL-052](tooling-backlog.md#tl-052-repeated-explicit-discards-collided-as-duplicate-local-names),
-[TL-053](tooling-backlog.md#tl-053-checked-source-snapshots-include-a-virtual-prelude),
-[TL-054](tooling-backlog.md#tl-054-evaluation-installation-did-not-preserve-the-windows-executable-suffix),
-[TL-055](tooling-backlog.md#tl-055-property-case-indices-differed-from-backend-test-entries).
-Recurring [guide](tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget),
-[timeout](tooling-backlog.md#tl-003-control-test-concurrency-and-improve-timeout-evidence) and
-[cache](tooling-backlog.md#tl-028-an-unavailable-default-cache-leaks-mkdir-stderr)
+Tooling discoveries/resolutions: [TL-036](../tooling-backlog.md#tl-036-result-returning-calls-can-silently-discard-failures),
+[TL-037](../tooling-backlog.md#tl-037-guide-contract-purity-exceeds-the-implemented-check),
+[TL-050](../tooling-backlog.md#tl-050-bounded-property-capture-and-capability-launch-use-separate-apis),
+[TL-051](../tooling-backlog.md#tl-051-generated-vela-strings-must-use-vela-quoting),
+[TL-052](../tooling-backlog.md#tl-052-repeated-explicit-discards-collided-as-duplicate-local-names),
+[TL-053](../tooling-backlog.md#tl-053-checked-source-snapshots-include-a-virtual-prelude),
+[TL-054](../tooling-backlog.md#tl-054-evaluation-installation-did-not-preserve-the-windows-executable-suffix),
+[TL-055](../tooling-backlog.md#tl-055-property-case-indices-differed-from-backend-test-entries).
+Recurring [guide](../tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget),
+[timeout](../tooling-backlog.md#tl-003-control-test-concurrency-and-improve-timeout-evidence) and
+[cache](../tooling-backlog.md#tl-028-an-unavailable-default-cache-leaks-mkdir-stderr)
 friction retains TL-017/TL-003/TL-028. Actual agent runs remain
 VAL-002; actual tokenizer measurement remains VAL-003; foreign native-host
 and sanitizer acceptance remains with the existing platform validation items.

@@ -42,7 +42,7 @@ callgrind's instruction counts, which do not move, and timed at the end.
 | `runtime/vela_rt.h` | the free lists; `vela_slice`; the array's `size`; the map functions below |
 | `runtime/vela_rt.c` | one allocation per array; arrays from the free lists; `vela_map_find_hashed`, `vela_map_set_found`; key hashing and comparing without calls; lengths at most 2^48 |
 | `tests/run/cow_after_write.vl`, `cow_hoisted.vl`, `map_found.vl`, `panic_range_*.vl` | the cases each change must get right |
-| `bench/after-m18.json`, `bench/profile-m18.json` | the numbers below |
+| `bench/results/after-m18.json`, `bench/results/profile-m18.json` | the numbers below |
 
 ## 1. What each check costs
 
@@ -274,7 +274,7 @@ without the scan was built: it gets five of the test's eight lines wrong.
 
 ## 8. The numbers
 
-Back to back, best of five runs, sizes as in M16 (`bench/after-m18.json`):
+Back to back, best of five runs, sizes as in M16 (`bench/results/after-m18.json`):
 
 | Benchmark | C | Rust | Vela M16b | Vela M18 | M16b / C | M18 / C | M18 / Rust | native / C |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

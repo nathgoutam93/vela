@@ -31,7 +31,7 @@ walkthrough had measured 2.95 in an earlier run.
 | `tests/cache_test.py` | the cache, in the default suite |
 | `eval/grade.py` | a timed-out check is killed with everything it started |
 | `bench/profile.py` | `--compiler` |
-| `bench/after-m16b.json`, `bench/profile-m16b.json` | the numbers below |
+| `bench/results/after-m16b.json`, `bench/results/profile-m16b.json` | the numbers below |
 
 ## 1. Element access inline
 

@@ -34,7 +34,7 @@ boxes or destructor records.
 Acceptance compares a zero-copy binary-format parser with independent C,
 and binary trees using reusable typed arenas with the same C storage strategy.
 Tooling findings and remaining platform validation are tracked in
-[the backlog](tooling-backlog.md).
+[the backlog](../tooling-backlog.md).
 
 `c.data` also borrows a growable array's contiguous storage under unsafe,
 without making it unique. The pointer is read-only and expires when its owner
@@ -130,13 +130,13 @@ APIs; M17 checks and tests every runnable guide example.
 
 The principal fixed/view/byte/parser fixtures cross-assemble for Linux x86-64
 with optimization on/off. Native execution, native bootstrap, ASan and TSan
-remain outstanding in [VAL-001](tooling-backlog.md#val-001-linux-native-and-sanitizer-validation).
+remain outstanding in [VAL-001](../tooling-backlog.md#val-001-linux-native-and-sanitizer-validation).
 Assembly validation does not establish native execution correctness.
 
-Tooling discoveries are retained as [TL-009](tooling-backlog.md#tl-009-new-declarations-need-semantic-editor-metadata) (semantic metadata), [TL-016](tooling-backlog.md#tl-016-testing-a-std-module-can-warn-that-it-shadows-its-own-dependency)
-(self-shadow warnings), [TL-017](tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget) (guide budget), [TL-018](tooling-backlog.md#tl-018-select-benchmark-input-generators-by-name) (benchmark generator
-selection), [TL-019](tooling-backlog.md#tl-019-implicit-decoder-loop-limits-retain-arithmetic-checks) (decoder range proofs) [TL-020](tooling-backlog.md#tl-020-immutable-memory-intrinsics-must-reject-mut-argument-markers) (intrinsic mutation markers) and [TL-021](tooling-backlog.md#tl-021-internal-array-syntax-markers-must-not-reserve-user-type-names) (internal syntax markers)
-in [the backlog](tooling-backlog.md). The self-shadow warning and general
+Tooling discoveries are retained as [TL-009](../tooling-backlog.md#tl-009-new-declarations-need-semantic-editor-metadata) (semantic metadata), [TL-016](../tooling-backlog.md#tl-016-testing-a-std-module-can-warn-that-it-shadows-its-own-dependency)
+(self-shadow warnings), [TL-017](../tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget) (guide budget), [TL-018](../tooling-backlog.md#tl-018-select-benchmark-input-generators-by-name) (benchmark generator
+selection), [TL-019](../tooling-backlog.md#tl-019-implicit-decoder-loop-limits-retain-arithmetic-checks) (decoder range proofs) [TL-020](../tooling-backlog.md#tl-020-immutable-memory-intrinsics-must-reject-mut-argument-markers) (intrinsic mutation markers) and [TL-021](../tooling-backlog.md#tl-021-internal-array-syntax-markers-must-not-reserve-user-type-names) (internal syntax markers)
+in [the backlog](../tooling-backlog.md). The self-shadow warning and general
 induction inference remain deferred. Existing host-selection/compiler-path/
 concurrency workarounds remain TL-001–TL-003. Agent trials and actual tokenizer
 validation remain VAL-002/VAL-003.
@@ -159,7 +159,7 @@ open rather than inferred from C/UBSan.
 
 The generated guide is **28,599 bytes**, about **7,149 tokens** under the
 existing bytes/4 estimate. All **373/373** negative-test diagnostics have codes;
-21 have fixes. `eval/m22-static.json` records the static metrics. Actual tokenizer
+21 have fixes. `eval/results/m22-static.json` records the static metrics. Actual tokenizer
 and new agent-driven evaluation remain VAL-003 and VAL-002 respectively.
 
 The suite uses the existing absolute-compiler and four-outer-worker workarounds,
@@ -200,7 +200,7 @@ parses 32 changing suffixes. Arena trees use depth 16 and reuse one scratch
 region across all short-lived trees, keeping a separate permanent region.
 SHA-256 and CRC-32 retain their unchanged M19 workloads and 1.2-times-C gates.
 
-`bench/after-m22.json` retains toolchain/machine, sizes, timings, acceptance
+`bench/results/after-m22.json` retains toolchain/machine, sizes, timings, acceptance
 checks, and compiler/source fingerprints. The baseline commit is M21's
 58c65e7; its dirty-tree flag identifies the M22 sources measured before commit.
 The new C baselines use bounded decoder loops and pointer-borrowed arena
@@ -209,5 +209,5 @@ traversal; the earlier exploratory ratios are not substituted for these runs.
 ```
 VELA_CACHE="$PWD/build/cache-m22" python3 bench/run.py --quick --check --languages c vela
 VELA_CACHE="$PWD/build/cache-m22" python3 bench/run.py varints arena_trees sha256 crc32 \
-    --runs 7 --languages c vela --json bench/after-m22.json
+    --runs 7 --languages c vela --json bench/results/after-m22.json
 ```

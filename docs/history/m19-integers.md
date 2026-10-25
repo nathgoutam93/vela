@@ -38,7 +38,7 @@ execution and memory/thread sanitizer validation remain open in VAL-001.
   a check only when the proof respects the result type's actual bounds.
 
 Discoveries and outstanding validation are recorded in
-[the tooling backlog](tooling-backlog.md).
+[the tooling backlog](../tooling-backlog.md).
 
 ## Implementation
 
@@ -102,7 +102,7 @@ AST dumps represent signed numeric constants directly as literal values.
 Bitwise operators are integer-only; `true & false` is now a type diagnostic
 rather than an unknown-character error.
 
-See [the tooling backlog](tooling-backlog.md) for the findings made during
+See [the tooling backlog](../tooling-backlog.md) for the findings made during
 this work:
 
 - TL-001: manual host selection also needs an inventory of dump tests;
@@ -141,10 +141,10 @@ implementations on this host; it does not establish native-backend performance.
 ```
 VELA_CACHE="$PWD/build/cache-m19" python3 bench/run.py --quick --check --languages c vela
 VELA_CACHE="$PWD/build/cache-m19" python3 bench/run.py sha256 crc32 --runs 7 \
-    --languages c vela --json bench/after-m19.json
+    --languages c vela --json bench/results/after-m19.json
 ```
 
-`bench/after-m19.json` retains best/median times, toolchain, sizes, individual
+`bench/results/after-m19.json` retains best/median times, toolchain, sizes, individual
 acceptance checks, and SHA-256 fingerprints of the measured compiler and
 sources. Its base commit is the M17 changeset; the explicit dirty-worktree
 metadata identifies this M19 implementation measured before commit.
@@ -200,4 +200,4 @@ The generated guide is 23,138 bytes, about 5,784 tokens using the harness's
 bytes/4 estimate, within its current 8,000-token budget check. Actual tokenizer
 validation remains VAL-003. All 373 negative-test diagnostics carry codes,
 and 21 carry applicable fixes; these are static metrics, not a new agent
-study. See `eval/m19-static.json` and VAL-002.
+study. See `eval/results/m19-static.json` and VAL-002.

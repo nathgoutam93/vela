@@ -93,7 +93,7 @@ and omits the walkthroughs. The old `docs`, `readme`, and `none` conditions
 remain available. The prompt describes module checking and the new tools.
 The stack task no longer claims that builtin names are forbidden in modules.
 
-`eval/static.json` preserves the M16 baseline. `eval/m17-static.json` records:
+`eval/results/static.json` preserves the M16 baseline. `eval/results/m17-static.json` records:
 
 | Measure | M16 | M17 |
 | --- | ---: | ---: |
@@ -128,6 +128,6 @@ detection is unsupported here, and a probe with leaks disabled hangs during
 startup. These are not sanitizer or native-execution passes. Linux native,
 ASan, and TSan validation remains outstanding.
 
-The [tooling backlog](tooling-backlog.md) tracks these validation gaps, the
+The [tooling backlog](../tooling-backlog.md) tracks these validation gaps, the
 pending agent/tokenizer measurements, and test-harness friction observed
 during M17. Later milestones add their discoveries there as they occur.

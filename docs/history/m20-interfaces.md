@@ -30,7 +30,7 @@ comparison laws hold; signature checking does not prove those laws.
 Acceptance will exercise custom-interface generic dispatch, lists sorting and
 deduplication, custom struct map keys, compiler use, bootstrap, both code paths,
 and the supported regression suite. Tooling discoveries and platform validation
-remain in [the backlog](tooling-backlog.md).
+remain in [the backlog](../tooling-backlog.md).
 
 ## Implementation
 
@@ -100,7 +100,7 @@ now says "unknown interface bound" because Eq/Ord/Key are no longer the only
 choices. Type-declaration syntax diagnostics now include interface. Both keep
 their existing diagnostic codes; new interface diagnostics occupy E3190–E3196.
 
-The tooling discoveries are [TL-009, TL-010, and TL-011](tooling-backlog.md). They cover
+The tooling discoveries are [TL-009, TL-010, and TL-011](../tooling-backlog.md). They cover
 semantic editor metadata, restricting descriptor adapters to map-key uses,
 and more precise failed-interface diagnostics. TL-011 remains deferred; the
 checker rejects invalid implementations, and the guide provides signatures.
@@ -148,7 +148,7 @@ marked as text because they are already defined by the compiler.
 `vela guide` is 24,475 bytes, approximately 6,118 tokens under the harness's
 bytes/4 estimate, within the current 8,000-token estimate gate. All 373
 negative-test diagnostics have codes and 21 carry applicable fixes. These
-measurements are retained in `eval/m20-static.json`; actual tokenizer and
+measurements are retained in `eval/results/m20-static.json`; actual tokenizer and
 agent-run validation remain separate.
 
 
@@ -170,7 +170,7 @@ on this host, using best-of-seven wall times and the same release settings:
 | CRC-32, 4 MiB / 32 streaming updates | 0.5569 s | 0.5073 s | 0.91 |
 
 Medians are 0.2374/0.2489 seconds for SHA-256 and 0.5574/0.5093 seconds for
-CRC-32 (C/Vela). Full-size timed outputs also match. `bench/after-m20.json`
+CRC-32 (C/Vela). Full-size timed outputs also match. `bench/results/after-m20.json`
 retains timings, machine/toolchain, source/compiler fingerprints, and both
 individual acceptance checks. Its baseline commit is M19 and its dirty-tree
 flag identifies the uncommitted M20 sources measured here. Rust is not
@@ -180,7 +180,7 @@ installed on this host, so this run compares C and Vela only.
 VELA_CACHE="$PWD/build/cache-m20" sh bootstrap/bootstrap.sh --update
 VELA_CACHE="$PWD/build/cache-m20" python3 bench/run.py --quick --check --languages c vela
 VELA_CACHE="$PWD/build/cache-m20" python3 bench/run.py sha256 crc32 --runs 7 \
-    --languages c vela --json bench/after-m20.json
+    --languages c vela --json bench/results/after-m20.json
 ```
 
 The broad and UBSan runs used the runner's existing filters, with four outer

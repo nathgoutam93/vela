@@ -2,7 +2,7 @@
 
 M29 adds three real-program workloads, a reproducible 100k-line project,
 compile/query budgets and opt-in incremental backend compilation. It keeps
-the [architecture baseline](design-baseline-to-m30.md) and existing twelve
+the [architecture baseline](../design-baseline-to-m30.md) and existing twelve
 release workloads/thresholds. Local validation is recorded below; foreign-host
 execution and earlier agent/platform acceptance remain separate.
 
@@ -12,10 +12,10 @@ execution and earlier agent/platform acceptance remain separate.
 python3 bench/scale.py build/scale
 build/vela check build/scale/main.vl
 python3 bench/real_programs.py --quick --check --json build/m29-check.json
-python3 bench/real_programs.py --gate --runs 5 --json bench/m29-real-programs.json
-python3 bench/real_programs.py --gate --runs 5 --solver /path/to/z3 --json bench/m29-real-programs.json
+python3 bench/real_programs.py --gate --runs 5 --json bench/results/m29-real-programs.json
+python3 bench/real_programs.py --gate --runs 5 --solver /path/to/z3 --json bench/results/m29-real-programs.json
 python3 bench/run.py --compiler build/vela --languages c vela-native --runs 5 \
-  --require-native-parity --json bench/after-m29.json
+  --require-native-parity --json bench/results/after-m29.json
 ```
 
 `--quick --check` is correctness evidence, never a full performance pass.
@@ -71,7 +71,7 @@ the measurements. The C reference receives the same user C flags/sysroot.
 
 ## Compilation and query budgets
 
-[The versioned budgets](../bench/m29-budgets.json) require median 100k-line
+[The versioned budgets](../../bench/m29-budgets.json) require median 100k-line
 checking and summary/impact queries below one second. Ordinary cold/warm
 builds, incremental cold builds and edited builds have 30-second budgets;
 incremental warm builds have a 20-second budget. The latter are explicit
@@ -148,9 +148,9 @@ passed 309 checks before the final external-input eligibility guard. Final
 normal M29 acceptance and the 123-check UBSan selection pass after that guard.
 Both incrementally built compiler images reuse all warm objects and emit C
 identical to the reference. Details are in
-[the validation record](../bench/m29-validation.json). The full scale and
-release measurements are retained in [the real-program report](../bench/m29-real-programs.json)
-and [the unchanged release matrix](../bench/after-m29.json).
+[the validation record](../../bench/results/m29-validation.json). The full scale and
+release measurements are retained in [the real-program report](../../bench/results/m29-real-programs.json)
+and [the unchanged release matrix](../../bench/results/after-m29.json).
 
 On this macOS ARM64 host, median 100k-line checking is **0.303 s**, API summary
 **0.463 s**, and impact **0.910 s**. Real-program geometric means are **0.933× C**
@@ -177,14 +177,14 @@ locations. It also runs the quick real-program matrix with Python/C oracles
 and rejects partial/deoptimized performance claims. Complete suites retain
 M17–M28 behavior rather than replacing their acceptance checks.
 
-Discoveries: [TL-056](tooling-backlog.md#tl-056-byte-balanced-c-partitions-invalidate-unrelated-objects),
-[TL-057](tooling-backlog.md#tl-057-preprocessed-compilation-retained-preprocessing-only-flags),
-[TL-058](tooling-backlog.md#tl-058-flattened-preprocessor-output-lost-system-header-classification),
-[TL-059](tooling-backlog.md#tl-059-reference-allocation-and-runtime-cache-warmth-can-distort-scale-comparisons),
-[TL-060](tooling-backlog.md#tl-060-plain-preprocessed-text-does-not-capture-nontext-compiler-inputs),
-[TL-061](tooling-backlog.md#tl-061-c-benchmark-streams-need-the-windows-runtimes-binary-mode).
-Guide budget work retains [TL-017](tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget).
-Source/header cache correctness follows [TL-004](tooling-backlog.md#tl-004-runtime-cache-omitted-an-included-header);
-normal diagnostic cost measurements extend [TL-036](tooling-backlog.md#tl-036-result-returning-calls-can-silently-discard-failures). Native Linux/sanitizer/performance and Windows-host
+Discoveries: [TL-056](../tooling-backlog.md#tl-056-byte-balanced-c-partitions-invalidate-unrelated-objects),
+[TL-057](../tooling-backlog.md#tl-057-preprocessed-compilation-retained-preprocessing-only-flags),
+[TL-058](../tooling-backlog.md#tl-058-flattened-preprocessor-output-lost-system-header-classification),
+[TL-059](../tooling-backlog.md#tl-059-reference-allocation-and-runtime-cache-warmth-can-distort-scale-comparisons),
+[TL-060](../tooling-backlog.md#tl-060-plain-preprocessed-text-does-not-capture-nontext-compiler-inputs),
+[TL-061](../tooling-backlog.md#tl-061-c-benchmark-streams-need-the-windows-runtimes-binary-mode).
+Guide budget work retains [TL-017](../tooling-backlog.md#tl-017-keep-the-expanded-memory-guide-within-its-reading-budget).
+Source/header cache correctness follows [TL-004](../tooling-backlog.md#tl-004-runtime-cache-omitted-an-included-header);
+normal diagnostic cost measurements extend [TL-036](../tooling-backlog.md#tl-036-result-returning-calls-can-silently-discard-failures). Native Linux/sanitizer/performance and Windows-host
 acceptance remain VAL-001/VAL-005. M28 actual agent trials and model-tokenizer
 measurement remain VAL-002/VAL-003; no new agent trial is claimed here.
