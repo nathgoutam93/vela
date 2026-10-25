@@ -43,6 +43,16 @@ class Checks:
 
 
 def modules(c: Checks):
+    # Local and std spellings may refer to the same file, including symlinks.
+    alias = c.base / 'std-alias'
+    alias.symlink_to(ROOT / 'std', target_is_directory=True)
+    for path, cwd in [('std/buffers.vl', ROOT), (str(ROOT/'std/http.vl'), ROOT),
+                      (str(alias/'buffers.vl'), c.base)]:
+        data = json.loads(c.run('check', '--json', path, cwd=cwd).stdout)
+        assert all(d['code'] != 'E7005' for d in data['errors']), data
+    c.write('shadow/text.vl', 'pub fn value() -> Int { return 1 }\n')
+    shadow = c.write('shadow/main.vl', 'import text\nfn main() { print(text.value()) }\n')
+    assert any(d['code'] == 'E7005' for d in c.diagnostics(shadow, code=0))
     lib = c.write('modules/stack.vl', '''import lists
 pub fn len(x: Int) -> Int { return x + 10 }
 pub fn own() -> Int { return len(2) }
@@ -186,6 +196,7 @@ def guide_and_install(c: Checks):
     guide = c.run('guide').stdout
     # Same bytes/4 budget as M16's baseline; fail when the reference grows.
     assert len(guide.encode()) <= 8000 * 4, len(guide.encode())
+    assert 'Assert Result by matching Ok/Err' in guide and 'Err(e) => assert(len(e) > 0)' in guide
     for module in ('maps', 'files', 'os', 'strings', 'tasks', 'math', 'bytes', 'lists', 'text'):
         assert 'import ' + module in guide
     for i, source in enumerate(re.findall(r'```vela\n(.*?)```', guide, re.S)):

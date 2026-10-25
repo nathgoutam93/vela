@@ -1,0 +1,130 @@
+{
+  "work": "pre-M30 tooling follow-up",
+  "validated_at_utc": "2026-10-25T11:19:39.639349+00:00",
+  "baseline_commit": "ddd84d6233ef80d5b559c9e79b069b2f40ce75b3",
+  "dirty_worktree": true,
+  "local_acceptance_passed": true,
+  "resolved_tooling": [
+    "TL-011",
+    "TL-016",
+    "TL-023",
+    "TL-028",
+    "TL-047"
+  ],
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.8",
+    "cc": "Apple clang version 17.0.0 (clang-1700.3.19.1)"
+  },
+  "source_trees": {
+    "stage1": {
+      "sha256": "b1eb8bc4679db31addf223ba7a9e12d8b60ea7b25091bc7eed86b329267143fd",
+      "files": 54,
+      "method": "sorted relative path UTF-8, NUL, bytes, NUL"
+    },
+    "runtime": {
+      "sha256": "faba61ac2acef74b2ec95c0f4c0f2560b38bcaa69ee33ad3c6c726a137b380bd",
+      "files": 11,
+      "method": "sorted relative path UTF-8, NUL, bytes, NUL"
+    },
+    "std": {
+      "sha256": "7657ec43fe7320e693df767acdf54d66bdc1702b8d01325d72c3b3f23bed8eca",
+      "files": 14,
+      "method": "sorted relative path UTF-8, NUL, bytes, NUL"
+    }
+  },
+  "source_sha256": {
+    "bootstrap/vela1.c": "11259418c2ab9386aef09ef7cf3f24aaf3a61a048a9efe53c4078a9d26cd3d16",
+    "docs/roadmap-after-m18.md": "cde1951991ad5171d7dd14b15c7ba571cb3ad46181dd67b49cf00c0858639fde",
+    "docs/tooling-backlog.md": "fa09aa50dab44fc639a013af43dfe81f86e90e1db9bd5c20f988b2d8f6dc1884",
+    "docs/tooling-followup-before-m30.md": "f278614784257b0ea1bb50dc5a5f563aa11a9c2953ec11ae5eb087ddd8db3c20",
+    "eval/tooling-followup-static.json": "76fcad8ebc76493b72be80c2de635248b9a4341a7485ed52f65e4fc70195915b",
+    "run_tests.py": "8e8de9e92128cd3ec3266523750dfc90fb13b3c35e78ae27cdc33ee14647bd2c",
+    "stage1/checker.vl": "0b7ad768157339beedde715f17774478cd6e78d07a042df067d56ac5d874b9ab",
+    "stage1/codegen.vl": "514575388d6b97eb32c86de8e426ef24fe9e0dcd56f47ee83d66a82f8fdf8626",
+    "stage1/diagnostics.vl": "efbd34c072253d3151727fb0d0d04f2ae7b7f7d7f281c2d04aa681bf863b0c7d",
+    "stage1/guide.vl": "624b90c5900e39e5756a2bc5f9d6f0d46fe8c1a6a2aef8548b5091417b4c10a9",
+    "stage1/main.vl": "bef05ed75e5b3d5d472cca571513ced02f16997d6314e113fd680e49930756bb",
+    "stage1/modules.vl": "c0cc4c2320204f5353519a1b68c867646ca101aebcadfee2fd26b941bfd9d6e9",
+    "tests/cache_test.py": "e7e62298dc96c589ef647ba6a5ab3610127556014bac1c9f4ff370e254d4e9ba",
+    "tests/fail/float_errors.vl": "009f845d623f315cb184e5c03aaebd3e457863fa5f2ec7481bb78c06158d6a92",
+    "tests/fail/generics_errors.vl": "d7aacd0172063c8f2de976739578ae0da7219a8513b9a06cb8b7817cb633ddb6",
+    "tests/fail/heap_type_errors.vl": "ccfc8efa1a547d752ae6077a9a0ffc9a4400dda21a49486413fd238ac2a6ab20",
+    "tests/long_literals_test.py": "6a097f3ddddc5cbfe25913a100547e6e7bb29d3fb5a187b041a73522d179500f",
+    "tests/m17_test.py": "f17a03baa79343949f9305f07df50ca6f1532c6ca2bfaea4d7afb89b7e730174",
+    "tests/m20_test.py": "a6bc6d43bb8fd2eceda74c848ad2334b624678e93a0b30d3c53ed8faf599a49a"
+  },
+  "compiler_sha256": {
+    "build/vela": "c48beefcacefeba25126c67f4e537208d6ba3c6d23707fc6a7b596a89596ff46",
+    "build/vela-native": "ff8ff05a1eef59be238cad253194b2b2db7538e6755e959fe776083dac98717f"
+  },
+  "guide": {
+    "bytes": 31989,
+    "sha256": "6b29a0e59602c0a20cc99add8a4cdca4c0e21336bc84246621e8c2b28aae224b",
+    "estimated_tokens_bytes_div_4": 7997.25,
+    "actual_model_tokens": null,
+    "tokenizer": null
+  },
+  "validation": [
+    {
+      "name": "bootstrap",
+      "command": "VELA_CACHE=$PWD/build/tooling/cache sh bootstrap/bootstrap.sh --update --native",
+      "exit_code": 0,
+      "checks_passed": null,
+      "log": "build/tooling-bootstrap.log",
+      "output": "generation 1: the seed, compiled by cc\ngeneration 2: built by generation 1\ngeneration 3: built by generation 2\nfixed point: generations 2 and 3 write identical C (  156427 lines)\nthe seed is updated\nbuilt build/vela\nnative 1: built by build/vela with VELA_BACKEND=native\nnative 2: built by native 1\nnative fixed point: natives 1 and 2 write identical assembly ( 2407543 lines)\nbuilt build/vela-native\n"
+    },
+    {
+      "name": "complete_c",
+      "command": "VELA_CACHE=$PWD/build/tooling/cache python3 -u run_tests.py --compiler build/vela --backend c --jobs 4",
+      "exit_code": 0,
+      "checks_passed": 310,
+      "log": "build/tooling-full-c.log",
+      "output": "310 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n"
+    },
+    {
+      "name": "native_compiler_selection",
+      "command": "VELA_CACHE=$PWD/build/tooling/cache python3 -u run_tests.py --compiler build/vela-native --backend native --jobs 4 tests/run/ tests/fail/ tests/dump/ tests/cli/ stage1/ cache_test m17_test m20_test long_literals_test",
+      "exit_code": 0,
+      "checks_passed": 279,
+      "log": "build/tooling-native.log",
+      "output": "279 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela-native)\n"
+    },
+    {
+      "name": "ubsan_selection",
+      "command": "python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ long_literals_test",
+      "exit_code": 0,
+      "checks_passed": 118,
+      "log": "build/tooling-ubsan.log",
+      "output": "118 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n",
+      "environment": {
+        "VELA_CACHE": "$PWD/build/tooling/cache",
+        "VELA_CFLAGS": "-Wall -Wextra -Werror -pedantic -Wno-unused-variable -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-tautological-compare -Wno-self-assign -g -fsanitize=undefined -fno-sanitize-recover=all",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      },
+      "scope": "C runtime fixtures; long-literal script also checks both C/native optimization modes with the instrumented C runtime; native instructions are not instrumented"
+    },
+    {
+      "name": "static",
+      "command": "python3 eval/static.py --vela build/vela --json eval/tooling-followup-static.json",
+      "exit_code": 0,
+      "checks_passed": null,
+      "log": "build/tooling-static.log",
+      "output": "Diagnostics in tests/fail: 373; with a code: 373; with a fix an agent can apply: 21\nTo read, README: 13,440 bytes, about 3,360 tokens\nTo read, README and walkthroughs: 754,762 bytes, about 188,690 tokens\nTo read, std: 44,567 bytes, about 11,141 tokens\nTo read, vela guide: 31,989 bytes, about 7,997 tokens\nQuestions vela query answers in one call: 10 of 12; partly 2; not at all 0\n  yes    What is the type of this name? (vela query type)\n  yes    Where is it defined? (vela query def)\n  yes    Where is it used? (vela query refs)\n  yes    What can go here? (vela query complete)\n  yes    Rename it without changing what any other name means (vela query rename)\n  yes    What is declared in this file? (vela query symbols)\n  yes    What does this function touch and promise? (vela query type: signature with uses, requires, ensures)\n  partly Who calls this function? (query impact lists conservative transitive dependents, including possible indirect callers)\n  yes    What is this module's public API? (vela query summary: public signatures, effects, contracts and types)\n  yes    Which tests cover this function? (vela query coverage TARGET --report REPORT uses measured Vela entry hits; without a report it lists static possibilities)\n  partly What breaks if I change this signature? (vela query impact lists potential dependencies; the proposed signature still needs type checking)\n  yes    What does this error mean, and how do I fix it? (vela explain CODE; vela check --json includes edits; vela fix applies them)\n"
+    }
+  ],
+  "actual_agent_trials": 0,
+  "outstanding_validation": [
+    "VAL-001",
+    "VAL-002",
+    "VAL-003",
+    "VAL-004",
+    "VAL-005",
+    "VAL-006"
+  ],
+  "limits": [
+    "No evaluation model/harness/tokenizer has been selected; self-tests and static metrics are not agent trials.",
+    "Foreign native-host execution and platform-specific acceptance remain open.",
+    "Historical M29 performance reports are unchanged; this is correctness/tooling validation, not a new performance matrix."
+  ]
+}

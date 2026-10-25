@@ -14,7 +14,7 @@
 // err: heap_type_errors.vl:41:14: error: a map cannot be looped over directly; loop over maps.keys(m) instead [E3052]
 // err: heap_type_errors.vl:43:14: error: cannot loop over Int; 'for ... in' needs an array, a Str or a range [E3053]
 // err: heap_type_errors.vl:45:20: error: maps.has needs a map, not [Int] [E3174]
-// err: heap_type_errors.vl:46:16: error: Map keys must be integers, Bool or Str, not [Int] [E3026]
+// err: heap_type_errors.vl:46:16: error: Map key [Int] does not implement Key; Key requires Eq: Eq.eq: expected fn([Int], [Int]) -> Bool; method is missing [E3026]
 // err: heap_type_errors.vl:47:15: error: operator '+' joins two Strs, found Str and Int [E3101]
 // err: heap_type_errors.vl:48:16: error: the bounds of a slice must be Int, found Bool [E3093]
 import maps

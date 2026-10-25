@@ -880,18 +880,18 @@ fn exists(path: Str) -> Bool uses os {
 // sees half of it. A cache that cannot be written is not an error.
 fn keep_runtime(object: Str, path: Str, tmp: Str) uses os {
     let partial = path + "." + modules.stem(tmp) + ".part"
-    match os.run(["mkdir", "-p", modules.dirname(path)]) {
-        Ok(code) => {
-            if code != 0 {
+    match processes.communicate(["mkdir", "-p", modules.dirname(path)], "", 65536, 3000) {
+        Ok(output) => {
+            if output.status != 0 {
                 return
             }
         }
         Err(_) => return
     }
-    match os.run(["cp", object, partial]) {
-        Ok(code) => {
-            if code == 0 {
-                let _ = os.run(["mv", "-f", partial, path])
+    match processes.communicate(["cp", object, partial], "", 65536, 3000) {
+        Ok(output) => {
+            if output.status == 0 {
+                let _ = processes.communicate(["mv", "-f", partial, path], "", 65536, 3000)
             }
         }
         Err(_) => {}

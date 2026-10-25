@@ -164,13 +164,45 @@ fn main() { let x = Item { n: 1 }; print(x.bump()); print(Item.show(x)); print(r
     assert command(c, env, 'fmt', p).stdout == formatted
 
 
+def obligations(c, work, env):
+    p = work/'obligation.vl'
+    item = 'type Item = struct { n: Int }\n'
+    eq = 'fn Item.eq(a: Item, b: Item) -> Bool { return a.n == b.n }\n'
+    key = 'fn main() { let m: Map[Item, Int] = [:] }\n'
+    cases = [
+        (item+key, 'E3026', ('Key requires Eq', 'Eq.eq', 'expected fn(Item, Item) -> Bool', 'missing')),
+        (item+eq+key, 'E3026', ('Key.hash', 'expected fn(Item) -> u64', 'missing')),
+        (item+eq+'fn Item.hash(x: Item) -> Int { return x.n }\n'+key,
+         'E3026', ('expected fn(Item) -> u64', 'found fn(Item) -> Int')),
+        (item+'fn Item.eq(a: Item, b: Int) -> Bool { return true }\n'+key,
+         'E3026', ('expected fn(Item, Item) -> Bool', 'found fn(Item, Int) -> Bool')),
+        (item+eq+'fn Item.hash(x: Item) -> u64 uses fs { return 0u64 }\n'+key,
+         'E3026', ('expected fn(Item) -> u64', 'found fn(Item) -> u64 uses fs')),
+        # Deferred declarations and inferred map literals use the same explanation.
+        (item+'type Index = struct { m: Map[Item, Int] }\n',
+         'E3026', ('Key requires Eq', 'Eq.eq', 'missing')),
+        (item+'fn main() { let m = [Item { n: 1 }: 2] }\n',
+         'E3116', ('Key requires Eq', 'Eq.eq', 'missing')),
+        (item+'type Parent = interface { fn read(x: Self) -> Int }\n'
+         'type Child = interface: Parent {}\n'
+         'fn Item.read(x: Item) -> Str { return "wrong" }\n'
+         'fn use[T: Child](x: T) {}\nfn main() { use(Item { n: 1 }) }\n',
+         'E3031', ('Child requires Parent', 'Parent.read', 'expected fn(Item) -> Int', 'found fn(Item) -> Str')),
+    ]
+    for source, code, fragments in cases:
+        p.write_text(source)
+        errors = json.loads(command(c, env, 'check', '--json', p, code=1).stdout)['errors']
+        matches = [e for e in errors if e['code'] == code]
+        assert matches and all(part in matches[0]['message'] for part in fragments), (source, errors)
+
+
 def main():
     c = Path(sys.argv[1] if len(sys.argv)>1 else ROOT/'build/vela').resolve()
     with tempfile.TemporaryDirectory(prefix='vela-m20-') as tmp:
         work = Path(tmp)
         env = {**os.environ,'VELA_BACKEND':'c','VELA_CACHE':str(work/'cache')}
         env.pop('VELA_ROOT',None)
-        for test in (acceptance,dispatch,rejected,tooling):
+        for test in (acceptance,dispatch,rejected,tooling,obligations):
             test(c,work,env)
             print('m20:',test.__name__,'passed',flush=True)
         if native_supported():

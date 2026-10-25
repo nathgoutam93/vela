@@ -19,6 +19,10 @@ in [the tooling backlog](tooling-backlog.md), with evidence, workarounds, and
 acceptance checks. Review it at milestone boundaries; it also tracks the
 remaining M17 validation.
 
+The [tooling follow-up before M30](tooling-followup-before-m30.md) records the
+local diagnostic, guide, loader, cache and long-literal fixes, separately from
+the outstanding agent-model and native-host validation.
+
 ## Design baseline through M30
 
 The [2026-10-25 scope decision](design-baseline-to-m30.md) accepts three

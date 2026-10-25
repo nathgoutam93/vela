@@ -75,6 +75,8 @@ type Gen = struct {
     closures: Int  // closures written so far in this C function, for names
     extra: [Str]  // C written before this function: its closures' environments and bodies
     wrappers: Map[Str, Str]  // functions used as values: wrapper definitions by name
+    long_strings: Map[Str, Str]  // immortal byte arrays, shared within this function
+    literal_prefix: Str  // function/type IDs and closure indices, never user names
     // Variables holding an array or map already made unique for a write
     // since the last block boundary, copy or call (M18): further writes to
     // them need no check. Forgotten when anything could share them.
@@ -95,11 +97,13 @@ type Gen = struct {
 
 fn new_gen(k: checker.Checked, l: layout.Layout, id: Int, params: [Int], args: [Int],
     instance_names: Map[Str, Str], cname: Str, env: ranges.Env) -> Gen {
+    let mut literal_prefix = "vs_f" + strings.from_int(id)
+    for arg in args { literal_prefix = literal_prefix + "_a" + strings.from_int(arg) }
     return Gen {
         k: k, l: l, filename: k.modules[k.fns[id].module].path, lines: [], depth: 1, temps: 0, names: [:],
         used: [:], frames: [], dead: false, current_fn: id, coverage: false, mode: 0, source: 0, params: params, args: args,
         instance_names: instance_names, cname: cname, captures: [:], closure_result: -2, closures: 0, extra: [],
-        wrappers: [:], unique: [], found: [], hoisted: [], cached: [:], env: env,
+        wrappers: [:], long_strings: [:], literal_prefix: literal_prefix, unique: [], found: [], hoisted: [], cached: [:], env: env,
     }
 }
 
@@ -379,6 +383,38 @@ pub fn c_string(data: Str) -> Str {
     }
     strings.add_byte(mut b, '"')
     return strings.build(b)
+}
+
+// C11 only guarantees 4095 bytes in a string literal, including adjacent
+// concatenated tokens. Static byte arrays preserve literal lifetime and NULs.
+fn string_literal(g: mut Gen, data: Str) -> Str {
+    return "VELA_STR(" + string_bytes(mut g, data) + ", " + strings.from_int(len(data)) + ")"
+}
+
+fn diagnostic_string(g: mut Gen, data: Str) -> Str {
+    if len(data) <= 4095 { return c_string(data) }
+    return "(const char *)" + string_bytes(mut g, data)
+}
+
+fn string_bytes(g: mut Gen, data: Str) -> Str {
+    if len(data) <= 4095 { return c_string(data) }
+    let mut name = ""
+    match maps.get(g.long_strings, data) {
+        Some(existing) => name = existing
+        None => {
+            name = g.literal_prefix + "_s" + strings.from_int(len(maps.keys(g.long_strings)))
+            g.long_strings[data] = name
+            let mut b = strings.builder()
+            strings.add(mut b, "static const uint8_t " + name + "[] = {\n")
+            for i in 0..len(data) {
+                strings.add(mut b, strings.from_int(int(data[i])) + ",")
+                if i % 24 == 23 { strings.add_byte(mut b, '\n') }
+            }
+            strings.add(mut b, "0};")
+            push(mut g.extra, strings.build(b))
+        }
+    }
+    return name
 }
 
 // ---- Output ----
@@ -1437,7 +1473,7 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
                 open(mut g, "{")
             }
         } else {
-            let tests = tests(g, a.pattern, v, t)
+            let tests = tests(mut g, a.pattern, v, t)
             let mut cond = strings.builder()
             for j in 0..len(tests) {
                 if j > 0 {
@@ -1535,7 +1571,7 @@ fn variant_ref(g: Gen, id: Int) -> [Int] {
 }
 
 // C conditions, all of which hold when the value at `path` matches `p`.
-fn tests(g: Gen, p: ast.Pattern, path: Str, t: Int) -> [Str] {
+fn tests(g: mut Gen, p: ast.Pattern, path: Str, t: Int) -> [Str] {
     let none: [Str] = []
     match p.kind {
         ast.PatternKind.Wild => return none
@@ -1549,7 +1585,7 @@ fn tests(g: Gen, p: ast.Pattern, path: Str, t: Int) -> [Str] {
                     return ["!" + path]
                 }
                 ast.ExprKind.StrLit(s) => {
-                    return ["vela_str_eq(" + path + ", VELA_STR(" + c_string(s) + ", " + strings.from_int(len(s)) + "))"]
+                    return ["vela_str_eq(" + path + ", " + string_literal(mut g, s) + ")"]
                 }
                 ast.ExprKind.IntLit(n) => return [path + " == " + integer_literal(n, t)]
                 ast.ExprKind.FixedIntLit(n, _, _) => return [path + " == " + integer_literal(n, t)]
@@ -1577,7 +1613,8 @@ fn tests(g: Gen, p: ast.Pattern, path: Str, t: Int) -> [Str] {
             let v = types.get(g.k.table, enum).variants[vi]
             let mut out = [path + ".tag == " + layout.tag(g.l, enum, v.name)]
             for i in 0..len(args) {
-                for t2 in tests(g, args[i], payload(g, path, enum, vi, i), v.payload[i]) {
+                let member = payload(g, path, enum, vi, i)
+                for t2 in tests(mut g, args[i], member, v.payload[i]) {
                     push(mut out, t2)
                 }
             }
@@ -1645,7 +1682,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             return value("false", t)
         }
         ast.ExprKind.StrLit(s) => {
-            return Value { c: "VELA_STR(" + c_string(s) + ", " + strings.from_int(len(s)) + ")", ty: t, owned: false,
+            return Value { c: string_literal(mut g, s), ty: t, owned: false,
                 is_static: true }
         }
         ast.ExprKind.UnitLit => return value("0", t)
@@ -1820,6 +1857,7 @@ fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
     let fname = "vc_" + name
     // The body, written by a generator of its own.
     let mut inner = new_gen(g.k, g.l, g.current_fn, g.params, g.args, g.instance_names, name, g.env)
+    inner.literal_prefix = g.literal_prefix + "_c" + strings.from_int(g.closures)
     inner.closure_result = info.result
     inner.filename = g.filename
     inner.mode = g.mode
@@ -2234,8 +2272,8 @@ fn mut_place(e: ast.Expr) -> ast.Expr {
 // that can be printed, the message shows both.
 // `kind` names the check in the panic: "assertion", "requires of 'f'"...
 fn assert_code(g: mut Gen, e: ast.Expr, cond: ast.Expr, kind: Str) {
-    let what = c_string(kind)
-    let text = c_string(ast.expr_text(cond))
+    let what = diagnostic_string(mut g, kind)
+    let text = diagnostic_string(mut g, ast.expr_text(cond))
     match cond.kind {
         ast.ExprKind.Binary(op, l, r) => {
             let t = ty(g, l)

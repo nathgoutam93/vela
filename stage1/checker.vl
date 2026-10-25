@@ -336,7 +336,7 @@ fn program(c: mut Checker, for_tests: Bool) {
     for use in c.key_uses {
         c.current = use.module
         if !key_type(c, use.actual) {
-            report(mut c, use.line, use.col, "E3026", "Map key " + show(c, use.actual) + " does not implement Key")
+            report(mut c, use.line, use.col, "E3026", key_failure(c, use.actual))
         }
     }
     for k in 0..len(c.order) {
@@ -704,7 +704,7 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
             }
             if !key_type(c, args[0]) && args[0] != types.ERROR() {
                 let k = t.args[0]
-                report(mut c, k.line, k.col, "E3026", "Map keys must be integers, Bool or Str, not " + show(c, args[0]))
+                report(mut c, k.line, k.col, "E3026", key_failure(c, args[0]))
                 return types.ERROR()
             }
             return types.map(mut c.table, args[0], args[1])
@@ -817,13 +817,7 @@ fn check_bounds(c: mut Checker, line: Int, col: Int, owner: Str, p: Int, t: Int)
         if satisfies(c, t, b) {
             continue
         }
-        let need = match b {
-            "Eq" => "to work with ==, as Int, Byte, Bool, Str and enums without values do"
-            "Ord" => "to be ordered by <, as Int, Byte, Float and Str are"
-            "Key" => "to be a map key: Int, Byte, Bool or Str"
-            _ => "to implement interface " + b
-        }
-        report(mut c, line, col, "E3031", owner + " needs " + pname + " " + need + ", but here " + pname + " is " + show(c, t))
+        report(mut c, line, col, "E3031", owner + " needs " + pname + ": " + b + ", but here " + pname + " is " + show(c, t) + "; " + failed_obligation(c, t, b, 0))
     }
 }
 
@@ -2406,7 +2400,7 @@ fn map_lit(c: mut Checker, e: ast.Expr, entries: [ast.MapEntry]) -> Int {
     let mut k = value(mut c, entries[0].key)
     let v = value(mut c, entries[0].value)
     if !key_type(c, k) && k != types.ERROR() {
-        report_at(mut c, entries[0].key, "E3116", "Map keys must be integers, Bool or Str, not " + show(c, k))
+        report_at(mut c, entries[0].key, "E3116", key_failure(c, k))
         k = types.ERROR()
     }
     for en in entries[1..len(entries)] {
@@ -4307,6 +4301,60 @@ fn satisfies_depth(c: Checker, t: Int, bound: Str, depth: Int) -> Bool {
         if types.plain(table, concrete) != types.plain(table, want) || !types.effects_within(a.effects, b.effects) { return false }
     }
     return true
+}
+
+fn key_failure(c: Checker, t: Int) -> Str {
+    return "Map key " + show(c, t) + " does not implement Key; " + failed_obligation(c, t, "Key", 0)
+}
+
+// Explain only a rejected bound. Keep successful conformance checks allocation
+// free of diagnostic text, and use the same lookup/substitution/effect rules.
+fn failed_obligation(c: Checker, t: Int, bound: Str, depth: Int) -> Str {
+    if types.is_param(c.table, t) { return "type parameter " + show(c, t) + " lacks bound " + bound }
+    if depth > 32 { return "interface obligation depth exceeded for " + bound }
+    let id = types.interface_id(c.table, bound)
+    if id < 0 { return "unknown interface " + bound }
+    let ti = types.get(c.table, id)
+    for parent in ti.bounds {
+        if !satisfies_depth(c, t, parent, depth + 1) {
+            return bound + " requires " + parent + ": " + failed_obligation(c, t, parent, depth + 1)
+        }
+    }
+    let mut table = c.table
+    let viewpoint = c.modules[c.current].name
+    for field in ti.fields {
+        let want = replace_self(mut table, field.ty, t)
+        let expected = bound + "." + field.name + ": expected " + types.show(table, want, viewpoint)
+        let dispatch = lookup_method(table, c.fns, c.modules, t, field.name)
+        if dispatch.fn_id < 0 {
+            let primitive_bound = intrinsic_bound(field.name)
+            if primitive_bound == "" || !intrinsic(table, t, primitive_bound) { return expected + "; method is missing" }
+            let core = types.interface_id(table, primitive_bound)
+            let actual = replace_self(mut table, types.get(table, core).fields[0].ty, t)
+            if types.plain(table, actual) != types.plain(table, want) || !types.effects_within(types.effects_of(table, actual), types.effects_of(table, want)) {
+                return expected + "; found intrinsic " + types.show(table, actual, viewpoint)
+            }
+            continue
+        }
+        let f = c.fns[dispatch.fn_id]
+        for arg in dispatch.args { if arg < 0 { return expected + "; method type arguments cannot be inferred" } }
+        if !f.decl.public && c.modules[f.module].name != ti.module && c.current != f.module { return expected + "; method is private" }
+        for i in 0..len(f.type_params) {
+            for need in types.get(table, f.type_params[i]).bounds {
+                if !satisfies_depth(c, dispatch.args[i], need, depth + 1) {
+                    return expected + "; method needs " + need + ": " + failed_obligation(c, dispatch.args[i], need, depth + 1)
+                }
+            }
+        }
+        let actual = types.func_with(mut table, f.params, f.result, f.decl.effects)
+        let concrete = types.subst(mut table, actual, f.type_params, dispatch.args)
+        let found = "; found " + types.show(table, concrete, viewpoint)
+        for mutable in f.mutable { if mutable { return expected + found + " with a mutable parameter" } }
+        if types.plain(table, concrete) != types.plain(table, want) || !types.effects_within(types.effects_of(table, concrete), types.effects_of(table, want)) {
+            return expected + found
+        }
+    }
+    return "unsatisfied interface " + bound
 }
 
 fn validate_interfaces(c: mut Checker) {

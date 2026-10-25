@@ -7,6 +7,7 @@ import integers
 import cffi
 import memops
 import sysops
+import sysio
 import files
 import lexer
 import maps
@@ -381,6 +382,15 @@ fn hides(ld: mut Loader, importer: Int, imp: ast.Import, path: Str, deps: [Str])
     let std_path = join(ld.std_dir, imp.name + ".vl")
     if normpath(std_path) == normpath(path) {
         return  // the program is in std/ itself
+    }
+    match sysio.canonical(std_path) {
+        Ok(standard) => {
+            match sysio.canonical(path) {
+                Ok(local) => { if standard == local { return } }
+                Err(_) => {}
+            }
+        }
+        Err(_) => {}
     }
     match read(ld, std_path) {
         Ok(_) => {

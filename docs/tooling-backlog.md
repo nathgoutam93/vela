@@ -305,7 +305,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-011: Explain the failed interface obligation in diagnostics
 
-- **Status:** deferred; discovered during M20.
+- **Status:** resolved in the pre-M30 tooling follow-up; discovered during M20.
 - **Evidence:** checking `type Item = struct { n: Int }` followed by
   `fn main() { let items: Map[Item, Int] = [:] }` reports E3026 with the
   legacy list "integers, Bool or Str". Generic E3031 failures name the bound
@@ -322,6 +322,18 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** missing eq/hash, incorrect result/parameter types, and
   effect mismatches each identify the failing obligation; valid custom keys
   stay accepted and the multi-error/JSON diagnostic suites remain useful.
+
+- **Pre-M30 implementation:** E3026/E3116 now explain Key and its Eq parent;
+  E3031 identifies the first failed parent/method, expected and actual
+  signatures/effects, visibility, mutability and generic-bound failures.
+  Diagnostic codes and conformance rules stay unchanged. Focused M20 checks
+  pass; final validation is recorded below.
+
+- **Final validation:** both bootstrap fixed points pass; the complete C suite
+  passes 310 checks, the native-built compiler selection passes 279, and
+  UBSan runtime/long-literal checks pass 118. See the
+  [walkthrough](tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/tooling-followup-validation.json).
 
 ### TL-012: Escaped scalar addresses must not retain range proofs
 
@@ -400,7 +412,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-016: Testing a std module can warn that it shadows its own dependency
 
-- **Status:** deferred; discovered in M22.
+- **Status:** resolved in the pre-M30 tooling follow-up; discovered in M22.
 - **Evidence:** `VELA_BACKEND=c build/vela-m22 test std/buffers.vl` warns
   that views.vl hides std/views.vl, although the imported file is that same
   standard module. The test passes. The entry program is inside std/, so its
@@ -415,6 +427,17 @@ the same entry. Close it with a commit or validation result; keep its history.
   retain the warning for a genuinely different local module.
 - **Acceptance:** direct std tests have no self-shadow warnings, and genuine
   local shadowing still emits E7005 in the existing diagnostic tests.
+
+- **Pre-M30 implementation:** compare canonical paths before E7005, retaining
+  lexical comparison and the existing behavior when canonicalization fails.
+  Focused M17 checks pass for relative/absolute std paths, a symlinked std
+  path and a genuinely different local text module. Final validation is recorded below.
+
+- **Final validation:** both bootstrap fixed points pass; the complete C suite
+  passes 310 checks, the native-built compiler selection passes 279, and
+  UBSan runtime/long-literal checks pass 118. See the
+  [walkthrough](tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/tooling-followup-validation.json).
 
 ### TL-017: Keep the expanded memory guide within its reading budget
 
@@ -562,7 +585,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-023: Long literals fail the strict C warning gate
 
-- **Status:** deferred; discovered during M23.
+- **Status:** resolved in the pre-M30 tooling follow-up; discovered during M23.
 - **Evidence:** the HTTP oversized-header oracle initially embedded 65,556
   bytes in one Vela literal. Under the suite's `-Wall -Wextra -Werror -pedantic`,
   generated VELA_STR receives Clang's overlength-string warning and E6002.
@@ -579,6 +602,28 @@ the same entry. Close it with a commit or validation result; keep its history.
   with the strict C flags in the 298-check suite and again under UBSan.
 - **Acceptance:** long literal boundary/escape/return/task cases compile under
   strict C flags and retain byte identity; native behavior still agrees.
+
+- **Pre-M30 recurrence:** the new strict-C regression found that assertion
+  source text also embeds the long expression as a C literal, even after
+  fixing expression/pattern values. This is observed compiler output, not
+  a suspected toolchain cause. Both paths now use NUL-terminated static byte
+  arrays above 4,095 bytes, with per-function reuse and immortal Str values.
+  tests/long_literals_test.py checks boundary lengths, NUL/UTF-8/escapes,
+  returned slices, captures, worker closures, nested patterns and test
+  assertions on C/native with optimization on/off. Focused checks pass;
+  final validation is recorded below.
+- **Pre-M30 review regression:** a user function named main_c1 and a worker
+  closure in main initially emitted the same byte-array symbol (reproduce
+  with >4,095-byte literals in both). The C compiler reports redefinition
+  and E6002. Array namespaces now use function/type IDs and explicit closure
+  indices, independent of user names. The small collision case is retained
+  in tests/long_literals_test.py; final validation is recorded below.
+
+- **Final validation:** both bootstrap fixed points pass; the complete C suite
+  passes 310 checks, the native-built compiler selection passes 279, and
+  UBSan runtime/long-literal checks pass 118. See the
+  [walkthrough](tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/tooling-followup-validation.json).
 
 ### TL-024: macOS network denial permits inert socket descriptors
 
@@ -682,7 +727,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-028: An unavailable default cache leaks mkdir stderr
 
-- **Status:** deferred; observed during the initial M26a intermediate build.
+- **Status:** resolved in the pre-M30 tooling follow-up; observed during the initial M26a intermediate build.
 - **Evidence:** build/vela build stage1/main.vl -o build/vela-m26a succeeded
   while printing mkdir: /Users/nathgoutam93/.cache/vela: Operation not permitted
   under the workspace sandbox. cached_runtime in stage1/main.vl attempts to
@@ -703,6 +748,18 @@ the same entry. Close it with a commit or validation result; keep its history.
   or emit an optional structured cache diagnostic while preserving real errors.
 - **Acceptance:** an inaccessible cache still builds correctly with intentional
   diagnostics, and a writable cache retains reuse/invalidation coverage.
+
+- **Pre-M30 implementation:** runtime cache mkdir/copy/rename now use bounded,
+  captured processes.communicate, matching the incremental cache convention.
+  Non-directory/unwritable cache cases build and run without stderr on both
+  local backends; writable reuse/invalidation and genuine compiler-error
+  visibility pass in tests/cache_test.py. Final validation is recorded below.
+
+- **Final validation:** both bootstrap fixed points pass; the complete C suite
+  passes 310 checks, the native-built compiler selection passes 279, and
+  UBSan runtime/long-literal checks pass 118. See the
+  [walkthrough](tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/tooling-followup-validation.json).
 
 ### TL-029: Native direct fixed-array assignment uses the growable-array ABI
 
@@ -945,6 +1002,14 @@ the same entry. Close it with a commit or validation result; keep its history.
   time/RSS are retained in bench/m29-real-programs.json. These are absolute
   measurements, not a claim that diagnostic bookkeeping has zero cost.
 
+- **Pre-M30 observation:** `build/vela check std/http.vl` correctly reports
+  E7009 for the best-effort socket.close calls in get_limit (source lines
+  105/106). This is an existing library cleanup-audit follow-up, not a
+  self-shadow regression or a failure of the discarded-Result diagnostic.
+  Workaround: review those outcomes when using the low-level cleanup API;
+  defer library handling/explicit-discard changes from this tooling pass.
+  Verify any later audit with the HTTP error-path and discarded-Result tests.
+
 ### TL-037: Guide contract purity exceeds the implemented check
 
 - **Status:** resolved during M28 under the accepted M30 baseline; discovered
@@ -1171,7 +1236,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-047: Result return-path oracles require pattern matching
 
-- **Status:** deferred guide/test-writing improvement; discovered during M27.
+- **Status:** resolved in the pre-M30 tooling follow-up; discovered during M27.
 - **Observed:** `assert(f()==Ok(2))` for a Result-returning f reports E3140
   because the constructor lacks context. Giving the expected value a Result
   type then reports E3099: Result values are not equality-comparable.
@@ -1185,6 +1250,18 @@ the same entry. Close it with a commit or validation result; keep its history.
   semantics change is proposed or authorized.
 - **Verify:** `tests/m27_test.py` return-path fixture matches Ok/Err explicitly
   and checks completed profile calls on both backends.
+
+- **Pre-M30 implementation:** the guide explicitly recommends matching
+  Result instead of equality. Its fake-filesystem example asserts both the
+  Ok payload and a propagated Err payload. M17 executable/installed guide
+  checks pass; output is 31,989 bytes (7,997.25 by bytes/4). Actual tokenizer
+  acceptance remains VAL-003; final validation is recorded below.
+
+- **Final validation:** both bootstrap fixed points pass; the complete C suite
+  passes 310 checks, the native-built compiler selection passes 279, and
+  UBSan runtime/long-literal checks pass 118. See the
+  [walkthrough](tooling-followup-before-m30.md) and
+  [source-bound evidence](../bench/tooling-followup-validation.json).
 
 ### TL-048: Legacy attribution harness omits later benchmark sizes
 
@@ -1611,6 +1688,10 @@ the same entry. Close it with a commit or validation result; keep its history.
   validation is not an actual agent trial. Run agents with COUNTEREXAMPLES.json
   as the supplied failure feedback and retain graded repairs, model/condition,
   turns and tokens before claiming M28’s agent-repair acceptance.
+- **Pre-M30 follow-up:** eval/README.md specifies an agent-neutral kit; no
+  evaluation model or harness has been selected in the repository. Actual
+  trials remain open while that choice is pending. Local compiler/guide
+  regressions do not count as model-driven trials.
 - **Workaround:** use the static metrics and seeded repair checks as
   implementation evidence; do not claim measured agent improvements.
 - **Required work:** compare the guide and prior documentation conditions on
@@ -1656,6 +1737,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   model-specific counting remains outstanding.
 - **M29 measurement:** the guide is 31,968 bytes, 7,992 by bytes/4, with
   incremental-cache controls documented. Actual tokenizer counting is open.
+- **Pre-M30 measurement:** Result assertion guidance fits in 31,989 bytes
+  (7,997.25 by bytes/4). No evaluation model/tokenizer is selected yet;
+  a tokenizer-specific count and its version remain required.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.
