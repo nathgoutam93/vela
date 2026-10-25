@@ -6,11 +6,12 @@ import os
 import packages
 import strings
 import text
-pub type Options = struct { allow: [Str], deny: [Str], rest: [Str], coverage: Str }
+pub type Options = struct { allow: [Str], deny: [Str], rest: [Str], coverage: Str, debug: Bool }
 pub fn parse(args: [Str], testing: Bool) -> Options uses os {
-    let mut allow: [Str] = []; let mut deny: [Str] = []; let mut coverage = ""; let mut i = 0
+    let mut allow: [Str] = []; let mut deny: [Str] = []; let mut coverage = ""; let mut debug = false; let mut i = 0
     for i < len(args) {
         let option = args[i]; if option == "--" { i = i + 1; break }
+        if option == "--debug" { debug = true; i = i + 1; continue }
         if option != "--allow" && option != "--deny" && option != "--coverage" { break }
         if i + 1 >= len(args) { fail("missing value after " + option) }; let value = args[i + 1]; i = i + 2
         if option == "--coverage" { if !testing || coverage != "" || value == "" { fail("--coverage REPORT is available once on test") }; coverage = value; continue }
@@ -18,7 +19,7 @@ pub fn parse(args: [Str], testing: Bool) -> Options uses os {
         if option == "--allow" { push(mut allow, value) } else { push(mut deny, value) }
     }
     if i >= len(args) { fail("missing source file") }
-    return Options { allow: allow, deny: deny, rest: args[i..len(args)], coverage: coverage }
+    return Options { allow: allow, deny: deny, rest: args[i..len(args)], coverage: coverage, debug: debug }
 }
 fn valid(value: Str, allow: Bool) -> Bool {
     if value == "fs" || value == "os" || value == "net" || value == "clock" || value == "unsafe" { return true }

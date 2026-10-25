@@ -1,0 +1,43 @@
+// Minimal DWARF4 source debugging for native output. The assembler supplies
+// the line table from .file/.loc; explicit CU/subprogram DIEs retain it in
+// Mach-O dSYMs and name Vela frames without exposing generated local layouts.
+import codegen
+import ir
+import maps
+import strings
+pub fn files(p: ir.Program) -> Map[Str, Int] {
+    let mut out: Map[Str, Int] = [:]
+    for f in p.funcs { if f.source != "" && !maps.has(out, f.source) { out[f.source] = len(out) + 1 } }
+    return out
+}
+pub fn prefix(darwin: Bool) -> Str { if darwin { return "LVD" }; return ".LVD" }
+pub fn header(p: ir.Program, darwin: Bool) -> Str {
+    let fs = files(p); if len(fs) == 0 { return "" }
+    let mut b = strings.builder()
+    for file in maps.keys(fs) { strings.add(mut b, ".file " + strings.from_int(fs[file]) + " " + codegen.c_string(file) + "\n") }
+    strings.add(mut b, prefix(darwin) + "start:\n"); return strings.build(b)
+}
+pub fn dwarf(p: ir.Program, darwin: Bool) -> Str {
+    let fs = files(p); if len(fs) == 0 { return "" }
+    let tag = prefix(darwin)
+    let mut abbrev = ".section .debug_abbrev,\"\",@progbits\n"
+    let mut info = ".section .debug_info,\"\",@progbits\n"
+    if darwin { abbrev = ".section __DWARF,__debug_abbrev,regular,debug\n"; info = ".section __DWARF,__debug_info,regular,debug\n" }
+    let mut b = strings.builder()
+    strings.add(mut b, abbrev + tag + "abbrev:\n")
+    // CU: name/string, stmt_list/sec_offset, low_pc/addr, high_pc/addr.
+    strings.add(mut b, ".uleb128 1\n.uleb128 17\n.byte 1\n.uleb128 3\n.uleb128 8\n.uleb128 16\n.uleb128 23\n.uleb128 17\n.uleb128 1\n.uleb128 18\n.uleb128 1\n.byte 0,0\n")
+    // Subprogram: name, low/high_pc, decl_file/data4, decl_line/data4.
+    strings.add(mut b, ".uleb128 2\n.uleb128 46\n.byte 0\n.uleb128 3\n.uleb128 8\n.uleb128 17\n.uleb128 1\n.uleb128 18\n.uleb128 1\n.uleb128 58\n.uleb128 6\n.uleb128 59\n.uleb128 6\n.byte 0,0\n.byte 0\n")
+    let mut abbrev_offset = "0"; let mut line_offset = "0"
+    if !darwin { abbrev_offset = tag + "abbrev"; line_offset = tag + "line" }
+    strings.add(mut b, info + ".long " + tag + "cuend-" + tag + "cuhead\n" + tag + "cuhead:\n.short 4\n.long " + abbrev_offset + "\n.byte 8\n.uleb128 1\n.asciz " + codegen.c_string(maps.keys(fs)[0]) + "\n.long " + line_offset + "\n.quad " + tag + "start\n.quad " + tag + "end\n")
+    for i in 0..len(p.funcs) {
+        let f = p.funcs[i]; if f.source == "" { continue }
+        let mut symbol = f.name; if darwin { symbol = "_" + symbol }
+        strings.add(mut b, ".uleb128 2\n.asciz " + codegen.c_string(f.display) + "\n.quad " + symbol + "\n.quad " + tag + strings.from_int(i) + "end\n.long " + strings.from_int(fs[f.source]) + "\n.long " + strings.from_int(f.source_line) + "\n")
+    }
+    strings.add(mut b, ".byte 0\n" + tag + "cuend:\n")
+    if !darwin { strings.add(mut b, ".section .debug_line,\"\",@progbits\n" + tag + "line:\n") }
+    return strings.build(b)
+}

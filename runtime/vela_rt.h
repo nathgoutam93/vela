@@ -29,6 +29,24 @@ typedef void (*vela_c_fn)(void);
 // some programs. This keeps clang from warning about the others.
 #define VELA_UNUSED __attribute__((unused))
 
+// M27 observation is opt-in; ordinary generated code has no scopes or calls.
+#ifdef VELA_OBSERVE
+void vela_observe_enter(const char *, const char *, int64_t, int64_t, const char *);
+void vela_observe_leave(void);
+void vela_observe_point(const char *, int64_t, int64_t);
+void vela_observe_init(int64_t, const char *);
+typedef struct { int active; } vela_observe_scope;
+static inline void vela_observe_cleanup(vela_observe_scope *s) { if (s->active) vela_observe_leave(); }
+#define VELA_OBSERVE_SCOPE(name, file, line, col, kind) \
+    vela_observe_scope vela_scope __attribute__((cleanup(vela_observe_cleanup), unused)) = \
+        (vela_observe_enter(name, file, line, col, kind), (vela_observe_scope){1})
+#endif
+#ifdef VELA_PROFILE
+#define VELA_PROFILE_SCOPE(kind) VELA_OBSERVE_SCOPE(__func__, "runtime", 0, 0, kind)
+#else
+#define VELA_PROFILE_SCOPE(kind) ((void)0)
+#endif
+
 // Stops the program: prints "<loc>: panic: <msg>" to stderr, exits with 101.
 // `loc` is the Vela source position, "file.vl:line:col".
 _Noreturn void vela_panic(const char *loc, const char *msg);
@@ -65,6 +83,7 @@ void *vela_alloc(size_t size);
 #endif
 
 static inline void vela_rc_inc(int64_t *rc) {
+    VELA_PROFILE_SCOPE("ref counting");
     int64_t n = __atomic_load_n(rc, __ATOMIC_RELAXED);
     if (__builtin_expect(n > 0, 1)) {
         *rc = n + 1;
@@ -75,6 +94,7 @@ static inline void vela_rc_inc(int64_t *rc) {
 
 // Drops a reference; true when it was the last, and the object must go.
 static inline bool vela_rc_dec(int64_t *rc) {
+    VELA_PROFILE_SCOPE("ref counting");
     int64_t n = __atomic_load_n(rc, __ATOMIC_RELAXED);
     if (__builtin_expect(n > 0, 1)) {
         *rc = n - 1;
@@ -86,6 +106,7 @@ static inline bool vela_rc_dec(int64_t *rc) {
 
 // Whether the object may be changed in place: one reference, one thread.
 static inline bool vela_rc_unique(int64_t *rc) {
+    VELA_PROFILE_SCOPE("copy-on-write");
     return __atomic_load_n(rc, __ATOMIC_RELAXED) == 1;
 }
 
@@ -93,6 +114,7 @@ static inline bool vela_rc_unique(int64_t *rc) {
 // it holds must be marked too; an object already shared holds only shared
 // objects.
 static inline bool vela_rc_share(int64_t *rc) {
+    VELA_PROFILE_SCOPE("ref counting");
     int64_t n = __atomic_load_n(rc, __ATOMIC_RELAXED);
     if (n <= 0) return false;
     *rc = -n;  // only this thread can see it yet
@@ -133,6 +155,7 @@ extern const vela_type vela_type_map;
 // members, and generated static assertions verify the contiguous layout.
 void *vela_fixed_array_at(void *base, int64_t i, int64_t length, int64_t size, const char *loc);
 static inline void *vela_fixed_at(void *base, int64_t i, int64_t length, size_t size, const char *loc) {
+    VELA_PROFILE_SCOPE("element access");
     if (__builtin_expect((uint64_t)i >= (uint64_t)length, 0)) vela_panic(loc, "index out of range");
     return (unsigned char *)base + (size_t)i * size;
 }
@@ -171,14 +194,17 @@ typedef struct vela_env {
 } vela_env;
 
 static inline void vela_env_retain(vela_env *e) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (e) vela_rc_inc(&e->rc);
 }
 
 static inline void vela_env_release(vela_env *e) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (e && vela_rc_dec(&e->rc)) e->drop(e);
 }
 
 static inline void vela_env_share(vela_env *e) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (e && vela_rc_share(&e->rc)) e->share(e);
 }
 
@@ -186,10 +212,12 @@ static inline void vela_env_share(vela_env *e) {
 #define VELA_STR(literal, n) ((vela_str){NULL, (const uint8_t *)(literal), (n)})
 
 static inline void vela_str_retain(vela_str s) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (s.obj) vela_rc_inc(&s.obj->rc);
 }
 
 static inline void vela_str_share(vela_str s) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (s.obj) vela_rc_share(&s.obj->rc);
 }
 
@@ -203,11 +231,13 @@ int vela_str_cmp_ptr(const vela_str *a, const vela_str *b);
 
 // s[i] for generated C, inline (M16b).
 static inline uint8_t vela_byte_at(vela_str s, int64_t i, const char *loc) {
+    VELA_PROFILE_SCOPE("element access");
     if (__builtin_expect((uint64_t)i >= (uint64_t)s.len, 0)) vela_panic(loc, "index out of range");
     return s.data[i];
 }
 // vela_str_slice inline, for generated C (M18).
 static inline vela_str vela_slice(vela_str s, int64_t lo, int64_t hi, const char *loc) {
+    VELA_PROFILE_SCOPE("strings");
     if (__builtin_expect(lo < 0 || hi > s.len || lo > hi, 0)) vela_panic(loc, "slice out of range");
     vela_str_retain(s);  // the slice shares the bytes, so it shares the object
     return (vela_str){s.obj, s.data + lo, hi - lo};
@@ -243,6 +273,7 @@ typedef struct vela_pool {
 extern _Thread_local vela_pool vela_pools;
 
 static inline void *vela_box_alloc(size_t size) {
+    VELA_PROFILE_SCOPE("allocation");
 #ifndef VELA_SANITIZED
     size_t c = (size - 1) / 8;
     if (c < VELA_POOL_CLASSES) {
@@ -259,6 +290,7 @@ static inline void *vela_box_alloc(size_t size) {
 }
 
 static inline void vela_box_free(void *p, size_t size) {
+    VELA_PROFILE_SCOPE("allocation");
 #ifndef VELA_SANITIZED
     size_t c = (size - 1) / 8;
     if (c < VELA_POOL_CLASSES && vela_pools.count[c] < VELA_POOL_BYTES / (int64_t)((c + 1) * 8)) {
@@ -284,6 +316,7 @@ typedef struct vela_array {
 vela_array *vela_array_new(const vela_type *elem, int64_t cap);
 
 static inline void vela_array_retain(vela_array *a) {
+    VELA_PROFILE_SCOPE("ref counting");
     vela_rc_inc(&a->rc);
 }
 
@@ -337,21 +370,25 @@ void vela_memory_write_native(vela_array *a, int64_t offset, int64_t width, bool
 // them out of loops. Each calls the runtime only on its slow path. `size`
 // is the element's size, a constant where they are used.
 static inline void *vela_at(vela_array *a, int64_t i, size_t size, const char *loc) {
+    VELA_PROFILE_SCOPE("element access");
     if (__builtin_expect((uint64_t)i >= (uint64_t)a->len, 0)) vela_panic(loc, "index out of range");
     return a->data + size * (size_t)i;
 }
 
 // vela_at for an array whose data and length a loop keeps in locals (M18).
 static inline void *vela_at_in(unsigned char *data, int64_t len, int64_t i, size_t size, const char *loc) {
+    VELA_PROFILE_SCOPE("element access");
     if (__builtin_expect((uint64_t)i >= (uint64_t)len, 0)) vela_panic(loc, "index out of range");
     return data + size * (size_t)i;
 }
 
 static inline void vela_unique(vela_array **ap) {
+    VELA_PROFILE_SCOPE("copy-on-write");
     if (__builtin_expect(!vela_rc_unique(&(*ap)->rc), 0)) vela_array_unique(ap);
 }
 
 static inline void vela_push(vela_array *a, const void *elem, size_t size) {
+    VELA_PROFILE_SCOPE("push");
     if (__builtin_expect(a->len == a->cap, 0)) vela_array_grow(a);
     memcpy(a->data + size * (size_t)a->len, elem, size);
     a->len++;
@@ -379,6 +416,7 @@ typedef struct vela_map {
 vela_map *vela_map_new(const vela_type *key, const vela_type *value);
 
 static inline void vela_map_retain(vela_map *m) {
+    VELA_PROFILE_SCOPE("ref counting");
     vela_rc_inc(&m->rc);
 }
 
@@ -388,6 +426,7 @@ void vela_map_release(vela_map *m);
 void vela_map_unique(vela_map **m);
 // vela_map_unique's check inline, for generated C (M16b).
 static inline void vela_unique_map(vela_map **mp) {
+    VELA_PROFILE_SCOPE("copy-on-write");
     if (__builtin_expect(!vela_rc_unique(&(*mp)->rc), 0)) vela_map_unique(mp);
 }
 // A pointer to the value for key, or NULL if there is none.

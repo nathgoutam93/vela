@@ -406,7 +406,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-017: Keep the expanded memory guide within its reading budget
 
-- **Status:** resolved in M22, extended through M24.
+- **Status:** resolved in M22, extended through M27.
 - **Evidence:** the first M22 `build/vela-m22 guide` output is 37,751 bytes,
   exceeding the existing 32,000-byte / estimated-8,000-token integration gate.
   New library signatures and rules add to repeated per-builtin explanation.
@@ -440,6 +440,13 @@ the same entry. Close it with a commit or validation result; keep its history.
   bytes. Compact platform prose while retaining target/data-model/WASI-limit
   information; final generated guide is 31,975 bytes (7,994 estimated tokens).
   This does not close the actual tokenizer measurement in VAL-003.
+
+- **M27 recurrence/resolution:** the first debugging/profile guide reached
+  32,077 bytes. At 32,010 bytes, five guide gates still fail in the first
+  full C suite. Compact repeated command prose while retaining the new
+  flags, panic format and elapsed-time limits. The final guide is 31,963
+  bytes; guide/installation gates pass in the clean 306-check C suite.
+  Actual tokenization remains VAL-003.
 
 ### TL-018: Select benchmark input generators by name
 
@@ -561,6 +568,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   sandbox_apply; running the same probe outside that sandbox works.
 - **Impact:** runtime checks and Seatbelt alone cannot establish the literal
   C socket-creation acceptance on this macOS host.
+- **M27 recurrence:** profile-with-denied-fs/os acceptance reproduces nested
+  sandbox initialization failure (E6011) inside the outer sandbox. The same
+  acceptance executes outside it; no policy is weakened for profiling.
 - **Workaround:** run OS-policy probes outside the outer sandbox and distinguish
   descriptor creation from bind/connect/send in assertions.
 - **Resolution:** deny socket creation using Linux seccomp; fail closed
@@ -657,6 +667,11 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Impact:** a successful compilation emits a low-level permission message,
   which can be mistaken for a compiler failure.
 - **Workaround:** set VELA_CACHE to a writable build/ directory on this host.
+- **M27 recurrence:** the default Vela cache again prints mkdir permission
+  stderr in the workspace sandbox; set VELA_CACHE=build/cache-m27. Wasmtime
+  50 also cannot create its default user cache here and exits before guest
+  execution; retain the M26 harness convention `run -C cache=n`. This is a
+  runner cache failure, not a failed WASI program.
 - **Proposed improvement:** suppress expected mkdir stderr on cache fallback
   or emit an optional structured cache diagnostic while preserving real errors.
 - **Acceptance:** an inaccessible cache still builds correctly with intentional
@@ -1067,6 +1082,97 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** local and cross target oracles execute max-size/unsigned-long
   round trips and pointer-slot guard checks for the corresponding widths.
 
+### TL-045: Native line directives alone lose Darwin source breakpoints
+
+- **Status:** resolved during M27; regression coverage in tests/m27_test.py.
+- **Observed:** assembling a function with `.file`/`.loc` and `cc -g
+  -gdwarf-4`, linking it and running `dsymutil` warns that no debug symbols
+  are present; LLDB cannot resolve the `.vl` breakpoint. The object has a
+  line table but lacks a compilation unit/subprogram description.
+- **Reproduction:** native `build --debug` source breakpoint acceptance in
+  `python3 tests/m27_test.py build/vela-m27`; the initial standalone probe
+  used build/m27/dwarf-probe.s and `lldb -b -o 'breakpoint set -f
+  dwarf-probe.vl -l 3' build/m27/dwarf-probe`.
+- **Impact:** `.loc` output can look plausible without usable source debugging.
+- **Workaround:** generated C debug output while native metadata is developed.
+- **Resolution:** emit minimal DWARF4 CU/subprograms with the assembler line
+  table, CFI for native frames, and retain a dSYM before deleting temporary
+  objects for either backend. VELA_DSYMUTIL selects a cross-toolchain utility.
+- **M27 cross-link recurrence:** dwarfdump --verify on Zig-linked native
+  Linux output finds invalid abbreviations/statement offsets when startup
+  objects precede the Vela object. Object-local zero offsets are not ELF
+  linked-section offsets. Use relocations to abbreviation/line-table labels
+  for ELF; retain Mach-O object-local offsets consumed by dsymutil. Verify
+  the linked executable with startup/runtime debug units present.
+- **Verify:** inspect DWARF, resolve the breakpoint, then execute and step on
+  `.vl` lines with an actual debugger. Cross-link inspection alone is not
+  debugger execution acceptance on a foreign platform.
+
+### TL-046: Expanded C statements drift from their Vela source lines
+
+- **Status:** resolved during M27.
+- **Observed:** a `#line` directive once per Vela statement resolves a line-2
+  breakpoint, but LLDB step-over stops at line 4 instead of the line-3 return.
+  Generated temporaries and observation calls consume C source lines.
+- **Reproduction:** `VELA_M27_DEBUGGER=1 python3 tests/m27_test.py build/vela-m27`,
+  C backend `step` fixture, breakpoint line 2 followed by thread step-over.
+- **Impact:** misleading stepping and caller locations despite a valid breakpoint.
+- **Workaround:** inspect generated C until the source maps are corrected.
+- **Resolution:** repeat the active Vela source line for every generated C
+  statement and reset generated wrappers away from user source paths.
+- **Verify:** actual LLDB breakpoint, backtrace and step-over at lines 2 and 3
+  on both backends; retain source metadata while cleaning temporary objects.
+
+### TL-047: Result return-path oracles require pattern matching
+
+- **Status:** deferred guide/test-writing improvement; discovered during M27.
+- **Observed:** `assert(f()==Ok(2))` for a Result-returning f reports E3140
+  because the constructor lacks context. Giving the expected value a Result
+  type then reports E3099: Result values are not equality-comparable.
+  These diagnostics are valid; the first alone did not reveal both constraints.
+- **Impact:** the initial M27 early-return fixture needed two edits before it
+  expressed the intended return-value oracle.
+- **Workaround:** `match f(){Ok(n)=>assert(n==2),Err(_)=>assert(false)}`;
+  match the error branch separately when checking propagation.
+- **Proposed improvement:** add a compact guide/test-authoring example for
+  Result assertions when documentation budget allows. No type or equality
+  semantics change is proposed or authorized.
+- **Verify:** `tests/m27_test.py` return-path fixture matches Ok/Err explicitly
+  and checks completed profile calls on both backends.
+
+### TL-048: Legacy attribution harness omits later benchmark sizes
+
+- **Status:** resolved during M27's attribution acceptance.
+- **Observed source:** bench/profile.py selected all twelve BENCHES, but SIZES
+  covered only the original eight. The `SIZES[b.name]` access had no entry for
+  varints, arena_trees, sha256 or crc32. This is a source-inspected missing-key
+  path; no Valgrind instruction measurement is claimed on this Mac.
+- **Impact:** the legacy all-benchmark path cannot select the added workloads;
+  the initial M27 reproduction needed its own temporary harness.
+- **Workaround:** name one of the original eight explicitly.
+- **Resolution:** preserve original sizes and fall back to existing benchmark
+  quick sizes for later entries. Add --instrumented using vela profile, the
+  same categories, complete-call checks and independent C output oracles.
+- **Verify:** `python3 bench/profile.py --instrumented --backend c --json
+  bench/m27-attribution-c.json` and the native counterpart cover all twelve
+  without Valgrind. Instruction counts remain a separate legacy measurement.
+
+### TL-049: Profile clock-fake acceptance belongs in a runtime fixture
+
+- **Status:** resolved in M27's test harness.
+- **Observed:** `vela profile` rejects a main containing `with clock=[0,0]`
+  with E3038: effect fakes only work in tests. A late fixture addition caused
+  the initial native suite to report 305 passes/one failure; this was an
+  invalid fixture, not a compiler regression.
+- **Impact:** an ordinary profile program cannot test fake-clock independence
+  through test-only syntax.
+- **Workaround/resolution:** use the existing C runtime fake-clock API in the
+  observation boundary fixture; keep language restrictions unchanged.
+- **Verify:** tests/fixtures/m27/observe.c fake-clock mode produces positive
+  work/wall timing with a frozen Vela clock; tests/m27_test.py checks the
+  report and also checks fail-closed behavior for an unavailable real clock.
+  Rerun the corrected M27 acceptance, retaining the original native result.
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
@@ -1176,6 +1282,14 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** record host, compiler/toolchain, commit, commands, and actual
   results. Keep any failures open instead of inferring a pass from C or UBSan.
 
+- **M27 local evidence:** 118 selected runtime/observation checks pass UBSan,
+  including C/native trace/profile/closure/task/cache/boundary acceptance.
+  Native instructions remain outside C sanitizer instrumentation. An empty
+  macOS ASan executable still hangs with detect_leaks=0 and is killed after
+  10 seconds; this is recorded as unavailable, not a sanitizer pass.
+  The same-source macOS release parity gate passes at 1.4604556; this does not
+  close the remaining Linux native-host sanitizer/kernel/performance checks.
+
 ### VAL-002: Measure M17 with agents
 
 - **Status:** open; carried from M17.
@@ -1282,3 +1396,27 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** retained native Windows commands/results and a complete
   passing supported-suite inventory, with unavailable native-emitter/kernel
   profiles named separately.
+
+### VAL-006: Native-host M27 debugging and observability acceptance
+
+- **Status:** open; discovered in M27. The user requested proceeding without
+  the native host; this does not close M26 VAL-001/VAL-004/VAL-005.
+- **Evidence:** macOS ARM64 C/native LLDB breakpoint, backtrace and step-over
+  acceptance passes, including a controlled panic deep in copied compiler
+  sources. C Linux/Windows/WASI and native Linux cross-debug links pass
+  dwarfdump verification; WASI JSON panic executes in wasmtime 50. All twelve
+  quick attribution workloads match independent C output on both local
+  backends. These do not establish native foreign debugger execution.
+- **Impact:** foreign native-host debugger behavior, thread timing and tool
+  integration cannot be inferred from source metadata or emulator execution.
+- **Workaround:** use locally executed macOS debug/profile paths and retain
+  cross-link/WASI evidence with explicit execution limits.
+- **Required work:** on Linux x86-64 run both backends with
+  VELA_M27_DEBUGGER=1 VELA_M27_COMPILER_PANIC=1, gdb installed, and the full
+  supported suite. On native Windows run C debug/profile acceptance, inspect
+  PE DWARF with the platform debugger, hit/step .vl lines, and verify copied
+  compiler panic/Unicode paths/tasks/report writes. Validate cross-building
+  debug outputs from Linux. Retain runtime/profile sanitizer evidence.
+- **Acceptance:** record host/toolchain/source identities, executable debugger
+  sessions and successful platform/profile inventory. Keep inherited M26
+  platform/kernel/performance gaps separate from these M27 checks.

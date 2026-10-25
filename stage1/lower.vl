@@ -103,6 +103,7 @@ type Fn = struct {
     closures: Int
     frames: [Frame]
     dead: Bool  // right after a return, break or continue
+    observe: Bool
     sret: Int  // the register with where the result goes, when it is in memory; -1 otherwise
     env: ranges.Env
     hoisted: Map[Int, Bool]
@@ -122,6 +123,8 @@ type Low = struct {
     cstrs: Map[Str, Str]  // the label of each C string
     made: Map[Str, Bool]  // functions written on demand (wrappers, thunks), by symbol
     descs: Map[Int, Str]  // descriptors written, by type
+    mode: Int
+    report: Str
     coverage: Bool
     param_ranges: [[ranges.Range]]
     envs: Map[Int, ranges.Env]
@@ -130,7 +133,7 @@ type Low = struct {
 fn new_fn(name: Str, result: Int) -> Fn {
     return Fn {
         f: ir.new_func(name, result), filename: "", current_fn: -1, params: [], args: [], cname: name, locals: [:],
-        captures: [:], closure_result: -2, closures: 0, frames: [], dead: false, sret: -1, taken: [:], env: ranges.new_env([]), hoisted: [:], cached: [:],
+        captures: [:], closure_result: -2, closures: 0, frames: [], dead: false, observe: false, sret: -1, taken: [:], env: ranges.new_env([]), hoisted: [:], cached: [:],
     }
 }
 
@@ -138,9 +141,10 @@ fn new_fn(name: Str, result: Int) -> Fn {
 
 // The IR of a program, or of `vela test`'s program (`for_tests`), or the
 // errors only making the generic copies finds.
-pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] { return lower_mode(checked, for_tests, false) }
-pub fn lower_coverage(checked: checker.Checked) -> Result[ir.Program, [errors.CompileError]] { return lower_mode(checked, true, true) }
-fn lower_mode(checked: checker.Checked, for_tests: Bool, coverage: Bool) -> Result[ir.Program, [errors.CompileError]] {
+pub fn lower(checked: checker.Checked, for_tests: Bool) -> Result[ir.Program, [errors.CompileError]] { return lower_mode(checked, for_tests, false, 0, "") }
+pub fn lower_coverage(checked: checker.Checked) -> Result[ir.Program, [errors.CompileError]] { return lower_mode(checked, true, true, 0, "") }
+pub fn lower_observed(k: checker.Checked, tests: Bool, coverage: Bool, mode: Int, report: Str) -> Result[ir.Program, [errors.CompileError]] { return lower_mode(k, tests, coverage, mode, report) }
+fn lower_mode(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int, report: Str) -> Result[ir.Program, [errors.CompileError]] {
     let mut k = checker.erased(checked)
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
@@ -178,7 +182,7 @@ fn lower_mode(checked: checker.Checked, for_tests: Bool, coverage: Bool) -> Resu
     let l = layout.new_layout(k.table, user_types, elements)
     let mut g = Low {
         k: k, l: l, shapes: [:], instance_names: [:], fs: new_fn("", -1), funcs: [], data: [], strs: [:], cstrs: [:],
-        made: [:], descs: [:], coverage: coverage, param_ranges: ranges.analyze(k), envs: [:],
+        made: [:], descs: [:], mode: mode, report: report, coverage: coverage, param_ranges: ranges.analyze(k), envs: [:],
     }
     // The copies of generic functions are named as codegen.vl names them.
     let mut taken: Map[Str, Bool] = [:]
@@ -236,6 +240,7 @@ fn entry(g: mut Low, for_tests: Bool, tests: [Int]) {
     let argc = ir.param(mut g.fs.f, ir.INT())
     let argv = ir.param(mut g.fs.f, ir.INT())
     ccall(mut g, "vela_init", [argc, argv], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+    if g.mode > 0 { ccall(mut g, "vela_observe_init", [konst(mut g, g.mode), cptr(mut g, g.report)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }
     if !for_tests {
         call(mut g, "f_main", [], -1)
         ret(mut g, konst(mut g, 0))
@@ -273,6 +278,14 @@ fn finish(g: mut Low) {
 // ---- Emitting ----
 
 fn emit(g: mut Low, i: ir.Inst) {
+    // Preserve attribution for primitives normally expanded into instructions.
+    if g.mode == 2 && (i.op == ir.Op.RcInc || i.op == ir.Op.RcDec || i.op == ir.Op.Copy) {
+        let mut call = ir.inst(ir.Op.CCall, i.dst, -1, -1, ir.RET_NONE())
+        call.sym = "vela_native_rc_inc"; call.args = [i.a]; call.kinds = [ir.KIND_INT()]
+        if i.op == ir.Op.RcDec { call.sym = "vela_native_rc_dec"; call.imm = ir.RET_BOOL() }
+        if i.op == ir.Op.Copy { call.sym = "vela_observe_copy"; call.args = [i.a, i.b, konst(mut g, i.imm)]; call.kinds = [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()] }
+        ir.add(mut g.fs.f, call); return
+    }
     ir.add(mut g.fs.f, i)
 }
 
@@ -315,6 +328,7 @@ fn fail_unless(g: mut Low, c: Int, fail: Int) {
 }
 
 fn ret(g: mut Low, r: Int) {
+    if g.fs.observe { ccall(mut g, "vela_observe_leave", [], [], ir.RET_NONE(), -1) }
     emit(mut g, ir.inst(ir.Op.Ret, -1, r, -1, 0))
 }
 
@@ -1391,6 +1405,7 @@ fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
         let t = local_ty(g, lid)
         param_local(mut g, lid, t, f.decl.params[i].mutable)
     }
+    observe_enter(mut g, codegen.display_name(g.k, id), f.decl.line, f.decl.col)
     if g.coverage { ccall(mut g, "vela_coverage_hit", [konst(mut g, id)], [ir.KIND_INT()], ir.RET_NONE(), -1) }
     for r in f.decl.requires {
         push_frame(mut g, "stmt")
@@ -1468,7 +1483,21 @@ fn block(g: mut Low, b: ast.Block, kind: Str) {
     pop_frame(mut g)
 }
 
+fn cptr(g: mut Low, value: Str) -> Int { return sym_addr(mut g, cstring(mut g, value)) }
+fn observe_source(g: mut Low, line: Int, col: Int) {
+    if g.mode == 0 { return }
+    let mut i = ir.inst(ir.Op.Source, -1, -1, -1, line); i.imm2 = col; i.sym = g.fs.filename; emit(mut g, i)
+    if g.mode == 1 { ccall(mut g, "vela_observe_point", [cptr(mut g, g.fs.filename), konst(mut g, line), konst(mut g, col)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }
+}
+fn observe_enter(g: mut Low, name: Str, line: Int, col: Int) {
+    if g.mode == 0 { return }
+    g.fs.observe = true; g.fs.f.source = g.fs.filename; g.fs.f.source_line = line; g.fs.f.display = name
+    let args = [cptr(mut g, name), cptr(mut g, g.fs.filename), konst(mut g, line), konst(mut g, col), cptr(mut g, "program")]
+    ccall(mut g, "vela_observe_enter", args, [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+    observe_source(mut g, line, col)
+}
 fn stmt(g: mut Low, s: ast.Stmt) {
+    observe_source(mut g, s.line, s.col)
     match s.kind {
         ast.StmtKind.Block(b) => {
             block(mut g, b, "block")
@@ -2568,6 +2597,7 @@ fn closure_value(g: mut Low, e: ast.Expr, body: ast.Block) -> Val {
             push(mut g.fs.frames[0].items, Item { v: g.fs.locals[lid], ty: pt, restore: "", saved: -1 })
         }
     }
+    observe_enter(mut g, codegen.display_name(g.k, saved.current_fn) + "::<closure@" + strings.from_int(e.line) + ":" + strings.from_int(e.col) + ">", e.line, e.col)
     for s in body.stmts {
         stmt(mut g, s)
     }

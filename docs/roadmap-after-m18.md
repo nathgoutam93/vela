@@ -205,6 +205,11 @@ do not substitute for those execution gates.
 
 ## M27: Debugging and observability
 
+**Status:** implemented and locally validated; native-host acceptance remains
+open. See [the walkthrough](m27-observability.md). Proceeding at the user's request while
+native hosts are unavailable; M26 acceptance gaps remain open. M27 foreign
+debugger execution is tracked separately as VAL-006.
+
 **Needs:** M25 and M26 (debug information for both backends, on every platform).
 
 **What gets built:** Debugging and observability: source-level debugging (#line and DWARF, so gdb and lldb step through .vl), panics with a Vela stack trace, also as JSON for agents, and vela profile (time per Vela function).

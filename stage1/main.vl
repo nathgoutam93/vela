@@ -60,6 +60,7 @@ import lower
 import lsp
 import modules
 import opt
+import profile_report
 import os
 import packages
 import parser
@@ -147,6 +148,7 @@ fn main() {
         check_json(args[3], root)
         return
     }
+    if command == "profile" { profile_command(args[2..len(args)], root); return }
     if command == "run" || command == "test" {
         let options = capabilities.parse(args[2..len(args)], command == "test")
         let path = options.rest[0]
@@ -178,22 +180,23 @@ fn main() {
 }
 
 fn target_command(command: Str, words: [Str], root: Str) uses fs, os {
-    let mut path = ""; let mut output = ""; let mut target = ""; let mut at = 0
+    let mut path = ""; let mut output = ""; let mut target = ""; let mut at = 0; let mut mode = 0
     for at < len(words) {
         let word = words[at]; at = at + 1
+        if word == "--debug" { mode = 1; continue }
         if word == "--target" || word == "-o" || word == "--output" {
             if at >= len(words) { usage() }; let value = words[at]; at = at + 1
             if word == "--target" { if target != "" { usage() }; target = targets.normalize(value) } else { if command != "build" || output != "" { usage() }; output = value }
         } else { if path != "" || len(word) > 0 && word[0] == '-' { usage() }; path = word }
     }
     if path == "" { usage() }
-    if command == "asm" { targets.require_native(target); let out = targets.program(lowered(path, native_program(path, checked_target(path, root, false, target), false)), target); print(out[0..len(out) - 1]); return }
+    if command == "asm" { targets.require_native(target); let out = targets.program(lowered(path, observed_program(path, checked_target(path, root, false, target), false, false, mode, "")), target); print(out[0..len(out) - 1]); return }
     if output == "" { output = default_output(path) }
-    build_from(path, output, root, false, checked_target(path, root, false, target), link_flags(path), target)
+    build_observed(path, output, root, false, checked_target(path, root, false, target), link_flags(path), target, mode, "")
 }
 
 fn usage() uses os {
-    os.eprint("usage: vela (build | run | test | c | ir | asm | check | tokens | ast | fmt | query) FILE, vela rename, vela lsp, " +
+    os.eprint("usage: vela (build | run | test | profile | c | ir | asm | check | tokens | ast | fmt | query) FILE, vela rename, vela lsp, " +
         "vela get, vela new, vela explain CODE, vela fix [--dry-run] FILE, or vela guide")
     os.exit(2)
 }
@@ -441,13 +444,42 @@ fn build(path: Str, exe: Str, root: Str, quick: Bool) uses fs, os {
 }
 // Admission and generation use the same immutable source/link snapshot.
 fn build_from(path: Str, exe: Str, root: Str, quick: Bool, k: checker.Checked, libraries: [Str], target: Str) uses fs, os {
+    build_observed(path, exe, root, quick, k, libraries, target, 0, "")
+}
+fn build_observed(path: Str, exe: Str, root: Str, quick: Bool, k: checker.Checked, libraries: [Str], target: Str, mode: Int, report: Str) uses fs, os {
+    let mut optimization = "-O2"; if mode == 1 { optimization = "-O0" }
     if native(quick) {
         targets.require_native(target)
-        let p = lowered(path, native_program(path, k, false))
-        assemble(targets.program(p, target), modules.stem(path), exe, root, "-O2", libraries, target)
+        let p = lowered(path, observed_program(path, k, false, false, mode, report))
+        assemble_mode(targets.program(p, target), modules.stem(path), exe, root, optimization, libraries, target, mode)
         return
     }
-    compile(c_code(path, codegen.generate(k)), modules.stem(path), exe, root, "-O2", libraries, target)
+    let mut made = codegen.generate(k)
+    if mode > 0 { made = codegen.generate_observed(k, false, false, mode, report) }
+    compile_mode(c_code(path, made), modules.stem(path), exe, root, optimization, libraries, target, mode)
+}
+fn observed_program(path: Str, k: checker.Checked, tests: Bool, coverage: Bool, mode: Int, report: Str) -> Result[ir.Program, [errors.CompileError]] uses os {
+    if mode > 0 { return lower.lower_observed(k, tests, coverage, mode, report) }
+    if coverage { return coverage_program(k) }
+    return native_program(path, k, tests)
+}
+fn observation_flags(mode: Int) -> [Str] {
+    if mode == 0 { return [] }
+    let mut out = ["-DVELA_OBSERVE", "-g", "-gdwarf-4", "-fno-omit-frame-pointer", "-fno-optimize-sibling-calls"]
+    if mode == 1 { push(mut out, "-O0") } else { push(mut out, "-DVELA_PROFILE") }
+    return out
+}
+// Mach-O links keep references to object DWARF. Retain a dSYM while the
+// scratch objects still exist, for C and native output alike.
+fn retain_debug(exe: Str, target: Str, mode: Int) uses os {
+    if mode == 0 || targets.selected(target) != "aarch64-apple-darwin" { return }
+    let mut tool = "dsymutil"; match os.env("VELA_DSYMUTIL") { Some(t) => tool = t, None => {} }
+    match os.run([tool, exe, "-o", exe + ".dSYM"]) { Ok(c) => { if c == 0 { return } }, Err(_) => {} }
+    driver_error("cannot retain debug symbols; install dsymutil or set VELA_DSYMUTIL")
+}
+fn remove_executable(exe: Str, debug: Bool) uses fs, os {
+    files.remove(exe)
+    if debug && targets.host() == "aarch64-apple-darwin" { os.run(["rm", "-rf", exe + ".dSYM"]) }
 }
 
 // VELA_BACKEND=c or VELA_BACKEND=native picks the backend. Otherwise `vela
@@ -505,6 +537,9 @@ fn lowered(path: Str, made: Result[ir.Program, [errors.CompileError]]) -> ir.Pro
 // Assembly into a scratch directory, assembled by the C compiler at the
 // same time as it compiles the runtime (optimizing at `opt`), then linked.
 fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str], target: Str) uses fs, os {
+    assemble_mode(asm, stem, exe, root, opt, libraries, target, 0)
+}
+fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str], target: Str, mode: Int) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
@@ -517,6 +552,7 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]
         Some(f) => { for word in split_flags(f) { push(mut flags, word) } }
         None => {}
     }
+    for flag in observation_flags(mode) { push(mut flags, flag) }
     let runtime = modules.join(root, "runtime")
     let source = modules.join(tmp, stem + ".s")
     match files.write(source, asm) {
@@ -538,6 +574,7 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]
     let have = cached != "" && exists(cached)
     let mut assembler = compiler
     for f in targets.assembly_flags(target) { push(mut assembler, f) }
+    if mode > 0 { push(mut assembler, "-g"); push(mut assembler, "-gdwarf-4") }
     for word in ["-c", source, "-o", program_o] { push(mut assembler, word) }
     let mut commands = [assembler, rt]
     if have { commands = [assembler] }
@@ -583,6 +620,7 @@ fn assemble(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str]
             Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + e + ")")
         }
     }
+    if len(failed) == 0 { retain_debug(exe, target, mode) }
     for f in [source, program_o, runtime_o] {
         if f != cached {
             files.remove(f)
@@ -613,6 +651,9 @@ fn c_code(path: Str, generated: Result[Str, [errors.CompileError]]) -> Str uses 
 // need (types, memory functions, prototypes). Building the compiler takes
 // a third of the time on four cores.
 fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str], target: Str) uses fs, os {
+    compile_mode(c_source, stem, exe, root, opt, libraries, target, 0)
+}
+fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [Str], target: Str, mode: Int) uses fs, os {
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
@@ -625,6 +666,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [
         Some(f) => { for word in split_flags(f) { push(mut flags, word) } }
         None => {}
     }
+    for flag in observation_flags(mode) { push(mut flags, flag) }
     let runtime = modules.join(root, "runtime")
     // -pthread: the runtime runs tasks on threads.
     let mut base = compiler
@@ -705,6 +747,7 @@ fn compile(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: [
     if len(failed) == 0 && cached != "" && !have {
         keep_runtime(objects[len(objects) - 1], cached, tmp)
     }
+    if len(failed) == 0 { retain_debug(exe, target, mode) }
     // The scratch directory goes either way.
     for f in written {
         files.remove(f)
@@ -782,7 +825,7 @@ fn cached_runtime(root: Str, cc: Str, opt: Str, flags: [Str], target: Str) -> St
     }
     let mut b = strings.builder()
     strings.add(mut b, targets.selected(target) + "\n" + cc + "\n" + opt + "\n" + join_words(flags) + "\n")
-    for name in ["vela_rt.c", "vela_rt.h", "vela_int.h", "vela_sys.inc", "vela_policy.inc", "vela_threads.h", "vela_policy_portable.inc", "vela_windows.h", "vela_windows_net.h", "vela_windows_process.inc"] {
+    for name in ["vela_rt.c", "vela_rt.h", "vela_observe.inc", "vela_int.h", "vela_sys.inc", "vela_policy.inc", "vela_threads.h", "vela_policy_portable.inc", "vela_windows.h", "vela_windows_net.h", "vela_windows_process.inc"] {
         match files.read(modules.join(modules.join(root, "runtime"), name)) {
             Ok(t) => strings.add(mut b, t)
             Err(_) => return ""
@@ -890,13 +933,14 @@ fn run(path: Str, args: [Str], root: Str, options: capabilities.Options) uses fs
         Err(e) => driver_error(e)
     }
     let exe = modules.join(tmp, "program")
-    build_from(path, exe, root, true, k, libraries, "")
+    let mut mode = 0; if options.debug { mode = 1 }
+    build_observed(path, exe, root, true, k, libraries, "", mode, "")
     let mut command = [exe]
     for a in args {
         push(mut command, a)
     }
     let result = sysio.sandbox_run(command, options.allow, options.deny)
-    files.remove(exe)
+    remove_executable(exe, options.debug)
     files.remove(tmp)
     match result {
         Ok(code) => os.exit(code)
@@ -1097,14 +1141,15 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
     let exe = modules.join(tmp, "tests")
     // Tests are built often and run briefly, so the C compiler does not
     // optimize: building the compiler's own tests takes 3 s instead of 20.
+    let mut mode = 0; if options.debug { mode = 1 }
     if native(true) {
-        let mut made = native_program(path, k, true)
-        if options.coverage != "" { made = coverage_program(k) }
-        assemble(targets.program(lowered(path, made), ""), modules.stem(path) + "_tests", exe, root, "-O0", libraries, "")
+        let made = observed_program(path, k, true, options.coverage != "", mode, "")
+        assemble_mode(targets.program(lowered(path, made), ""), modules.stem(path) + "_tests", exe, root, "-O0", libraries, "", mode)
     } else {
         let mut made = codegen.generate_tests(k)
         if options.coverage != "" { made = codegen.generate_coverage_tests(k) }
-        compile(c_code(path, made), modules.stem(path) + "_tests", exe, root, "-O0", libraries, "")
+        if mode > 0 { made = codegen.generate_observed(k, true, options.coverage != "", mode, "") }
+        compile_mode(c_code(path, made), modules.stem(path) + "_tests", exe, root, "-O0", libraries, "", mode)
     }
     let mut results: [json.Json] = []
     let mut failed = 0
@@ -1128,12 +1173,12 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
                     failed = failed + 1
                 }
             }
-            Err(e) => { files.remove(events); files.remove(exe); files.remove(tmp); capabilities.fail(e) }
+            Err(e) => { files.remove(events); remove_executable(exe, options.debug); files.remove(tmp); capabilities.fail(e) }
         }
     }
     files.remove(modules.join(tmp, "hits"))
     if options.coverage != "" { match agent_queries.report(k, results) { Ok(data) => { match files.write(options.coverage, json.pretty(data)) { Ok(_) => {}, Err(e) => driver_error(e) } }, Err(e) => driver_error(e) } }
-    files.remove(exe)
+    remove_executable(exe, options.debug)
     files.remove(tmp)
     let n = len(chosen)
     let mut summary = strings.from_int(n) + " tests"
@@ -1207,4 +1252,32 @@ fn link_flags(path: Str) -> [Str] uses fs, os {
 
 fn coverage_program(k: checker.Checked) -> Result[ir.Program, [errors.CompileError]] uses os {
     match lower.lower_coverage(k) { Ok(p) => { match os.env("VELA_OPT") { Some("0") => return Ok(p), _ => {} }; return Ok(opt.optimize(p)) }, Err(e) => return Err(e) }
+}
+
+// Profile artifacts are driver-owned output, with the same narrow runtime
+// write grant used by coverage. User fs/os/net restrictions remain enforced.
+fn profile_command(words: [Str], root: Str) uses fs, os {
+    let mut report = ""; let mut args: [Str] = []; let mut i = 0
+    for i < len(words) {
+        if words[i] == "--json" { if report != "" || i+1 >= len(words) { usage() }; report = words[i+1]; i = i+2; continue }
+        if words[i] == "--allow" || words[i] == "--deny" { if i+1 >= len(words) { usage() }; push(mut args, words[i]); push(mut args, words[i+1]); i = i+2; continue }
+        for word in words[i..len(words)] { push(mut args, word) }; break
+    }
+    let options = capabilities.parse(args, false)
+    for denied in options.deny { if denied == "clock" { capabilities.fail("profiling requires clock access") } }
+    let path = options.rest[0]; let k = checked(path, root); let libraries = link_flags(path)
+    capabilities.admit(k, options, libraries, false)
+    let mut tmp = ""; match files.temp_dir() { Ok(d) => tmp = d, Err(e) => driver_error(e) }
+    let persistent = report != ""; if !persistent { report = modules.join(tmp, "profile.json") }
+    // Create/truncate before launch; a stale report cannot pass as this run.
+    match files.write(report, "") { Ok(_) => {}, Err(e) => driver_error(e) }
+    let exe = modules.join(tmp, "profile")
+    build_observed(path, exe, root, true, k, libraries, "", 2, report)
+    let mut command = [exe]; for arg in options.rest[1..len(options.rest)] { push(mut command, arg) }
+    let mut allows = options.allow; push(mut allows, "coverage:" + report)
+    let result = sysio.sandbox_run(command, allows, options.deny)
+    let mut valid = false
+    match files.read(report) { Ok(data) => { valid = profile_report.show(data); }, Err(_) => {} }
+    remove_executable(exe, true); if !persistent { files.remove(report) }; files.remove(tmp)
+    match result { Ok(code) => { if code != 0 { os.exit(code) }; if !valid { driver_error("program exited without a valid profile report") } }, Err(e) => capabilities.fail(e) }
 }

@@ -58,6 +58,8 @@ type Gen = struct {
     frames: [Frame]
     dead: Bool  // true right after a return, break or continue
     current_fn: Int
+    mode: Int
+    source: Int
     coverage: Bool
     // In a copy of a generic function, its type parameters and what they
     // are in this copy; empty otherwise.
@@ -94,7 +96,7 @@ fn new_gen(k: checker.Checked, l: layout.Layout, id: Int, params: [Int], args: [
     instance_names: Map[Str, Str], cname: Str, env: ranges.Env) -> Gen {
     return Gen {
         k: k, l: l, filename: k.modules[k.fns[id].module].path, lines: [], depth: 1, temps: 0, names: [:],
-        used: [:], frames: [], dead: false, current_fn: id, coverage: false, params: params, args: args,
+        used: [:], frames: [], dead: false, current_fn: id, coverage: false, mode: 0, source: 0, params: params, args: args,
         instance_names: instance_names, cname: cname, captures: [:], closure_result: -2, closures: 0, extra: [],
         wrappers: [:], unique: [], found: [], hoisted: [], cached: [:], env: env,
     }
@@ -108,13 +110,13 @@ type ArmCode = enum {
 }
 
 pub fn generate(checked: checker.Checked) -> Result[Str, [errors.CompileError]] {
-    return program(checked, false, false)
+    return program(checked, false, false, 0, "")
 }
 
 // The C for `vela test`: the program's tests, and a main that runs the one
 // whose number it is given (its index in test_ids).
 pub fn generate_tests(checked: checker.Checked) -> Result[Str, [errors.CompileError]] {
-    return program(checked, true, false)
+    return program(checked, true, false, 0, "")
 }
 
 // The tests `vela test` runs: those of the main module, and of every module
@@ -132,9 +134,11 @@ pub fn test_ids(k: checker.Checked) -> [Int] {
 }
 
 // The C, or the errors only making the generic copies finds.
-pub fn generate_coverage_tests(checked: checker.Checked) -> Result[Str, [errors.CompileError]] { return program(checked, true, true) }
+pub fn generate_coverage_tests(checked: checker.Checked) -> Result[Str, [errors.CompileError]] { return program(checked, true, true, 0, "") }
 
-fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool) -> Result[Str, [errors.CompileError]] {
+pub fn generate_observed(k: checker.Checked, tests: Bool, coverage: Bool, mode: Int, report: Str) -> Result[Str, [errors.CompileError]] { return program(k, tests, coverage, mode, report) }
+
+fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int, report: Str) -> Result[Str, [errors.CompileError]] {
     let mut k = checker.erased(checked)
     // The functions that are not generic are all written; generic ones only
     // as the copies they are called as. Tests only for `vela test`.
@@ -249,6 +253,7 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool) -> Result[
         }
         let mut g = new_gen(k, l, id, params, args, instance_names, name, flow_envs[id])
         g.coverage = coverage
+        g.mode = mode
         let lines = function(mut g, id, name)
         // Where the driver may cut the C into parts compiled in parallel:
         // before each function, with the closures written for it.
@@ -304,6 +309,7 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool) -> Result[
             strings.add_byte(mut b, '\n')
         }
         strings.add(mut b, out[i])
+        if mode > 0 && out[i] == "    vela_init(argc, argv);" { strings.add(mut b, "\n    vela_observe_init(" + strings.from_int(mode) + ", " + c_string(report) + ");") }
     }
     return Ok(strings.build(b))
 }
@@ -375,6 +381,7 @@ pub fn c_string(data: Str) -> Str {
 // ---- Output ----
 
 fn emit(g: mut Gen, line: Str) {
+    if g.mode > 0 && g.source > 0 && !(len(line) > 0 && line[0] == '#') { push(mut g.lines, source_line(g.filename, g.source)) }
     if line == "" {
         return  // a retain or release of a value that needs none
     }
@@ -683,6 +690,7 @@ fn release_until(g: mut Gen, stop: Str) {
 
 fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
     let f = g.k.fns[id]
+    observe_scope(mut g, display_name(g.k, id), f.decl.line, f.decl.col)
     if g.coverage { emit(mut g, "vela_coverage_hit(" + strings.from_int(id) + ");") }
     push_frame(mut g, "function")
     let mut names: [Str] = []
@@ -709,11 +717,14 @@ fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
         ensures_code(mut g, "")
     }
     pop_frame(mut g)
-    let mut out = [prototype(g.k, g.l, id, names, g.params, g.args, cname) + " {"]
+    let mut out: [Str] = []
+    if g.mode > 0 { push(mut out, source_line(g.filename, f.decl.line)) }
+    push(mut out, prototype(g.k, g.l, id, names, g.params, g.args, cname) + " {")
     for line in g.lines {
         push(mut out, line)
     }
     push(mut out, "}")
+    if g.mode > 0 { push(mut out, "#line 1 \"<vela-generated>\"") }
     return out
 }
 
@@ -749,12 +760,27 @@ fn block(g: mut Gen, b: ast.Block, kind: Str) {
     pop_frame(mut g)
 }
 
+pub fn display_name(k: checker.Checked, id: Int) -> Str {
+    let f = k.fns[id]; let module = k.modules[f.module].name
+    if module == "" { return f.decl.name }; return module + "." + f.decl.name
+}
+fn source_line(file: Str, line: Int) -> Str { return "#line " + strings.from_int(line) + " " + c_string(file) }
+fn observe_scope(g: mut Gen, name: Str, line: Int, col: Int) {
+    if g.mode == 0 { return }
+    g.source = line
+    emit(mut g, "VELA_OBSERVE_SCOPE(" + c_string(name) + ", " + c_string(g.filename) + ", " + strings.from_int(line) + ", " + strings.from_int(col) + ", \"program\");")
+}
 fn stmt(g: mut Gen, s: ast.Stmt) {
+    let saved_source = g.source; g.source = s.line
+    if g.mode > 0 {
+        if g.mode == 1 { emit(mut g, "vela_observe_point(" + c_string(g.filename) + ", " + strings.from_int(s.line) + ", " + strings.from_int(s.col) + ");") }
+    }
     match s.kind {
         ast.StmtKind.Block(b) => {
             open(mut g, "{")
             block(mut g, b, "block")
             close(mut g, "}")
+            g.source = saved_source
             return
         }
         _ => {}
@@ -763,6 +789,7 @@ fn stmt(g: mut Gen, s: ast.Stmt) {
     push_frame(mut g, "stmt")
     stmt_body(mut g, s)
     pop_frame(mut g)
+    g.source = saved_source
 }
 
 fn stmt_body(g: mut Gen, s: ast.Stmt) {
@@ -1790,6 +1817,8 @@ fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
     let mut inner = new_gen(g.k, g.l, g.current_fn, g.params, g.args, g.instance_names, name, g.env)
     inner.closure_result = info.result
     inner.filename = g.filename
+    inner.mode = g.mode
+    observe_scope(mut inner, display_name(g.k, g.current_fn) + "::<closure@" + strings.from_int(e.line) + ":" + strings.from_int(e.col) + ">", e.line, e.col)
     for i in 0..len(info.captures) {
         inner.captures[info.captures[i]] = "(env->c" + strings.from_int(i) + ")"
     }
@@ -1847,6 +1876,7 @@ fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
         push(mut g.extra, "}")
     }
     push(mut g.extra, "")
+    if g.mode > 0 { push(mut g.extra, source_line(g.filename, e.line)) }
     push(mut g.extra, "static " + c_type(g, sub(g, info.result)) + " " + fname + "(" + strings.build(params) + ") {")
     if n > 0 {
         push(mut g.extra, "    " + env + " *env = (" + env + " *)env_;")
@@ -1857,6 +1887,7 @@ fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
         push(mut g.extra, line)
     }
     push(mut g.extra, "}")
+    if g.mode > 0 { push(mut g.extra, "#line 1 \"<vela-generated>\"") }
     if n == 0 {
         return store(mut g, t, "(" + c_type(g, t) + "){ .fn = " + fname + ", .env = NULL }")
     }

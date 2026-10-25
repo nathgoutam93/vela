@@ -1,0 +1,4158 @@
+{
+  "measurement": "instrumented monotonic elapsed nanoseconds",
+  "backend": "c",
+  "quick": true,
+  "source_sha256": {
+    "bench/arena_trees/main.c": "790c8477cee0dc85f9691d660d37df9131a2396c308ca41dd3cf2716176abbd8",
+    "bench/arena_trees/main.rs": "5a6fe7ee4db16c8654e60caa62b66675a266522c88e3990c157f3983f90579c4",
+    "bench/arena_trees/main.vl": "119a5a953a399f31d490c8be0a4d4a6f0abbea92597d2134fb78ea614bc63f46",
+    "bench/binarytrees/main.c": "807b5207d2e2c909c27a7cd38abc6be7ec8d4dbcaea5f53df09f56e117dd67e9",
+    "bench/binarytrees/main.rs": "18a3f5a701027b80a412ae9c10de12fb2bbe95728fc111b23ad615f87a8717b9",
+    "bench/binarytrees/main.vl": "e3c6a0ca77d1fe82d2faf94934b62c9b0c3117bab8ecb565a33168750362dfc7",
+    "bench/crc32/crc32.vl": "940fa4bc09d8d34ab68ac3fe6df50e70981cbec778b472d827deb62b1f558e57",
+    "bench/crc32/main.c": "64bf516e5d8779b1eedc2e1f021988e1b1e1c3fe342c856911728fa3b4ab62db",
+    "bench/crc32/main.rs": "74a089aa854974eeaf33918a7219fbbd26a9db4b4d45e809df8285b07de8887f",
+    "bench/crc32/main.vl": "659c723a12dbaaf51a65f34d887ec4c65db0596c79af9fbc001b2b82cf535dc5",
+    "bench/fannkuch/main.c": "a1ec5b5c667ece096aa1f2cd04739f76593eea2b43b6372d3058dba6bff0e13e",
+    "bench/fannkuch/main.rs": "3e626af496e38f6b47aa64c539c7d2aecdec033962b6be9c512f5cae516baf9f",
+    "bench/fannkuch/main.vl": "2cb271ad4643034b362d6a8c1a4d91bb3a8cd64be2b37773c277eff0d85e4e90",
+    "bench/fasta/main.c": "03be9f68bd99069af99047436911e760b9d5fb86632ee043a6c70149eaea2792",
+    "bench/fasta/main.rs": "cdff5a5b3d25cf183a8835afd5fb9327e05eb417e4938be4cc7e81460b27b354",
+    "bench/fasta/main.vl": "ee59d048bb7cf3938a8e8225b9e7a5b082e65beeec3467e701ec094219ad8e67",
+    "bench/knucleotide/main.c": "affc9b77f4f43c8301716674e5d33a587a05a02154874e4f579dbc03353a58e0",
+    "bench/knucleotide/main.rs": "39f67eef31b7507d1be74ab6bca7effb41d6847fd1358ad5bb9a7f08d900e056",
+    "bench/knucleotide/main.vl": "5e4a06d16bdf96665e2089a48d7d96652323effe14790953b0e82a34dc6677f0",
+    "bench/mandelbrot/main.c": "70fcbd2ecab80142938a24ff3ba7377fe481ce3ddeb7eba6e99310faf522952d",
+    "bench/mandelbrot/main.rs": "b9db05ae4fa127c31230d8df33b975e6f3aa1dc3fcf1f8f67b19706062011870",
+    "bench/mandelbrot/main.vl": "5a255fd48f78acf90834f647e3a41e086acda9eef15ea0bcd86dc7a655dcd742",
+    "bench/nbody/main.c": "8fcbc5b9479a1586461e0615c34358abbc7b9fd39847372567ab22b09fcb3f7f",
+    "bench/nbody/main.rs": "ebb2be9217c923cc0f109aa96682640208ee8d38e0daa8f01c3ade522f7ecaa0",
+    "bench/nbody/main.vl": "3d4c424478aacba2f38f2bf85a11b7b11a3d695a26c6a03e3afa4ae6d9b9fb8a",
+    "bench/run.py": "6ac49fe6e47b84a52a22761a11ba30844d67f713cc4ce7c98800573e4d965fdc",
+    "bench/sha256/main.c": "1b870bbf6256a16fe2288cc52d03ca3165d91796982d670eafaa3237866bd436",
+    "bench/sha256/main.rs": "42ba06a4758adff7ec42a7db64a4dd10dbc8ced5cb4cdf61774dee852bfd7ae4",
+    "bench/sha256/main.vl": "4e2e40e32af28142fd28a32eaabee00c3ec7f209a5ec3e4b26b87e1392c66858",
+    "bench/sha256/sha256.vl": "b6c34fef785be9a10097bf16a3b265b3dfc9a899dd9b33a7a511bf301429fcd3",
+    "bench/spectralnorm/main.c": "d01b6c87575c26a2e5afa31df0caed6d73a08981c6153486fc1a32748098adc3",
+    "bench/spectralnorm/main.rs": "9ec719ecc97c466308a5e6c0fbfe4a723470f51276e77fea15a628586b655b78",
+    "bench/spectralnorm/main.vl": "c4f949bd409afbd7c1ae84ef6516959db85cbea9ef9e222adc6776f1c3ee44c6",
+    "bench/varints/main.c": "c17814b48cb1c11279da2d1641c5a84f3362d83b719fbb328a95b8299b119640",
+    "bench/varints/main.rs": "6972054b0f58eb681ec5234991904832106baa63fa23be309c9f5d99c10de584",
+    "bench/varints/main.vl": "04bfc7d67540aa0f8090b52d3e890fc27629d6cea1aa1653dbc401011486162d",
+    "bench/varints/varints.vl": "7ceb978c501c606f14d4ff850945de76d90513406bd239700ec5414d2beeb2bf",
+    "bench/wordfreq/main.c": "7789ed080b0ddb73b56ef481655117e012993932bf04bd9fc077a2e02ea32bb2",
+    "bench/wordfreq/main.rs": "0f5adc4d239d122d3880af961131bb4324299f6c588e024932ee2736f8b3eb00",
+    "bench/wordfreq/main.vl": "7f68b12f36f130d2de2390916275c19b10a266ff4e580abca835b48369cb74ff",
+    "packages/json/json.vl": "051aa549e7b25729d53678c28cb49291e5168c37648ac96e188787eda4d241e0",
+    "packages/json/vela.mod": "e6ac090348f113d70cc4e564e211901c9b8a82d43e26e844d2af3c865568794b",
+    "runtime/vela_int.h": "e600cfd5cab132401aba9e03b5e4a3c45995c33cbbab7f8b581739a258d74059",
+    "runtime/vela_observe.inc": "ae3c346990f4364ec53bf48b42515e435c2c6a2bbff13195cd14cc6ddb2b1721",
+    "runtime/vela_policy.inc": "9990ac63b5540c3af53f62a28a7b5b15053d2d42a5ce3086183d78073229fb94",
+    "runtime/vela_policy_portable.inc": "1737295f17af3f86658850d28134a6131387b09a279431340f4e11ad31ccc84d",
+    "runtime/vela_rt.c": "d24fceec9edbb529d463edb077b8ea20902de546781840a572fe757fb507236e",
+    "runtime/vela_rt.h": "63a3401c2f13319029b972395ccbe79170f4ea04a0f71d6afb64370f81014a11",
+    "runtime/vela_sys.inc": "70523051a017c1718f25e96fadaa60ac8c2a7e61edbd1cc209066f61b54c73be",
+    "runtime/vela_threads.h": "ac583b3dd0069704b12f2aaa6bf4c0ef282111e7004814ac8306a67b8558f3db",
+    "runtime/vela_windows.h": "e630e02b37a51eca8cfd64d811171734033d83019b0d01f9c01f01155bc225dc",
+    "runtime/vela_windows_net.h": "16591563be67a14e5ff84d4e5e680c700e24f4645c9893071cf67b0e72420e15",
+    "runtime/vela_windows_process.inc": "70dc8c7c9f23874f69c1ae8db52c1f0795d8e1f24029c1a8b942e4dfd2643d9d",
+    "stage1/agent_queries.vl": "9a717de947f1ea4fbf4ad677fa9b6ca731cb15351fb13e59d61ebee84e503bc6",
+    "stage1/arm64.vl": "a47e94634e9c1d03a0587a049b879154570c07dce2c232d1b6f638aa92287be1",
+    "stage1/ast.vl": "71be5595bf344c9ed88c60276e59789cda435bccc8d19b753b46d68a4fa8b45a",
+    "stage1/bits.vl": "8e14141f4f203c1850984ff0355df3d69092ac62327602eeed4fef93314f0b96",
+    "stage1/call_graph.vl": "07cf773d2aa93e647983787bfcfcbde08a6aed430e8296d4d8aa7017d2ffd18a",
+    "stage1/capabilities.vl": "e5c364e8570ce6083091560d0a193205e5639832e123fbf6f909518dd061c821",
+    "stage1/cffi.vl": "6b98f14d1e4d85b4a595de6337fa258387fee7160d4e9df2a3816abcedb7f636",
+    "stage1/chars.vl": "c42a95f8a5cb41d535981094761ccd447db7eb643ba40a8449b3504e7e7652d9",
+    "stage1/checker.vl": "20cf1f165b97cd92bd725ba1ef3aa7cd2cf131b9f1c00b790b839d60995465bd",
+    "stage1/codegen.vl": "e5a557e96806e6e4513a5e7cfe65eff660cf3400859b0e40aa10f85f189ad563",
+    "stage1/complete.vl": "99507944d5e2a03249b93154e4dede64c68c5f2d4d8990fee683882bc7b8e4f8",
+    "stage1/debug_info.vl": "afbc5d8080374561aebcfae0ba7c0e84c492b4c085d26dc454ca737ab96ea8ae",
+    "stage1/diagnostics.vl": "49c10e8e6c75c0e356aa454946f101007ea117380edee91f320dea01f0b8b94c",
+    "stage1/errors.vl": "2a31eea563f9ea1b591e700955c82c1ee887bd24b4797bb7c9eb3d5d733a8e27",
+    "stage1/fixer.vl": "7370240f796cc19c3e6b38f0e03dc66061d0e6343154f29b31e7a7d9ac87a2a8",
+    "stage1/format.vl": "d8a7a58a851aa909e1e7818a8850888c11998c25c8eee56915cad77c93b5baf0",
+    "stage1/guide.vl": "ad137d9e72a6b558a0303a952702b9b191019ffd3045af6d4dee41f180a97f8c",
+    "stage1/index.vl": "974652e9ab5dc963a75fb241ec58f771100efddb58f69f1abf6151e5fb0ba258",
+    "stage1/integers.vl": "8a580cd712b592475ea30bb4fd06ce61dc033c1183ebb77cad55a7b5b9865012",
+    "stage1/interfaces.vl": "990c820ed20895079cc23b0a926d935f32844d30919da49fb91d8f8875af110f",
+    "stage1/ir.vl": "8d39afd8a1b8e606a26764485411cc9805b5187a90ccd81a7346a1c17c95a3d4",
+    "stage1/layout.vl": "2556147fbf66b348ec4b5b00926fdabc0c32b4030f4bd88598ce7eaee5e16b24",
+    "stage1/lexer.vl": "b253ef64ffe1a5e5f8466e666c8379010eba177c28d2a619d7a6d666ebfcc2e3",
+    "stage1/live.vl": "fb1c6d41eca98fcc39f4c65667bbe43642f3042183d7510707494a8b62ecdda9",
+    "stage1/loops.vl": "b0286f5dd7d9edf08d9a6b0a63f97a4638d4f3a00a8a48447c6f436057859a59",
+    "stage1/lower.vl": "3b4c631d0ea04682eef7414c7fc0c89b894229add62a129be95d2a6f2f60d1d1",
+    "stage1/lsp.vl": "4c5d880e580b92557dfffcd9eabf6fccc7c3d78130b83148e58c42ef1b1d5ead",
+    "stage1/main.vl": "3cf3b64fb3ff67c4ee6de6494bfc3d17d746d33c89088a6fa42b8ca7fb12b8a3",
+    "stage1/match_check.vl": "e91be1b1bf88c868bba3b5c986d66834688dc1f626922357d594d781ba4bc8b5",
+    "stage1/memops.vl": "938eae0dd685ef057699207b39b259d9ea74604b248e0bbff70e2c69eb1c97ad",
+    "stage1/modules.vl": "8060b7c8df148587c8a7caab6a0f99b2a2dbaa0faee07767b66b5a09a7c4c2c2",
+    "stage1/mono.vl": "be0e0e52218cdf2bf99abc8677c39657992b491cd3d036e90de3894d3bd54265",
+    "stage1/opt.vl": "ba42bace372b3582d2f43879e634e9c175074dd47e12e5adf9472714acdbb9e5",
+    "stage1/packages.vl": "de2a8e6e42c907b3bbb3a69d9ddef328dfdacdd4c544cd2033f06cf0505ae1f2",
+    "stage1/parser.vl": "e714ee9ed7889b9ba33b4878d56e2a6cd432597d904d603e00e1c3ec6bd9f3c7",
+    "stage1/profile_report.vl": "610d2168d059d4346420f4c674a0e030f5962877fbd232df2ca24f6b7f698d2a",
+    "stage1/promote.vl": "1488e4852cbdbdb5026580d46496930d5514433bc19ad7ec4478d92a40a2992a",
+    "stage1/query.vl": "5b004c8594e69c5b0ec84c3ffe5eb9fe0173e51c46b36c3c3376e8af6b255f56",
+    "stage1/ranges.vl": "eb56edd99320ad3e237b7e3e40abc0ffd10d9ef854d610a4f05ba68507c247fc",
+    "stage1/regalloc.vl": "46ef0073de3f032f420f75d72a6f2b7eb2a8f549395d1c032c16ebffa43a6133",
+    "stage1/rename.vl": "c419d39210d1939fcf8185054890100c14562d3c38b41b0438304290a8d3dfe8",
+    "stage1/repairs.vl": "0583b8d36f2795b67e581d504264f6ee15cf2ab19847fa180217190192ee7050",
+    "stage1/sysops.vl": "20146b0bc85754a714d3b38a15fa0bd1bce05543b9567c0399a64d2e07a7270d",
+    "stage1/targets.vl": "087b0839d331aec59179eac4d461c2dae64b7acabbf318d1dcc865052a07a423",
+    "stage1/types.vl": "9c05be4ca1308fe027dff7ac5577e93a964fd2e8f9ff307b3a058266cb6a54fa",
+    "stage1/unsafe_query.vl": "08450ad03a8d7f7e6acd5e8e93e52e6156e70bbd50cfa2886e7d0c78c0a9007f",
+    "stage1/vela.mod": "078addafcbb27518f09b00e0b758b1e6833d13e88ed740226543812cc5aecbba",
+    "stage1/x64.vl": "c0c457d4a6083e40f376a2aecfea845222800e542344a7170e32b6d91b0f37a9",
+    "std/arenas.vl": "7712c21cd8f2c734be19a0cfe266242b4db4e8d352e48facf8f26678fb340c5e",
+    "std/buffers.vl": "d5f89c0c7efa5a137a6fdc111733aebbba30a82776f6f229b648307339191854",
+    "std/bytes.vl": "2a893336976e500559bd2684d211454bb70226423e53c6f9550911988510d6cc",
+    "std/http.vl": "6e67ba10da0a2d8611943757fa0317251d2fea063f4a3864f8ae34fb27a9889e",
+    "std/io.vl": "c258a1047ca0dbc3038a5cb6f85be8c422c15e526dc5db3b5e5f607968c412c4",
+    "std/lists.vl": "dfbc5cf2b06d0b26af0e6e312da5024fb0dd8bba774df005d592712f47996f59",
+    "std/net.vl": "7e39b15bbb0fe1f61f575d55c7552997c20c5cf756460c8aaa75209e720050cb",
+    "std/paths.vl": "0e46f2ae7b152f3127c156279c53662477955d9f037c4334df50937384919812",
+    "std/processes.vl": "cbdb77e8000a706444b415499cbe08109626348f930db25177f5d08c7c28d92e",
+    "std/text.vl": "8e3fcd808bfd5d8f8e4f0028e0043850a85173b50c78aaf3d4410e1df0f95bfa",
+    "std/time.vl": "c2183e86f32cc9d10857e0ef606a1e056789938cd0f91d4862d8afa4b7f8c4d5",
+    "std/unicode.vl": "0870ced2fd92f50a354ebe193a663ff7a962d4bf91b24da4c7bd1fb884fec158",
+    "std/views.vl": "63b6c03f6b0c9e3954cef246c2f9e869dc53ac244fe8057168ab40b14188a314"
+  },
+  "results": {
+    "varints": {
+      "args": [
+        "1024",
+        "2"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 2381000,
+        "other runtime": 2000,
+        "allocation": 23000,
+        "push": 682000,
+        "ref counting": 14000,
+        "copy-on-write": 1000,
+        "strings": 2000,
+        "output": 4000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 3390000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/varints/main.vl",
+            "category": "program",
+            "line": 22,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 3109000,
+            "self_ns": 4000
+          },
+          {
+            "name": "argument",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/varints/main.vl",
+            "category": "program",
+            "line": 6,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 18000,
+            "self_ns": 7000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 7000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 10000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 8000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 15000,
+            "self_ns": 15000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 10000,
+            "self_ns": 4000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 13,
+            "completed": 13,
+            "inclusive_ns": 4000,
+            "self_ns": 4000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 5000,
+            "self_ns": 5000
+          },
+          {
+            "name": "encode",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/varints/main.vl",
+            "category": "program",
+            "line": 11,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 3031000,
+            "self_ns": 2328000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 9697,
+            "completed": 9697,
+            "inclusive_ns": 680000,
+            "self_ns": 680000
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 9000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_slice",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 5000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_str_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 6000,
+            "self_ns": 5000
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "varints.parse",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/varints/varints.vl",
+            "category": "program",
+            "line": 4,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 44000,
+            "self_ns": 42000
+          },
+          {
+            "name": "vela_print_uint",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 4000,
+            "self_ns": 2000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          }
+        ]
+      }
+    },
+    "arena_trees": {
+      "args": [
+        "6"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 13108000,
+        "other runtime": 2000,
+        "allocation": 21000,
+        "push": 216000,
+        "element access": 265000,
+        "ref counting": 6000,
+        "copy-on-write": 1371000,
+        "output": 13000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 15199000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/arena_trees/main.vl",
+            "category": "program",
+            "line": 20,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 15002000,
+            "self_ns": 82000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 4000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 17000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 15000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 14000,
+            "self_ns": 14000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 4399,
+            "completed": 4399,
+            "inclusive_ns": 265000,
+            "self_ns": 265000
+          },
+          {
+            "name": "pow2",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/arena_trees/main.vl",
+            "category": "program",
+            "line": 19,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "arenas.create",
+            "file": "std/arenas.vl",
+            "category": "program",
+            "line": 5,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 42000,
+            "self_ns": 26000
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 10000,
+            "self_ns": 5000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "make",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/arena_trees/main.vl",
+            "category": "program",
+            "line": 8,
+            "calls": 4398,
+            "completed": 4398,
+            "inclusive_ns": 45436000,
+            "self_ns": 5247000
+          },
+          {
+            "name": "leaf",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/arena_trees/main.vl",
+            "category": "program",
+            "line": 7,
+            "calls": 8796,
+            "completed": 8796,
+            "inclusive_ns": 424000,
+            "self_ns": 424000
+          },
+          {
+            "name": "arenas.alloc",
+            "file": "std/arenas.vl",
+            "category": "program",
+            "line": 9,
+            "calls": 4398,
+            "completed": 4398,
+            "inclusive_ns": 3257000,
+            "self_ns": 1697000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 4479,
+            "completed": 4479,
+            "inclusive_ns": 1371000,
+            "self_ns": 1158000
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 4479,
+            "completed": 4479,
+            "inclusive_ns": 213000,
+            "self_ns": 213000
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 4398,
+            "completed": 4398,
+            "inclusive_ns": 216000,
+            "self_ns": 216000
+          },
+          {
+            "name": "check",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/arena_trees/main.vl",
+            "category": "program",
+            "line": 14,
+            "calls": 8878,
+            "completed": 8878,
+            "inclusive_ns": 31503000,
+            "self_ns": 4482000
+          },
+          {
+            "name": "arenas.get",
+            "file": "std/arenas.vl",
+            "category": "program",
+            "line": 14,
+            "calls": 4398,
+            "completed": 4398,
+            "inclusive_ns": 1396000,
+            "self_ns": 1131000
+          },
+          {
+            "name": "vela_print_uint",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 13000,
+            "self_ns": 9000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 4000,
+            "self_ns": 4000
+          },
+          {
+            "name": "arenas.reset",
+            "file": "std/arenas.vl",
+            "category": "program",
+            "line": 23,
+            "calls": 81,
+            "completed": 81,
+            "inclusive_ns": 46000,
+            "self_ns": 19000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 4000,
+            "self_ns": 4000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          }
+        ]
+      }
+    },
+    "nbody": {
+      "args": [
+        "1000"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 804000,
+        "other runtime": 21000,
+        "allocation": 5000,
+        "push": 1000,
+        "ref counting": 9000,
+        "copy-on-write": 500000,
+        "element access": 1000,
+        "strings": 2000,
+        "output": 1000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 1529000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 137,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1344000,
+            "self_ns": 265000
+          },
+          {
+            "name": "arg",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 126,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 29000,
+            "self_ns": 4000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 23000,
+            "self_ns": 21000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 4000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 2000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 13,
+            "completed": 13,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 4000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 15,
+            "completed": 15,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 16,
+            "completed": 16,
+            "inclusive_ns": 5000,
+            "self_ns": 5000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "system",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 36,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 11000,
+            "self_ns": 3000
+          },
+          {
+            "name": "body",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 31,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 7000,
+            "self_ns": 3000
+          },
+          {
+            "name": "days_per_year",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 27,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "solar_mass",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 23,
+            "calls": 8,
+            "completed": 8,
+            "inclusive_ns": 6000,
+            "self_ns": 6000
+          },
+          {
+            "name": "pi",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 19,
+            "calls": 16,
+            "completed": 16,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "offset_momentum",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 50,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 7000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 2009,
+            "completed": 2009,
+            "inclusive_ns": 500000,
+            "self_ns": 410000
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 2009,
+            "completed": 2009,
+            "inclusive_ns": 90000,
+            "self_ns": 90000
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "energy",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 64,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "fixed9",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 108,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 19000,
+            "self_ns": 9000
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_str_concat",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_builder_add",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_builder_build",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 1000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "advance",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/nbody/main.vl",
+            "category": "program",
+            "line": 81,
+            "calls": 1000,
+            "completed": 1000,
+            "inclusive_ns": 1009000,
+            "self_ns": 511000
+          }
+        ]
+      }
+    },
+    "spectralnorm": {
+      "args": [
+        "100"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 107053000,
+        "other runtime": 3000,
+        "allocation": 33000,
+        "push": 31000,
+        "ref counting": 40000,
+        "copy-on-write": 14000,
+        "element access": 189000,
+        "strings": 1000,
+        "output": 1000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 107510000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/spectralnorm/main.vl",
+            "category": "program",
+            "line": 77,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 107365000,
+            "self_ns": 75000
+          },
+          {
+            "name": "arg",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/spectralnorm/main.vl",
+            "category": "program",
+            "line": 58,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 9000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 4000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 6000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 4000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 16,
+            "completed": 16,
+            "inclusive_ns": 6000,
+            "self_ns": 6000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 68,
+            "completed": 68,
+            "inclusive_ns": 18000,
+            "self_ns": 16000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 73,
+            "completed": 73,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 8,
+            "completed": 8,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "filled",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/spectralnorm/main.vl",
+            "category": "program",
+            "line": 69,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 131000,
+            "self_ns": 70000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 46,
+            "completed": 46,
+            "inclusive_ns": 14000,
+            "self_ns": 13000
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 46,
+            "completed": 46,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 300,
+            "completed": 300,
+            "inclusive_ns": 55000,
+            "self_ns": 25000
+          },
+          {
+            "name": "vela_array_grow",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 18,
+            "completed": 18,
+            "inclusive_ns": 30000,
+            "self_ns": 6000
+          },
+          {
+            "name": "array_resize",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 18,
+            "completed": 18,
+            "inclusive_ns": 24000,
+            "self_ns": 13000
+          },
+          {
+            "name": "vela_realloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 12,
+            "completed": 12,
+            "inclusive_ns": 11000,
+            "self_ns": 11000
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 63,
+            "completed": 63,
+            "inclusive_ns": 20000,
+            "self_ns": 15000
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 63,
+            "completed": 63,
+            "inclusive_ns": 5000,
+            "self_ns": 5000
+          },
+          {
+            "name": "times_ata",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/spectralnorm/main.vl",
+            "category": "program",
+            "line": 35,
+            "calls": 20,
+            "completed": 20,
+            "inclusive_ns": 107077000,
+            "self_ns": 32000
+          },
+          {
+            "name": "times",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/spectralnorm/main.vl",
+            "category": "program",
+            "line": 13,
+            "calls": 20,
+            "completed": 20,
+            "inclusive_ns": 55106000,
+            "self_ns": 46571000
+          },
+          {
+            "name": "eval_a",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/spectralnorm/main.vl",
+            "category": "program",
+            "line": 9,
+            "calls": 400000,
+            "completed": 400000,
+            "inclusive_ns": 16527000,
+            "self_ns": 16527000
+          },
+          {
+            "name": "vela_at_in",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 4000,
+            "completed": 4000,
+            "inclusive_ns": 183000,
+            "self_ns": 183000
+          },
+          {
+            "name": "times_transposed",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/spectralnorm/main.vl",
+            "category": "program",
+            "line": 24,
+            "calls": 20,
+            "completed": 20,
+            "inclusive_ns": 51920000,
+            "self_ns": 43732000
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 200,
+            "completed": 200,
+            "inclusive_ns": 6000,
+            "self_ns": 6000
+          },
+          {
+            "name": "fixed9",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/spectralnorm/main.vl",
+            "category": "program",
+            "line": 40,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 52000,
+            "self_ns": 43000
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 3000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_str_concat",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_builder_add",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_builder_build",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 0
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          }
+        ]
+      }
+    },
+    "fannkuch": {
+      "args": [
+        "7"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 26433000,
+        "other runtime": 2000,
+        "allocation": 1715000,
+        "push": 4000,
+        "ref counting": 4929000,
+        "copy-on-write": 7037000,
+        "element access": 7283000,
+        "strings": 1000,
+        "output": 1000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 47563000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fannkuch/main.vl",
+            "category": "program",
+            "line": 20,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 47405000,
+            "self_ns": 26429000
+          },
+          {
+            "name": "arg",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fannkuch/main.vl",
+            "category": "program",
+            "line": 9,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 11000,
+            "self_ns": 4000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 4000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5043,
+            "completed": 5043,
+            "inclusive_ns": 1421000,
+            "self_ns": 1167000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5043,
+            "completed": 5043,
+            "inclusive_ns": 254000,
+            "self_ns": 252000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 13,
+            "completed": 13,
+            "inclusive_ns": 6000,
+            "self_ns": 6000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 10083,
+            "completed": 10083,
+            "inclusive_ns": 3939000,
+            "self_ns": 3148000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 10089,
+            "completed": 10089,
+            "inclusive_ns": 511000,
+            "self_ns": 511000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 8,
+            "completed": 8,
+            "inclusive_ns": 3000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5043,
+            "completed": 5043,
+            "inclusive_ns": 280000,
+            "self_ns": 280000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 10083,
+            "completed": 10083,
+            "inclusive_ns": 9829000,
+            "self_ns": 3276000
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 15123,
+            "completed": 15123,
+            "inclusive_ns": 696000,
+            "self_ns": 696000
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 14,
+            "completed": 14,
+            "inclusive_ns": 15000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_grow",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 13000,
+            "self_ns": 2000
+          },
+          {
+            "name": "array_resize",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 11000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_realloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 9000,
+            "self_ns": 9000
+          },
+          {
+            "name": "vela_at_in",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 146709,
+            "completed": 146709,
+            "inclusive_ns": 7031000,
+            "self_ns": 7031000
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5040,
+            "completed": 5040,
+            "inclusive_ns": 1267000,
+            "self_ns": 1015000
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5040,
+            "completed": 5040,
+            "inclusive_ns": 252000,
+            "self_ns": 252000
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 5040,
+            "completed": 5040,
+            "inclusive_ns": 252000,
+            "self_ns": 252000
+          },
+          {
+            "name": "vela_array_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 5040,
+            "completed": 5040,
+            "inclusive_ns": 6063000,
+            "self_ns": 3065000
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 2000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 1000,
+            "self_ns": 0
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_str_concat",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 2000,
+            "self_ns": 1000
+          }
+        ]
+      }
+    },
+    "binarytrees": {
+      "args": [
+        "6"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 8456000,
+        "other runtime": 1000,
+        "allocation": 674000,
+        "push": 0,
+        "ref counting": 311000,
+        "strings": 7000,
+        "output": 4000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 9628000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/binarytrees/main.vl",
+            "category": "program",
+            "line": 47,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 9453000,
+            "self_ns": 2003000
+          },
+          {
+            "name": "arg",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/binarytrees/main.vl",
+            "category": "program",
+            "line": 36,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 6000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 2000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 4317,
+            "completed": 4317,
+            "inclusive_ns": 372000,
+            "self_ns": 357000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 279,
+            "completed": 279,
+            "inclusive_ns": 22000,
+            "self_ns": 22000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 4341,
+            "completed": 4341,
+            "inclusive_ns": 303000,
+            "self_ns": 303000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 26,
+            "completed": 26,
+            "inclusive_ns": 10000,
+            "self_ns": 6000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 4317,
+            "completed": 4317,
+            "inclusive_ns": 294000,
+            "self_ns": 294000
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 7000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_str_concat",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 14,
+            "completed": 14,
+            "inclusive_ns": 7000,
+            "self_ns": 4000
+          },
+          {
+            "name": "make",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/binarytrees/main.vl",
+            "category": "program",
+            "line": 13,
+            "calls": 4398,
+            "completed": 4398,
+            "inclusive_ns": 13994000,
+            "self_ns": 2756000
+          },
+          {
+            "name": "check",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/binarytrees/main.vl",
+            "category": "program",
+            "line": 21,
+            "calls": 8878,
+            "completed": 8878,
+            "inclusive_ns": 19855000,
+            "self_ns": 3695000
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 4000,
+            "self_ns": 1000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 3000,
+            "self_ns": 3000
+          },
+          {
+            "name": "pow2",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/binarytrees/main.vl",
+            "category": "program",
+            "line": 28,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          }
+        ]
+      }
+    },
+    "mandelbrot": {
+      "args": [
+        "100"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 1275000,
+        "other runtime": 2000,
+        "allocation": 0,
+        "push": 0,
+        "ref counting": 1000,
+        "strings": 1000,
+        "output": 1000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 1364000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/mandelbrot/main.vl",
+            "category": "program",
+            "line": 20,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1280000,
+            "self_ns": 1274000
+          },
+          {
+            "name": "arg",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/mandelbrot/main.vl",
+            "category": "program",
+            "line": 9,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 4000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 0
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          }
+        ]
+      }
+    },
+    "fasta": {
+      "args": [
+        "1000"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 11601000,
+        "other runtime": 38000,
+        "allocation": 115000,
+        "push": 646000,
+        "ref counting": 177000,
+        "copy-on-write": 54000,
+        "output": 69000,
+        "element access": 2099000,
+        "strings": 87000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 15052000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fasta/main.vl",
+            "category": "program",
+            "line": 87,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 14886000,
+            "self_ns": 11000
+          },
+          {
+            "name": "arg",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fasta/main.vl",
+            "category": "program",
+            "line": 13,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 44000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 39000,
+            "self_ns": 38000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 173,
+            "completed": 173,
+            "inclusive_ns": 72000,
+            "self_ns": 62000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 173,
+            "completed": 173,
+            "inclusive_ns": 10000,
+            "self_ns": 9000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 176,
+            "completed": 176,
+            "inclusive_ns": 21000,
+            "self_ns": 21000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 179,
+            "completed": 179,
+            "inclusive_ns": 119000,
+            "self_ns": 90000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 347,
+            "completed": 347,
+            "inclusive_ns": 20000,
+            "self_ns": 20000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 175,
+            "completed": 175,
+            "inclusive_ns": 71000,
+            "self_ns": 64000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 173,
+            "completed": 173,
+            "inclusive_ns": 16000,
+            "self_ns": 16000
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 10038,
+            "completed": 10038,
+            "inclusive_ns": 653000,
+            "self_ns": 643000
+          },
+          {
+            "name": "cumulative",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fasta/main.vl",
+            "category": "program",
+            "line": 37,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 27000,
+            "self_ns": 9000
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 3000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 170,
+            "completed": 170,
+            "inclusive_ns": 54000,
+            "self_ns": 41000
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 170,
+            "completed": 170,
+            "inclusive_ns": 13000,
+            "self_ns": 13000
+          },
+          {
+            "name": "vela_array_grow",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 10000,
+            "self_ns": 3000
+          },
+          {
+            "name": "array_resize",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 7000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_realloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 5000,
+            "self_ns": 5000
+          },
+          {
+            "name": "alu",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fasta/main.vl",
+            "category": "program",
+            "line": 9,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "repeat_fasta",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fasta/main.vl",
+            "category": "program",
+            "line": 47,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1461000,
+            "self_ns": 978000
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 171,
+            "completed": 171,
+            "inclusive_ns": 69000,
+            "self_ns": 32000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 171,
+            "completed": 171,
+            "inclusive_ns": 37000,
+            "self_ns": 37000
+          },
+          {
+            "name": "smaller",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fasta/main.vl",
+            "category": "program",
+            "line": 24,
+            "calls": 168,
+            "completed": 168,
+            "inclusive_ns": 13000,
+            "self_ns": 13000
+          },
+          {
+            "name": "vela_byte_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 10000,
+            "completed": 10000,
+            "inclusive_ns": 621000,
+            "self_ns": 621000
+          },
+          {
+            "name": "vela_builder_build",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 168,
+            "completed": 168,
+            "inclusive_ns": 107000,
+            "self_ns": 34000
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 168,
+            "completed": 168,
+            "inclusive_ns": 73000,
+            "self_ns": 53000
+          },
+          {
+            "name": "random_fasta",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fasta/main.vl",
+            "category": "program",
+            "line": 67,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 13335000,
+            "self_ns": 10097000
+          },
+          {
+            "name": "next_random",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/fasta/main.vl",
+            "category": "program",
+            "line": 32,
+            "calls": 8000,
+            "completed": 8000,
+            "inclusive_ns": 490000,
+            "self_ns": 490000
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 23796,
+            "completed": 23796,
+            "inclusive_ns": 1478000,
+            "self_ns": 1478000
+          }
+        ]
+      }
+    },
+    "knucleotide": {
+      "args": [
+        "{fasta}"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 17021000,
+        "other runtime": 126000,
+        "allocation": 283000,
+        "push": 228000,
+        "element access": 8000,
+        "ref counting": 25074000,
+        "copy-on-write": 5000,
+        "strings": 13181000,
+        "maps": 41402000,
+        "copying": 1046000,
+        "output": 13000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 98502000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/knucleotide/main.vl",
+            "category": "program",
+            "line": 63,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 98387000,
+            "self_ns": 68000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 25000,
+            "self_ns": 24000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 8000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 7000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 139,
+            "completed": 139,
+            "inclusive_ns": 47000,
+            "self_ns": 47000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 22,
+            "completed": 22,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_files_read",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 106000,
+            "self_ns": 102000
+          },
+          {
+            "name": "vela_str_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 48419,
+            "completed": 48419,
+            "inclusive_ns": 10591000,
+            "self_ns": 8539000
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 48423,
+            "completed": 48423,
+            "inclusive_ns": 2052000,
+            "self_ns": 2052000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 48504,
+            "completed": 48504,
+            "inclusive_ns": 10797000,
+            "self_ns": 8743000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 48512,
+            "completed": 48512,
+            "inclusive_ns": 2055000,
+            "self_ns": 2055000
+          },
+          {
+            "name": "sequence",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/knucleotide/main.vl",
+            "category": "program",
+            "line": 12,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1370000,
+            "self_ns": 945000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 5000,
+            "self_ns": 5000
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_slice",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 35135,
+            "completed": 35135,
+            "inclusive_ns": 14917000,
+            "self_ns": 6897000
+          },
+          {
+            "name": "vela_byte_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 171,
+            "completed": 171,
+            "inclusive_ns": 8000,
+            "self_ns": 8000
+          },
+          {
+            "name": "vela_str_eq",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 3000,
+            "self_ns": 1000
+          },
+          {
+            "name": "str_eq",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 22199,
+            "completed": 22199,
+            "inclusive_ns": 4546000,
+            "self_ns": 3348000
+          },
+          {
+            "name": "load_u32",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 48312,
+            "completed": 48312,
+            "inclusive_ns": 1974000,
+            "self_ns": 1974000
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 5005,
+            "completed": 5005,
+            "inclusive_ns": 244000,
+            "self_ns": 227000
+          },
+          {
+            "name": "vela_array_grow",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 17000,
+            "self_ns": 1000
+          },
+          {
+            "name": "array_resize",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 16000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_realloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 210,
+            "completed": 210,
+            "inclusive_ns": 232000,
+            "self_ns": 232000
+          },
+          {
+            "name": "vela_builder_build",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 3000,
+            "self_ns": 0
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 26,
+            "completed": 26,
+            "inclusive_ns": 11000,
+            "self_ns": 7000
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 21000,
+            "self_ns": 14000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "counts",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/knucleotide/main.vl",
+            "category": "program",
+            "line": 36,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 88895000,
+            "self_ns": 15914000
+          },
+          {
+            "name": "vela_map_new",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 23000,
+            "self_ns": 6000
+          },
+          {
+            "name": "map_reserve",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 51,
+            "completed": 51,
+            "inclusive_ns": 248000,
+            "self_ns": 31000
+          },
+          {
+            "name": "map_rebuild_index",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 48,
+            "completed": 48,
+            "inclusive_ns": 1985000,
+            "self_ns": 1457000
+          },
+          {
+            "name": "vela_unique_map",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_map_find_hashed",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 34961,
+            "completed": 34961,
+            "inclusive_ns": 35766000,
+            "self_ns": 12699000
+          },
+          {
+            "name": "key_hash",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 35168,
+            "completed": 35168,
+            "inclusive_ns": 12628000,
+            "self_ns": 5646000
+          },
+          {
+            "name": "hash_str",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 35168,
+            "completed": 35168,
+            "inclusive_ns": 6982000,
+            "self_ns": 5267000
+          },
+          {
+            "name": "map_insert",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 12970,
+            "completed": 12970,
+            "inclusive_ns": 11776000,
+            "self_ns": 6997000
+          },
+          {
+            "name": "map_key",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 48176,
+            "completed": 48176,
+            "inclusive_ns": 2074000,
+            "self_ns": 2074000
+          },
+          {
+            "name": "copy_elem",
+            "file": "runtime",
+            "category": "copying",
+            "line": 0,
+            "calls": 25940,
+            "completed": 25940,
+            "inclusive_ns": 1046000,
+            "self_ns": 1046000
+          },
+          {
+            "name": "map_value",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 48136,
+            "completed": 48136,
+            "inclusive_ns": 2088000,
+            "self_ns": 2088000
+          },
+          {
+            "name": "map_index_entry",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 27019,
+            "completed": 27019,
+            "inclusive_ns": 988000,
+            "self_ns": 988000
+          },
+          {
+            "name": "key_eq",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 22196,
+            "completed": 22196,
+            "inclusive_ns": 8473000,
+            "self_ns": 3929000
+          },
+          {
+            "name": "vela_map_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_map_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 14,
+            "completed": 14,
+            "inclusive_ns": 7227000,
+            "self_ns": 3669000
+          },
+          {
+            "name": "by_count",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/knucleotide/main.vl",
+            "category": "program",
+            "line": 49,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 558000,
+            "self_ns": 94000
+          },
+          {
+            "name": "vela_map_keys",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 31000,
+            "self_ns": 17000
+          },
+          {
+            "name": "vela_map_at",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 202,
+            "completed": 202,
+            "inclusive_ns": 341000,
+            "self_ns": 47000
+          },
+          {
+            "name": "vela_map_find",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 207,
+            "completed": 207,
+            "inclusive_ns": 301000,
+            "self_ns": 67000
+          },
+          {
+            "name": "map_lookup",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 207,
+            "completed": 207,
+            "inclusive_ns": 222000,
+            "self_ns": 89000
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_str_concat",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 50,
+            "completed": 50,
+            "inclusive_ns": 20000,
+            "self_ns": 15000
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 27,
+            "completed": 27,
+            "inclusive_ns": 13000,
+            "self_ns": 9000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 27,
+            "completed": 27,
+            "inclusive_ns": 4000,
+            "self_ns": 4000
+          },
+          {
+            "name": "load_u64",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 24936,
+            "completed": 24936,
+            "inclusive_ns": 939000,
+            "self_ns": 939000
+          }
+        ]
+      }
+    },
+    "wordfreq": {
+      "args": [
+        "{words}"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 3168000,
+        "other runtime": 148000,
+        "allocation": 97000,
+        "push": 83000,
+        "element access": 65000,
+        "ref counting": 3766000,
+        "maps": 11917000,
+        "copy-on-write": 0,
+        "strings": 3519000,
+        "copying": 111000,
+        "output": 5000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 23057000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/wordfreq/main.vl",
+            "category": "program",
+            "line": 16,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 22879000,
+            "self_ns": 2540000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 4000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 6000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 4000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 50,
+            "completed": 50,
+            "inclusive_ns": 30000,
+            "self_ns": 30000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 1006,
+            "completed": 1006,
+            "inclusive_ns": 81000,
+            "self_ns": 81000
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 1012,
+            "completed": 1012,
+            "inclusive_ns": 65000,
+            "self_ns": 65000
+          },
+          {
+            "name": "vela_files_read",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 157000,
+            "self_ns": 145000
+          },
+          {
+            "name": "vela_str_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5267,
+            "completed": 5267,
+            "inclusive_ns": 1630000,
+            "self_ns": 1356000
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5268,
+            "completed": 5268,
+            "inclusive_ns": 274000,
+            "self_ns": 274000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5305,
+            "completed": 5305,
+            "inclusive_ns": 1514000,
+            "self_ns": 1247000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5307,
+            "completed": 5307,
+            "inclusive_ns": 267000,
+            "self_ns": 267000
+          },
+          {
+            "name": "vela_map_new",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 5000,
+            "self_ns": 2000
+          },
+          {
+            "name": "map_reserve",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 9,
+            "completed": 9,
+            "inclusive_ns": 66000,
+            "self_ns": 7000
+          },
+          {
+            "name": "vela_realloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 38,
+            "completed": 38,
+            "inclusive_ns": 62000,
+            "self_ns": 62000
+          },
+          {
+            "name": "map_rebuild_index",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 9,
+            "completed": 9,
+            "inclusive_ns": 282000,
+            "self_ns": 223000
+          },
+          {
+            "name": "vela_unique_map",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_slice",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 2000,
+            "completed": 2000,
+            "inclusive_ns": 981000,
+            "self_ns": 466000
+          },
+          {
+            "name": "vela_map_find_hashed",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 2000,
+            "completed": 2000,
+            "inclusive_ns": 2604000,
+            "self_ns": 827000
+          },
+          {
+            "name": "key_hash",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 6206,
+            "completed": 6206,
+            "inclusive_ns": 3011000,
+            "self_ns": 1262000
+          },
+          {
+            "name": "hash_str",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 6206,
+            "completed": 6206,
+            "inclusive_ns": 1749000,
+            "self_ns": 1363000
+          },
+          {
+            "name": "load_u32",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 10694,
+            "completed": 10694,
+            "inclusive_ns": 598000,
+            "self_ns": 598000
+          },
+          {
+            "name": "map_insert",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 1004,
+            "completed": 1004,
+            "inclusive_ns": 1389000,
+            "self_ns": 787000
+          },
+          {
+            "name": "map_key",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 9218,
+            "completed": 9218,
+            "inclusive_ns": 552000,
+            "self_ns": 552000
+          },
+          {
+            "name": "copy_elem",
+            "file": "runtime",
+            "category": "copying",
+            "line": 0,
+            "calls": 2008,
+            "completed": 2008,
+            "inclusive_ns": 111000,
+            "self_ns": 111000
+          },
+          {
+            "name": "map_value",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 7210,
+            "completed": 7210,
+            "inclusive_ns": 369000,
+            "self_ns": 369000
+          },
+          {
+            "name": "map_index_entry",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 2360,
+            "completed": 2360,
+            "inclusive_ns": 94000,
+            "self_ns": 94000
+          },
+          {
+            "name": "load_u64",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 6741,
+            "completed": 6741,
+            "inclusive_ns": 377000,
+            "self_ns": 377000
+          },
+          {
+            "name": "key_eq",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 5202,
+            "completed": 5202,
+            "inclusive_ns": 3856000,
+            "self_ns": 1199000
+          },
+          {
+            "name": "str_eq",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 5202,
+            "completed": 5202,
+            "inclusive_ns": 2657000,
+            "self_ns": 2068000
+          },
+          {
+            "name": "vela_map_keys",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1272000,
+            "self_ns": 658000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 6000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_array_grow",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 5000,
+            "self_ns": 1000
+          },
+          {
+            "name": "array_resize",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 4000,
+            "self_ns": 0
+          },
+          {
+            "name": "before",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/wordfreq/main.vl",
+            "category": "program",
+            "line": 12,
+            "calls": 1089,
+            "completed": 1089,
+            "inclusive_ns": 10857000,
+            "self_ns": 628000
+          },
+          {
+            "name": "vela_map_at",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 4206,
+            "completed": 4206,
+            "inclusive_ns": 10246000,
+            "self_ns": 1006000
+          },
+          {
+            "name": "vela_map_find",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 4206,
+            "completed": 4206,
+            "inclusive_ns": 9240000,
+            "self_ns": 1512000
+          },
+          {
+            "name": "map_lookup",
+            "file": "runtime",
+            "category": "maps",
+            "line": 0,
+            "calls": 4206,
+            "completed": 4206,
+            "inclusive_ns": 7498000,
+            "self_ns": 2056000
+          },
+          {
+            "name": "vela_str_cmp",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 17,
+            "completed": 17,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 474000,
+            "self_ns": 196000
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 12,
+            "completed": 12,
+            "inclusive_ns": 3000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_str_concat",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 22,
+            "completed": 22,
+            "inclusive_ns": 8000,
+            "self_ns": 7000
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 12,
+            "completed": 12,
+            "inclusive_ns": 5000,
+            "self_ns": 3000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 12,
+            "completed": 12,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_map_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 818000,
+            "self_ns": 426000
+          }
+        ]
+      }
+    },
+    "sha256": {
+      "args": [
+        "1024",
+        "2"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 8544000,
+        "other runtime": 26000,
+        "allocation": 31000,
+        "push": 79000,
+        "element access": 249000,
+        "copy-on-write": 4000,
+        "strings": 7000,
+        "ref counting": 20000,
+        "output": 2000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 9271000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/sha256/main.vl",
+            "category": "program",
+            "line": 6,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 8962000,
+            "self_ns": 9000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 27000,
+            "self_ns": 26000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 8000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 5000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 15,
+            "completed": 15,
+            "inclusive_ns": 9000,
+            "self_ns": 9000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 2242,
+            "completed": 2242,
+            "inclusive_ns": 97000,
+            "self_ns": 97000
+          },
+          {
+            "name": "text.parse_int",
+            "file": "std/text.vl",
+            "category": "program",
+            "line": 156,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 2000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_byte_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 130,
+            "completed": 130,
+            "inclusive_ns": 5000,
+            "self_ns": 5000
+          },
+          {
+            "name": "bytes.is_digit",
+            "file": "std/bytes.vl",
+            "category": "program",
+            "line": 9,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "text.repeat",
+            "file": "std/text.vl",
+            "category": "program",
+            "line": 114,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 266000,
+            "self_ns": 199000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 9,
+            "completed": 9,
+            "inclusive_ns": 4000,
+            "self_ns": 4000
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 9,
+            "completed": 9,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_builder_add",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 1024,
+            "completed": 1024,
+            "inclusive_ns": 63000,
+            "self_ns": 54000
+          },
+          {
+            "name": "array_resize",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 14,
+            "completed": 14,
+            "inclusive_ns": 17000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_realloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 12000,
+            "self_ns": 12000
+          },
+          {
+            "name": "vela_builder_build",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 6000,
+            "self_ns": 0
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 6000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 16,
+            "completed": 16,
+            "inclusive_ns": 16000,
+            "self_ns": 15000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 21,
+            "completed": 21,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_str_concat",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 6000,
+            "self_ns": 5000
+          },
+          {
+            "name": "sha256.digest",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/sha256/sha256.vl",
+            "category": "program",
+            "line": 10,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 8573000,
+            "self_ns": 7346000
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 400,
+            "completed": 400,
+            "inclusive_ns": 33000,
+            "self_ns": 22000
+          },
+          {
+            "name": "lists.repeat",
+            "file": "std/lists.vl",
+            "category": "program",
+            "line": 56,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 44000,
+            "self_ns": 25000
+          },
+          {
+            "name": "vela_array_grow",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 11000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 1000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "sha256.rotr",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/sha256/sha256.vl",
+            "category": "program",
+            "line": 8,
+            "calls": 20160,
+            "completed": 20160,
+            "inclusive_ns": 915000,
+            "self_ns": 915000
+          },
+          {
+            "name": "vela_at_in",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 3080,
+            "completed": 3080,
+            "inclusive_ns": 147000,
+            "self_ns": 147000
+          },
+          {
+            "name": "sha256.hex",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/sha256/sha256.vl",
+            "category": "program",
+            "line": 71,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 70000,
+            "self_ns": 48000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 11,
+            "completed": 11,
+            "inclusive_ns": 4000,
+            "self_ns": 4000
+          },
+          {
+            "name": "vela_print_str",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 2000,
+            "self_ns": 1000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          }
+        ]
+      }
+    },
+    "crc32": {
+      "args": [
+        "4096",
+        "2"
+      ],
+      "output_matches_independent_c": true,
+      "self_ns_by_category": {
+        "program": 2539000,
+        "other runtime": 37000,
+        "allocation": 25000,
+        "push": 308000,
+        "element access": 419000,
+        "copy-on-write": 1000,
+        "strings": 2000,
+        "ref counting": 14000,
+        "output": 5000
+      },
+      "profile": {
+        "format": "vela.profile",
+        "version": 1,
+        "measurement": "instrumented monotonic elapsed nanoseconds",
+        "wall_ns": 3646000,
+        "complete": true,
+        "truncated": false,
+        "functions": [
+          {
+            "name": "main",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/crc32/main.vl",
+            "category": "program",
+            "line": 5,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 3350000,
+            "self_ns": 11000
+          },
+          {
+            "name": "vela_os_args",
+            "file": "runtime",
+            "category": "other runtime",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 40000,
+            "self_ns": 37000
+          },
+          {
+            "name": "vela_array_new",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 5000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_box_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 4000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_alloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 3000,
+            "self_ns": 3000
+          },
+          {
+            "name": "vela_array_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 8194,
+            "completed": 8194,
+            "inclusive_ns": 419000,
+            "self_ns": 419000
+          },
+          {
+            "name": "text.parse_int",
+            "file": "std/text.vl",
+            "category": "program",
+            "line": 156,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 3000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_byte_at",
+            "file": "runtime",
+            "category": "element access",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "bytes.is_digit",
+            "file": "std/bytes.vl",
+            "category": "program",
+            "line": 9,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "text.repeat",
+            "file": "std/text.vl",
+            "category": "program",
+            "line": 114,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1132000,
+            "self_ns": 818000
+          },
+          {
+            "name": "vela_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 1000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_rc_unique",
+            "file": "runtime",
+            "category": "copy-on-write",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_builder_add",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 4096,
+            "completed": 4096,
+            "inclusive_ns": 307000,
+            "self_ns": 291000
+          },
+          {
+            "name": "array_resize",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 13,
+            "completed": 13,
+            "inclusive_ns": 20000,
+            "self_ns": 6000
+          },
+          {
+            "name": "vela_realloc",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 10,
+            "completed": 10,
+            "inclusive_ns": 13000,
+            "self_ns": 13000
+          },
+          {
+            "name": "vela_builder_build",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 2000,
+            "self_ns": 0
+          },
+          {
+            "name": "str_from",
+            "file": "runtime",
+            "category": "strings",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_array_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 5,
+            "completed": 5,
+            "inclusive_ns": 10000,
+            "self_ns": 10000
+          },
+          {
+            "name": "vela_rc_dec",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 8,
+            "completed": 8,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_box_free",
+            "file": "runtime",
+            "category": "allocation",
+            "line": 0,
+            "calls": 3,
+            "completed": 3,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "crc32.table",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/crc32/crc32.vl",
+            "category": "program",
+            "line": 5,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 76000,
+            "self_ns": 7000
+          },
+          {
+            "name": "lists.repeat",
+            "file": "std/lists.vl",
+            "category": "program",
+            "line": 56,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 68000,
+            "self_ns": 45000
+          },
+          {
+            "name": "vela_push",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 256,
+            "completed": 256,
+            "inclusive_ns": 20000,
+            "self_ns": 16000
+          },
+          {
+            "name": "vela_array_grow",
+            "file": "runtime",
+            "category": "push",
+            "line": 0,
+            "calls": 7,
+            "completed": 7,
+            "inclusive_ns": 4000,
+            "self_ns": 0
+          },
+          {
+            "name": "vela_array_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_rc_inc",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 4,
+            "completed": 4,
+            "inclusive_ns": 0,
+            "self_ns": 0
+          },
+          {
+            "name": "crc32.update",
+            "file": "/Users/nathgoutam93/Documents/vela/bench/crc32/crc32.vl",
+            "category": "program",
+            "line": 17,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 2076000,
+            "self_ns": 1655000
+          },
+          {
+            "name": "vela_str_retain",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 2,
+            "completed": 2,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          },
+          {
+            "name": "vela_str_release",
+            "file": "runtime",
+            "category": "ref counting",
+            "line": 0,
+            "calls": 6,
+            "completed": 6,
+            "inclusive_ns": 2000,
+            "self_ns": 2000
+          },
+          {
+            "name": "vela_print_int",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 5000,
+            "self_ns": 4000
+          },
+          {
+            "name": "print_line",
+            "file": "runtime",
+            "category": "output",
+            "line": 0,
+            "calls": 1,
+            "completed": 1,
+            "inclusive_ns": 1000,
+            "self_ns": 1000
+          }
+        ]
+      }
+    }
+  }
+}

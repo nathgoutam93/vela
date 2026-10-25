@@ -30,10 +30,13 @@
 #include <mach-o/dyld.h>
 #endif
 
+#include "vela_observe.inc"
+
 void vela_panic(const char *loc, const char *msg) {
     // Flush first so everything the program printed appears before the panic.
     fflush(stdout);
-    fprintf(stderr, "%s: panic: %s\n", loc, msg);
+    if (!vela_panic_json(loc, msg, NULL, NULL, NULL, NULL)) fprintf(stderr, "%s: panic: %s\n", loc, msg);
+    vela_observe_panic();
     fflush(stderr);
     // _Exit skips atexit handlers. A panic is a bug, and values still in use
     // when it happens are not released, so a leak checker running at exit
@@ -43,7 +46,8 @@ void vela_panic(const char *loc, const char *msg) {
 
 void vela_assert_failed(const char *loc, const char *what, const char *text) {
     fflush(stdout);
-    fprintf(stderr, "%s: panic: %s failed: %s\n", loc, what, text);
+    if (!vela_panic_json(loc, "assertion failed", what, text, NULL, NULL)) fprintf(stderr, "%s: panic: %s failed: %s\n", loc, what, text);
+    vela_observe_panic();
     fflush(stderr);
     _Exit(101);
 }
@@ -52,8 +56,9 @@ void vela_assert_failed_values(const char *loc, const char *what, const char *te
                                bool quote) {
     const char *q = quote ? "\"" : "";
     fflush(stdout);
-    fprintf(stderr, "%s: panic: %s failed: %s (left: %s%.*s%s, right: %s%.*s%s)\n", loc, what, text, q,
+    if (!vela_panic_json(loc, "assertion failed", what, text, &left, &right)) fprintf(stderr, "%s: panic: %s failed: %s (left: %s%.*s%s, right: %s%.*s%s)\n", loc, what, text, q,
             (int)left.len, (const char *)left.data, q, q, (int)right.len, (const char *)right.data, q);
+    vela_observe_panic();
     fflush(stderr);
     _Exit(101);
 }
@@ -82,6 +87,7 @@ static void check_count(int64_t n) {
 _Thread_local vela_pool vela_pools;
 
 void *vela_alloc(size_t size) {
+    VELA_PROFILE_SCOPE("allocation");
     check_size(size);
     void *p = malloc(size);
     if (p == NULL && size != 0) vela_panic("vela runtime", "out of memory");
@@ -89,6 +95,7 @@ void *vela_alloc(size_t size) {
 }
 
 static void *vela_realloc(void *p, size_t size) {
+    VELA_PROFILE_SCOPE("allocation");
     check_size(size);
     p = realloc(p, size);
     if (p == NULL && size != 0) vela_panic("vela runtime", "out of memory");
@@ -97,12 +104,14 @@ static void *vela_realloc(void *p, size_t size) {
 
 // Unaligned loads of a string's bytes.
 static uint64_t load_u64(const uint8_t *p) {
+    VELA_PROFILE_SCOPE("strings");
     uint64_t w;
     memcpy(&w, p, 8);
     return w;
 }
 
 static uint64_t load_u32(const uint8_t *p) {
+    VELA_PROFILE_SCOPE("strings");
     uint32_t w;
     memcpy(&w, p, 4);
     return w;
@@ -111,6 +120,7 @@ static uint64_t load_u32(const uint8_t *p) {
 // ---- Descriptors for the built-in types ----
 
 static uint64_t hash_u64(uint64_t x) {
+    VELA_PROFILE_SCOPE("maps");
     // splitmix64's finaliser: cheap, and spreads nearby keys apart.
     x ^= x >> 30;
     x *= 0xbf58476d1ce4e5b9ULL;
@@ -120,14 +130,18 @@ static uint64_t hash_u64(uint64_t x) {
     return x;
 }
 
-static uint64_t hash_int(const void *v) { return hash_u64((uint64_t)*(const int64_t *)v); }
+static uint64_t hash_int(const void *v) {
+    VELA_PROFILE_SCOPE("maps"); return hash_u64((uint64_t)*(const int64_t *)v); }
 static bool eq_int(const void *a, const void *b) { return *(const int64_t *)a == *(const int64_t *)b; }
-static uint64_t hash_byte(const void *v) { return hash_u64(*(const uint8_t *)v); }
+static uint64_t hash_byte(const void *v) {
+    VELA_PROFILE_SCOPE("maps"); return hash_u64(*(const uint8_t *)v); }
 static bool eq_byte(const void *a, const void *b) { return *(const uint8_t *)a == *(const uint8_t *)b; }
-static uint64_t hash_bool(const void *v) { return hash_u64(*(const bool *)v); }
+static uint64_t hash_bool(const void *v) {
+    VELA_PROFILE_SCOPE("maps"); return hash_u64(*(const bool *)v); }
 static bool eq_bool(const void *a, const void *b) { return *(const bool *)a == *(const bool *)b; }
 
 static inline uint64_t hash_str(const void *v) {
+    VELA_PROFILE_SCOPE("maps");
     // Word at a time (M16b), and the last bytes in at most two loads that
     // may overlap, as wyhash reads them. A map's order is the order of
     // insertion, so the hash decides only where an entry's number goes in
@@ -203,10 +217,12 @@ static void share_elem(const vela_type *t, void *v) {
 // ---- Str ----
 
 void vela_str_release(vela_str s) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (s.obj && vela_rc_dec(&s.obj->rc)) free(s.obj);
 }
 
 vela_str vela_str_concat(vela_str a, vela_str b) {
+    VELA_PROFILE_SCOPE("strings");
     int64_t len;
     if (__builtin_add_overflow(a.len, b.len, &len)) vela_panic("vela runtime", "string too long");
     vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
@@ -217,15 +233,18 @@ vela_str vela_str_concat(vela_str a, vela_str b) {
 }
 
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc) {
+    VELA_PROFILE_SCOPE("strings");
     return vela_slice(s, lo, hi, loc);
 }
 
 uint8_t vela_str_at(vela_str s, int64_t i, const char *loc) {
+    VELA_PROFILE_SCOPE("element access");
     if (i < 0 || i >= s.len) vela_panic(loc, "index out of range");
     return s.data[i];
 }
 
 static inline bool str_eq(vela_str a, vela_str b) {
+    VELA_PROFILE_SCOPE("strings");
     if (a.len != b.len) return false;
     uint64_t n = (uint64_t)a.len;
     // Short strings, the usual map keys, without a call (M16b): two loads
@@ -246,10 +265,12 @@ static inline bool str_eq(vela_str a, vela_str b) {
 }
 
 bool vela_str_eq(vela_str a, vela_str b) {
+    VELA_PROFILE_SCOPE("strings");
     return str_eq(a, b);
 }
 
 int vela_str_cmp(vela_str a, vela_str b) {
+    VELA_PROFILE_SCOPE("strings");
     int64_t n = a.len < b.len ? a.len : b.len;
     int c = n ? memcmp(a.data, b.data, (size_t)n) : 0;
     if (c != 0) return c;
@@ -258,8 +279,10 @@ int vela_str_cmp(vela_str a, vela_str b) {
 
 // Native code already holds Str values by address. Read-only comparisons
 // can borrow those values instead of constructing C aggregate argument copies.
-bool vela_str_eq_ptr(const vela_str *a, const vela_str *b) { return str_eq(*a, *b); }
-int vela_str_cmp_ptr(const vela_str *a, const vela_str *b) { return vela_str_cmp(*a, *b); }
+bool vela_str_eq_ptr(const vela_str *a, const vela_str *b) {
+    VELA_PROFILE_SCOPE("strings"); return str_eq(*a, *b); }
+int vela_str_cmp_ptr(const vela_str *a, const vela_str *b) {
+    VELA_PROFILE_SCOPE("strings"); return vela_str_cmp(*a, *b); }
 
 // ---- Arrays ----
 
@@ -273,6 +296,7 @@ static unsigned char *inline_data(vela_array *a) {
 }
 
 vela_array *vela_array_new(const vela_type *elem, int64_t cap) {
+    VELA_PROFILE_SCOPE("allocation");
     check_count(cap);
     size_t size = checked_bytes((uint64_t)cap, elem->size, sizeof(vela_array));
     vela_array *a = vela_box_alloc(size);
@@ -287,6 +311,7 @@ vela_array *vela_array_new(const vela_type *elem, int64_t cap) {
 
 // Room for `bytes` bytes of elements, keeping the ones there.
 static void array_resize(vela_array *a, size_t bytes) {
+    VELA_PROFILE_SCOPE("allocation");
     if (a->data == inline_data(a)) {
         unsigned char *data = vela_alloc(bytes);
         if (a->len) memcpy(data, a->data, a->elem->size * (size_t)a->len);
@@ -297,6 +322,7 @@ static void array_resize(vela_array *a, size_t bytes) {
 }
 
 void vela_array_release(vela_array *a) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_dec(&a->rc)) return;
     if (a->elem->release) {
         for (int64_t i = 0; i < a->len; i++) a->elem->release(a->data + a->elem->size * (size_t)i);
@@ -306,6 +332,7 @@ void vela_array_release(vela_array *a) {
 }
 
 void vela_array_unique(vela_array **ap) {
+    VELA_PROFILE_SCOPE("copy-on-write");
     vela_array *a = *ap;
     if (vela_rc_unique(&a->rc)) return;  // nobody else can see it: change it in place
     vela_array *copy = vela_array_new(a->elem, a->len);
@@ -320,16 +347,19 @@ void vela_array_unique(vela_array **ap) {
 }
 
 void vela_array_share(vela_array *a) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_share(&a->rc) || !a->elem->share) return;
     for (int64_t i = 0; i < a->len; i++) share_elem(a->elem, a->data + a->elem->size * (size_t)i);
 }
 
 void *vela_array_at(vela_array *a, int64_t i, const char *loc) {
+    VELA_PROFILE_SCOPE("element access");
     if (i < 0 || i >= a->len) vela_panic(loc, "index out of range");
     return a->data + a->elem->size * (size_t)i;
 }
 
 void vela_array_grow(vela_array *a) {
+    VELA_PROFILE_SCOPE("push");
     // Doubling makes n pushes cost O(n) in total.
     a->cap = a->cap < 4 ? 4 : a->cap * 2;
     check_count(a->cap);
@@ -337,12 +367,14 @@ void vela_array_grow(vela_array *a) {
 }
 
 void vela_array_push(vela_array *a, const void *elem) {
+    VELA_PROFILE_SCOPE("push");
     if (a->len == a->cap) vela_array_grow(a);
     memcpy(a->data + a->elem->size * (size_t)a->len, elem, a->elem->size);
     a->len++;
 }
 
 void vela_array_set(vela_array *a, int64_t i, const void *elem, const char *loc) {
+    VELA_PROFILE_SCOPE("element access");
     void *slot = vela_array_at(a, i, loc);
     release_elem(a->elem, slot);
     memcpy(slot, elem, a->elem->size);
@@ -374,20 +406,24 @@ vela_array *vela_array_slice(vela_array *a, int64_t lo, int64_t hi, const char *
 // Keep 15 high hash bits beside the entry number. A probe can reject a
 // collision before fetching that entry's full hash, liveness or string.
 static inline int64_t map_index_entry(int64_t i, uint64_t h) {
+    VELA_PROFILE_SCOPE("maps");
     return (int64_t)((h & MAP_TAG_MASK) | (uint64_t)i);
 }
 
-static void *map_key(vela_map *m, int64_t i) { return m->keys + m->key->size * (size_t)i; }
+static void *map_key(vela_map *m, int64_t i) {
+    VELA_PROFILE_SCOPE("maps"); return m->keys + m->key->size * (size_t)i; }
 
 // A key's hash and equality, with no call through its type for the usual
 // keys, Str and Int (M18).
 static inline uint64_t key_hash(const vela_map *m, const void *key) {
+    VELA_PROFILE_SCOPE("maps");
     if (m->key == &vela_type_str) return hash_str(key);
     if (m->key == &vela_type_int) return hash_int(key);
     return m->key->hash(key);
 }
 
 static inline bool key_eq(const vela_map *m, const void *a, const void *b) {
+    VELA_PROFILE_SCOPE("maps");
     if (m->key == &vela_type_str) return str_eq(*(const vela_str *)a, *(const vela_str *)b);
     if (m->key == &vela_type_int) return *(const int64_t *)a == *(const int64_t *)b;
     return m->key->eq(a, b);
@@ -396,6 +432,7 @@ static inline bool key_eq(const vela_map *m, const void *a, const void *b) {
 // memcpy of an element, with the usual sizes known to the C compiler, so
 // it copies them inline instead of calling memcpy.
 static inline void copy_elem(void *to, const void *from, size_t size) {
+    VELA_PROFILE_SCOPE("copying");
     switch (size) {
     case 8: memcpy(to, from, 8); return;
     case 16: memcpy(to, from, 16); return;
@@ -403,9 +440,11 @@ static inline void copy_elem(void *to, const void *from, size_t size) {
     default: memcpy(to, from, size);
     }
 }
-static void *map_value(vela_map *m, int64_t i) { return m->values + m->value->size * (size_t)i; }
+static void *map_value(vela_map *m, int64_t i) {
+    VELA_PROFILE_SCOPE("maps"); return m->values + m->value->size * (size_t)i; }
 
 static void map_reserve(vela_map *m, int64_t cap) {
+    VELA_PROFILE_SCOPE("maps");
     check_count(cap);
     m->cap = cap;
     m->keys = vela_realloc(m->keys, checked_bytes((uint64_t)cap, m->key->size, 0));
@@ -415,6 +454,7 @@ static void map_reserve(vela_map *m, int64_t cap) {
 }
 
 static void map_rebuild_index(vela_map *m, int64_t index_cap) {
+    VELA_PROFILE_SCOPE("maps");
     // Compact first, so removed entries stop taking up space and slots.
     int64_t j = 0;
     for (int64_t i = 0; i < m->count; i++) {
@@ -439,6 +479,7 @@ static void map_rebuild_index(vela_map *m, int64_t index_cap) {
 }
 
 vela_map *vela_map_new(const vela_type *key, const vela_type *value) {
+    VELA_PROFILE_SCOPE("maps");
     vela_map *m = vela_alloc(sizeof(vela_map));
     *m = (vela_map){1, 0, 0, 0, key, value, NULL, NULL, NULL, NULL, 0, NULL};
     map_reserve(m, 4);
@@ -447,6 +488,7 @@ vela_map *vela_map_new(const vela_type *key, const vela_type *value) {
 }
 
 void vela_map_release(vela_map *m) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_dec(&m->rc)) return;
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
@@ -462,6 +504,7 @@ void vela_map_release(vela_map *m) {
 }
 
 void vela_map_unique(vela_map **mp) {
+    VELA_PROFILE_SCOPE("copy-on-write");
     vela_map *m = *mp;
     if (vela_rc_unique(&m->rc)) return;
     vela_map *copy = vela_map_new(m->key, m->value);
@@ -476,6 +519,7 @@ void vela_map_unique(vela_map **mp) {
 }
 
 void vela_map_share(vela_map *m) {
+    VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_share(&m->rc)) return;
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
@@ -504,15 +548,18 @@ static inline __attribute__((always_inline)) int64_t map_lookup_hashed(vela_map 
 }
 
 static int64_t map_lookup(vela_map *m, const void *key) {
+    VELA_PROFILE_SCOPE("maps");
     return map_lookup_hashed(m, key, key_hash(m, key));
 }
 
 void *vela_map_find(vela_map *m, const void *key) {
+    VELA_PROFILE_SCOPE("maps");
     int64_t i = map_lookup(m, key);
     return i < 0 ? NULL : map_value(m, i);
 }
 
 void *vela_map_at(vela_map *m, const void *key, const char *loc) {
+    VELA_PROFILE_SCOPE("maps");
     void *v = vela_map_find(m, key);
     if (v == NULL) vela_panic(loc, "key not found in map");
     return v;
@@ -521,6 +568,7 @@ void *vela_map_at(vela_map *m, const void *key, const char *loc) {
 // The key is already there, its value at `slot`: keep the old key, drop
 // the new one.
 static void map_replace(vela_map *m, void *slot, const void *key, const void *value) {
+    VELA_PROFILE_SCOPE("maps");
     release_elem(m->key, (void *)key);
     release_elem(m->value, slot);
     copy_elem(slot, value, m->value->size);
@@ -528,6 +576,7 @@ static void map_replace(vela_map *m, void *slot, const void *key, const void *va
 
 // A key known not to be in the map, with hash h.
 static void map_insert(vela_map *m, const void *key, const void *value, uint64_t h) {
+    VELA_PROFILE_SCOPE("maps");
     if (m->count == m->cap) map_reserve(m, m->cap * 2);
     if ((m->count + 1) * 3 > m->index_cap * 2) {
         // Keep the table at most two thirds full, so walks stay short.
@@ -546,6 +595,7 @@ static void map_insert(vela_map *m, const void *key, const void *value, uint64_t
 }
 
 static void map_set_hashed(vela_map *m, const void *key, const void *value, uint64_t h) {
+    VELA_PROFILE_SCOPE("maps");
     int64_t i = map_lookup_hashed(m, key, h);
     if (i >= 0) {
         map_replace(m, map_value(m, i), key, value);
@@ -555,6 +605,7 @@ static void map_set_hashed(vela_map *m, const void *key, const void *value, uint
 }
 
 void vela_map_set(vela_map *m, const void *key, const void *value) {
+    VELA_PROFILE_SCOPE("maps");
     map_set_hashed(m, key, value, key_hash(m, key));
 }
 
@@ -571,6 +622,7 @@ void vela_map_set(vela_map *m, const void *key, const void *value) {
 // is borrowed, and retained only when the map keeps it: a new value for a
 // key already there costs no reference count.
 void *vela_map_find_hashed(vela_map *m, const void *key, uint64_t *h) {
+    VELA_PROFILE_SCOPE("maps");
     *h = key_hash(m, key);
     int64_t i = map_lookup_hashed(m, key, *h);
     return i < 0 ? NULL : map_value(m, i);
@@ -592,6 +644,7 @@ void vela_map_set_found(vela_map *m, const vela_map *looked_in, void *slot, uint
 }
 
 bool vela_map_remove(vela_map *m, const void *key) {
+    VELA_PROFILE_SCOPE("maps");
     int64_t i = map_lookup(m, key);
     if (i < 0) return false;
     release_elem(m->key, map_key(m, i));
@@ -612,6 +665,7 @@ bool vela_map_remove(vela_map *m, const void *key) {
 }
 
 vela_array *vela_map_keys(vela_map *m) {
+    VELA_PROFILE_SCOPE("maps");
     vela_array *a = vela_array_new(m->key, m->len);
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
@@ -734,6 +788,7 @@ static vela_str str_from(const char *data, size_t len);
 
 // A line and its newline, with nothing from another thread between them.
 static void print_line(FILE *f, const char *data, size_t len) {
+    VELA_PROFILE_SCOPE("output");
     flockfile(f);
     if (len) fwrite(data, 1, len, f);
     putc_unlocked('\n', f);
@@ -811,6 +866,7 @@ int64_t vela_float_to_int(double x, const char *loc) {
 }
 
 void vela_print_float(double x) {
+    VELA_PROFILE_SCOPE("output");
     char buf[40];
     int len = float_text(x, buf, sizeof buf);
     if (fake_stdout) {
@@ -827,6 +883,7 @@ void vela_eprint_float(double x) {
 }
 
 void vela_print_int(int64_t x) {
+    VELA_PROFILE_SCOPE("output");
     if (fake_stdout) {
         char buf[32];
         int len = snprintf(buf, sizeof buf, "%" PRId64, x);
@@ -839,6 +896,7 @@ void vela_print_int(int64_t x) {
 }
 
 void vela_print_bool(bool x) {
+    VELA_PROFILE_SCOPE("output");
     if (fake_stdout) {
         captured(x ? VELA_STR("true", 4) : VELA_STR("false", 5));
         return;
@@ -847,6 +905,7 @@ void vela_print_bool(bool x) {
 }
 
 void vela_print_str(vela_str x) {
+    VELA_PROFILE_SCOPE("output");
     if (fake_stdout) {
         captured(x);
         return;
@@ -944,6 +1003,7 @@ void vela_init(int argc, char **argv) {
 }
 
 vela_array *vela_os_args(void) {
+    VELA_PROFILE_SCOPE("other runtime");
     if (fake_args) {
         vela_array_retain(fake_args);
         return fake_args;
@@ -960,16 +1020,19 @@ vela_array *vela_os_args(void) {
 }
 
 void vela_os_exit(int64_t code, const char *loc) {
+    VELA_PROFILE_SCOPE("other runtime");
     vela_cap_require("os");
     if (code < 0 || code > 255) vela_panic(loc, "exit code must be 0 to 255");
     fflush(stdout);
     fflush(stderr);
+    vela_observe_flush();
     _Exit((int)code);
 }
 
 // ---- files ----
 
 static vela_str str_from(const char *data, size_t len) {
+    VELA_PROFILE_SCOPE("strings");
     vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
     obj->rc = 1;
     if (len) memcpy(obj->bytes, data, len);
@@ -996,6 +1059,7 @@ static char *c_path(vela_str path) {
 }
 
 bool vela_files_read(vela_str path, vela_str *out) {
+    VELA_PROFILE_SCOPE("other runtime");
     if (files_faked) {
         lock_fakes();
         vela_str *found = vela_map_find(fake_files, &path);
@@ -1049,6 +1113,7 @@ bool vela_files_read(vela_str path, vela_str *out) {
 }
 
 bool vela_files_write(vela_str path, vela_str data, vela_str *err) {
+    VELA_PROFILE_SCOPE("other runtime");
     if (files_faked) {
         vela_str_retain(path);  // the map owns what it is given
         vela_str_retain(data);
@@ -1086,6 +1151,7 @@ bool vela_files_write(vela_str path, vela_str data, vela_str *err) {
 // ---- strings ----
 
 void vela_builder_add(vela_array *b, vela_str s) {
+    VELA_PROFILE_SCOPE("push");
     if (s.len == 0) return;
     int64_t need;
     if (__builtin_add_overflow(b->len, s.len, &need)) vela_panic("vela runtime", "string too long");
@@ -1101,12 +1167,14 @@ void vela_builder_add(vela_array *b, vela_str s) {
 }
 
 void vela_builder_add_int(vela_array *b, int64_t n) {
+    VELA_PROFILE_SCOPE("strings");
     char buf[24];  // INT64_MIN is 20 characters
     int len = snprintf(buf, sizeof buf, "%" PRId64, n);
     vela_builder_add(b, (vela_str){NULL, (const uint8_t *)buf, len});
 }
 
 vela_str vela_builder_build(vela_array *b) {
+    VELA_PROFILE_SCOPE("strings");
     return str_from((const char *)b->data, (size_t)b->len);
 }
 
@@ -1460,6 +1528,7 @@ void vela_os_write(vela_str s) {
 }
 
 bool vela_os_env(vela_str name, vela_str *out) {
+    VELA_PROFILE_SCOPE("other runtime");
     if (fake_env) {
         vela_str *found = vela_map_find(fake_env, &name);
         if (!found) return false;
@@ -1514,6 +1583,7 @@ double vela_math_sqrt(double x) {
 }
 
 int64_t vela_tasks_workers(void) {
+    VELA_PROFILE_SCOPE("other runtime");
     int64_t n = __atomic_load_n(&workers, __ATOMIC_RELAXED);
     if (n > 0) return n;
 #if defined(__wasi__)
@@ -1675,6 +1745,7 @@ static void run_tasks(vela_array *xs, void *f, vela_env *env, vela_task_call cal
 }
 
 vela_array *vela_tasks_map(vela_array *xs, void *f, vela_env *env, vela_task_call call, const vela_type *result) {
+    VELA_PROFILE_SCOPE("other runtime");
     vela_array *out = vela_array_new(result, xs->len);
     run_tasks(xs, f, env, call, out->data, result->size);
     out->len = xs->len;  // every slot is filled now
@@ -1717,6 +1788,7 @@ vela_str vela_from_uint(uint64_t n) {
     return str_from(buf, (size_t)len);
 }
 void vela_print_uint(uint64_t n) {
+    VELA_PROFILE_SCOPE("output");
     if (fake_stdout) { vela_str s = vela_from_uint(n); captured(s); vela_str_release(s); return; }
     char buf[32];
     int len = snprintf(buf, sizeof buf, "%" PRIu64, n);
@@ -1867,3 +1939,10 @@ void vela_native_rc_inc(int64_t *rc) { vela_rc_inc(rc); }
 bool vela_native_rc_dec(int64_t *rc) { return vela_rc_dec(rc); }
 void *vela_native_box_alloc(int64_t size) { return vela_box_alloc((size_t)size); }
 void vela_native_box_free(void *p, int64_t size) { vela_box_free(p, (size_t)size); }
+
+#ifdef VELA_PROFILE
+void vela_observe_copy(void *dst, const void *src, int64_t size) {
+    VELA_PROFILE_SCOPE("copying");
+    memmove(dst, src, (size_t)size);
+}
+#endif

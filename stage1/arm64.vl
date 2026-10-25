@@ -1,4 +1,5 @@
 // Darwin ARM64 from the common IR, with loop-aware physical allocation.
+import debug_info
 import ir
 import bits
 import regalloc
@@ -10,7 +11,7 @@ type Pass = struct { bank: Int, at: Int, size: Int, copy: Int }
 type Plan = struct { args: [Pass], bytes: Int }
 type Out = struct {
     lines: [Str], f: ir.Func, fid: Int, homes: [Int], slots: [Int], locs: [regalloc.Loc], labels: Int,
-    stubs: [Str], doubles: Map[Str, Str], locals: Map[Str, Bool], frameless: Bool
+    stubs: [Str], doubles: Map[Str, Str], locals: Map[Str, Bool], frameless: Bool, files: Map[Str, Int]
 }
 fn num(n: Int) -> Str { return strings.from_int(n) }
 fn align(n: Int, a: Int) -> Int { return (n + a - 1) / a * a }
@@ -141,6 +142,7 @@ fn call(o: mut Out, i: ir.Inst) {
 }
 fn instruction(o: mut Out, i: ir.Inst) {
     let op = i.op
+    if op == ir.Op.Source { emit(mut o, ".loc " + num(o.files[i.sym]) + " " + num(i.imm) + " " + num(i.imm2)); return }
     if op == ir.Op.Label { push(mut o.lines, ir_label(o, i.imm) + ":"); return }
     if op == ir.Op.Const { if o.locs[i.dst].kind >= 2 { return }; let r = result(o, i.dst, "x9"); constant(mut o, r, i.imm); put(mut o, i.dst, r); return }
     if op == ir.Op.SlotAddr || op == ir.Op.SymAddr {
@@ -266,7 +268,7 @@ fn rotate(o: mut Out, at: Int, counts: [Int], known: [Bool]) -> Int {
     let a = source(mut o, i.a, "x9"); let dst = result(o, r.dst, "x11")
     emit(mut o, "ror " + width_reg(dst, 4) + ", " + width_reg(a, 4) + ", #" + num(n)); put(mut o, r.dst, dst); return k + 3 - at
 }
-fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], locals: Map[Str, Bool]) -> [Str] {
+fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], locals: Map[Str, Bool], files: Map[Str, Int]) -> [Str] {
     let locs = regalloc.allocate(f); let mut saved: [Str] = []
     for l in locs { if l.kind == 0 && regalloc.callee(l.reg) { let mut found = false; for r in saved { if r == l.reg { found = true } }; if !found { push(mut saved, l.reg) } } }
     let mut homes: [Int] = []; let mut slots: [Int] = []; let mut at = len(saved) * 8
@@ -277,16 +279,26 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], locals: Map[Str, B
     let total = align(at + outgoing, 16)
     let mut returning_call = false
     for k in 0..len(f.insts) { let i = f.insts[k]; if (i.op == ir.Op.Call || i.op == ir.Op.CallInd || i.op == ir.Op.CCall || (i.op == ir.Op.Copy && i.imm > 256)) && !(k + 1 < len(f.insts) && f.insts[k+1].op == ir.Op.Unreachable) { returning_call = true } }
-    let frameless = total == 0 && len(saved) == 0 && len(f.params) <= 8 && !returning_call
-    let mut o = Out { lines: [], f: f, fid: fid, homes: homes, slots: slots, locs: locs, labels: 0, stubs: [], doubles: doubles, locals: locals, frameless: frameless }
+    let debug = len(files) > 0
+    let frameless = !debug && total == 0 && len(saved) == 0 && len(f.params) <= 8 && !returning_call
+    let mut o = Out { lines: [], f: f, fid: fid, homes: homes, slots: slots, locs: locs, labels: 0, stubs: [], doubles: doubles, locals: locals, frameless: frameless, files: files }
     emit(mut o, ".p2align 2"); if f.public { emit(mut o, ".globl " + symbol(f.name)) }; push(mut o.lines, symbol(f.name) + ":")
-    if !frameless { emit(mut o, "stp x29, x30, [sp, #-16]!"); emit(mut o, "mov x29, sp") }
+    if debug { emit(mut o, ".loc 1 0 0"); emit(mut o, ".cfi_startproc") }
+    if !frameless {
+        emit(mut o, "stp x29, x30, [sp, #-16]!")
+        if debug { emit(mut o, ".cfi_def_cfa_offset 16"); emit(mut o, ".cfi_offset w29, -16"); emit(mut o, ".cfi_offset w30, -8") }
+        emit(mut o, "mov x29, sp")
+        if debug { emit(mut o, ".cfi_def_cfa_register w29") }
+    }
     if total > 0 && total <= 4095 { emit(mut o, "sub sp, sp, #" + num(total)) } else if total > 0 {
         constant(mut o, "x14", total)
         if total > 4096 { let again = label(mut o); let last = label(mut o); push(mut o.lines, again + ":"); emit(mut o, "cmp x14, #1, lsl #12"); emit(mut o, "b.ls " + last); emit(mut o, "sub sp, sp, #1, lsl #12"); emit(mut o, "str xzr, [sp]"); emit(mut o, "sub x14, x14, #1, lsl #12"); emit(mut o, "b " + again); push(mut o.lines, last + ":") }
         emit(mut o, "sub sp, sp, x14"); emit(mut o, "str xzr, [sp]")
     }
-    for k in 0..len(saved) { emit(mut o, "stur " + saved[k] + ", [x29, #-" + num((k+1)*8) + "]") }
+    for k in 0..len(saved) {
+        emit(mut o, "stur " + saved[k] + ", [x29, #-" + num((k+1)*8) + "]")
+        if debug { emit(mut o, ".cfi_offset " + saved[k] + ", -" + num(16+(k+1)*8)) }
+    }
     let mut kinds: [Int] = []; for p in f.params { let mut k = ir.KIND_INT(); if f.classes[p] == ir.FLOAT() { k = ir.KIND_FLOAT() }; push(mut kinds, k) }
     let inputs = plan(kinds, f.abi, -1, len(f.abi) == 0)
     for k in 0..len(f.params) {
@@ -316,8 +328,12 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], locals: Map[Str, B
         }
         instruction(mut o, i); k = k + 1
     }
-    if !frameless { push(mut o.lines, "LR" + num(fid) + ":"); for k in 0..len(saved) { emit(mut o, "ldur " + saved[k] + ", [x29, #-" + num((k+1)*8) + "]") }; emit(mut o, "mov sp, x29"); emit(mut o, "ldp x29, x30, [sp], #16"); emit(mut o, "ret") }
-    for s in o.stubs { push(mut o.lines, s) }; for key in maps.keys(o.doubles) { doubles[key] = o.doubles[key] }; return o.lines
+    if debug { emit(mut o, ".cfi_remember_state") }
+    if !frameless { push(mut o.lines, "LR" + num(fid) + ":"); for k in 0..len(saved) { emit(mut o, "ldur " + saved[k] + ", [x29, #-" + num((k+1)*8) + "]") }; emit(mut o, "mov sp, x29"); emit(mut o, "ldp x29, x30, [sp], #16"); if debug { emit(mut o, ".cfi_def_cfa sp, 0"); emit(mut o, ".cfi_restore w29"); emit(mut o, ".cfi_restore w30") }; emit(mut o, "ret") }
+    if debug { emit(mut o, ".cfi_restore_state") }
+    for s in o.stubs { push(mut o.lines, s) }
+    if debug { emit(mut o, ".cfi_endproc"); push(mut o.lines, "LVD" + num(fid) + "end:") }
+    for key in maps.keys(o.doubles) { doubles[key] = o.doubles[key] }; return o.lines
 }
 fn data(b: mut strings.Builder, d: ir.Data) {
     strings.add(mut b, "    .p2align 3\n" + symbol(d.label) + ":\n")
@@ -328,13 +344,16 @@ fn data(b: mut strings.Builder, d: ir.Data) {
 }
 pub fn program(p: ir.Program) -> Str {
     let mut b = strings.builder(); strings.add(mut b, "    .section __TEXT,__text,regular,pure_instructions\n")
+    let files = debug_info.files(p); strings.add(mut b, debug_info.header(p, true))
     let mut locals: Map[Str, Bool] = [:]; for f in p.funcs { locals[f.name] = true }; for d in p.data { locals[d.label] = true }
     let mut doubles: Map[Str, Str] = [:]
-    for i in 0..len(p.funcs) { for line in function(p.funcs[i], i, mut doubles, locals) { strings.add(mut b, line + "\n") } }
+    for i in 0..len(p.funcs) { for line in function(p.funcs[i], i, mut doubles, locals, files) { strings.add(mut b, line + "\n") } }
+    if len(files) > 0 { strings.add(mut b, "LVDend:\n") }
     strings.add(mut b, "    .section __TEXT,__const\n")
     for row in [".Lmsg_overflow", ".Lmsg_div0", ".Lmsg_byte", ".Lmsg_tobyte"] { let message = match row { ".Lmsg_overflow" => "integer overflow", ".Lmsg_div0" => "division by zero", ".Lmsg_byte" => "byte overflow", _ => "value does not fit in a Byte" }; strings.add(mut b, symbol(row) + ":\n    .asciz \"" + message + "\"\n") }
     for value in maps.keys(doubles) { strings.add(mut b, "    .p2align 3\n" + symbol(doubles[value]) + ":\n    .double " + value + "\n") }
     for d in p.data { if !d.relocated { data(mut b, d) } }
     strings.add(mut b, "    .section __DATA,__const\n"); for d in p.data { if d.relocated { data(mut b, d) } }
+    strings.add(mut b, debug_info.dwarf(p, true))
     strings.add(mut b, "    .subsections_via_symbols\n"); return strings.build(b)
 }

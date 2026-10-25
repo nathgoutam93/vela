@@ -83,6 +83,7 @@ pub type Op = enum {
     // the result comes back (RET_*); a is where a vela_str result goes, or -1
     RcInc  // one more reference to the object at a, whose count is its first word
     RcDec  // dst = 1 if a reference to the object at a was the last, after dropping it
+    Source  // sym: file, imm: line, imm2: column (debug builds only)
     Unreachable  // after a call that never returns
 }
 
@@ -144,6 +145,9 @@ pub fn FLOAT() -> Int {
 }
 
 pub type Func = struct {
+    source: Str
+    source_line: Int
+    display: Str
     name: Str  // its symbol
     public: Bool  // seen by other object files: main, and nothing else
     params: [Int]  // the registers its arguments arrive in, in order
@@ -170,7 +174,7 @@ pub type Program = struct {
 
 pub fn new_func(name: Str, result: Int) -> Func {
     return Func {
-        name: name, public: false, params: [], result: result, insts: [], classes: [], slot_sizes: [], slot_aligns: [],
+        source: "", source_line: 0, display: "", name: name, public: false, params: [], result: result, insts: [], classes: [], slot_sizes: [], slot_aligns: [],
         labels: 0, abi: [],
     }
 }
@@ -323,6 +327,7 @@ pub fn op_name(op: Op) -> Str {
         Op.CCall => "ccall"
         Op.RcInc => "rc.inc"
         Op.RcDec => "rc.dec"
+        Op.Source => "source"
         Op.Unreachable => "unreachable"
     }
 }

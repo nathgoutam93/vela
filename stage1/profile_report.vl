@@ -1,0 +1,29 @@
+// Human-readable attribution from the runtime's versioned JSON report.
+import json
+import maps
+import os
+import strings
+pub fn show(data: Str) -> Bool {
+    let mut doc = json.null()
+    match json.parse(data) { Ok(d) => doc = d, Err(_) => return false }
+    if json.str_or(json.get(doc, "format"), "") != "vela.profile" || json.int_or(json.get(doc, "version"), 0) != 1 { return false }
+    os.eprint("Vela profile: instrumented elapsed time (ns); worker times may overlap")
+    if !json.bool_or(json.get(doc, "complete"), false) { os.eprint("incomplete: active calls or truncated instrumentation; timings include completed calls only") }
+    let mut rows = json.items(json.get(doc, "functions")); let mut categories: Map[Str, Int] = [:]
+    for row in rows {
+        let kind = json.str_or(json.get(row, "category"), "other runtime")
+        let mut n = 0; match maps.get(categories, kind) { Some(v) => n = v, None => {} }
+        categories[kind] = n + json.int_or(json.get(row, "self_ns"), 0)
+    }
+    os.eprint("self ns  calls  function")
+    for _ in 0..len(rows) {
+        let mut best = -1; let mut ns = -1
+        for i in 0..len(rows) { let value = json.int_or(json.get(rows[i], "self_ns"), -1); if value > ns { best = i; ns = value } }
+        if best < 0 { break }
+        let row = rows[best]; rows[best] = json.null()
+        os.eprint(strings.from_int(ns) + "  " + strings.from_int(json.int_or(json.get(row, "calls"), 0)) + "  " + json.str_or(json.get(row, "name"), "?"))
+    }
+    os.eprint("self ns by category:")
+    for kind in maps.keys(categories) { os.eprint("  " + kind + ": " + strings.from_int(categories[kind])) }
+    return true
+}

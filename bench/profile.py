@@ -20,6 +20,9 @@ instructions each function executes itself, by what the function does:
     program         the program's own code, with the overflow checks the
                     C compiler inlines into it
 
+For instrumented elapsed attribution without Valgrind, use
+`vela profile [--json REPORT] bench/NAME/main.vl ARGS...` (M27).
+
 Instruction counts are not time (a cache miss costs more than an add), but
 they are exact and repeatable, and they show which costs are worth
 attacking first.
@@ -39,7 +42,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BENCH = ROOT / "bench"
 sys.path.insert(0, str(BENCH))
-from run import BENCHES  # noqa: E402
+from run import BENCHES, build, source_identity  # noqa: E402
 
 SIZES = {
     "nbody": ["100000"], "spectralnorm": ["300"], "fannkuch": ["8"], "binarytrees": ["12"],
@@ -88,13 +91,51 @@ def profile(name: str, exe: Path, args: list[str], work: Path) -> dict[str, int]
     return totals
 
 
+def instrumented(vela: Path, opts) -> int:
+    """The M27 counterpart: elapsed boundary attribution, independent C output."""
+    results = {}; identity = source_identity()
+    columns = [k for k, _ in KINDS] + ["program", "other runtime"]
+    print("Instrumented elapsed time; workers may overlap. These are not instruction counts.")
+    print("| Benchmark | Self ms | " + " | ".join(columns) + " |")
+    print("|" + " --- |" * (len(columns) + 2))
+    with tempfile.TemporaryDirectory(prefix="vela-observe-") as tmp:
+        work = Path(tmp); fasta, _ = build("c", next(b for b in BENCHES if b.name == "fasta"), work, vela)
+        files = {"{fasta}": str(work / "fasta.txt"), "{words}": str(work / "words.txt")}
+        with open(files["{fasta}"], "wb") as f: subprocess.run([str(fasta), "1000"], stdout=f, check=True)
+        with open(files["{words}"], "wb") as f: subprocess.run([sys.executable, str(BENCH / "words.py"), "2000"], stdout=f, check=True)
+        for b in BENCHES:
+            if opts.only and b.name not in opts.only: continue
+            args = [files.get(a, a) for a in b.quick]
+            oracle, _ = build("c", b, work, vela)
+            expected = subprocess.run([str(oracle), *args], capture_output=True, check=True, timeout=240).stdout
+            report = work / (b.name + ".json")
+            ran = subprocess.run([str(vela), "profile", "--json", str(report), str(BENCH / b.name / "main.vl"), *args],
+                                 env={**os.environ, "VELA_BACKEND": opts.backend}, capture_output=True, check=True, timeout=240)
+            if ran.stdout != expected: raise RuntimeError(b.name + ": instrumented output differs from independent C")
+            doc = json.loads(report.read_text())
+            if not doc["complete"] or doc["truncated"]: raise RuntimeError(b.name + ": incomplete observation")
+            totals = {}
+            for row in doc["functions"]: totals[row["category"]] = totals.get(row["category"], 0) + row["self_ns"]
+            total = sum(totals.values()) or 1
+            cells = [f"{100 * totals.get(c, 0) / total:.0f}%" for c in columns]
+            print(f"| {b.name} | {total / 1e6:.2f} | " + " | ".join(cells) + " |", flush=True)
+            results[b.name] = {"args": b.quick, "output_matches_independent_c": True, "self_ns_by_category": totals, "profile": doc}
+    if source_identity() != identity: raise RuntimeError("sources changed during observation")
+    if opts.json:
+        Path(opts.json).write_text(json.dumps({"measurement": "instrumented monotonic elapsed nanoseconds", "backend": opts.backend,
+            "quick": True, "source_sha256": identity, "results": results}, indent=2) + "\n")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("only", nargs="*")
     ap.add_argument("--backend", choices=["c", "native"], default="c")
     ap.add_argument("--json")
+    ap.add_argument("--instrumented", action="store_true", help="use vela profile at quick sizes; elapsed ns, no Valgrind")
     ap.add_argument("--compiler", default=str(ROOT / "build" / "vela"))
     opts = ap.parse_args()
+    if opts.instrumented: return instrumented(Path(opts.compiler).resolve(), opts)
     if not shutil.which("valgrind"):
         print("bench/profile.py needs valgrind")
         return 1
@@ -118,7 +159,7 @@ def main() -> int:
             exe = work / b.name
             env = {**os.environ, "VELA_BACKEND": opts.backend}
             subprocess.run([str(vela), "build", str(BENCH / b.name / "main.vl"), "-o", str(exe)], env=env, check=True)
-            totals = profile(b.name, exe, [files.get(a, a) for a in SIZES[b.name]], work)
+            totals = profile(b.name, exe, [files.get(a, a) for a in SIZES.get(b.name, b.quick)], work)
             all_ = sum(totals.values()) or 1
             results[b.name] = totals
             cells = [f"{100 * totals.get(c, 0) / all_:.0f}%" for c in columns]

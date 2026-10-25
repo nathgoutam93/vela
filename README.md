@@ -24,6 +24,8 @@ sh bootstrap/bootstrap.sh     # builds build/vela, and checks the fixed point
 ```
 build/vela run hello.vl       # compile and run (imports are found next to it)
 build/vela build hello.vl     # produce ./hello, through C
+build/vela run --debug hello.vl # source maps and Vela panic stacks
+build/vela profile --json profile.json hello.vl # instrumented elapsed time
 build/vela test hello.vl      # run its `test` blocks (and those of what it imports)
 build/vela fmt -w hello.vl    # format it in place (-l lists unformatted files)
 build/vela c hello.vl         # show the generated C
@@ -211,3 +213,8 @@ SDK/sysroot for other clang toolchains. Windows restricted OS policies fail
 closed; WASI preview 1 runs tasks sequentially and returns unsupported errors
 for real process/socket APIs. See [M26](docs/m26-platforms.md) for commands,
 validated execution profiles and remaining acceptance work.
+
+M27 adds opt-in `.vl` source debugging for C and native output, Vela panic
+stacks (`VELA_PANIC=json` for agents), and `vela profile` function/runtime
+attribution without Valgrind. See [the walkthrough](docs/m27-observability.md)
+for commands, measurement limits and platform validation still outstanding.

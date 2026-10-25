@@ -22,6 +22,7 @@
 // The frame: rbp, the callee-saved registers used, then the IR's slots
 // and the spilled values, then the arguments of calls that go on the
 // stack, with rsp a multiple of 16 at every call.
+import debug_info
 import ir
 import live
 import lists
@@ -50,20 +51,23 @@ type Out = struct {
     stub_count: Int
     labels: Int  // local labels made for expansions
     doubles: Map[Str, Str]  // the label of each Float constant, shared by the file
+    files: Map[Str, Int]
     saved: [Str]  // callee-saved registers pushed
 }
 
 pub fn program(p: ir.Program) -> Str {
     let mut b = strings.builder()
     strings.add(mut b, "    .intel_syntax noprefix\n    .text\n")
+    let files = debug_info.files(p); strings.add(mut b, debug_info.header(p, false))
     let mut doubles: Map[Str, Str] = [:]
     for i in 0..len(p.funcs) {
-        let lines = function(p.funcs[i], i, mut doubles)
+        let lines = function(p.funcs[i], i, mut doubles, files)
         for l in lines {
             strings.add(mut b, l)
             strings.add_byte(mut b, '\n')
         }
     }
+    if len(files) > 0 { strings.add(mut b, ".LVDend:\n") }
     strings.add(mut b, "\n    .section .rodata\n")
     strings.add(mut b, ".Lmsg_overflow:\n    .asciz \"integer overflow\"\n")
     strings.add(mut b, ".Lmsg_div0:\n    .asciz \"division by zero\"\n")
@@ -84,6 +88,7 @@ pub fn program(p: ir.Program) -> Str {
             data(mut b, d)
         }
     }
+    strings.add(mut b, debug_info.dwarf(p, false))
     strings.add(mut b, "\n    .section .note.GNU-stack,\"\",@progbits\n")
     return strings.build(b)
 }
@@ -515,7 +520,7 @@ fn stack_bytes(f: ir.Func, i: ir.Inst) -> Int {
     return bytes
 }
 
-fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str]) -> [Str] {
+fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, Int]) -> [Str] {
     let mut locs = allocate(f)
     let mut saved: [Str] = []
     for r in ["rbx", "r12", "r13", "r14", "r15"] {
@@ -552,7 +557,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str]) -> [Str] {
     }
     let total = align_up(at + out_bytes, 16)
     let mut o = Out {
-        lines: [], fid: fid, locs: locs, classes: f.classes, stubs: [], stub_count: 0, labels: 0, doubles: doubles, saved: saved,
+        lines: [], fid: fid, locs: locs, classes: f.classes, stubs: [], stub_count: 0, labels: 0, doubles: doubles, saved: saved, files: files,
     }
     push(mut o.lines, "")
     push(mut o.lines, "    .p2align 4")
@@ -561,10 +566,15 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str]) -> [Str] {
     }
     push(mut o.lines, "    .type " + f.name + ", @function")
     push(mut o.lines, f.name + ":")
+    let debug = len(files) > 0
+    if debug { emit(mut o, ".loc 1 0 0"); emit(mut o, ".cfi_startproc") }
     emit(mut o, "push rbp")
+    if debug { emit(mut o, ".cfi_def_cfa_offset 16"); emit(mut o, ".cfi_offset rbp, -16") }
     emit(mut o, "mov rbp, rsp")
-    for r in saved {
-        emit(mut o, "push " + r)
+    if debug { emit(mut o, ".cfi_def_cfa_register rbp") }
+    for k in 0..len(saved) {
+        emit(mut o, "push " + saved[k])
+        if debug { emit(mut o, ".cfi_offset " + saved[k] + ", -" + num(24+k*8)) }
     }
     if total - 8 * len(saved) > 0 {
         emit(mut o, "sub rsp, " + num(total - 8 * len(saved)))
@@ -623,6 +633,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str]) -> [Str] {
         k = k + 1
     }
     push(mut o.lines, ".LR" + num(fid) + ":")
+    if debug { emit(mut o, ".cfi_remember_state") }
     if len(saved) > 0 {
         emit(mut o, "lea rsp, [rbp - " + num(8 * len(saved)) + "]")
     } else {
@@ -634,10 +645,13 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str]) -> [Str] {
         i = i - 1
     }
     emit(mut o, "pop rbp")
+    if debug { emit(mut o, ".cfi_def_cfa rsp, 8"); emit(mut o, ".cfi_restore rbp") }
     emit(mut o, "ret")
+    if debug { emit(mut o, ".cfi_restore_state") }
     for s in o.stubs {
         push(mut o.lines, s)
     }
+    if debug { emit(mut o, ".cfi_endproc"); push(mut o.lines, ".LVD" + num(fid) + "end:") }
     // Its size, so that profilers and debuggers can tell where it ends.
     push(mut o.lines, "    .size " + f.name + ", . - " + f.name)
     for key in maps.keys(o.doubles) {
@@ -680,6 +694,7 @@ fn branch_suffix(c: Str) -> Str {
 // is left out.
 fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
     let op = i.op
+    if op == ir.Op.Source { emit(mut o, ".loc " + num(o.files[i.sym]) + " " + num(i.imm) + " " + num(i.imm2)); return }
     if op == ir.Op.Label {
         push(mut o.lines, ir_label(o, i.imm) + ":")
         return
