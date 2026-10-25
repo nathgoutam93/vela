@@ -97,7 +97,8 @@ static void vela_trace_json(FILE *out) {
     for (size_t i = 0; i < vela_trace_depth; i++) {
         vela_trace_frame *f = &vela_trace[vela_trace_depth-1-i];
         if (strcmp(f->kind, "program")) continue;
-        if (!first) fputc(',', out); first = false;
+        if (!first) { fputc(',', out); }
+        first = false;
         fputs("{\"function\":", out); vela_json_text(out, f->name); fputs(",\"file\":", out); vela_json_text(out, f->file);
         fprintf(out, ",\"line\":%" PRId64 ",\"column\":%" PRId64 "}", f->line, f->col);
     }

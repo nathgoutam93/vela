@@ -27,6 +27,10 @@ done
 # records source positions (for panics) as "compiler/src/lexer.vl:12:5", so an
 # absolute path would make the output depend on where the repository is.
 cd "$(dirname "$0")/../.."
+if ! command -v cmp >/dev/null 2>&1; then
+    echo "bootstrap requires cmp; install diffutils and retry" >&2
+    exit 2
+fi
 cc=${VELA_CC:-cc}
 build=build
 platform_libs=

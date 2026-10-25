@@ -1691,7 +1691,66 @@ the same entry. Close it with a commit or validation result; keep its history.
   fixture bytes and historical JSON report bytes match the prior checkout;
   all current relative Markdown links resolve.
 
+### TL-067: Windows bootstrap requires cmp from MSYS2 diffutils
+
+- **Status:** in progress after M30; local fix applied, Windows rerun pending.
+- **Evidence:** the Windows C bootstrap step in
+  [run 40183666565](https://github.com/nathgoutam93/vela/actions/runs/40183666565/job/121139807808)
+  reports `cmp: command not found` at the fixed-point check, followed by the
+  misleading `NOT a fixed point` message. The same missing command appears
+  in later run 40188570070. MSYS2's `diffutils` package supplies `cmp.exe`.
+- **Impact:** Windows validation stops before the compiler or test suite can
+  be assessed.
+- **Workaround:** install `diffutils` in the CLANG64 MSYS2 environment.
+- **Resolution:** add `diffutils` to the workflow install list and make
+  bootstrap report the missing command before compilation.
+- **Acceptance:** manually dispatch Platforms on this commit; Windows bootstrap
+  must reach the fixed point and advance to the supported test suites. The
+  missing-command preflight exits 2 with the actionable message in a local
+  restricted-PATH check.
+
+### TL-068: Strict Linux C compilation rejects an observation-runtime line
+
+- **Status:** in progress after M30; local fix applied, Linux rerun pending.
+- **Evidence:** [run 40183666565](https://github.com/nathgoutam93/vela/actions/runs/40183666565/job/121139807985)
+  passed 304 C checks but failed M27, M28, and M29 integration checks when
+  GCC treated `runtime/vela_observe.inc:100` as
+  `-Werror=misleading-indentation`. The observed error is the adjacent `if`
+  and `first = false` statements on one line; any further Linux compiler
+  issue is unproven.
+- **Impact:** debug/profile-enabled programs cannot compile under the strict
+  Linux flags, obscuring the remaining integration results.
+- **Workaround:** split the condition and assignment into unambiguous statements.
+- **Resolution:** make the conditional body explicit and put `first = false`
+  on its own line, preserving behavior.
+- **Acceptance:** local strict C syntax compilation and focused M27–M29
+  integration checks pass; manually dispatched Linux C suite passes on GCC
+  with warnings as errors.
+
 ## Outstanding validation
+
+### VAL-007: Recheck CI performance gates after deterministic failures
+
+- **Status:** open; observed in post-M30 CI log review.
+- **Evidence:** Linux
+  [run 40183666565](https://github.com/nathgoutam93/vela/actions/runs/40183666565/job/121139807985)
+  measured M24 `query impact` samples of 1.2501, 1.1935, and 1.1719
+  seconds, failing the existing best-of-three `<1` second assertion. macOS
+  [run 40183666565](https://github.com/nathgoutam93/vela/actions/runs/40183666565/job/121139808016)
+  passed the 12-program geometric-mean parity ceiling at 1.448678 but failed
+  `native_compiler_faster`: the native-built compiler's check took 0.177
+  seconds versus 0.172 seconds for the C-built compiler. Runner contention
+  is a suspected cause, not an observed fact. The next push run was
+  cancelled; no workflow run has validated the current post-M30 head.
+- **Impact:** performance gates can fail after functional suites pass, and the
+  current code has no host CI result.
+- **Workaround:** retain the failed measurements and run links; do not claim the gates pass from local results or change their thresholds based on one run.
+- **Required work:** manually rerun Platforms on the current commit after
+  TL-067 and TL-068, inspect uploaded timing JSON and job logs, and repeat
+  the affected measurements on the same host if they fail again. Diagnose
+  any repeatable slowdown before changing a gate.
+- **Acceptance:** both platform gates pass on the current commit, or a
+  reproducible regression is identified and fixed with new validation evidence.
 
 ### VAL-001: Linux native and sanitizer validation
 
