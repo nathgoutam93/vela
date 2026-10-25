@@ -8,6 +8,7 @@ Solver time/RSS are measured separately only when --solver is supplied.
 """
 from __future__ import annotations
 import argparse
+import functools
 import hashlib
 import json
 import os
@@ -15,6 +16,7 @@ from pathlib import Path
 import platform
 import random
 import re
+import shutil
 import statistics
 import subprocess
 import tempfile
@@ -37,11 +39,17 @@ def run(cmd,env,code=0,timeout=180):
     if p.returncode not in allowed:raise RuntimeError(f'{cmd}: exit {p.returncode}\n{p.stderr.decode(errors="replace")[-7000:]}\n{p.stdout.decode(errors="replace")[-1000:]}')
     return p
 
+@functools.lru_cache(maxsize=1)
+def darwin_time_available():
+    # Restricted local sandboxes can run the program but deny the sysctl
+    # queried by /usr/bin/time -l, making its exit status unusable.
+    return subprocess.run(['/usr/bin/time','-l','true'],capture_output=True).returncode==0
+
 def measure(cmd,env,code=0):
     """Fresh process wall time plus OS-reported maximum RSS where available."""
     timer=[];system=platform.system()
     if Path('/usr/bin/time').is_file():
-        if system=='Darwin':timer=['/usr/bin/time','-l']
+        if system=='Darwin' and darwin_time_available():timer=['/usr/bin/time','-l']
         elif system=='Linux':timer=['/usr/bin/time','-f','vela_rss_kib=%M']
     start=time.perf_counter();p=run([*timer,*cmd],env,code);elapsed=time.perf_counter()-start
     stderr=p.stderr.decode(errors='replace');rss=None
@@ -107,6 +115,10 @@ def build_program(name,language,compiler,work,env):
         cmd+=[str(REAL/name/'main.c')]
         if name=='compressor':cmd+=['-lz']
         cmd+=['-o',str(exe)]
+        settings=env
+    elif language=='rust':
+        cmd=[env.get('RUSTC','rustc'),'--edition=2024','-C','opt-level=3',
+             str(REAL/name/'main.rs'),'-o',str(exe)]
         settings=env
     else:
         cmd=[str(compiler),'build',str(REAL/name/'main.vl'),'-o',str(exe)]
@@ -176,28 +188,41 @@ def main():
     ap.add_argument('--runs',type=int,default=5)
     ap.add_argument('--quick',action='store_true');ap.add_argument('--check',action='store_true')
     ap.add_argument('--gate',action='store_true');ap.add_argument('--json',type=Path)
+    ap.add_argument('--with-rust',action='store_true',help='include standalone Rust versions of the two applications')
+    ap.add_argument('--apps-only',action='store_true',help='measure the two applications without compiler and scale workloads')
     ap.add_argument('--solver',help='explicit optional solver; record its time/RSS separately')
     opts=ap.parse_args()
     if opts.runs<1:ap.error('--runs must be positive')
+    if opts.with_rust and not shutil.which(os.environ.get('RUSTC','rustc')):
+        ap.error('--with-rust requires rustc (or RUSTC pointing to it)')
+    if opts.gate and opts.apps_only:ap.error('--gate requires compiler and scale workloads')
     if opts.gate and (opts.quick or opts.check or opts.runs<3 or not native_host()):ap.error('--gate needs full sizes, >=3 runs and a supported native host')
     if opts.gate and (os.environ.get('VELA_OPT')=='0' or any(x.startswith(('-fsanitize','-fprofile')) or x in ('-O0','-O1','-Og','-pg','--coverage','-ftest-coverage') for x in os.environ.get('VELA_CFLAGS','').split())):ap.error('--gate requires release settings; use --check for instrumentation')
     sources=identities()
     env={**os.environ,'VELA_ROOT':str(ROOT),'VELA_INCREMENTAL':'0'}
-    report={'format':'vela.scale.benchmark','version':1,'machine':machine(),'quick':opts.quick,'runs':opts.runs,'source_sha256':sources,'programs':{},'solver':{'requested':False}}
+    report={'format':'vela.scale.benchmark','version':1,'machine':machine(),
+            'quick':opts.quick,'runs':opts.runs,'apps_only':opts.apps_only,
+            'with_rust':opts.with_rust,'source_sha256':sources,'programs':{},
+            'solver':{'requested':False}}
     report['toolchain']={'command':c_driver(env),'version':run([*c_driver(env),'--version'],env).stdout.decode(errors='replace'),
         'build_environment':{k:env.get(k) for k in ('VELA_CC','VELA_CFLAGS','VELA_SYSROOT','VELA_OPT','VELA_INLINE','VELA_THREADS','SDKROOT','MACOSX_DEPLOYMENT_TARGET')},'python_zlib_version':zlib.ZLIB_RUNTIME_VERSION,'python_version':platform.python_version()}
+    if opts.with_rust:
+        report['toolchain']['rustc_command']=env.get('RUSTC','rustc')
+        report['toolchain']['rustc_version']=run([env.get('RUSTC','rustc'),'--version'],env).stdout.decode(errors='replace').strip()
+        report['machine']['rustc']=report['toolchain']['rustc_version']
     report['driver']={'file':str(opts.compiler.resolve()),'sha256':digest(opts.compiler.resolve().read_bytes())}
     with tempfile.TemporaryDirectory(prefix='vela-m29-') as td:
         work=Path(td);env['VELA_CACHE']=str(work/'runtime-cache')
-        images,builds=compiler_images(opts.compiler.resolve(),work,env,opts.gate)
+        images,builds=({'c':opts.compiler.resolve()}, {}) if opts.apps_only else compiler_images(opts.compiler.resolve(),work,env,opts.gate)
         report['compilers']={k:{'sha256':digest(p.read_bytes()),'bytes':p.stat().st_size} for k,p in images.items()};report['compiler_builds']=builds
         data=inputs(work,opts.quick)
         report['inputs']={name:{'sha256':digest(Path(args[0]).read_bytes()),'bytes':Path(args[0]).stat().st_size,'rounds':int(args[1]),
             'oracle':{'python_response_sha256':digest(expected)} if name=='json_service' else {'python_original_adler32':int(expected.splitlines()[2]),'compressed_stream_reference':'independent C application, same host zlib'}} for name,(args,expected) in data.items()}
         languages=['c','vela']+(['vela-native'] if native_host() else [])
+        app_languages=languages+(['rust'] if opts.with_rust else [])
         for name in ['json_service','compressor']:
             args,expected=data[name];executables={};rows={};reference=None
-            for language in languages:
+            for language in app_languages:
                 exe,built=build_program(name,language,images['c'],work,env);executables[language]=exe
                 actual=run([str(exe),*args],env).stdout
                 if name=='compressor':
@@ -210,29 +235,30 @@ def main():
                 elif actual!=expected:raise AssertionError((name,language,'independent Python output mismatch',actual[:400],expected[:400]))
                 if reference is None:reference=actual
                 rows[language]={'build':built,'binary_bytes':exe.stat().st_size,'stdout_sha256':digest(actual)}
-            samples={k:[] for k in languages}
+            samples={k:[] for k in app_languages}
             for trial in range(1 if opts.check else opts.runs):
-                for language in languages[trial%len(languages):]+languages[:trial%len(languages)]:
+                for language in app_languages[trial%len(app_languages):]+app_languages[:trial%len(app_languages)]:
                     sample,_=measure([str(executables[language]),*args],env)
                     if sample['stdout_sha256']!=rows[language]['stdout_sha256']:raise AssertionError((name,language,'timed output changed'))
                     samples[language].append(sample)
-            for language in languages:rows[language]['timing']=summary(samples[language])
+            for language in app_languages:rows[language]['timing']=summary(samples[language])
             report['programs'][name]=rows
             print(name+': outputs agree; '+str({k:round(v['timing']['median'],4) for k,v in rows.items()}),flush=True)
-        # The compiler's C reference is the same compiler built through C;
-        # the two application references above are handwritten independent C.
-        reference=run([str(images['c']),'c','compiler/src/main.vl'],env).stdout
-        rows={};samples={k:[] for k in languages}
-        for trial in range(1 if opts.check else opts.runs):
-            for language in languages[trial%len(languages):]+languages[:trial%len(languages)]:
+        if not opts.apps_only:
+            # The compiler's C reference is the same compiler built through C;
+            # the two application references above are handwritten independent C.
+            reference=run([str(images['c']),'c','compiler/src/main.vl'],env).stdout
+            rows={};samples={k:[] for k in languages}
+            for trial in range(1 if opts.check else opts.runs):
+                for language in languages[trial%len(languages):]+languages[:trial%len(languages)]:
+                    exe=images['native'] if language=='vela-native' else images['c']
+                    sample,actual=measure([str(exe),'c','compiler/src/main.vl'],env)
+                    assert actual==reference,'compiler C output differs';samples[language].append(sample)
+            for language in languages:
                 exe=images['native'] if language=='vela-native' else images['c']
-                sample,actual=measure([str(exe),'c','compiler/src/main.vl'],env)
-                assert actual==reference,'compiler C output differs';samples[language].append(sample)
-        for language in languages:
-            exe=images['native'] if language=='vela-native' else images['c']
-            rows[language]={'timing':summary(samples[language]),'binary_bytes':exe.stat().st_size,'stdout_sha256':digest(reference),'reference_kind':'same-source compiler built via C'}
-        report['programs']['compiler']=rows
-        report['frontend']=frontend_and_builds(images['c'],work,env,1 if opts.check else opts.runs,opts.quick)
+                rows[language]={'timing':summary(samples[language]),'binary_bytes':exe.stat().st_size,'stdout_sha256':digest(reference),'reference_kind':'same-source compiler built via C'}
+            report['programs']['compiler']=rows
+            report['frontend']=frontend_and_builds(images['c'],work,env,1 if opts.check else opts.runs,opts.quick)
         if opts.solver:
             example=work/'verification.vl';example.write_text('fn step(x:u8)->u8 requires x<255u8 ensures result>x{return x+1u8}\n')
             sample,out=measure([str(images['c']),'verify','--json','--solver',opts.solver,'--timeout','1000','--budget','5000',str(example)],env,(0,1,3))

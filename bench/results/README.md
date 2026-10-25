@@ -12,6 +12,7 @@ Run tools from [bench/](../README.md) and put fresh scratch reports in `build/`.
 | `m24-queries.json`, `m26a-queries.json` | Query latency evidence |
 | `m28-compiler-*.json` | Bounded proof and generated-property evidence |
 | `m29-real-programs.json`, `m29-scale-baseline.json` | Real-program and scale measurements |
+| [`2026-10-25-real-rust-macos.md`](2026-10-25-real-rust-macos.md) and its JSON report | Two real applications compared across C, Rust, and both Vela backends |
 | `*-validation.json` | Commands, environments, outcomes and validation limits |
 
 Reports retain their original bytes. Paths, commands, source digests and

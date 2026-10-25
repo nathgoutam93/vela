@@ -5,13 +5,13 @@ Run commands from the repository root after building `build/vela`.
 | Tool or directory | Purpose |
 | --- | --- |
 | [run.py](run.py) | Algorithm workloads in Vela, C and Rust; output checks and release/native parity gates |
-| [real_programs.py](real_programs.py) | JSON service, compressor, compiler, scale and compilation/query budgets |
+| [real_programs.py](real_programs.py) | JSON service and compressor in C, Vela, optional Rust; compiler, scale and compilation/query budgets |
 | [scale.py](scale.py) | Generate the large-source checking workload |
 | [compare.py](compare.py) | Compare compiler revisions with matching workloads |
 | [profile.py](profile.py) | Attribute time with platform-specific profiling tools or `vela profile` |
 | [m29-budgets.json](m29-budgets.json) | Active acceptance thresholds, consumed by `real_programs.py` |
 | `NAME/main.vl`, `main.c`, `main.rs` | Algorithm implementations compared operation for operation |
-| [real/](real) | Real-program workloads and independent C references |
+| [real/](real) | Real-program workloads and independent C and Rust references |
 | [results/](results/README.md) | Retained measurements, experiments and validation records |
 
 Start with output correctness at small sizes:
@@ -25,6 +25,19 @@ For performance acceptance, use the full workloads and the documented gates:
 ```sh
 python3 bench/run.py --compiler build/vela --languages c vela-native --runs 5 --require-native-parity --json build/release-parity.json
 python3 bench/real_programs.py --compiler build/vela --gate --runs 3 --json build/real-programs.json
+```
+
+To compare the two applications with Rust on one machine, install `rustc`
+and run the opt-in matrix. Each executable must match the independent output
+oracle before timing. The JSON service parses 5,008 requests eight times;
+the compressor compresses and restores 4 MiB eight times using system zlib.
+The report records each build, binary size, output digest, rotated timing
+samples, toolchain versions and source digests. `--apps-only` avoids unrelated
+compiler and scale measurements. This is a comparison of these programs on
+one host, not a general language ranking.
+
+```sh
+python3 bench/real_programs.py --compiler build/vela --with-rust --apps-only --runs 5 --json build/real-programs-rust.json
 ```
 
 The [native-parity walkthrough](../docs/history/m25-native-parity.md) and
