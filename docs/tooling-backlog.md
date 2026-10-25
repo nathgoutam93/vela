@@ -1693,8 +1693,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-067: Windows bootstrap requires portable tools and seed bytes
 
-- **Status:** in progress after M30; `cmp` fix validated on Windows, seed
-  line-ending fix awaits rerun.
+- **Status:** resolved after M30.
 - **Evidence:** the Windows C bootstrap step in
   [run 40183666565](https://github.com/nathgoutam93/vela/actions/runs/40183666565/job/121139807808)
   reports `cmp: command not found` at the fixed-point check, followed by the
@@ -1713,9 +1712,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   to LF checkout bytes in `.gitattributes`.
 - **Acceptance:** manually dispatch Platforms on this commit; Windows bootstrap
   must reach the fixed point, match the checked-in seed and advance to the
-  supported test suites. The
-  missing-command preflight exits 2 with the actionable message in a local
-  restricted-PATH check.
+  supported test suites. The missing-command preflight exits 2 with the
+  actionable message in a local restricted-PATH check.
+- **Validation:** Windows [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142674)
+  installs diffutils, reaches the 156,425-line fixed point, reports the seed
+  current, and advances to the core C suite. Its later failures are separate.
 
 ### TL-068: Strict Linux C compilation rejects an observation-runtime line
 
@@ -1741,7 +1742,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-069: GCC rejects intentional recursion in a debug fixture
 
-- **Status:** in progress after M30; local fix applied, Linux rerun pending.
+- **Status:** resolved after M30.
 - **Evidence:** Linux [run 40211096749](https://github.com/nathgoutam93/vela/actions/runs/40211096749/job/121222292334)
   fails `tests/m27_test.py` when GCC diagnoses `recursive-panic.vl` as
   `-Werror=infinite-recursion`. Its base case intentionally panics, and the
@@ -1756,11 +1757,12 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Local validation:** `run_tests.py ... m27_test` passes on macOS. In an
   isolated Debian x86-64 container, the exact recursive fixture compiles
   under GCC with the strict flags and exits 101 at its intended Vela panic.
+- **CI validation:** Linux [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142669)
+  reaches M27's debugger check without the recursion warning.
 
 ### TL-070: Native property runner reads the case index as the result
 
-- **Status:** in progress after M30; isolated x86-64 fix verified, Linux CI
-  rerun pending.
+- **Status:** resolved after M30.
 - **Evidence:** Linux [run 40211096749](https://github.com/nathgoutam93/vela/actions/runs/40211096749/job/121222292334)
   fails the M28 narrow property with `no admitted cases`. In an isolated
   x86-64 Linux container the exact fixture passes under C (one admitted,
@@ -1781,6 +1783,81 @@ the same entry. Close it with a commit or validation result; keep its history.
   native, each with one admitted and seven discarded cases. Both local
   bootstrap fixed points pass with the refreshed seed. The focused local
   M27 and M28 integration suites pass (2/2).
+- **CI validation:** the M28 integration check passes in Linux
+  [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142669).
+
+### TL-071: Linux readelf filename assertion checked the wrong DWARF section
+
+- **Status:** in progress after M30; local fix applied, CI rerun pending.
+- **Evidence:** Linux [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142669)
+  fails M27 at `assert 'step.vl' in info`, where `info` is only
+  `readelf --debug-dump=info`. The isolated x86-64 ELF contains
+  `DW_TAG_subprogram` in `.debug_info` and `step.vl` in decoded line rows.
+- **Impact:** a valid debug build fails the test before the later debugger
+  acceptance steps can run.
+- **Workaround:** inspect both `readelf --debug-dump=info` and
+  `--debug-dump=decodedline` when checking function and source metadata.
+- **Resolution:** make the assertion read the appropriate sections. The
+  focused Linux debugger check passes in the isolated x86-64 container.
+- **Acceptance:** Linux CI M27 passes, including its requested GDB step.
+
+### TL-072: Windows temporary executables lack the suffix needed by CreateProcess
+
+- **Status:** in progress after M30; source fix and cross-compilation pass,
+  native Windows rerun pending.
+- **Evidence:** Windows [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142674)
+  bootstraps but `vela run` and `vela test` report `No such file or directory
+  [E6010]` for generated temporary programs. The driver names them `program`,
+  `tests`, `profile`, and `properties` without `.exe`; the Windows process
+  adapter passes explicit paths to `CreateProcessW`. The missing suffix is
+  the identified launch mismatch, pending native rerun confirmation.
+- **Impact:** Windows cannot execute compiler-managed run/test/profile paths;
+  M27, M28 and M30 checks stop early.
+- **Workaround:** use explicit `.exe` output paths for Windows builds.
+- **Resolution:** add `.exe` to driver-owned temporary executable names on
+  Windows and to integration test executables that run directly.
+- **Acceptance:** Windows M27/M28/M30 integrations and supported suite pass.
+
+### TL-073: Windows fixture output needs byte-exact UTF-8 and OS error expectations
+
+- **Status:** in progress after M30; local harness fix applied, Windows rerun
+  pending.
+- **Evidence:** Windows [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142674)
+  reports five fixture output differences and crashes while printing a `✓`
+  diagnostic under Python's cp1252 console encoding. Its CRT reports
+  `Permission denied` when opening a directory, while the POSIX fixture
+  expects `Is a directory`. The stdin fixture receives an extra line;
+  text-mode pipe translation is the suspected cause. The Windows process
+  adapter omits the command name from a failed launch error.
+- **Impact:** genuine fixture results are obscured by decoding and platform
+  assumptions, and the test runner can crash before its summary.
+- **Workaround:** use Python UTF-8 mode, byte-exact stdin and an explicit
+  Windows expected output for the directory error.
+- **Resolution:** configure Windows CI Python for UTF-8; decode fixture
+  streams as UTF-8 and supply exact stdin bytes; retain an alternate Windows
+  output header for the directory case; add the missing command context to
+  Windows process errors.
+- **Acceptance:** affected fixtures and the full Windows core suite pass;
+  local affected fixtures pass and the Windows runtime cross-compiles with
+  strict warnings as errors.
+
+### TL-074: MSYS2 Clang modules fail inside its own malloc header
+
+- **Status:** in progress after M30; harness change applied, Windows rerun
+  pending.
+- **Evidence:** Windows [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142674)
+  fails the M29 cache oracle's intentionally opaque `-fmodules` build because
+  MSYS2 Clang reports `_MarkAllocaS` and `_freea` redefinitions in `malloc.h`.
+  This is observed toolchain behavior; the header/module cause is unproven.
+- **Impact:** an optional compiler-state probe blocks cache acceptance even
+  though the cache reports its disabled decision before the compile error.
+- **Workaround:** on Windows, inspect the failed build report for the cache
+  decision instead of requiring this Clang mode to link successfully.
+- **Resolution:** retain the successful opaque-mode probe elsewhere and on
+  Windows accept the current Clang failure or a successful compile while
+  requiring the disabled-cache reason in the report.
+- **Acceptance:** M29 cache correctness and the external-state refusal check
+  pass on Windows CI.
 
 ## Outstanding validation
 
@@ -1811,6 +1888,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   integration with its query timing assertion, but exits the C suite on
   TL-069 and TL-070 before running its later benchmark gates. Retain Linux
   performance validation until a complete run reaches them.
+- **Run 40213687036 recurrence:** Linux `query impact` samples are 1.2388,
+  1.2223 and 1.3164 seconds with four outer test workers, again failing the
+  best-of-three `<1` gate. The next run serializes M24 after the worker pool
+  drains, preserving the threshold and separating contention from a genuine
+  isolated slowdown. The macOS matrix job was cancelled by the user.
 
 ### VAL-001: Linux native and sanitizer validation
 

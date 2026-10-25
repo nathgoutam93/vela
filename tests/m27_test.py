@@ -17,6 +17,9 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 
+def host_exe(path):
+    return path.with_name(path.name + '.exe') if os.name == 'nt' else path
+
 def run(args, env, code=0, timeout=240):
     r = subprocess.run(list(map(str, args)), cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)
     assert r.returncode == code, (args, r.returncode, r.stdout[-6000:], r.stderr[-6000:])
@@ -146,7 +149,7 @@ def deep_compiler(c, w, env):
         shutil.copytree(ROOT/'packages/json',root/'packages/json')
         lexer=root/'compiler/src/lexer.vl'
         lexer.write_text(lexer.read_text().replace('fn identifier(lx: mut Lexer) {','fn identifier(lx: mut Lexer) { assert(false)',1))
-    exe=w/'fault-compiler-exe'
+    exe=host_exe(w/'fault-compiler-exe')
     run([c,'build','--debug',root/'compiler/src/main.vl','-o',exe],env,timeout=600)
     p=source(w,'input','fn main(){}\n')
     r=run([exe,'check',p],{**env,'VELA_PANIC':'json'},101)
@@ -165,12 +168,13 @@ fn main(){
     print(add(20))
 }
 ''')
-    exe = w/'step'
+    exe = host_exe(w/'step')
     run([c, 'build', '--debug', p, '-o', exe], env)
     if platform.system() != 'Darwin':
         if shutil.which('readelf'):
             info=run(['readelf','--debug-dump=info',exe],env).stdout
-            assert 'step.vl' in info and 'DW_TAG_subprogram' in info
+            lines=run(['readelf','--debug-dump=decodedline',exe],env).stdout
+            assert 'step.vl' in lines and 'DW_TAG_subprogram' in info
         if platform.system()=='Linux' and env.get('VELA_M27_DEBUGGER')=='1' and shutil.which('gdb'):
             r=run(['gdb','--batch','-ex',f'break {p}:2','-ex','run','-ex','bt','-ex','next','-ex','frame','-ex','continue',exe],env)
             assert 'Breakpoint 1,' in r.stdout and 'step.vl:3' in r.stdout and '42' in r.stdout,r.stdout+r.stderr
@@ -209,7 +213,7 @@ def cache_modes(c,w,env):
     run([c,'run',p],e);assert len(list(cache.glob('runtime-*.o')))==4
 
 def runtime_boundaries(w,env):
-    cc=env.get('VELA_CC','cc'); exe=w/'runtime-boundaries'; report=w/'saturated.json'
+    cc=env.get('VELA_CC','cc'); exe=host_exe(w/'runtime-boundaries'); report=w/'saturated.json'
     flags=['-std=c11','-O1','-g','-DVELA_OBSERVE','-DVELA_PROFILE','-I',ROOT/'runtime']
     if os.name!='nt': flags+=['-pthread']
     flags+=env.get('VELA_CFLAGS','').split()

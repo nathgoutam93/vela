@@ -113,7 +113,7 @@ SANITIZE_CFLAGS = " -g -fsanitize=address,undefined -fno-sanitize-recover=all"
 # --tsan: catch data races between threads (it cannot be combined with ASan).
 TSAN_CFLAGS = " -g -fsanitize=thread"
 
-HEADER_LINE = re.compile(r"//\s*(out|err|exit|dump|args|command|in):(.*)$")
+HEADER_LINE = re.compile(r"//\s*(out|out-windows|err|exit|dump|args|command|in):(.*)$")
 COMPILE_TIMEOUT = 60
 RUN_TIMEOUT = 10
 VELA_TEST_TIMEOUT = 600  # the compiler's own tests build the whole compiler, under --sanitize too
@@ -122,6 +122,7 @@ VELA_TEST_TIMEOUT = 600  # the compiler's own tests build the whole compiler, un
 @dataclass
 class Expectations:
     out: list[str] = field(default_factory=list)
+    out_windows: list[str] = field(default_factory=list)
     err: list[str] = field(default_factory=list)
     exit: int = 0
     dump: str | None = None
@@ -144,6 +145,8 @@ def read_expectations(path: Path) -> Expectations:
             value = value[1:]
         if key == "out":
             expect.out.append(value)
+        elif key == "out-windows":
+            expect.out_windows.append(value)
         elif key == "err":
             expect.err.append(value)
         elif key == "exit":
@@ -261,13 +264,14 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
             workdir.mkdir()
         try:
             ran = subprocess.run(
-                [str(exe), *expect.args], cwd=workdir, env=env, capture_output=True, text=True,
-                input="".join(line + "\n" for line in expect.stdin), timeout=RUN_TIMEOUT,
+                [str(exe), *expect.args], cwd=workdir, env=env, capture_output=True,
+                input="".join(line + "\n" for line in expect.stdin).encode("utf-8"), timeout=RUN_TIMEOUT,
             )
         except subprocess.TimeoutExpired as exc:
             return timeout_details("subprocess", exc, env)
-        problems = compare("stdout", expect.out, ran.stdout)
-        problems += compare("stderr", expect.err, ran.stderr)
+        expected_out = expect.out_windows if os.name == "nt" and expect.out_windows else expect.out
+        problems = compare("stdout", expected_out, ran.stdout.decode("utf-8", errors="replace"))
+        problems += compare("stderr", expect.err, ran.stderr.decode("utf-8", errors="replace"))
         if ran.returncode != expect.exit:
             problems.append(f"exit code: expected {expect.exit}, got {ran.returncode}")
         return problems
@@ -472,17 +476,22 @@ def main() -> int:
     for path, reason in skipped:
         print(f"SKIP  {path.relative_to(ROOT)}: {reason}", flush=True)
     failed = 0
+    # M24 measures subsecond query latency. Run it after the worker pool has
+    # drained so other integration builds do not contend for the same CPU.
+    serial = [test for test in tests if test == M24_TEST]
+    parallel = [test for test in tests if test != M24_TEST]
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
-        results = pool.map(lambda t: run_test(compiler, t, env), tests)
-        for test, problems in zip(tests, results):
-            name = test.relative_to(ROOT)
-            if problems:
-                failed += 1
-                print(f"FAIL  {name}")
-                for line in problems:
-                    print(f"      {line}")
-            elif args.verbose:
-                print(f"ok    {name}")
+        completed = list(zip(parallel, pool.map(lambda t: run_test(compiler, t, env), parallel)))
+    completed.extend((test, run_test(compiler, test, env)) for test in serial)
+    for test, problems in completed:
+        name = test.relative_to(ROOT)
+        if problems:
+            failed += 1
+            print(f"FAIL  {name}")
+            for line in problems:
+                print(f"      {line}")
+        elif args.verbose:
+            print(f"ok    {name}")
 
     passed = len(tests) - failed
     print(f"{passed} passed, {failed} failed, {len(skipped)} skipped  (compiler: {shlex.join(compiler)})")

@@ -431,6 +431,10 @@ fn default_output(path: Str) -> Str {
     }
     return modules.join(dir, name)
 }
+fn temporary_executable(directory: Str, name: Str) -> Str uses os {
+    if targets.host() == "x86_64-w64-windows-gnu" { return modules.join(directory, name + ".exe") }
+    return modules.join(directory, name)
+}
 
 // The words of VELA_CFLAGS.
 fn split_flags(flags: Str) -> [Str] {
@@ -964,7 +968,7 @@ fn run(path: Str, args: [Str], root: Str, options: capabilities.Options) uses fs
         Ok(dir) => tmp = dir
         Err(e) => driver_error(e)
     }
-    let exe = modules.join(tmp, "program")
+    let exe = temporary_executable(tmp, "program")
     let mut mode = 0; if options.debug { mode = 1 }
     build_observed(path, exe, root, true, k, libraries, "", mode, "")
     let mut command = [exe]
@@ -1170,7 +1174,7 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
         Ok(dir) => tmp = dir
         Err(e) => driver_error(e)
     }
-    let exe = modules.join(tmp, "tests")
+    let exe = temporary_executable(tmp, "tests")
     // Tests are built often and run briefly, so the C compiler does not
     // optimize: building the compiler's own tests takes 3 s instead of 20.
     let mut mode = 0; if options.debug { mode = 1 }
@@ -1303,7 +1307,7 @@ fn profile_command(words: [Str], root: Str) uses fs, os {
     let persistent = report != ""; if !persistent { report = modules.join(tmp, "profile.json") }
     // Create/truncate before launch; a stale report cannot pass as this run.
     match files.write(report, "") { Ok(_) => {}, Err(e) => driver_error(e) }
-    let exe = modules.join(tmp, "profile")
+    let exe = temporary_executable(tmp, "profile")
     build_observed(path, exe, root, true, k, libraries, "", 2, report)
     let mut command = [exe]; for arg in options.rest[1..len(options.rest)] { push(mut command, arg) }
     let mut allows = options.allow; push(mut allows, "coverage:" + report)
@@ -1372,7 +1376,7 @@ fn property_command(path:Str,words:[Str],root:Str,options:capabilities.Options) 
     let plan=properties.prepare(loaded,original,options.cases,options.seed,options.size,options.shrinks,words)
     let mut k=original
     if len(plan.specs)>0{k=checker.check_target(plan.loaded,true,"",targets.host());if len(k.errors)>0{fail(path,k.errors)};k=properties.mark(k,plan.specs)}
-    let mut tmp="";match files.temp_dir(){Ok(dir)=>tmp=dir,Err(e)=>driver_error(e)};let exe=modules.join(tmp,"properties")
+    let mut tmp="";match files.temp_dir(){Ok(dir)=>tmp=dir,Err(e)=>driver_error(e)};let exe=temporary_executable(tmp,"properties")
     if len(plan.specs)>0{
         if native(true){assemble_mode(targets.program(lowered(path,lower.lower_observed(k,true,false,3,"")),""),modules.stem(path)+"_properties",exe,root,"-O0",libraries,"",3)} else{compile_mode(c_code(path,codegen.generate_observed(k,true,false,3,"")),modules.stem(path)+"_properties",exe,root,"-O0",libraries,"",3)}
     }

@@ -1292,7 +1292,21 @@ static bool run_program(vela_array *command, int64_t *code, vela_str *err, vela_
     if(handled)return fake_ok;
     if (!vela_cap_process(err)) return false;
 #if defined(_WIN32)
-    return win_run_program(command, code, err, captured);
+    if (win_run_program(command, code, err, captured)) return true;
+    if (command->len > 0) {
+        vela_str prior = *err;
+        char *detail = c_path(prior);
+        if (detail) {
+            size_t n = strlen(detail) + 3;
+            char *why = vela_alloc(n);
+            snprintf(why, n, ": %s", detail);
+            *err = message("cannot run ", ((vela_str *)command->data)[0], why);
+            free(why);
+            free(detail);
+            vela_str_release(prior);
+        }
+    }
+    return false;
 #elif defined(__wasi__)
     (void)command; (void)code; (void)captured;
     *err = str_from("processes are unsupported on WASI", 33);

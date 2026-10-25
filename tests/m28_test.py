@@ -154,7 +154,7 @@ fn main(){print(f(2))}
     d=verify(c,p,env,code=3);assert d['status']=='unknown' and all(r['status']=='unknown' for r in d['results'])
     for backend in ['c','native']:
         if backend=='native' and not native_host():continue
-        e={**env,'VELA_BACKEND':backend};exe=w/('preserved-'+backend)
+        e={**env,'VELA_BACKEND':backend};exe=w/('preserved-'+backend+('.exe' if os.name=='nt' else ''))
         verify(c,p,e,'--build',exe,code=3)
         assert run([exe],e).stdout=='observable\n2\n'
     d=verify(c,p,env,'--solver',w/'missing-solver',code=3);assert d['status']=='unknown'

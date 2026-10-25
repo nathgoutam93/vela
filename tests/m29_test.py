@@ -66,7 +66,16 @@ def cache_checks(c,w,base):
         disabled=build(settings={'VELA_CACHE':str(blocked)});assert not disabled['enabled'],disabled
         version=run([base.get('VELA_CC','cc'),'--version'],base).stdout
         if 'clang' in version.lower():
-            opaque=build(settings={'VELA_CFLAGS':env['VELA_CFLAGS']+' -fmodules'})
+            module_flags=env['VELA_CFLAGS']+' -fmodules'
+            if os.name=='nt':
+                # Current MSYS2 Clang modules duplicate declarations in its
+                # malloc.h. The cache decision is still observable in the
+                # failed build report; do not require that toolchain mode to link.
+                report.unlink(missing_ok=True)
+                run([c,'build',p,'-o',exe],{**env,'VELA_CFLAGS':module_flags,'VELA_BUILD_REPORT':str(report)},(0,70))
+                opaque=json.loads(report.read_text())
+            else:
+                opaque=build(settings={'VELA_CFLAGS':module_flags})
             assert not opaque['enabled'] and 'external compiler state' in opaque['reason'],opaque
         # A toolchain wrapper changed without changing --version still changes
         # its content identity. Actual native Windows execution remains CI work.

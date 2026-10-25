@@ -63,6 +63,7 @@ jobs:
     runs-on: windows-2022
     env:
       VELA_M26_UNICODE: 'hé😀\value'
+      PYTHONUTF8: '1'
       VELA_CC: clang
       VELA_BACKEND: c
       VELA_THREADS: 4
