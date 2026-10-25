@@ -91,6 +91,7 @@ M25_TEST = TESTS / "m25_test.py"
 M26_TEST = TESTS / "m26_test.py"
 M27_TEST = TESTS / "m27_test.py"
 M28_TEST = TESTS / "m28_test.py"
+M29_TEST = TESTS / "m29_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -195,6 +196,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(M26A_TEST, compiler, env)
     if path == M28_TEST:
         return run_script(M28_TEST, compiler, env)
+    if path == M29_TEST:
+        return run_script(M29_TEST, compiler, env)
     if path == M27_TEST:
         return run_script(M27_TEST, compiler, env)
     if path == M26_TEST:
@@ -385,6 +388,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(M26_TEST)
     tests.append(M27_TEST)
     tests.append(M28_TEST)
+    tests.append(M29_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

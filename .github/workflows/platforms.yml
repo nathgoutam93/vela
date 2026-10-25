@@ -41,9 +41,21 @@ jobs:
           VELA_SOLVER: z3
         if: runner.os == 'Linux'
         run: python3 tests/m28_test.py build/vela
+      - name: Real programs, scale and compilation budgets
+        run: python3 -u bench/real_programs.py --compiler build/vela --gate --runs 3 --json build/m29-real-programs.json
+      - name: Retain existing release parity gate
+        run: python3 -u bench/run.py --compiler build/vela --languages c vela-native --runs 5 --require-native-parity --json build/m29-release-parity.json
+      - name: Retain performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m29-${{ runner.os }}
+          path: |
+            build/m29-real-programs.json
+            build/m29-release-parity.json
       - name: Linux address and undefined-behavior sanitizers
         if: runner.os == 'Linux'
-        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --sanitize tests/run/ m23_test m27_test m28_test
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --sanitize tests/run/ m23_test m27_test m28_test m29_test
       - name: Linux thread sanitizer
         if: runner.os == 'Linux'
         run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 2 --tsan tests/run/tasks
@@ -72,7 +84,7 @@ jobs:
         run: sh bootstrap/bootstrap.sh
       - name: Core C fixtures and target ABI/cache oracles
         shell: msys2 {0}
-        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ tests/fail/ tests/dump/ m26_test m27_test m28_test
+        run: python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 tests/run/ tests/fail/ tests/dump/ m26_test m27_test m28_test m29_test
       - name: Windows systems oracle
         shell: msys2 {0}
         run: |

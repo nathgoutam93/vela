@@ -418,7 +418,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-017: Keep the expanded memory guide within its reading budget
 
-- **Status:** resolved in M22, extended through M28.
+- **Status:** resolved in M22, extended through M29.
 - **Evidence:** the first M22 `build/vela-m22 guide` output is 37,751 bytes,
   exceeding the existing 32,000-byte / estimated-8,000-token integration gate.
   New library signatures and rules add to repeated per-builtin explanation.
@@ -465,6 +465,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   Compact repeated prose/examples while retaining semantic rules and generated
   APIs. The refreshed fixed-point guide is 31,969 bytes (7,992.25 by bytes/4).
   Actual model-tokenizer acceptance remains VAL-003.
+
+- **M29 recurrence/resolution:** document the opt-in object cache/report
+  environment controls while compacting repeated effect prose. The generated
+  guide is 31,968 bytes (7,992 by bytes/4); executable examples and installed
+  guide checks remain in M17. Actual tokenizer validation stays VAL-003.
 
 ### TL-018: Select benchmark input generators by name
 
@@ -934,6 +939,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   explicitly acknowledges best-effort cleanup. tests/m28_test.py checks
   counts/locations/editor severity, fixes and execution on C/native.
 
+- **M29 cost evidence:** normal checking includes the discarded-Result rule;
+  the 100,304-line fixture checks at 0.303 s median. Compiler check/emission,
+  API/impact queries, ordinary/incremental builds, sizes and requested solver
+  time/RSS are retained in bench/m29-real-programs.json. These are absolute
+  measurements, not a claim that diagnostic bookkeeping has zero cost.
+
 ### TL-037: Guide contract purity exceeds the implemented check
 
 - **Status:** resolved during M28 under the accepted M30 baseline; discovered
@@ -1318,6 +1329,112 @@ the same entry. Close it with a commit or validation result; keep its history.
   pass, including both C/native property execution and regenerated compiler
   evidence with 20 admitted samples.
 
+### TL-056: Byte-balanced C partitions invalidate unrelated objects
+
+- **Status:** resolved during M29; local acceptance and build budgets pass.
+- **Observed source:** stage1/main.vl:c_parts chooses boundaries from total
+  C byte length. Editing one function body changes the byte shares and can
+  move otherwise unchanged functions between translation units.
+- **Impact:** object caching alone cannot reliably reuse unaffected units
+  after a body edit; the frontend currently always checks current sources.
+- **Workaround:** rebuild the whole program with the existing runtime cache.
+- **Resolution:** opt-in stable function-part groups and actual
+  preprocessed-C content keys, retaining fresh checking and linking. Native
+  reuse is whole assembly object plus the independently cached C runtime.
+- **Verify:** unchanged builds reuse all backend objects; one same-line body
+  edit rebuilds only its C group, while declaration/header/flags/toolchain
+  changes invalidate affected objects. Compiler errors remain fresh; cache-off,
+  debug/profile, concurrent writes, corrupt objects and link changes are tested.
+
+### TL-057: Preprocessed compilation retained preprocessing-only flags
+
+- **Status:** resolved during M29; strict C/native cache acceptance passes.
+- **Observed:** incremental service compilation prints Clang's unused-command-
+  line-argument warning for -I runtime when compiling the already preprocessed
+  .i files. With the suite's -Werror this would reject valid generated input.
+- **Reproduce:** VELA_INCREMENTAL=1 VELA_BUILD_REPORT=build/m29/cache-first.json
+  build/vela-m29-initial build bench/real/json_service/main.vl -o build/m29/service-inc.
+- **Impact:** the new cache path would fail strict compilation despite correct C.
+- **Resolution:** retain full arguments in the cache key and actual preprocessing,
+  then remove preprocessing-only include/define options from the .i compile.
+  Optimization/target/code-generation flags remain; source warnings stay enabled.
+- **Verify:** strict -Wall/-Wextra/-Werror/-pedantic cold and reused builds on
+  both backends, plus macro/header/flag invalidation and compiler-failure paths.
+
+### TL-058: Flattened preprocessor output lost system-header classification
+
+- **Status:** resolved during M29; strict C/native cache acceptance passes.
+- **Observed:** the strict incremental service build failed with Clang
+  nullability/block-extension errors in macOS SDK declarations. -E -P had
+  removed system-header line markers, making those declarations appear to
+  be ordinary generated source. Full evidence: build/m29/cache-strict.log.
+- **Impact:** otherwise valid source fails strict compilation on macOS.
+- **Initial workaround:** disable incremental reuse while correcting the cache path.
+- **Resolution:** preserve -E line/system-header markers. Publish
+  generated C at an atomic content-addressed path before preprocessing to keep
+  unchanged input stable. Preprocess runtime C at its original path so quoted
+  include precedence is retained; never rewrite preprocessed tokens. Clang
+  also diagnoses its own GNU-style line markers under -pedantic when reading
+  .i input: disable only -Wgnu-line-marker for that second compilation. The
+  actual preprocessing step keeps all strict flags and SDK/source warnings
+  retain their original classification.
+- **Verify:** strict builds/reuse pass on macOS, changed runtime/SDK headers
+  invalidate their objects, and Vela panic paths/locations are unchanged.
+  Linux/Windows execution remains separately recorded rather than inferred.
+
+### TL-059: Reference allocation and runtime-cache warmth can distort scale comparisons
+
+- **Status:** resolved during M29; final matched measurements pass.
+- **Observed source/data:** the first independent C JSON parser allocated a
+  temporary number string before strtoll, while Vela parsed a string view.
+  Its initial median was 0.479 s versus native 0.381 s. This does not attribute
+  the complete timing difference to allocation. Initial build rows also
+  compared cold ordinary runtime compilation with warm incremental objects.
+- **Impact:** an avoidable reference allocation or inherited runtime-cache
+  benefit can make performance claims misleading.
+- **Resolution:** parse numeric tokens directly in the NUL-terminated input,
+  batch C response output, and measure ordinary builds with cold and warm
+  runtime caches separately from incremental cold/warm/edit builds. Keep
+  complete outputs, independent Python oracles, rotated timing order and
+  unchanged thresholds; no speedup attribution is inferred from unmatched runs.
+- **Verify:** all C/Vela/native responses agree, including duplicate/NUL keys,
+  malformed inputs and exact Int boundaries; every timing sample has the same
+  output hash. Full-size results retain source/toolchain identities, samples,
+  memory, binary sizes and all ordinary/incremental phases. A source change
+  during measurement invalidates acceptance.
+
+### TL-060: Plain preprocessed text does not capture nontext compiler inputs
+
+- **Status:** resolved during M29; final normal/UBSan acceptance passes.
+- **Observed source:** incremental.c_unit hashes textual preprocessing, while
+  VELA_CFLAGS can request PCH/modules/plugins or external profile/ignorelist
+  files. Such inputs are not necessarily fully represented in that text.
+- **Impact:** treating every compiler configuration as cacheable would exceed
+  the cache’s actual input model. This is a source/design finding, not a
+  claimed observed misexecution of a plugin or profile.
+- **Resolution:** bypass incremental reuse for these known external-state
+  options; perform ordinary compilation and current linking. Bind cacheable
+  configurations to the actual working directory and standard toolchain env.
+  Arbitrary wrappers with other hidden inputs require VELA_CACHE=off.
+- **Verify:** a real Clang -fmodules build succeeds with enabled=false and the
+  external-state reason; ordinary strict builds still reuse objects. Partial,
+  instrumented/deoptimized release-gate requests remain rejected.
+
+### TL-061: C benchmark streams need the Windows runtime’s binary mode
+
+- **Status:** corrected in the M29 C references; native Windows validation open.
+- **Observed source:** runtime/vela_rt.c initializes standard streams with
+  _setmode(...,_O_BINARY) on Windows. The new C references initially used CRT
+  default text stdout while the oracle compares complete byte hashes.
+- **Impact:** Windows CRLF translation could create an oracle mismatch even
+  for equivalent responses. This is source inspection, not Windows execution.
+- **Resolution:** use binary stdout in both C references on _WIN32; preserve
+  ordinary POSIX behavior. Record exact fixture hashes/bytes and Python/toolchain
+  versions so CRLF source generation and vendor-zlib differences are explicit.
+- **Verify:** quick real-program bytes agree with Python/C on native Windows,
+  including NUL/Unicode payloads. Local C/native oracle coverage passes; do not
+  infer Windows-host execution from this conditional source change (VAL-005).
+
 ## Outstanding validation
 
 ### VAL-001: Linux native and sanitizer validation
@@ -1453,6 +1570,21 @@ the same entry. Close it with a commit or validation result; keep its history.
   emission are faster. See bench/after-m28.json and bench/m28-validation.json.
   This does not close Linux native-host performance acceptance.
 
+- **M29 required follow-up:** run bench/real_programs.py --gate --runs 5
+  and the unchanged release gate on actual Linux x86-64, retaining all samples,
+  RSS/binary sizes, compiler/toolchain/source hashes and cache behavior. Run
+  both supported suites and sanitizer selections including tests/m29_test.py.
+  Local Mac measurements do not establish foreign-host performance budgets.
+
+- **M29 local evidence:** both fixed points pass; complete C/native suites
+  each pass 309 checks before the final external-state cache guard. Final M29
+  normal acceptance and 123 selected UBSan checks pass after that guard, including
+  both backend cache paths and the independent C references. Incrementally built
+  C/native compilers reuse all warm objects and emit identical C. The local scale
+  gate passes at 0.303 s/100k lines, 0.933× C through C and 1.026× C natively;
+  the unchanged release gate passes at 1.459× C with faster native compiler.
+  Foreign-host performance/sanitizer evidence is still required separately.
+
 ### VAL-002: Measure M17 with agents
 
 - **Status:** open; carried from M17.
@@ -1522,6 +1654,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **M28 measurement:** guide output is 31,969 bytes, 7,992.25 by bytes/4;
   executable examples and installed guide are regression checked. Actual
   model-specific counting remains outstanding.
+- **M29 measurement:** the guide is 31,968 bytes, 7,992 by bytes/4, with
+  incremental-cache controls documented. Actual tokenizer counting is open.
 - **Workaround:** report it explicitly as an estimate.
 - **Required work:** count the generated guide with the tokenizer used for
   agent evaluation and record the tokenizer/version with the result.
@@ -1576,6 +1710,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   Its unsupported deny-policy path must remain unknown/fail closed. Retain
   actual native Windows execution and process-tree/output-limit behavior;
   cross-target SMT alias checks do not establish that runtime coverage.
+- **M29 follow-up:** execute incremental C/real-program correctness on the
+  native Windows toolchain, including preprocessed headers, spaces/Unicode
+  paths, executable resolution, corruption/concurrent writers and current
+  linking. Windows has no native emitter; do not turn that missing matrix
+  into a full native scale-performance pass.
 - **Acceptance:** retained native Windows commands/results and a complete
   passing supported-suite inventory, with unavailable native-emitter/kernel
   profiles named separately.

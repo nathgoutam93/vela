@@ -250,6 +250,11 @@ Property-test success remains separate from formal proof.
 
 ## M29: Scale
 
+**Status:** implemented and locally validated: 100k-line check 0.303 s;
+real-program means 0.933× C through C and 1.026× C natively. Both fixed points
+and available correctness/sanitizer/release gates pass. See
+[the walkthrough](m29-scale.md). Foreign-host acceptance remains separate.
+
 **Needs:** M21 and M23 (real programs call C and use std) and M25 (both backends measured).
 
 **What gets built:** Scale: a benchmark suite of real programs (a JSON service, a compressor, the compiler itself), incremental compilation, and a compile-time budget the suite enforces.

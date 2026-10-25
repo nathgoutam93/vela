@@ -64,6 +64,7 @@ import opt
 import properties
 import verification
 import evidence
+import incremental
 import processes
 import text
 import profile_report
@@ -556,6 +557,7 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
         Err(e) => driver_error(e)
     }
     let compiler = targets.compiler(target)
+    let cache=incremental.begin(cache_dir(),mode,"native",targets.selected(target),compiler)
     let cc = compiler[0]
     let mut flags = targets.flags(target)
     match os.env("VELA_CFLAGS") {
@@ -580,7 +582,7 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
         push(mut rt, word)
     }
     // The runtime from the cache when it is there (M16b).
-    let cached = cached_runtime(root, join_words(compiler), opt, flags, target)
+    let mut cached = "";if cache.reason=="not requested"||mode>0{cached=cached_runtime(root, join_words(compiler), opt, flags, target)}
     let have = cached != "" && exists(cached)
     let mut assembler = compiler
     for f in targets.assembly_flags(target) { push(mut assembler, f) }
@@ -588,6 +590,17 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
     for word in ["-c", source, "-o", program_o] { push(mut assembler, word) }
     let mut commands = [assembler, rt]
     if have { commands = [assembler] }
+    let mut probes:[incremental.Probe]=[]
+    let mut actual_program=program_o
+    if incremental.enabled(cache){
+        let mut as_base=compiler;for f in targets.assembly_flags(target){push(mut as_base,f)}
+        let a=incremental.assembly(cache,as_base,source,program_o,asm)
+        let mut rt_base=compiler;for f in ["-std=c11",opt]{push(mut rt_base,f)};for f in flags{push(mut rt_base,f)};push(mut rt_base,"-I");push(mut rt_base,runtime)
+        let r=incremental.c_unit(cache,rt_base,modules.join(runtime,"vela_rt.c"),runtime_o)
+        probes=[a,r];commands=[];for p in probes{if !p.hit{push(mut commands,p.command)}};actual_program=a.object;runtime_o=r.object
+    }else if cache.report!=""{
+        probes=[incremental.Probe{object:program_o,source:source,key:"",command:assembler,hit:false},incremental.Probe{object:runtime_o,source:modules.join(runtime,"vela_rt.c"),key:cached,command:rt,hit:have}]
+    }
     let codes = tasks.map(commands, fn(command) {
         match os.run(command) {
             Ok(code) => return code
@@ -616,7 +629,7 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
             push(mut link, f)
         }
         for f in targets.libraries(target) { push(mut link, f) }
-        for word in [program_o, runtime_o, "-lm", "-o", exe] {
+        for word in [actual_program, runtime_o, "-lm", "-o", exe] {
             push(mut link, word)
         }
         for library in libraries { push(mut link, library) }
@@ -631,8 +644,10 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
         }
     }
     if len(failed) == 0 { retain_debug(exe, target, mode) }
+    match incremental.finish(cache,probes,len(failed)==0){Ok(_)=>{},Err(e)=>driver_error(e)}
+    for p in probes{if p.source!=source&&modules.dirname(p.source)==tmp{cleanup(p.source)}}
     for f in [source, program_o, runtime_o] {
-        if f != cached {
+        if f != cached && (cache.directory=="" || !text.starts_with(f,cache.directory+"/")) {
             cleanup(f)
         }
     }
@@ -670,6 +685,7 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
         Err(e) => driver_error(e)
     }
     let compiler = targets.compiler(target)
+    let cache=incremental.begin(cache_dir(),mode,"c",targets.selected(target),compiler)
     let cc = compiler[0]
     let mut flags = targets.flags(target)
     match os.env("VELA_CFLAGS") {
@@ -690,13 +706,16 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
     let mut written: [Str] = []
     let mut objects: [Str] = []
     // The runtime once per set of flags, from the cache when it is there.
-    let cached = cached_runtime(root, join_words(compiler), opt, flags, target)
+    let mut cached="";if cache.reason=="not requested"||mode>0{cached=cached_runtime(root, join_words(compiler), opt, flags, target)}
     let have = cached != "" && exists(cached)
     // About 400 KB of C per unit before another is worth starting.
-    let units = c_parts(c_source, tasks.workers(), 400000)
+    let mut units = c_parts(c_source, tasks.workers(), 400000)
+    if incremental.enabled(cache){units=incremental.parts(c_source,tasks.workers())}
+    let mut probes:[incremental.Probe]=[]
     for i in 0..len(units) + 1 {
         if i == len(units) && have {
             push(mut objects, cached)
+            if cache.report!=""{push(mut probes,incremental.Probe{object:cached,source:"",key:cached,command:[],hit:true})}
             continue
         }
         let mut source = modules.join(runtime, "vela_rt.c")
@@ -708,12 +727,14 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
             }
         }
         let object = modules.join(tmp, "part" + strings.from_int(i) + ".o")
+        if incremental.enabled(cache){let p=incremental.c_unit(cache,base,source,object);push(mut probes,p);push(mut written,p.source);push(mut objects,p.object);if !p.hit{push(mut commands,p.command)};continue}
         push(mut objects, object)
         let mut command = base
         for word in ["-c", source, "-o", object] {
             push(mut command, word)
         }
         push(mut commands, command)
+        if cache.report!=""{push(mut probes,incremental.Probe{object:object,source:source,key:"",command:command,hit:false})}
     }
     let codes = tasks.map(commands, fn(command) {
         match os.run(command) {
@@ -758,12 +779,13 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
         keep_runtime(objects[len(objects) - 1], cached, tmp)
     }
     if len(failed) == 0 { retain_debug(exe, target, mode) }
+    match incremental.finish(cache,probes,len(failed)==0){Ok(_)=>{},Err(e)=>driver_error(e)}
     // The scratch directory goes either way.
     for f in written {
         cleanup(f)
     }
     for o in objects {
-        if o != cached {
+        if o != cached && (cache.directory=="" || !text.starts_with(o,cache.directory+"/")) {
             cleanup(o)
         }
     }
@@ -782,8 +804,8 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
 // line. Now it is compiled once for each C compiler, optimization level,
 // set of VELA_CFLAGS and version of the runtime, and kept in the cache
 // directory: VELA_CACHE, else $XDG_CACHE_HOME/vela, else ~/.cache/vela.
-// VELA_CACHE=off turns it off. Nothing else is cached: the program is
-// compiled every time.
+// VELA_CACHE=off disables caching. VELA_INCREMENTAL=1 also reuses backend
+// objects after fresh checking; linking always runs.
 
 fn cache_dir() -> Str uses os {
     match os.env("VELA_CACHE") {

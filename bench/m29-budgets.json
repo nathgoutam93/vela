@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "check_100k_seconds": 1.0,
+  "query_seconds": 1.0,
+  "cold_build_seconds": 30.0,
+  "warm_build_seconds": 20.0,
+  "edit_build_seconds": 30.0,
+  "real_program_geometric_mean": 1.2
+}

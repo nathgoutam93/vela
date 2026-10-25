@@ -1,0 +1,458 @@
+{
+  "milestone": "M29",
+  "status": "implemented_locally_pending_foreign_hosts",
+  "local_acceptance_passed": true,
+  "milestone_acceptance_passed": false,
+  "acceptance_scope": "macOS ARM64 implementation and all local acceptance pass; actual foreign native-host validation remains open",
+  "validated_at_utc": "2026-10-25T10:08:37.353948+00:00",
+  "baseline_commit": "ee4eb9227911e65a7f7d889c3df08e6d452c8ea6",
+  "dirty_worktree": true,
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.8",
+    "cc": "Apple clang version 17.0.0 (clang-1700.3.19.1)"
+  },
+  "source_sha256": {
+    ".github/workflows/platforms.yml": "ed6ca9f4a40dc905a7e0662084cdbce58d9ad19e9a8a7cbe3f353feb6269ee5d",
+    "README.md": "c75c56cfa1bcd6e1a681a25071d2c99ec41235f5ef6903a978dff99bea4301b2",
+    "bench/real/compressor/main.c": "c1e05f5cd201f21ee28109248b209ebfff70c34ae6cd252eb9648d2a9a05ea9b",
+    "bench/real/compressor/main.vl": "8cd58ac89a2f27da2f215769adf46971377cc6850cd2a04620d41a10e76f8299",
+    "bench/real/compressor/vela.mod": "4d0e6ed8ac544e05474f8ea5f98e8ac590df3e445694949846fc173136b709d2",
+    "bench/real/compressor/zlib.vl": "2c049b417eead2a29fd71ddca93042ea3b1139f6d48d7e1ca24cac2f1ac5dbc9",
+    "bench/real/json_service/main.c": "5222ad03882eb52c58d066ab553ce44c3c7ce6fac1c504e36e31486a0c7d155e",
+    "bench/real/json_service/main.vl": "f66219ca576539904fd5a39fb5f4faf05826658f0e081ccd8151dde5c2b77243",
+    "bench/real/json_service/vela.mod": "8149e5a5731e106c59f37852da2979aa15f45016d8872e995006364c903cdaf8",
+    "bench/real_programs.py": "5b47fb16b7a6bb95afa2769177bb460a0211eaba07c6bca4eb16e1febd5a41d8",
+    "bench/scale.py": "c765e2a57166f09fc7a2cd649becf8d3b8f1c838a2f4aecdfc65b84996c82474",
+    "bootstrap/vela1.c": "53d3187624dc97587931d4924bed641143afab976a889f3c091370dcdd1ecf7f",
+    "docs/m29-scale.md": "5c8366710856b2c37a6b24189dd6c369415606e0fcc2a5232d0c4806a0949327",
+    "docs/roadmap-after-m18.md": "e8851070228befb85e676987c9e4076ff8471221d993574a15f6ec210c958577",
+    "docs/tooling-backlog.md": "c8dd47abb922d190baaa75a2d38591f82a3155c69326eabade8b940831460057",
+    "packages/json/json.vl": "051aa549e7b25729d53678c28cb49291e5168c37648ac96e188787eda4d241e0",
+    "packages/json/vela.mod": "e6ac090348f113d70cc4e564e211901c9b8a82d43e26e844d2af3c865568794b",
+    "run_tests.py": "d27e5025b4947b81b87451e63017c140b1742003876311037efe159e7d1f74aa",
+    "runtime/vela_int.h": "e600cfd5cab132401aba9e03b5e4a3c45995c33cbbab7f8b581739a258d74059",
+    "runtime/vela_observe.inc": "de5ccc13c5c8520def4a54eb400f5656e4ceec760793b96c6f0f106ee0100c43",
+    "runtime/vela_policy.inc": "9990ac63b5540c3af53f62a28a7b5b15053d2d42a5ce3086183d78073229fb94",
+    "runtime/vela_policy_portable.inc": "1737295f17af3f86658850d28134a6131387b09a279431340f4e11ad31ccc84d",
+    "runtime/vela_rt.c": "d24fceec9edbb529d463edb077b8ea20902de546781840a572fe757fb507236e",
+    "runtime/vela_rt.h": "63a3401c2f13319029b972395ccbe79170f4ea04a0f71d6afb64370f81014a11",
+    "runtime/vela_sys.inc": "70523051a017c1718f25e96fadaa60ac8c2a7e61edbd1cc209066f61b54c73be",
+    "runtime/vela_threads.h": "ac583b3dd0069704b12f2aaa6bf4c0ef282111e7004814ac8306a67b8558f3db",
+    "runtime/vela_windows.h": "e630e02b37a51eca8cfd64d811171734033d83019b0d01f9c01f01155bc225dc",
+    "runtime/vela_windows_net.h": "16591563be67a14e5ff84d4e5e680c700e24f4645c9893071cf67b0e72420e15",
+    "runtime/vela_windows_process.inc": "70dc8c7c9f23874f69c1ae8db52c1f0795d8e1f24029c1a8b942e4dfd2643d9d",
+    "stage1/agent_queries.vl": "9a717de947f1ea4fbf4ad677fa9b6ca731cb15351fb13e59d61ebee84e503bc6",
+    "stage1/arm64.vl": "a47e94634e9c1d03a0587a049b879154570c07dce2c232d1b6f638aa92287be1",
+    "stage1/ast.vl": "71be5595bf344c9ed88c60276e59789cda435bccc8d19b753b46d68a4fa8b45a",
+    "stage1/bits.vl": "8e14141f4f203c1850984ff0355df3d69092ac62327602eeed4fef93314f0b96",
+    "stage1/call_graph.vl": "07cf773d2aa93e647983787bfcfcbde08a6aed430e8296d4d8aa7017d2ffd18a",
+    "stage1/capabilities.vl": "0fadb0ad3b900d2510ebcbd2e6ba49a2696288085996479de791da88bc74ad82",
+    "stage1/cffi.vl": "6b98f14d1e4d85b4a595de6337fa258387fee7160d4e9df2a3816abcedb7f636",
+    "stage1/chars.vl": "c42a95f8a5cb41d535981094761ccd447db7eb643ba40a8449b3504e7e7652d9",
+    "stage1/checker.vl": "4eee984b521d698a1c8ab3903b67db151c01274fcd25358007b43ea8928cdb55",
+    "stage1/codegen.vl": "a6cb89d45f59684708bb9c482f30e3e2c9f64413a56d357b84fa2e4664ff8d1d",
+    "stage1/complete.vl": "99507944d5e2a03249b93154e4dede64c68c5f2d4d8990fee683882bc7b8e4f8",
+    "stage1/contract_checks.vl": "8217ea347cd43147a54c21293c9cc9f46cf265f055754e5f7adfefebc2749cc2",
+    "stage1/debug_info.vl": "afbc5d8080374561aebcfae0ba7c0e84c492b4c085d26dc454ca737ab96ea8ae",
+    "stage1/diagnostics.vl": "3008bf8e2e5af84c3c2cc85cd9a50de786234d84bd50b58b0c00bfee6160d9d6",
+    "stage1/errors.vl": "2a31eea563f9ea1b591e700955c82c1ee887bd24b4797bb7c9eb3d5d733a8e27",
+    "stage1/evidence.vl": "cf93679034d67041f9ef769586ab59f3cfb4b2474298cdb78f49ac3362b8cd97",
+    "stage1/fixer.vl": "7370240f796cc19c3e6b38f0e03dc66061d0e6343154f29b31e7a7d9ac87a2a8",
+    "stage1/format.vl": "d8a7a58a851aa909e1e7818a8850888c11998c25c8eee56915cad77c93b5baf0",
+    "stage1/guide.vl": "6872ff5dd75da0e94a847b1ef4ede258b924599bd56eefd336261e09e6734bc3",
+    "stage1/incremental.vl": "0ac76bf06d3c50617edfea0f30a61b23960077587e3ca30e1e04988a68a4ea32",
+    "stage1/index.vl": "974652e9ab5dc963a75fb241ec58f771100efddb58f69f1abf6151e5fb0ba258",
+    "stage1/integers.vl": "45739d073e59c93f31718f5f8cf9a9424e192f2157e89d1de8fcdefa7747593a",
+    "stage1/interfaces.vl": "990c820ed20895079cc23b0a926d935f32844d30919da49fb91d8f8875af110f",
+    "stage1/ir.vl": "cab3dd585329fed7d4f2cf53eeb7d2698b229717895c282e1a5a526d876e99d6",
+    "stage1/layout.vl": "2556147fbf66b348ec4b5b00926fdabc0c32b4030f4bd88598ce7eaee5e16b24",
+    "stage1/lexer.vl": "b253ef64ffe1a5e5f8466e666c8379010eba177c28d2a619d7a6d666ebfcc2e3",
+    "stage1/live.vl": "fb1c6d41eca98fcc39f4c65667bbe43642f3042183d7510707494a8b62ecdda9",
+    "stage1/loops.vl": "b0286f5dd7d9edf08d9a6b0a63f97a4638d4f3a00a8a48447c6f436057859a59",
+    "stage1/lower.vl": "ace06e0126ec39bc5acaeb310491a1ed0353cbfaea1b92d1822d40d68cc48137",
+    "stage1/lsp.vl": "4c5d880e580b92557dfffcd9eabf6fccc7c3d78130b83148e58c42ef1b1d5ead",
+    "stage1/main.vl": "ba1f25a719c02da6904089e39eebe65d8ca103924859b484804de05e25f1f3c1",
+    "stage1/match_check.vl": "e91be1b1bf88c868bba3b5c986d66834688dc1f626922357d594d781ba4bc8b5",
+    "stage1/memops.vl": "938eae0dd685ef057699207b39b259d9ea74604b248e0bbff70e2c69eb1c97ad",
+    "stage1/modules.vl": "8060b7c8df148587c8a7caab6a0f99b2a2dbaa0faee07767b66b5a09a7c4c2c2",
+    "stage1/mono.vl": "be0e0e52218cdf2bf99abc8677c39657992b491cd3d036e90de3894d3bd54265",
+    "stage1/opt.vl": "ba42bace372b3582d2f43879e634e9c175074dd47e12e5adf9472714acdbb9e5",
+    "stage1/packages.vl": "de2a8e6e42c907b3bbb3a69d9ddef328dfdacdd4c544cd2033f06cf0505ae1f2",
+    "stage1/parser.vl": "e714ee9ed7889b9ba33b4878d56e2a6cd432597d904d603e00e1c3ec6bd9f3c7",
+    "stage1/profile_report.vl": "610d2168d059d4346420f4c674a0e030f5962877fbd232df2ca24f6b7f698d2a",
+    "stage1/promote.vl": "1488e4852cbdbdb5026580d46496930d5514433bc19ad7ec4478d92a40a2992a",
+    "stage1/proof_hash.vl": "0bcf5e34ec2c3d55df0ed8367e9dc4a7dd00fe23e3472dd6bc34c895277566a0",
+    "stage1/properties.vl": "d06aee7b67a1ad2255d2ddbe39e997857d474512d83167888f74dad288233bc3",
+    "stage1/query.vl": "5b004c8594e69c5b0ec84c3ffe5eb9fe0173e51c46b36c3c3376e8af6b255f56",
+    "stage1/ranges.vl": "cb71b723cea4c09e6a627b4485aa61c0dccd3fba7440509872d799f5e63a1d62",
+    "stage1/regalloc.vl": "46ef0073de3f032f420f75d72a6f2b7eb2a8f549395d1c032c16ebffa43a6133",
+    "stage1/rename.vl": "c419d39210d1939fcf8185054890100c14562d3c38b41b0438304290a8d3dfe8",
+    "stage1/repairs.vl": "0583b8d36f2795b67e581d504264f6ee15cf2ab19847fa180217190192ee7050",
+    "stage1/sysops.vl": "20146b0bc85754a714d3b38a15fa0bd1bce05543b9567c0399a64d2e07a7270d",
+    "stage1/targets.vl": "087b0839d331aec59179eac4d461c2dae64b7acabbf318d1dcc865052a07a423",
+    "stage1/types.vl": "9c05be4ca1308fe027dff7ac5577e93a964fd2e8f9ff307b3a058266cb6a54fa",
+    "stage1/unsafe_query.vl": "08450ad03a8d7f7e6acd5e8e93e52e6156e70bbd50cfa2886e7d0c78c0a9007f",
+    "stage1/verification.vl": "77f4c6a4f8015a0168d9ae6b774e438477ed38971031ce855b6527fd01587ca8",
+    "stage1/x64.vl": "c0c457d4a6083e40f376a2aecfea845222800e542344a7170e32b6d91b0f37a9",
+    "std/arenas.vl": "7712c21cd8f2c734be19a0cfe266242b4db4e8d352e48facf8f26678fb340c5e",
+    "std/buffers.vl": "d5f89c0c7efa5a137a6fdc111733aebbba30a82776f6f229b648307339191854",
+    "std/bytes.vl": "2a893336976e500559bd2684d211454bb70226423e53c6f9550911988510d6cc",
+    "std/http.vl": "6e67ba10da0a2d8611943757fa0317251d2fea063f4a3864f8ae34fb27a9889e",
+    "std/io.vl": "c258a1047ca0dbc3038a5cb6f85be8c422c15e526dc5db3b5e5f607968c412c4",
+    "std/lists.vl": "dfbc5cf2b06d0b26af0e6e312da5024fb0dd8bba774df005d592712f47996f59",
+    "std/net.vl": "7e39b15bbb0fe1f61f575d55c7552997c20c5cf756460c8aaa75209e720050cb",
+    "std/paths.vl": "0e46f2ae7b152f3127c156279c53662477955d9f037c4334df50937384919812",
+    "std/processes.vl": "cbdb77e8000a706444b415499cbe08109626348f930db25177f5d08c7c28d92e",
+    "std/property.vl": "840f78599482fdc4f82a5b95872b60fe28065b823ec9fdbdb9b2403e1a5d624c",
+    "std/text.vl": "8e3fcd808bfd5d8f8e4f0028e0043850a85173b50c78aaf3d4410e1df0f95bfa",
+    "std/time.vl": "c2183e86f32cc9d10857e0ef606a1e056789938cd0f91d4862d8afa4b7f8c4d5",
+    "std/unicode.vl": "0870ced2fd92f50a354ebe193a663ff7a962d4bf91b24da4c7bd1fb884fec158",
+    "std/views.vl": "63b6c03f6b0c9e3954cef246c2f9e869dc53ac244fe8057168ab40b14188a314",
+    "tests/m29_test.py": "a06a900d8c62f05deb1f5956774126e286e17f41133474d6f8312b49345c7e34"
+  },
+  "compiler_images": {
+    "c": "f420ace734efef4ddc4c9d1a0dff7f36a1365c49b8ab42ea500a8d840ff31420",
+    "native": "81fc6eb836601247df0c70b1e93e7694697de8f87021903ac3053a6f0d51e3e4"
+  },
+  "local": {
+    "bootstrap_initial": [
+      "generation 1: the seed, compiled by cc",
+      "generation 2: built by generation 1",
+      "generation 3: built by generation 2",
+      "fixed point: generations 2 and 3 write identical C (  155695 lines)",
+      "the seed is updated",
+      "built build/vela",
+      "native 1: built by build/vela with VELA_BACKEND=native",
+      "native 2: built by native 1",
+      "native fixed point: natives 1 and 2 write identical assembly ( 2394080 lines)",
+      "built build/vela-native"
+    ],
+    "bootstrap_final": [
+      "generation 1: the seed, compiled by cc",
+      "generation 2: built by generation 1",
+      "generation 3: built by generation 2",
+      "fixed point: generations 2 and 3 write identical C (  155789 lines)",
+      "the seed is updated",
+      "built build/vela",
+      "native 1: built by build/vela with VELA_BACKEND=native",
+      "native 2: built by native 1",
+      "native fixed point: natives 1 and 2 write identical assembly ( 2396147 lines)",
+      "built build/vela-native"
+    ],
+    "c_suite_before_final_guard": "309 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)",
+    "native_suite_before_final_guard": "309 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)",
+    "final_m29_normal_acceptance": [
+      "M29: c cache checks passed",
+      "M29: native cache checks passed",
+      "M29: real programs, incremental edit outputs and partial-gate guards passed",
+      "M29 scale and incremental checks passed."
+    ],
+    "final_ubsan": "123 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)",
+    "suite_scope": "The 309-check complete suites preceded the final external compiler-state eligibility guard. Final normal M29 acceptance and the 123-check UBSan selection include that guard, both backend cache paths and current application references.",
+    "incremental_compiler": {
+      "results": [
+        {
+          "backend": "c",
+          "cold": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "c",
+            "target": "aarch64-apple-darwin",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 0,
+            "compiled": 5,
+            "units": [
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/dbb9a132f0f539687929d8883d7761ee7ca9d67f13d21a17d4ef8f687d214d44.o",
+                "hit": false
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/a2dab2d44827e5fe01cd10aa66ef6b73e03823ca9b010d020652493ae008db34.o",
+                "hit": false
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/1b9e8b93481ef05a28f9ba11dff9a444cfdc399a22d743313c334cb8ba8d6eb2.o",
+                "hit": false
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/a4177fcc47367bf2fa5fdf04ea1f9b16d926f91a3199e69e3b06086ac94b09b0.o",
+                "hit": false
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/3ed571a4e8f4c2f41476cfe69d56787969a41efcc1e2e18498c27d3ec6796669.o",
+                "hit": false
+              }
+            ]
+          },
+          "warm": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "c",
+            "target": "aarch64-apple-darwin",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 5,
+            "compiled": 0,
+            "units": [
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/dbb9a132f0f539687929d8883d7761ee7ca9d67f13d21a17d4ef8f687d214d44.o",
+                "hit": true
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/a2dab2d44827e5fe01cd10aa66ef6b73e03823ca9b010d020652493ae008db34.o",
+                "hit": true
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/1b9e8b93481ef05a28f9ba11dff9a444cfdc399a22d743313c334cb8ba8d6eb2.o",
+                "hit": true
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/a4177fcc47367bf2fa5fdf04ea1f9b16d926f91a3199e69e3b06086ac94b09b0.o",
+                "hit": true
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/3ed571a4e8f4c2f41476cfe69d56787969a41efcc1e2e18498c27d3ec6796669.o",
+                "hit": true
+              }
+            ]
+          },
+          "compiler_output_sha256": "53d3187624dc97587931d4924bed641143afab976a889f3c091370dcdd1ecf7f"
+        },
+        {
+          "backend": "native",
+          "cold": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "native",
+            "target": "aarch64-apple-darwin",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 0,
+            "compiled": 2,
+            "units": [
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/48e216a69047ec42a8b5af6fa4292d16f9c669a482d6c6b57d89ada667f61a57.o",
+                "hit": false
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/b8c2240a520b6d21449bfdabe15b6830e21c9a15ace51e60978f5b142b831af5.o",
+                "hit": false
+              }
+            ]
+          },
+          "warm": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "native",
+            "target": "aarch64-apple-darwin",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 2,
+            "compiled": 0,
+            "units": [
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/48e216a69047ec42a8b5af6fa4292d16f9c669a482d6c6b57d89ada667f61a57.o",
+                "hit": true
+              },
+              {
+                "key": "/Users/nathgoutam93/Documents/vela/build/m29/self-cache/objects-v1/b8c2240a520b6d21449bfdabe15b6830e21c9a15ace51e60978f5b142b831af5.o",
+                "hit": true
+              }
+            ]
+          },
+          "compiler_output_sha256": "53d3187624dc97587931d4924bed641143afab976a889f3c091370dcdd1ecf7f"
+        }
+      ]
+    },
+    "sanitizer_scope": "C programs, runtime helpers and independent C references are UBSan instrumented. Native emitted instructions and ordinary driver are not claimed as instrumented; existing Mac ASan and foreign sanitizer gaps stay open.",
+    "guide_bytes": 31968,
+    "guide_tokens_bytes_over_4": 7992.0,
+    "final_compiler_check": {
+      "ok": true,
+      "errors": []
+    }
+  },
+  "real_programs": {
+    "report": "bench/m29-real-programs.json",
+    "acceptance": {
+      "passed": true,
+      "errors": [],
+      "geometric_mean": {
+        "vela": 0.9326171299423098,
+        "vela-native": 1.0263680724377549
+      },
+      "budgets": {
+        "version": 1,
+        "check_100k_seconds": 1.0,
+        "query_seconds": 1.0,
+        "cold_build_seconds": 30.0,
+        "warm_build_seconds": 20.0,
+        "edit_build_seconds": 30.0,
+        "real_program_geometric_mean": 1.2
+      }
+    },
+    "scale_lines": 100304,
+    "check_median_seconds": 0.30277970898896456,
+    "query_median_seconds": {
+      "summary": 0.4631077909725718,
+      "impact": 0.9098355840542354
+    },
+    "build_seconds": {
+      "c": {
+        "normal": 2.8770565419690683,
+        "normal_warm": 2.132873375026975,
+        "cold": 4.5805689170374535,
+        "warm": 1.4428245419985615,
+        "edit": 2.7816467919619754
+      },
+      "native": {
+        "normal": 4.275788000028115,
+        "normal_warm": 4.182185499987099,
+        "cold": 4.36595375003526,
+        "warm": 2.5245571669656783,
+        "edit": 4.662111374957021
+      }
+    },
+    "solver_requested": true,
+    "solver_status": "proved",
+    "solver_timing": {
+      "seconds": 0.24023645801935345,
+      "max_rss_bytes": 40550400,
+      "stdout_sha256": "665ef94c3c20e28db9c682112115bc5cc9a4e1a4aed6d49535004d92295d8dc3"
+    }
+  },
+  "release_performance": {
+    "report": "bench/after-m29.json",
+    "acceptance": {
+      "complete_full_matrix": true,
+      "native_over_c": {
+        "varints": 2.736932354594887,
+        "arena_trees": 1.8504238532573827,
+        "nbody": 1.3467502403174003,
+        "spectralnorm": 0.8738743322608218,
+        "fannkuch": 1.4567615678160033,
+        "binarytrees": 0.7823613339917961,
+        "mandelbrot": 1.4147466900563528,
+        "fasta": 1.511826317033333,
+        "knucleotide": 1.8576520748542396,
+        "wordfreq": 1.7553142599623404,
+        "sha256": 1.5093120401492537,
+        "crc32": 1.306322124710219
+      },
+      "geometric_mean": 1.4594852002555205,
+      "limit": 1.5,
+      "programs_passed": true,
+      "native_compiler_faster": true,
+      "same_source_compilers": true,
+      "passed": true
+    },
+    "compiler": {
+      "vela": {
+        "sha256": "df48defdfd02ba9ee020df17e232efcc321af13bed5198fe8d51042e6a154e07",
+        "check": 0.2073273750138469,
+        "check_timing": {
+          "best": 0.2073273750138469,
+          "median": 0.20841100002871826,
+          "samples": [
+            0.2227870419737883,
+            0.20886349998181686,
+            0.2073273750138469,
+            0.20761149999452755,
+            0.20841100002871826
+          ]
+        },
+        "c": 0.5134807499707676,
+        "c_timing": {
+          "best": 0.5134807499707676,
+          "median": 0.5176759160240181,
+          "samples": [
+            0.5834780420409516,
+            0.5183537499979138,
+            0.5176759160240181,
+            0.5134807499707676,
+            0.5151492499862798
+          ]
+        }
+      },
+      "vela-native": {
+        "sha256": "9956f095af2fc14778d11e5c94a447be4d6c748fba9a8f6e975d46ddc452c225",
+        "check": 0.1969296250026673,
+        "check_timing": {
+          "best": 0.1969296250026673,
+          "median": 0.1981538749532774,
+          "samples": [
+            0.9121867089997977,
+            0.1981538749532774,
+            0.1979992080014199,
+            0.19888358301250264,
+            0.1969296250026673
+          ]
+        },
+        "c": 0.46096545801265165,
+        "c_timing": {
+          "best": 0.46096545801265165,
+          "median": 0.46223337500123307,
+          "samples": [
+            0.465087125019636,
+            0.46223258395912126,
+            0.46096545801265165,
+            0.46223337500123307,
+            0.46343574998900294
+          ]
+        }
+      }
+    }
+  },
+  "initial_scale_baseline": "bench/m29-scale-baseline.json",
+  "static_evaluation": "eval/m29-static.json",
+  "dependencies": {
+    "c_zlib": {
+      "runtime_version": "1.2.12",
+      "query_command": [
+        "cc",
+        "-std=c11",
+        "build/m29/zlib-version.c",
+        "-lz",
+        "-o",
+        "build/m29/zlib-version"
+      ],
+      "query_source": "#include <stdio.h>\n#include <zlib.h>\nint main(void){puts(zlibVersion());return 0;}\n"
+    },
+    "python_zlib": "1.2.12"
+  },
+  "commands": [
+    "VELA_BACKEND=c sh bootstrap/bootstrap.sh --update --native (repeated after the final cache eligibility guard)",
+    "python3 -u run_tests.py --compiler build/vela --backend c --jobs 4 (309 passed, before guard)",
+    "python3 -u run_tests.py --compiler build/vela --backend native --jobs 4 (309 passed, before guard)",
+    "python3 -u tests/m29_test.py build/vela (after guard)",
+    "VELA_CFLAGS=<strict flags> -g -fsanitize=undefined -fno-sanitize-recover=all UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 python3 -u run_tests.py --compiler build/vela --backend c --jobs 3 tests/run/ m23_test m27_test m28_test m29_test stage1/main.vl std/property.vl",
+    "python3 -u bench/real_programs.py --compiler build/vela --gate --runs 5 --solver <local-z3> --json bench/m29-real-programs.json",
+    "python3 -u bench/run.py --compiler build/vela --languages c vela-native --runs 5 --require-native-parity --json bench/after-m29.json",
+    "VELA_INCREMENTAL=1 VELA_THREADS=4 VELA_CACHE=build/m29/self-cache VELA_BACKEND=c|native build/vela build stage1/main.vl -o build/m29/compiler-incremental-BACKEND (cold/warm, then C-emission SHA parity)",
+    "python3 eval/static.py --vela build/vela --json eval/m29-static.json"
+  ],
+  "open_validation": [
+    "VAL-001: actual Linux native/sanitizer/performance and existing Mac ASan limits",
+    "VAL-005: actual Windows C/cache/program execution; no Windows native emitter is claimed",
+    "VAL-002/VAL-003: carried actual agent trials and model-tokenizer count",
+    "VAL-004/VAL-006: carried Linux kernel-policy and foreign debugger acceptance"
+  ],
+  "actual_agent_runs": 0,
+  "tooling": [
+    "TL-004",
+    "TL-017",
+    "TL-036",
+    "TL-056",
+    "TL-057",
+    "TL-058",
+    "TL-059",
+    "TL-060",
+    "TL-061"
+  ]
+}

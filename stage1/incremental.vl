@@ -1,0 +1,128 @@
+// Opt-in backend object reuse. The frontend always checks the current source.
+// C cache keys contain the actual preprocessed translation unit, so included
+// headers/macros are inputs rather than guessed dependency timestamps.
+import codegen
+import files
+import json
+import modules
+import os
+import processes
+import proof_hash
+import strings
+import sysio
+import text
+
+pub type Config = struct { directory: Str, identity: Str, report: Str, reason: Str, backend: Str, target: Str }
+pub type Probe = struct { object: Str, source: Str, key: Str, command: [Str], hit: Bool }
+fn words(xs: [Str]) -> Str { let mut out: [json.Json] = []; for x in xs { push(mut out, json.string(x)) }; return json.show(json.array(out)) }
+fn setting(name: Str) -> Str uses os { return match os.env(name) { Some(s) => s, None => "" } }
+fn binary(command: Str) -> Str uses fs, os {
+    // Bind wrappers as well as --version. Bare names use the same PATH search.
+    let mut candidates: [Str] = []; if text.contains(command, "/") || text.contains(command, "\\") { push(mut candidates, command) }; let mut sep = ":"; if text.contains(setting("OS"), "Windows") { sep = ";" }
+    for dir in text.split(setting("PATH"), sep) { push(mut candidates, modules.join(dir, command)) }
+    for path in candidates {
+        match files.read(path) { Ok(data) => return proof_hash.source(data), Err(_) => {} }
+        if sep == ";" { match files.read(path + ".exe") { Ok(data) => return proof_hash.source(data), Err(_) => {} } }
+    }
+    return ""
+}
+pub fn begin(directory: Str, mode: Int, backend: Str, target: Str, compiler: [Str]) -> Config uses fs, os {
+    let mut out = Config { directory: "", identity: "", report: setting("VELA_BUILD_REPORT"), reason: "not requested", backend: backend, target: target }
+    if setting("VELA_INCREMENTAL") != "1" { return out }
+    if mode != 0 { out.reason = "debug/profile/property objects are not reused"; return out }
+    if directory == "" { out.reason = "VELA_CACHE is disabled"; return out }
+    // These options consume or produce compiler state outside plain textual
+    // preprocessing. Preserve ordinary compilation rather than reuse objects.
+    let extra=setting("VELA_CFLAGS")
+    for option in ["-fmodule","-include-pch","-fpch","-fplugin","-fpass-plugin","-load","-specs","--specs","-fprofile","--coverage","-ftest-coverage","-ignorelist","-blacklist"]{
+        if text.contains(extra,option){out.reason="external compiler state is not cached";return out}
+    }
+    let mut version = compiler; push(mut version, "--version")
+    match processes.communicate(version, "", 65536, 3000) {
+        Ok(v) => { if v.status != 0 { out.reason = "toolchain identity unavailable"; return out }; out.identity = words(compiler) + "\n" + v.stdout + v.stderr }
+        Err(_) => { out.reason = "toolchain identity unavailable"; return out }
+    }
+    let image = binary(compiler[0]); if image == "" { out.reason = "toolchain image unavailable"; return out }
+    out.identity = out.identity + "\n" + image + "\n" + backend + "\n" + target
+    match sysio.canonical("."){Ok(path)=>out.identity=out.identity+"\n"+path,Err(_)=>{out.reason="working directory unavailable";return out}}
+    for name in ["PATH", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET", "IPHONEOS_DEPLOYMENT_TARGET", "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "GCC_EXEC_PREFIX", "COMPILER_PATH", "LIBRARY_PATH", "SOURCE_DATE_EPOCH", "CFLAGS", "CXXFLAGS", "ASFLAGS"] { out.identity = out.identity + "\n" + name + "=" + setting(name) }
+    let dest = modules.join(directory, "objects-v1")
+    match processes.communicate(["mkdir", "-p", dest], "", 65536, 3000) { Ok(v) => { if v.status != 0 { out.reason = "cache is not writable"; return out } }, Err(_) => { out.reason = "cache is not writable"; return out } }
+    out.directory = dest; out.reason = "enabled"; return out
+}
+pub fn enabled(c: Config) -> Bool { return c.directory != "" }
+fn has(path: Str) -> Bool uses fs {
+    match files.read(path) { Ok(data) => match files.read(path + ".sha256") { Ok(hash) => return hash == proof_hash.source(data), Err(_) => {} }, Err(_) => {} }; return false
+}
+pub fn c_unit(c: Config, base: [Str], source: Str, object: Str) -> Probe uses fs, os {
+    let pre = object + ".i"; let mut command = base; let mut input = source
+    // Generated C lived in a random scratch directory. Publish the exact
+    // bytes at a content-addressed name before preprocessing; retain #line
+    // and system-header markers, rather than rewriting preprocessed tokens.
+    // The runtime stays at its original path to preserve quoted include order.
+    if modules.dirname(source) == modules.dirname(object) { match files.read(source) { Ok(data) => {
+        let stable = modules.join(c.directory, "source-" + proof_hash.source(data) + ".c")
+        let partial = stable + "." + modules.stem(modules.dirname(object)) + ".part"
+        match files.write(partial, data) { Ok(_) => { match processes.communicate(["mv", "-f", partial, stable], "", 65536, 3000) { Ok(v) => { if v.status == 0 { input = stable } }, Err(_) => {} } }, Err(_) => {} }
+        let _ = files.remove(partial)
+    }, Err(_) => {} } }
+    for word in ["-E", input, "-o", pre] { push(mut command, word) }
+    let mut ok = false; match os.run(command) { Ok(code) => ok = code == 0, Err(_) => {} }
+    if !ok { let mut fallback = base; for word in ["-c", source, "-o", object] { push(mut fallback, word) }; return Probe { object: object, source: pre, key: "", command: fallback, hit: false } }
+    match files.read(pre) {
+        Ok(data) => { let mut p = probe(c, base, pre, object, "c\n" + data); if !p.hit { p.command = preprocessed_flags(base); if text.contains(c.identity, "clang") { push(mut p.command, "-Wno-gnu-line-marker") }; for word in ["-c", pre, "-o", object] { push(mut p.command, word) } }; return p }
+        Err(_) => { let mut fallback = base; for word in ["-c", source, "-o", object] { push(mut fallback, word) }; return Probe { object: object, source: pre, key: "", command: fallback, hit: false } }
+    }
+}
+fn preprocessed_flags(base: [Str]) -> [Str] {
+    let mut out: [Str] = []; let mut i = 0
+    for i < len(base) { let flag = base[i]; i = i + 1
+        if flag == "-I" || flag == "-D" || flag == "-U" || flag == "-include" || flag == "-imacros" || flag == "-isystem" || flag == "-iquote" || flag == "-idirafter" || flag == "-Xpreprocessor" { i = i + 1; continue }
+        if text.starts_with(flag, "-I") || text.starts_with(flag, "-D") || text.starts_with(flag, "-U") || text.starts_with(flag, "-Wp,") || flag == "-nostdinc" || flag == "-nostdinc++" || flag == "-undef" { continue }
+        push(mut out, flag)
+    }; return out
+}
+pub fn assembly(c: Config, base: [Str], source: Str, object: Str, data: Str) -> Probe uses fs {
+    return probe(c, base, source, object, "asm\n" + data)
+}
+fn probe(c: Config, base: [Str], source: Str, object: Str, data: Str) -> Probe uses fs {
+    let key = modules.join(c.directory, proof_hash.source(c.identity + "\n" + words(base) + "\n" + data) + ".o")
+    let mut command = base; for word in ["-c", source, "-o", object] { push(mut command, word) }
+    if has(key) { return Probe { object: key, source: source, key: key, command: [], hit: true } }
+    return Probe { object: object, source: source, key: key, command: command, hit: false }
+}
+pub fn finish(c: Config, probes: [Probe], success: Bool) -> Result[Unit, Str] uses fs, os {
+    if !enabled(c) && c.report == "" { return Ok(()) }
+    let mut rows: [json.Json] = []; let mut hits = 0; let mut compiled = 0
+    for p in probes {
+        if p.hit { hits = hits + 1 } else { compiled = compiled + 1 }
+        if success && !p.hit && p.key != "" {
+            // Each writer owns its scratch name; atomic rename publishes only
+            // complete objects. Failed compilation never populates the cache.
+            let partial = p.key + "." + modules.stem(modules.dirname(p.object)) + ".part"
+            match processes.communicate(["cp", p.object, partial], "", 65536, 3000) { Ok(v) => { if v.status == 0 { let _ = processes.communicate(["mv", "-f", partial, p.key], "", 65536, 3000) } }, Err(_) => {} }
+            match files.read(p.object) { Ok(data) => { match files.write(partial + ".sha256", proof_hash.source(data)) { Ok(_) => { let _ = processes.communicate(["mv", "-f", partial + ".sha256", p.key + ".sha256"], "", 65536, 3000) }, Err(_) => {} } }, Err(_) => {} }
+            let _ = files.remove(partial)
+            let _ = files.remove(partial + ".sha256")
+        }
+        push(mut rows, json.object([json.member("key", json.string(p.key)), json.member("hit", json.boolean(p.hit))]))
+    }
+    if c.report != "" {
+        let mut status = "failed"; if success { status = "ok" }
+        files.write(c.report, json.pretty(json.object([json.member("format", json.string("vela.build.cache")), json.member("version", json.integer(1)), json.member("status", json.string(status)), json.member("backend", json.string(c.backend)), json.member("target", json.string(c.target)), json.member("enabled", json.boolean(enabled(c))), json.member("reason", json.string(c.reason)), json.member("hits", json.integer(hits)), json.member("compiled", json.integer(compiled)), json.member("units", json.array(rows))])))?
+    }
+    return Ok(())
+}
+
+// Stable, contiguous groups of function/closure parts. Membership depends on
+// part count, not byte length, so editing one body does not rebalance all units.
+pub fn parts(source: Str, n: Int) -> [Str] {
+    let mark = codegen.part_mark(); let mut cuts: [Int] = []; let mut at = 0
+    for at + len(mark) <= len(source) { if source[at] == '/' && source[at..at + len(mark)] == mark { push(mut cuts, at); at = at + len(mark) } else { at = at + 1 } }
+    if len(cuts) == 0 { return [source] }; let mut count = n; if count < 1 { count = 1 }; if count > len(cuts) { count = len(cuts) }
+    // Tiny programs need only one toolchain process.
+    if len(source) < 65536 { count = 1 }
+    let prefix = source[0..cuts[0]]; let mut out: [Str] = []
+    for i in 0..count { let start = cuts[len(cuts) * i / count]; let mut end = len(source); if i + 1 < count { end = cuts[len(cuts) * (i + 1) / count] }; push(mut out, prefix + source[start..end]) }
+    return out
+}

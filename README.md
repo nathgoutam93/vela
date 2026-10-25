@@ -28,6 +28,7 @@ build/vela run --debug hello.vl # source maps and Vela panic stacks
 build/vela profile --json profile.json hello.vl # instrumented elapsed time
 build/vela verify --json hello.vl # bounded contract proofs; --solver z3 opts in to SMT
 build/vela test --properties --json hello.vl # generated contract cases, not proof
+VELA_INCREMENTAL=1 build/vela build hello.vl -o hello # reuse backend objects
 build/vela test hello.vl      # run its `test` blocks (and those of what it imports)
 build/vela fmt -w hello.vl    # format it in place (-l lists unformatted files)
 build/vela c hello.vl         # show the generated C
@@ -225,3 +226,7 @@ M28 adds discarded-Result warnings (E7009), bounded opt-in contract verification
 and generated contract properties with JSON counterexamples. Unproved checks
 remain at runtime. See [the walkthrough](docs/m28-verification.md) for supported
 domains, budgets, evidence freshness and remaining agent/platform validation.
+
+M29 adds a real-program performance matrix, a 100k-line scale fixture and
+incremental backend compilation. See [the walkthrough](docs/m29-scale.md) for
+cache granularity, compilation/query budgets and reproducible measurements.

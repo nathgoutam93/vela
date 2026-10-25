@@ -1,0 +1,31 @@
+// JSON-lines aggregation service. Each response selects values >= threshold.
+import files
+import json
+import os
+import text
+pub fn respond(line: Str) -> Str {
+    let mut request = json.null()
+    match json.parse(line) { Ok(value) => request = value, Err(_) => return "{\"error\":\"request\"}" }
+    let mut id = 0; match json.as_int(json.get(request, "id")) { Some(n) => id = n, None => return "{\"error\":\"request\"}" }
+    let mut threshold = 0; match json.as_int(json.get(request, "threshold")) { Some(n) => threshold = n, None => return "{\"error\":\"request\"}" }
+    let mut values: [json.Json] = []; match json.get(request, "values") { json.Json.Array(xs) => values = xs, _ => return "{\"error\":\"request\"}" }
+    let mut count = 0; let mut sum = 0; let mut maximum = json.null()
+    for value in values {
+        let mut n = 0; match json.as_int(value) { Some(v) => n = v, None => return "{\"error\":\"request\"}" }
+        if n >= threshold { count = count + 1; sum = sum + n; if count == 1 || n > json.int_or(maximum, 0) { maximum = json.integer(n) } }
+    }
+    return json.show(json.object([json.member("id", json.integer(id)), json.member("count", json.integer(count)), json.member("sum", json.integer(sum)), json.member("max", maximum)]))
+}
+fn main() uses fs, os {
+    let args = os.args(); if len(args) != 3 { os.eprint("usage: json_service FILE ROUNDS"); os.exit(2) }
+    let mut rounds = 0; match text.parse_int(args[2]) { Some(n) => rounds = n, None => os.exit(2) }; if rounds < 1 { os.exit(2) }
+    let mut data = ""; match files.read(args[1]) { Ok(s) => data = s, Err(e) => { os.eprint(e); os.exit(1) } }
+    let requests = text.lines(data)
+    for _ in 0..rounds { for request in requests { print(respond(request)) } }
+}
+test "JSON request validation and aggregation" {
+    assert(respond("{\"id\":3,\"threshold\":0,\"values\":[-2,4,1]}") == "{\"id\":3,\"count\":2,\"sum\":5,\"max\":4}")
+    assert(respond("{\"id\":1,\"threshold\":2,\"values\":[]}") == "{\"id\":1,\"count\":0,\"sum\":0,\"max\":null}")
+    assert(respond("{\"id\":0,\"threshold\":0,\"values\":[true]}") == "{\"error\":\"request\"}")
+    assert(respond("bad") == "{\"error\":\"request\"}")
+}

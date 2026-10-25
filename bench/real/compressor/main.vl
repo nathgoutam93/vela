@@ -1,0 +1,16 @@
+// A file compressor with verified binary decompression on every iteration.
+import files
+import os
+import text
+import zlib
+fn main() uses fs, os {
+    let args = os.args(); if len(args) != 3 { os.eprint("usage: compressor FILE ROUNDS"); os.exit(2) }
+    let mut rounds = 0; match text.parse_int(args[2]) { Some(n) => rounds = n, None => os.exit(2) }; if rounds < 1 { os.exit(2) }
+    let mut data = ""; match files.read(args[1]) { Ok(s) => data = s, Err(e) => { os.eprint(e); os.exit(1) } }
+    for _ in 0..rounds {
+        let mut packed = ""; match zlib.compress(data, 6) { Ok(s) => packed = s, Err(_) => os.exit(1) }
+        let mut restored = ""; match zlib.decompress(packed, len(data)) { Ok(s) => restored = s, Err(_) => os.exit(1) }
+        if restored != data { os.exit(1) }
+        print(len(packed)); print(zlib.checksum(packed)); print(zlib.checksum(restored))
+    }
+}
