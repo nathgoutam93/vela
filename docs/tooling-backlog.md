@@ -1691,27 +1691,35 @@ the same entry. Close it with a commit or validation result; keep its history.
   fixture bytes and historical JSON report bytes match the prior checkout;
   all current relative Markdown links resolve.
 
-### TL-067: Windows bootstrap requires cmp from MSYS2 diffutils
+### TL-067: Windows bootstrap requires portable tools and seed bytes
 
-- **Status:** in progress after M30; local fix applied, Windows rerun pending.
+- **Status:** in progress after M30; `cmp` fix validated on Windows, seed
+  line-ending fix awaits rerun.
 - **Evidence:** the Windows C bootstrap step in
   [run 40183666565](https://github.com/nathgoutam93/vela/actions/runs/40183666565/job/121139807808)
   reports `cmp: command not found` at the fixed-point check, followed by the
   misleading `NOT a fixed point` message. The same missing command appears
   in later run 40188570070. MSYS2's `diffutils` package supplies `cmp.exe`.
-- **Impact:** Windows validation stops before the compiler or test suite can
+- **Next Windows run:** [run 40211096749](https://github.com/nathgoutam93/vela/actions/runs/40211096749/job/121222292528)
+  installs diffutils and reaches a 156,427-line generation 2/3 fixed point,
+  then reports that the checked-in seed differs. `.gitattributes` pins `.vl`
+  files to LF but omitted `compiler/bootstrap/vela1.c`; Windows checkout
+  newline conversion is the suspected cause, pending confirmation by rerun.
+- **Impact:** Windows validation stops before the supported test suites can
   be assessed.
 - **Workaround:** install `diffutils` in the CLANG64 MSYS2 environment.
-- **Resolution:** add `diffutils` to the workflow install list and make
-  bootstrap report the missing command before compilation.
+- **Resolution:** add `diffutils` to the workflow install list, make bootstrap
+  report the missing command before compilation, and pin the generated seed
+  to LF checkout bytes in `.gitattributes`.
 - **Acceptance:** manually dispatch Platforms on this commit; Windows bootstrap
-  must reach the fixed point and advance to the supported test suites. The
+  must reach the fixed point, match the checked-in seed and advance to the
+  supported test suites. The
   missing-command preflight exits 2 with the actionable message in a local
   restricted-PATH check.
 
 ### TL-068: Strict Linux C compilation rejects an observation-runtime line
 
-- **Status:** in progress after M30; local fix applied, Linux rerun pending.
+- **Status:** resolved after M30.
 - **Evidence:** [run 40183666565](https://github.com/nathgoutam93/vela/actions/runs/40183666565/job/121139807985)
   passed 304 C checks but failed M27, M28, and M29 integration checks when
   GCC treated `runtime/vela_observe.inc:100` as
@@ -1726,6 +1734,53 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Acceptance:** local strict C syntax compilation and focused M27–M29
   integration checks pass; manually dispatched Linux C suite passes on GCC
   with warnings as errors.
+- **Validation:** local strict C syntax compilation and focused M27–M29
+  checks pass. Linux [run 40211096749](https://github.com/nathgoutam93/vela/actions/runs/40211096749/job/121222292334)
+  passes 308 C checks without the observation-runtime warning. Two new
+  failures in that job are recorded separately below.
+
+### TL-069: GCC rejects intentional recursion in a debug fixture
+
+- **Status:** in progress after M30; local fix applied, Linux rerun pending.
+- **Evidence:** Linux [run 40211096749](https://github.com/nathgoutam93/vela/actions/runs/40211096749/job/121222292334)
+  fails `tests/m27_test.py` when GCC diagnoses `recursive-panic.vl` as
+  `-Werror=infinite-recursion`. Its base case intentionally panics, and the
+  test needs deep recursion to check stack truncation.
+- **Impact:** the strict C suite stops an accepted debug fixture before it
+  can check the runtime stack trace.
+- **Workaround:** compile Vela-generated C with `-Wno-infinite-recursion`;
+  keep warnings as errors for other generated-code warnings.
+- **Resolution:** add that exception to the test runner's strict flags.
+- **Acceptance:** local Clang and Linux GCC accept the flag; the focused M27
+  test passes locally, and the complete Linux C suite passes on rerun.
+- **Local validation:** `run_tests.py ... m27_test` passes on macOS. In an
+  isolated Debian x86-64 container, the exact recursive fixture compiles
+  under GCC with the strict flags and exits 101 at its intended Vela panic.
+
+### TL-070: Native property runner reads the case index as the result
+
+- **Status:** in progress after M30; isolated x86-64 fix verified, Linux CI
+  rerun pending.
+- **Evidence:** Linux [run 40211096749](https://github.com/nathgoutam93/vela/actions/runs/40211096749/job/121222292334)
+  fails the M28 narrow property with `no admitted cases`. In an isolated
+  x86-64 Linux container the exact fixture passes under C (one admitted,
+  seven discarded) but is unknown under native (zero admitted, eight
+  discarded). Calling the generated property helper directly gives the
+  right answers. Disassembly of native `main` shows the helper result saved
+  in `r12` while the following comparison uses `r10`, the case index.
+- **Impact:** native property results can be misclassified as discarded,
+  weakening contract sampling and failing Linux acceptance.
+- **Workaround:** run the same property suite with the C backend until the
+  native dispatch is validated.
+- **Resolution:** use the result register returned by `call` in
+  `compiler/src/lower.vl`; its final argument is an IR class, not a register.
+- **Acceptance:** the narrow fixture passes with both backends in the Linux
+  container; the checked-in M28 suite and complete Linux C/native CI pass.
+- **Local validation:** after rebuilding the isolated x86-64 compiler with
+  the corrected call result, the same narrow fixture passes under C and
+  native, each with one admitted and seven discarded cases. Both local
+  bootstrap fixed points pass with the refreshed seed. The focused local
+  M27 and M28 integration suites pass (2/2).
 
 ## Outstanding validation
 
@@ -1751,6 +1806,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   any repeatable slowdown before changing a gate.
 - **Acceptance:** both platform gates pass on the current commit, or a
   reproducible regression is identified and fixed with new validation evidence.
+- **Next run:** macOS in [run 40211096749](https://github.com/nathgoutam93/vela/actions/runs/40211096749)
+  passes all steps, including release parity. Linux passes the M24 C
+  integration with its query timing assertion, but exits the C suite on
+  TL-069 and TL-070 before running its later benchmark gates. Retain Linux
+  performance validation until a complete run reaches them.
 
 ### VAL-001: Linux native and sanitizer validation
 

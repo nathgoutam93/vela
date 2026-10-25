@@ -267,7 +267,7 @@ fn entry(g: mut Low, for_tests: Bool, tests: [Int]) {
             let missing=label(mut g);branch_cmp(mut g,"le",n,konst(mut g,2),missing)
             let word = load(mut g,argv,16,8)
             let index = ccall(mut g,"strtol",[word,konst(mut g,0),konst(mut g,10)],[ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT()],ir.RET_INT(),-1)
-            let result = reg(mut g,ir.INT());call(mut g,fn_name(g.k,tests[i]),[index],result)
+            let result = call(mut g,fn_name(g.k,tests[i]),[index],ir.INT())
             let skipped=label(mut g);branch_cmp(mut g,"eq",result,konst(mut g,0),skipped);ret(mut g,konst(mut g,0));place_label(mut g,skipped);ret(mut g,konst(mut g,77));place_label(mut g,missing);ret(mut g,konst(mut g,77))
         } else { call(mut g, fn_name(g.k, tests[i]), [], -1); ret(mut g, konst(mut g, 0)) }
         place_label(mut g, next)

@@ -1,4 +1,5 @@
 *.vl text eol=lf
+compiler/bootstrap/vela1.c text eol=lf
 # Deliberately uses Windows line endings.
 tests/run/crlf.vl -text
 # The 1.0 compatibility corpus pins exact bytes, including package manifests.

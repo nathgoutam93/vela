@@ -100,11 +100,12 @@ KINDS = ("run", "fail", "dump", "cli")
 # Generated C must compile without a single warning; the test suite enforces it.
 # The exceptions are warnings about the Vela program rather than about the
 # code generator: Vela allows unused variables and parameters, `x == x` and
-# `x = x`, so C must too. (gcc ignores -Wno-self-assign, which is clang's.)
+# `x = x`, and recursion whose base case exits, so C must too.
+# (gcc ignores -Wno-self-assign, which is clang's.)
 STRICT_CFLAGS = (
     "-Wall -Wextra -Werror -pedantic"
     " -Wno-unused-variable -Wno-unused-parameter -Wno-unused-but-set-variable"
-    " -Wno-tautological-compare -Wno-self-assign"
+    " -Wno-tautological-compare -Wno-self-assign -Wno-infinite-recursion"
 )
 # --sanitize: catch memory errors (use after free, out of bounds), undefined
 # behaviour, and, when the program exits, any memory it never freed.
