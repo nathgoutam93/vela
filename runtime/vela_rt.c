@@ -86,6 +86,43 @@ static void check_count(int64_t n) {
 
 _Thread_local vela_pool vela_pools;
 
+_Thread_local int64_t vela_visit_depth;
+_Thread_local int64_t vela_visit_waiting;
+typedef struct vela_visit {
+    void *p;
+    vela_visit_fn f;
+} vela_visit;
+static _Thread_local vela_visit *visits;
+static _Thread_local int64_t visit_cap;
+
+void vela_visit_later(void *p, vela_visit_fn f) {
+    if (vela_visit_waiting == visit_cap) {
+        visit_cap = visit_cap ? visit_cap * 2 : 256;
+        vela_visit *grown = realloc(visits, (size_t)visit_cap * sizeof *visits);
+        if (!grown) vela_panic("vela runtime", "out of memory");
+        visits = grown;
+    }
+    visits[vela_visit_waiting++] = (vela_visit){p, f};
+}
+
+// The waiting visits, newest first, one level below the outermost: those
+// that go deep again wait here too. The list is freed once it is empty, so
+// a worker thread that ends keeps nothing.
+void vela_visit_drain(void) {
+    vela_visit_depth = 1;
+    while (vela_visit_waiting > 0) {
+        vela_visit v = visits[--vela_visit_waiting];
+        v.f(v.p);
+    }
+    vela_visit_depth = 0;
+    free(visits);
+    visits = NULL;
+    visit_cap = 0;
+}
+
+void vela_env_drop(void *e) { ((vela_env *)e)->drop(e); }
+void vela_env_mark(void *e) { ((vela_env *)e)->share(e); }
+
 void *vela_alloc(size_t size) {
     VELA_PROFILE_SCOPE("allocation");
     check_size(size);
@@ -325,14 +362,22 @@ static void array_resize(vela_array *a, size_t bytes) {
     }
 }
 
+static void array_free(void *p) {
+    vela_array *a = p;
+    for (int64_t i = 0; i < a->len; i++) a->elem->release(a->data + a->elem->size * (size_t)i);
+    if (a->data != inline_data(a)) free(a->data);
+    vela_box_free(a, (size_t)a->size);
+}
+
 void vela_array_release(vela_array *a) {
     VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_dec(&a->rc)) return;
-    if (a->elem->release) {
-        for (int64_t i = 0; i < a->len; i++) a->elem->release(a->data + a->elem->size * (size_t)i);
+    if (!a->elem->release) {
+        if (a->data != inline_data(a)) free(a->data);
+        vela_box_free(a, (size_t)a->size);
+        return;
     }
-    if (a->data != inline_data(a)) free(a->data);
-    vela_box_free(a, (size_t)a->size);
+    vela_bounded(a, array_free);
 }
 
 void vela_array_unique(vela_array **ap) {
@@ -350,10 +395,15 @@ void vela_array_unique(vela_array **ap) {
     *ap = copy;
 }
 
+static void array_mark(void *p) {
+    vela_array *a = p;
+    for (int64_t i = 0; i < a->len; i++) share_elem(a->elem, a->data + a->elem->size * (size_t)i);
+}
+
 void vela_array_share(vela_array *a) {
     VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_share(&a->rc) || !a->elem->share) return;
-    for (int64_t i = 0; i < a->len; i++) share_elem(a->elem, a->data + a->elem->size * (size_t)i);
+    vela_bounded(a, array_mark);
 }
 
 void *vela_array_at(vela_array *a, int64_t i, const char *loc) {
@@ -491,9 +541,16 @@ vela_map *vela_map_new(const vela_type *key, const vela_type *value) {
     return m;
 }
 
+static void map_free(void *p);
+
 void vela_map_release(vela_map *m) {
     VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_dec(&m->rc)) return;
+    vela_bounded(m, map_free);
+}
+
+static void map_free(void *p) {
+    vela_map *m = p;
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
         release_elem(m->key, map_key(m, i));
@@ -522,14 +579,19 @@ void vela_map_unique(vela_map **mp) {
     *mp = copy;
 }
 
-void vela_map_share(vela_map *m) {
-    VELA_PROFILE_SCOPE("ref counting");
-    if (!vela_rc_share(&m->rc)) return;
+static void map_mark(void *p) {
+    vela_map *m = p;
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
         share_elem(m->key, map_key(m, i));
         share_elem(m->value, map_value(m, i));
     }
+}
+
+void vela_map_share(vela_map *m) {
+    VELA_PROFILE_SCOPE("ref counting");
+    if (!vela_rc_share(&m->rc)) return;
+    vela_bounded(m, map_mark);
 }
 
 // The entry number holding `key`, or -1.
@@ -984,7 +1046,94 @@ vela_str vela_os_executable(void) {
     }
 }
 
+// ---- Stack overflow ----
+//
+// A program recursing too deeply runs off the end of its thread's stack
+// into the guard pages below it, and the system's fault would end it
+// silently. Each thread running Vela code records where its stack ends and
+// gets a small alternate stack to handle the fault on; a fault just below
+// the end of the faulting thread's stack is reported as a Vela panic, so the
+// output is flushed and the failure reads like any other (text, JSON or with
+// the Vela stack). Any other fault (from foreign code, say) gets the default
+// action back and happens again exactly as it would have. Sanitizers report
+// overflows themselves, and Windows and WASI have no POSIX signals.
+#if !defined(_WIN32) && !defined(__wasi__) && !defined(VELA_SANITIZED)
+#include <signal.h>
+#if defined(__APPLE__)
+#include <pthread.h>
+#endif
+#if defined(__linux__)
+#include <ucontext.h>
+#endif
+#define VELA_ALT_STACK ((size_t)64 << 10)
+static _Thread_local uintptr_t stack_end;  // the lowest address of this thread's stack, or 0
+
+void vela_thread_guard(void) {
+    pthread_t self = pthread_self();
+#if defined(__APPLE__)
+    stack_end = (uintptr_t)pthread_get_stackaddr_np(self) - pthread_get_stacksize_np(self);
+#else
+    pthread_attr_t attr;
+    if (pthread_getattr_np(self, &attr) == 0) {
+        void *low = NULL;
+        size_t size = 0;
+        if (pthread_attr_getstack(&attr, &low, &size) == 0) stack_end = (uintptr_t)low;
+        pthread_attr_destroy(&attr);
+    }
+#endif
+    stack_t alternate;
+    alternate.ss_sp = malloc(VELA_ALT_STACK);
+    alternate.ss_size = VELA_ALT_STACK;
+    alternate.ss_flags = 0;
+    if (alternate.ss_sp && sigaltstack(&alternate, NULL) != 0) free(alternate.ss_sp);
+}
+
+// The faulting thread's stack pointer, or 0. Linux finds the main thread's
+// stack through /proc/self/maps, which a filesystem policy can deny; near
+// the stack pointer, only the guard region below the stack can fault.
+static uintptr_t fault_sp(void *context) {
+#if defined(__linux__) && defined(__x86_64__)
+    return (uintptr_t)((ucontext_t *)context)->uc_mcontext.gregs[REG_RSP];
+#elif defined(__linux__) && defined(__aarch64__)
+    return (uintptr_t)((ucontext_t *)context)->uc_mcontext.sp;
+#else
+    (void)context;
+    return 0;
+#endif
+}
+
+static void on_fault(int sig, siginfo_t *info, void *context) {
+    uintptr_t at = (uintptr_t)info->si_addr;
+    uintptr_t near = (uintptr_t)64 << 10;
+    bool overflow = false;
+    if (stack_end) {
+        // A frame can reach well below the last page before touching it.
+        overflow = at < stack_end + near && at + ((uintptr_t)1 << 20) >= stack_end;
+    } else {
+        uintptr_t sp = fault_sp(context);
+        overflow = sp && at < sp + near && at + near >= sp;
+    }
+    if (overflow) vela_panic("vela runtime", "stack overflow");
+    signal(sig, SIG_DFL);
+}
+
+static void guard_stacks(void) {
+    struct sigaction action;
+    memset(&action, 0, sizeof action);
+    action.sa_sigaction = on_fault;
+    action.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGSEGV, &action, NULL);
+    sigaction(SIGBUS, &action, NULL);
+    vela_thread_guard();
+}
+#else
+void vela_thread_guard(void) {}
+static void guard_stacks(void) {}
+#endif
+
 void vela_init(int argc, char **argv) {
+    guard_stacks();
     // Keep terminal output line buffered. Redirected output uses a larger
     // stdio buffer; the existing read, panic and exit paths flush it.
     static char output_buffer[65536];
@@ -1689,6 +1838,7 @@ static void close_job(task_job *j) {
 
 static void *pool_thread(void *unused) {
     (void)unused;
+    vela_thread_guard();
     pthread_mutex_lock(&pool_lock);
     for (;;) {
         if (!open_jobs) {
@@ -1959,6 +2109,7 @@ void vela_native_rc_inc(int64_t *rc) { vela_rc_inc(rc); }
 bool vela_native_rc_dec(int64_t *rc) { return vela_rc_dec(rc); }
 void *vela_native_box_alloc(int64_t size) { return vela_box_alloc((size_t)size); }
 void vela_native_box_free(void *p, int64_t size) { vela_box_free(p, (size_t)size); }
+void vela_native_bounded(void *p, vela_visit_fn f) { vela_bounded(p, f); }
 
 #ifdef VELA_PROFILE
 void vela_observe_copy(void *dst, const void *src, int64_t size) {

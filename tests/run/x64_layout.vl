@@ -1,0 +1,137 @@
+// out: 39.0
+// out: 6.0
+// out: 1026
+// out: -9
+// out: 124
+// out: bad byte at 2
+// out: too big
+// out: 1
+// out: true
+// out: false
+// out: false
+// out: 201
+// out: 101
+// out: 2
+// out: 12
+// out: 10
+// out: 31
+// out: 63
+// out: -1
+// out: -1
+// out: 21
+// Native x86-64 layout: blocks that only return or fail are written after
+// a function's epilogue. These shapes check that every path still reaches
+// the code after a moved block, including the code a skipped block's
+// branch now falls into. The helpers are public so that they are not
+// inlined where they are small enough to be: each call runs a body that
+// keeps its own return after the moved blocks.
+import ints
+import maps
+
+pub type Acc = struct { xs: [Int], total: Int }
+
+// A checked index as the last statement before the return: the branch
+// skips a failure block and falls into the store and the epilogue. Twelve
+// checked stores keep it above the inlining limit, so the call runs this
+// body with its own return.
+pub fn fill(xs: mut [Float], v: Float) {
+    xs[0] = v * 1.0
+    xs[1] = v * 2.0
+    xs[2] = v * 3.0
+    xs[3] = v * 4.0
+    xs[4] = v * 5.0
+    xs[5] = v * 6.0
+    xs[6] = v * 7.0
+    xs[7] = v * 8.0
+    xs[8] = v * 9.0
+    xs[9] = v * 10.0
+    xs[10] = v * 11.0
+    xs[11] = v * 12.0
+}
+
+// Early returns from nested loops, with values live across them.
+pub fn find(grid: [[Int]], want: Int) -> Int {
+    let mut seen = 0
+    for r in 0..len(grid) {
+        for c in 0..len(grid[r]) {
+            seen = seen + 1
+            if grid[r][c] == want { return r * 1000 + c * 10 + seen % 10 }
+        }
+    }
+    return -seen
+}
+
+// Err from inside a loop, then more work after the check on success.
+pub fn parse_digits(s: Str) -> Result[Int, Str] {
+    let mut n = 0
+    for i in 0..len(s) {
+        let b = s[i]
+        if b < '0' || b > '9' { return Err("bad byte at " + ints.to_str(i)) }
+        n = n * 10 + int(b - '0')
+    }
+    if n > 100000 { return Err("too big") }
+    n = n + 1
+    return Ok(n)
+}
+
+// A Bool condition whose false path only returns.
+pub fn all_even(xs: [Int]) -> Bool {
+    let mut ok = true
+    for x in xs {
+        ok = x % 2 == 0
+        if !ok { return false }
+        ok = ok && x >= 0
+    }
+    return ok
+}
+
+// A Float comparison whose false path only returns, with NaN reaching it.
+pub fn below(xs: [Float], limit: Float) -> Int {
+    let mut count = 0
+    for x in xs {
+        if x < limit { count = count + 1 } else { return count * 100 + 1 }
+    }
+    return count
+}
+
+// Several checks in a row, each skipping its own failure block.
+pub fn sum3(xs: [Int], i: Int) -> Int {
+    return xs[i] + xs[i + 1] + xs[i + 2]
+}
+
+pub fn bump(acc: mut Acc, i: Int) -> Int {
+    if i >= len(acc.xs) { return -1 }
+    acc.xs[i] = acc.xs[i] + i
+    acc.total = acc.total + acc.xs[i]
+    return acc.total
+}
+
+fn main() {
+    let mut fs = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    fill(mut fs, 0.5)
+    let mut total = 0.0
+    for x in fs { total = total + x }
+    print(total)
+    print(fs[11])
+    let grid = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    print(find(grid, 6))
+    print(find(grid, 42))
+    for s in ["123", "12x4", "999999", ""] {
+        match parse_digits(s) { Ok(n) => print(n), Err(e) => print(e) }
+    }
+    print(all_even([2, 4, 6]))
+    print(all_even([2, 3, 6]))
+    print(all_even([2, -4]))
+    let zero = 0.0
+    print(below([1.0, 2.0, 3.0], 2.5))
+    print(below([1.0, zero / zero, 0.5], 2.5))
+    print(below([0.1, 0.2], 1.0))
+    print(sum3([1, 2, 3, 4, 5], 2))
+    let mut acc = Acc { xs: [10, 20, 30], total: 0 }
+    let mut log: [Int] = []
+    for i in 0..5 { push(mut log, bump(mut acc, i)) }
+    for x in log { print(x) }
+    let mut m: Map[Str, Int] = [:]
+    for w in ["a", "b", "a"] { m[w] = match maps.get(m, w) { Some(n) => n + 1, None => 1 } }
+    print(m["a"] * 10 + m["b"])
+}

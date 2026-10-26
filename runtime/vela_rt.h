@@ -183,6 +183,32 @@ _Noreturn void vela_assert_failed(const char *loc, const char *what, const char 
 _Noreturn void vela_assert_failed_values(const char *loc, const char *what, const char *text, vela_str left,
                                          vela_str right, bool quote);
 
+// ---- Bounded release and sharing ----
+//
+// Freeing or sharing a value visits what it holds, which can hold more: a
+// list or tree built in a loop can be millions deep, and visiting it by
+// recursion overflows the stack. vela_bounded runs f(p) at most
+// VELA_VISIT_DEPTH visits deep on this thread; a deeper one waits in a
+// thread-local list that the outermost visit works through before it
+// returns, so the stack stays bounded for every shape and every visit has
+// happened when the outermost release or share returns.
+#define VELA_VISIT_DEPTH 256
+typedef void (*vela_visit_fn)(void *p);
+extern _Thread_local int64_t vela_visit_depth;
+extern _Thread_local int64_t vela_visit_waiting;
+void vela_visit_later(void *p, vela_visit_fn f);
+void vela_visit_drain(void);
+
+static inline void vela_bounded(void *p, vela_visit_fn f) {
+    if (__builtin_expect(vela_visit_depth >= VELA_VISIT_DEPTH, 0)) {
+        vela_visit_later(p, f);
+        return;
+    }
+    vela_visit_depth++;
+    f(p);
+    if (--vela_visit_depth == 0 && __builtin_expect(vela_visit_waiting != 0, 0)) vela_visit_drain();
+}
+
 // A closure's environment: the copies it captured, behind this header. The
 // code generator makes a struct for each closure that starts with one, and
 // `drop` releases the copies and frees it. A named function used as a
@@ -198,14 +224,17 @@ static inline void vela_env_retain(vela_env *e) {
     if (e) vela_rc_inc(&e->rc);
 }
 
+void vela_env_drop(void *e);  // e->drop(e), as a vela_visit_fn
+void vela_env_mark(void *e);  // e->share(e)
+
 static inline void vela_env_release(vela_env *e) {
     VELA_PROFILE_SCOPE("ref counting");
-    if (e && vela_rc_dec(&e->rc)) e->drop(e);
+    if (e && vela_rc_dec(&e->rc)) vela_bounded(e, vela_env_drop);
 }
 
 static inline void vela_env_share(vela_env *e) {
     VELA_PROFILE_SCOPE("ref counting");
-    if (e && vela_rc_share(&e->rc)) e->share(e);
+    if (e && vela_rc_share(&e->rc)) vela_bounded(e, vela_env_mark);
 }
 
 // The Str for a C string literal of `n` bytes.
@@ -457,6 +486,7 @@ void vela_eprint_float(double x);
 
 // Called by main() before anything else, to keep the command line.
 void vela_init(int argc, char **argv);
+void vela_thread_guard(void);  // a thread about to run Vela code: report its stack overflow (vela_rt.c)
 // os.args(): every argument, the program's own name first.
 vela_array *vela_os_args(void);
 // Absolute, resolved path to the running executable, independent of argv[0].
@@ -694,6 +724,7 @@ void vela_native_rc_inc(int64_t *rc);
 bool vela_native_rc_dec(int64_t *rc);
 void *vela_native_box_alloc(int64_t size);
 void vela_native_box_free(void *p, int64_t size);
+void vela_native_bounded(void *p, vela_visit_fn f);
 
 #include "vela_int.h"
 

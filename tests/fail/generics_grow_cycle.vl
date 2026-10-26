@@ -1,0 +1,33 @@
+// A growing cycle through three functions, a closure and a function used as
+// a value; it is reported even though main never reaches it. Calls that
+// shrink or keep the types, or that leave the cycle, are fine.
+// err: generics_grow_cycle.vl:22:54: error: 'c' is called here with types that grow without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]]) [E7006]
+fn wrap[T](x: T) -> [T] {
+    return [x]
+}
+
+fn size[T](x: T) -> Int {
+    return len([wrap(x)])
+}
+
+fn a[T](x: T, n: Int) -> Int {
+    if n == 0 {
+        return size(x)
+    }
+    return b(x, n - 1)
+}
+
+fn b[U](y: U, n: Int) -> Int {
+    let w = wrap(y)
+    let k = fn(z: Option[U], m: Int) -> Int { return c(z, m) }
+    return k(Some(y), n) + size(w)
+}
+
+fn c[V](v: V, n: Int) -> Int {
+    let h: fn(V, Int) -> Int = a
+    return h(v, n)
+}
+
+fn main() {
+    print(size("s"))
+}

@@ -2155,6 +2155,263 @@ the same entry. Close it with a commit or validation result; keep its history.
   correction/rerun; all 315 checks per backend are covered without hiding
   either initial failure.
 
+### TL-084: The x86-64 emitter lacked the ARM64 allocation and selection work
+
+- **Status:** resolved in the post-M30 x86-64 native pass; macOS was not rerun.
+- **Discovery:** Linux x86-64 review of commit `d9fb025`.
+- **Evidence:** `python3 bench/run.py --compiler build/vela --languages c
+  vela-native --runs 5 --require-native-parity` measures 1.880× C on Linux
+  x86-64 (SHA-256 4.34×, spectral-norm 3.04×) against 1.39× on macOS ARM64
+  from the same IR. `vela asm bench/sha256/main.vl` shows the eight working
+  variables in stack slots and every `and`/`or`/`xor`/shift going through
+  `rax`; spectral-norm's inner loop executes `idiv` for `/ 2`. `x64.vl`
+  allocates six general registers, evicts the longest interval and calls
+  `live.intervals(f, false)`, which counts failed-check reports as clobbering
+  calls. M25's improvements went into `regalloc.vl` and `arm64.vl` only
+  (observed); the release gate was only exercised on ARM64.
+- **Impact:** M25's "within 1.5× C" acceptance did not hold for the x86-64
+  emitter, and Linux native performance was not representative of the design.
+- **Resolution:** in `x64.vl`, exempt non-returning calls from liveness, evict
+  by loop-weighted cost, add `rdi`/`rsi`/`r8`/`r9` as a pool for values no call
+  reads and no returning call or long copy overlaps, compute logic, shift,
+  extension and immediate operations in the result register, use immediate
+  shift counts, strength-reduce power-of-two division/remainder, and port the
+  ARM64 `rotate` and `narrow` peepholes.
+- **Verification:** both fixed points; complete C/native suites (314/315, the
+  remaining M24 latency failure reproduces with the before compiler, VAL-007);
+  `VELA_OPT=0` native selection 254/254; `tests/run/x64_selection.vl`, 789
+  independently computed cases at both optimization settings. A nine-round
+  paired comparison improves the native geometric mean from 1.767× to 1.480× C
+  by medians (single-workload changes under about 10% are within host
+  variation, TL-085); see the [walkthrough](history/x64-native-performance.md) and
+  [report](../bench/results/2026-10-26-x64-native-performance.md).
+
+### TL-085: Single native timing comparisons cannot resolve small x86-64 changes
+
+- **Status:** resolved; the proposed JCC mitigation is not adopted. Discovered
+  in the post-M30 x86-64 native pass, originally titled "x86-64 branch
+  placement changes native timings by up to 25%".
+- **Evidence:** on an Intel Xeon @ 2.10 GHz (model 207), the varints
+  assembly from the before and after compilers takes 305 and 322 ms. The same
+  files assembled with GNU as `-Wa,-mbranches-within-32B-boundaries` take 256
+  and 232 ms (15 interleaved rounds). Mandelbrot is unaffected. The after code
+  is shorter at every step. The JCC erratum (a jump crossing or ending on a
+  32-byte boundary leaves the µop cache) is the suspected cause; it has not
+  been confirmed with performance counters.
+- **Impact:** unrelated code-layout shifts change x86-64 timings by ±10% or
+  more, making single runs of the release gate unreliable and hiding real
+  improvements as apparent regressions.
+- **Workaround:** use interleaved paired comparisons with repeated rounds and
+  confirm suspected regressions with the mitigation before acting on them.
+- **Proposed improvement:** pass the mitigation when assembling x86-64
+  native output: GCC needs `-Wa,-mbranches-within-32B-boundaries` and Clang
+  `-mbranches-within-32B-boundaries`; each rejects the other spelling, so the
+  driver must detect the compiler family (or the emitter must pad branches
+  itself). Measure on AMD and newer Intel hosts, where the padding is cost
+  without benefit.
+- **Verification:** rerun `bench/compare.py --backend native` with and without
+  the option on an affected and an unaffected CPU, and both fixed points.
+- **Recurrence (TL-086 pass):** the same varints assembly measures 199 or
+  237 ms through `vela build` depending only on placement, and 170 ms with the
+  mitigation. In a nine-round paired comparison, nbody, wordfreq and
+  knucleotide appear 16–34% slower. Hand-assembled builds of the same
+  outputs show no slowdown, and knucleotide reverses (314 → 389 ms
+  unmitigated, 408 → 326 ms mitigated). A single release-gate or A/B run on
+  this CPU therefore cannot resolve changes under about 30% in one workload;
+  this now limits further x86-64 tuning.
+- **Re-examination:** the host is an Emerald Rapids guest (family 6, model
+  207, stepping 2, `amx_tile`, `avx512_fp16`), not a Skylake-derived core
+  the erratum affects, so the suspected cause above is withdrawn.
+  Byte-identical executables differ by up to 3% in median and 17% in best
+  sample over 15–21 interleaved rounds. With an identical-binary control, the
+  mitigation changes nbody +3.4%, wordfreq +2.3% and fannkuch −0.8%. SHA-256 is
+  −15.6%, but shifting the whole program by 8 or 16 bytes gives the same time,
+  so that gain is one favorable placement. A compiler passing the option moves
+  the paired twelve-program median geometric mean from 1.300× to 1.319× C.
+  Aligning loop headers to 32 bytes changes means by −2.4% to under 1%.
+  SHA-256 alone is materially placement-sensitive (234–286 ms across shifts).
+  See the [report](../bench/results/2026-10-26-x64-timing-noise.md).
+- **Resolution:** do not pass the mitigation. No measured CPU benefits, and
+  GCC/Clang spellings would need a probe on every native build; a driver
+  implementation was written and measured (gcc, clang, a rejecting toolchain
+  and an opt-out all behaved as intended) but is not committed. The
+  remaining issue is measurement: compare against an identical-binary
+  control, use medians over at least 21 interleaved rounds, and repeat a
+  suspected regression in a separate session. Earlier attributions of
+  apparent slowdowns to branch placement (TL-084 report, TL-086 report and
+  walkthrough) are withdrawn; those differences are within host variation.
+
+### TL-086: x86-64 hot paths jumped around inline failure blocks
+
+- **Status:** resolved in the second post-M30 x86-64 pass; macOS was not rerun.
+- **Discovery:** profiling varints, fannkuch and CRC-32 after TL-084.
+- **Evidence:** `vela ir bench/varints/main.vl` writes each `Err` return and
+  each bounds-check failure inline, between a loop test and its body; x64
+  emits `jcc cold; jmp hot` per test and a taken `jb` around every failure
+  call. `perm[i]` and `entries[k]` are `imul`, `mov`, `add`, `mov`. ARM64
+  shares the IR layout (varints 2.57× C there); its emitter was not changed.
+- **Impact:** varints 2.54×, fannkuch 1.83× and CRC-32 1.68× C natively on
+  Linux x86-64 after TL-084.
+- **Resolution:** in `x64.vl`, write blocks that only return or fail after the
+  epilogue and jump to them on the opposite condition, invert compare-branches
+  followed by a jump over their own target, and fold scaled indexes into
+  memory operands. Details are in the
+  [walkthrough](history/x64-native-performance.md#second-pass-layout-and-addressing).
+- **Verification:** both fixed points; complete C/native suites 314/316 (the
+  reviewed x86-64 snapshot update passes; the remaining M24 latency failure is
+  VAL-007); `VELA_OPT=0` native selection 255/255; M27 with gdb on both
+  backends; `tests/run/x64_layout.vl`, which fails on the first version's
+  misplaced fall-through label (nbody's dropped store) and passes now. The
+  paired comparison reduces CRC-32 35.7%, varints 33.5% and fannkuch 17.6%;
+  its apparent nbody/wordfreq/knucleotide slowdowns are within host
+  variation (TL-085), not placement effects as first reported;
+  the release gate passes on Linux x86-64 at 1.283×
+  ([report](../bench/results/2026-10-26-x64-layout.md)).
+
+### TL-087: Dropping or sharing deep values overflowed the stack
+
+- **Status:** resolved in a post-M30 correctness fix; macOS was not rerun.
+- **Discovery:** the post-M30 review, on Linux x86-64.
+- **Evidence:** a program building one million nodes in a loop exits 139
+  (SIGSEGV, no panic, buffered output lost) when the value is dropped or
+  captured by `tasks.map`. gdb shows `rc_release_t_List` recursing once per
+  node natively. Before this change: a left-deep tree and an enum chain through
+  a struct crash on both backends; `More(Pair, Str)` and closure chains crash
+  natively only; sharing a deep tree with workers crashes on both. Only a
+  single recursive tail was iterative (TL-031's native walk, the C compact
+  helpers).
+- **Impact:** ordinary loop-built data structures crash safe programs, with
+  backend-dependent results.
+- **Workaround:** none in safe code.
+- **Resolution:** add `vela_bounded` to the runtime. It nests release/share
+  visits at most 256 deep per thread, defers deeper ones to a thread-local
+  list, and drains that list before the outermost visit returns. Route the C
+  and native box helpers, the native tail walk and closure environments, and
+  runtime arrays, maps and environments through it. See the
+  [walkthrough](history/deep-release.md).
+- **Verification:** `tests/run/deep_drop.vl` (every shape, one million deep,
+  plus a half-shared list) passes C/native at opt=1/0 and crashes on the
+  previous compiler. Both fixed points pass (159,893 C and 1,976,771 x86-64
+  assembly lines); complete C/native suites 316/317 each, the remaining failure
+  being the known M24 latency gate (VAL-007); `VELA_OPT=0` native selection
+  256/256. Complete ASan/UBSan suites pass 314/317 on both backends with no
+  sanitizer reports; the three failures are LeakSanitizer refusing to run
+  inside `--deny` sandboxes, as before this change. TSan passes the task
+  fixtures and `deep_drop` on both backends. Measured cost is within
+  identical-binary controls except arena_trees (+5% beyond its control with
+  byte-identical code and no bounded visits), recorded without a
+  mechanism.
+
+### TL-088: Stack overflow from program recursion is a silent segmentation fault
+
+- **Status:** resolved in a post-M30 fix on Linux; macOS was not rerun, and
+  Windows/WASI are unchanged. Discovered in the post-M30 review.
+- **Evidence:** `fn down(n: Int) -> Int { if n == 0 { return 0 }; return 1 +
+  down(n - 1) }` called with 10,000,000 exits 139 on both backends, including
+  with `--debug` and `VELA_PANIC=json`. No message, Vela stack or JSON
+  failure is produced, and buffered stdout is lost.
+- **Impact:** an agent or user sees a crash rather than the M27 panic report.
+  The compatibility policy excludes resource exhaustion, so this is a
+  diagnostics gap, not a semantic one.
+- **Workaround:** none; reduce recursion depth.
+- **Proposed improvement:** install a SIGSEGV handler on an alternate signal
+  stack (`sigaltstack`) per thread. It recognizes a fault in the guard region
+  of the thread's stack and reports a Vela panic ("stack overflow", exit 101,
+  JSON when requested) after flushing output.
+- **Verification:** the program above exits 101 with a stack-overflow panic on
+  both backends and in workers, text and JSON; ordinary segmentation faults
+  from foreign code are not misreported.
+- **Resolution:** `vela_init` installs a SIGSEGV/SIGBUS handler on an
+  alternate signal stack, and `vela_thread_guard` records each thread's stack
+  end and alternate stack for the main thread and task workers. A fault from
+  1 MB below to 64 KB above the end becomes `vela runtime: panic: stack
+  overflow`, exit 101; other faults get the default action back and recur.
+  Under a filesystem policy, Linux cannot read `/proc/self/maps` for the main
+  thread's stack. The first version then still crashed silently under `--deny
+  fs`; the handler now falls back to the faulting stack pointer. Sanitizer
+  builds keep their own reports. See the
+  [walkthrough](history/stack-overflow.md).
+- **Validation:** `tests/stack_overflow_test.py` passes C/native at opt=1/0
+  (text with flushed output, JSON, `--debug`, workers, `vela test`, built
+  executables, `--deny fs`, `--allow fs:DIR`, `--deny net`). A foreign
+  bad-address read still ends with SIGSEGV and no report. The script fails on
+  the previous runtime with a silent exit 139. Complete C/native suites pass
+  317/318 (the known M24 latency gate, VAL-007). Sanitizer suites are unchanged
+  at 315/318 (LeakSanitizer inside sandboxes) with no reports, TSan passes,
+  and M27 with gdb passes on both backends.
+- **Remaining:** the report runs the stdio panic path from the handler, which
+  can fail to appear if the overflow occurs while the C library holds a lock.
+  Windows needs structured exception handling.
+
+### TL-089: Semantic queries loaded every module twice and indexed by strings
+
+- **Status:** resolved after the post-M30 review; the gates' host evidence is
+  in VAL-007.
+- **Discovery:** profiling the M24 query-latency failures on Linux x86-64.
+- **Evidence:** `query.analyze_completing` (every query and the language
+  server) and `check --json` loaded, lexed and parsed every module with
+  `load_open`/`load`, then discarded that and loaded all of them again with
+  `load_program` whenever the program's `vela.mod` resolved (also when there is
+  none). `index.walk_module` then lexed each module again and built a map from
+  formatted `"line:col"` strings to token indexes, one entry per token. On the
+  compiler's 63 modules, `vela profile` counts 189 lexer runs for one `query
+  impact`.
+- **Impact:** queries, `check --json` and the language server did about twice
+  the necessary loading. The M24 `impact`/`coverage` gate (best of three under
+  1 s) and the M29 100k-line query budget failed on Linux CI and the Linux VM.
+- **Resolution:** load once, falling back to the files alone only when the
+  manifest does not resolve, as the discarded first load was then used.
+  Find a token by binary search over the token list, which is in source order,
+  returning the last token at a position as the map did. The index still lexes
+  each module once; keeping tokens on every module would add about 80 bytes per
+  token to every `check` and `build`.
+- **Verification:** before/after outputs are byte-identical for summary,
+  impact, coverage, `check --json` (compiler, 100k-line project, an example),
+  both manifest-error branches, 240 random `type`/`def`/`refs`/`impact` queries
+  across compiler and std sources, and three cross-module renames. Over 1.0
+  million tokens of repository and benchmark sources, none is out of order and
+  one pair shares a position. Best of seven on the Linux VM: compiler `impact`
+  913 → 575 ms, `coverage` 965 → 518 ms, `summary` 567 → 356 ms, `check
+  --json` 472 → 344 ms, `refs` 904 → 551 ms; 100k-line `impact` 1,544 → 827 ms
+  and `summary` 851 → 530 ms.
+
+### TL-090: Growing generic cycles passed check and failed build
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** post-M30 review, comparing `vela check` with `vela build` on
+  generic recursion.
+- **Evidence:** `fn f[T](x: T, n: Int) -> Int` calling `g([x], n - 1)`, with
+  `fn g[U](y: U, n: Int) -> Int` calling `f(y, n)`, passed `vela check`,
+  `check --json` and the language server, and `vela build`/`run` failed with
+  E7006. The checker's E3145 only covered a function calling itself; growth
+  around a cycle of several functions was found only when monomorphization
+  reached its depth limit, and only in code reachable from `main`.
+- **Impact:** the editor and agents reported success for programs that could
+  not be built. A cycle that `main` did not reach yet was accepted until a
+  later change made it reachable.
+- **Workaround:** run `vela build`, not only `vela check`.
+- **Resolution:** the checker records every generic function a generic
+  function calls or uses as a value, including from closures, with its type
+  arguments. Each type parameter is a node; a use links each caller parameter
+  to each callee parameter whose argument mentions it, and the link grows when
+  the argument is not the parameter itself. A growing link inside a strongly
+  connected component (Tarjan) is reported as E7006 at the call, using
+  monomorphization's message: the expanding-cycle rule C# uses for generic
+  types. Self-calls keep E3145. Monomorphization's depth limit stays as a
+  backstop; an attempt to grow types through interface dispatch is already
+  rejected by bound checking (E3031). Under the compatibility policy this
+  rejects programs that violate the specification's rule that generic
+  recursion must not generate an unbounded sequence of larger type arguments,
+  also in unreachable code. Migration: pass the same type parameter around the
+  cycle, or hold the growing part in a recursive data type.
+- **Verification:** `tests/fail/generics_grow.vl` keeps its original E7006 and
+  now also reports the other growing call; `tests/fail/generics_grow_cycle.vl`
+  covers three functions, a closure, a function used as a value, an unreached
+  cycle and non-growing calls that must stay accepted. The previous seed's
+  `check` accepts both reproducers while its `run` reports E7006. Both
+  bootstrap fixed points pass, and the complete C and native suites pass
+  319/319 on Linux x86-64.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
@@ -2196,6 +2453,28 @@ the same entry. Close it with a commit or validation result; keep its history.
   the raw [M29 artifact](https://github.com/nathgoutam93/vela/actions/runs/40215742923/artifacts/12607262926)
   and measure on the intended native Linux host before changing the threshold
   or claiming a compiler regression. The user requested no more workflow runs.
+- **Linux x86-64 host, 2026-10-26:** on a four-CPU Xeon @ 2.10 GHz VM the
+  M24 compiler-query gate fails isolated and in full suites with best-of-three
+  `impact`/`coverage` of 1.00–1.26 s, for both `d9fb025` and the x86-64 pass
+  (966–1,071 ms with the before compiler). `query.vl`'s `analyze_completing`
+  loads every module with `load_open`, then loads all of them again with
+  `load_program` whenever a vela.mod resolves; `index.vl` tokenizes each
+  module a third time (63 modules, 189 lexer runs under `vela profile`).
+  Loading once in a scratch build gives byte-identical output with `impact`
+  1,026 → 559 ms and `summary` 617 → 304 ms on the compiler source. Fixed as
+  [TL-089](#tl-089-semantic-queries-loaded-every-module-twice-and-indexed-by-strings),
+  which also replaces the index's string-keyed token map. After it, both
+  complete suites pass 318/318 on this VM, M24 run alone measures best
+  `impact` 0.55–0.62 s, and the M29 gate passes (`python3
+  bench/real_programs.py --gate --runs 3`: real programs 1.109× C through C
+  and 1.038× natively, 100k-line `impact` median 0.959 s, `summary` 0.532 s,
+  check 0.516 s). The 100k `impact` margin is narrow on this host.
+- **Linux x86-64 release gate:** after TL-084 and TL-086 the unchanged
+  `bench/run.py --require-native-parity --runs 5` gate passes on the same VM at
+  1.283× C with a faster native-built compiler
+  ([report](../bench/results/2026-10-26-x64-layout-release-parity.json)). Per
+  TL-085, one run on this host is not a stable margin; the M24/M29 query budgets
+  above remain failing.
 - **Native Linux handoff:** after `sh compiler/bootstrap/bootstrap.sh --native`,
   run `python3 -u bench/real_programs.py --compiler build/vela --gate --runs 3
   --json build/m29-real-programs-native-linux.json` on the intended host.

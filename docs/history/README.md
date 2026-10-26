@@ -54,6 +54,9 @@ for day-to-day work.
 | [tooling-followup-before-m30](tooling-followup-before-m30.md) | Tooling follow-up before M30 |
 | [Networking runtime performance](network-runtime-performance.md) | Socket allocation, writes and operation lifetimes |
 | [Native performance follow-up](native-performance-followup.md) | Immutable string metadata, bounded recursive inlining and iterative enum cleanup |
+| [Native x86-64 code generation](x64-native-performance.md) | x86-64 allocation, instruction selection, rotates, power-of-two division, cold-block layout and scaled addressing |
+| [Bounded release and sharing](deep-release.md) | Releasing and sharing values of any depth without overflowing the stack |
+| [Stack overflow as a Vela panic](stack-overflow.md) | Reporting a program's stack overflow as an ordinary panic |
 
 Retained reports live in [bench/results/](../../bench/results/README.md) and
 [evaluation/results/](../../evaluation/results/README.md). Their embedded paths and source

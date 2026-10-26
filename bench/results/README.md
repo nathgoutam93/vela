@@ -16,6 +16,9 @@ Run tools from [bench/](../README.md) and put fresh scratch reports in `build/`.
 | [`2026-10-25-peers-macos.md`](2026-10-25-peers-macos.md) and its JSON report | Twelve-round JSON, allocation and TCP comparison across C, Rust, Go, Swift and both Vela backends |
 | [`2026-10-26-network-runtime.md`](2026-10-26-network-runtime.md) and `2026-10-26-network-*.json` | Original/final networking runtime, isolated experiments, fresh peers, validation and unchanged release gate |
 | [`2026-10-26-native-performance.md`](2026-10-26-native-performance.md) and `2026-10-26-native-*` | Native compiler profiles, accepted/rejected experiments, full comparisons and validation |
+| [`2026-10-26-x64-native-performance.md`](2026-10-26-x64-native-performance.md) and `2026-10-26-x64-*.json` | Linux x86-64 paired native comparison and before/after release gates |
+| [`2026-10-26-x64-layout.md`](2026-10-26-x64-layout.md) and `2026-10-26-x64-layout-*.json` | Linux x86-64 cold-block layout and addressing: paired comparison and release gate |
+| [`2026-10-26-x64-timing-noise.md`](2026-10-26-x64-timing-noise.md) | x86-64 timing variation, layout sensitivity and the rejected JCC mitigation |
 | `*-validation.json` | Commands, environments, outcomes and validation limits |
 
 Reports retain their original bytes. Paths, commands, source digests and

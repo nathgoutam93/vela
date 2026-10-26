@@ -57,10 +57,13 @@ pub fn analyze(path: Str, source: Str, std_dir: Str, open: Map[Str, Str]) -> Ana
 // (checker.Completion).
 pub fn analyze_completing(path: Str, source: Str, std_dir: Str, open: Map[Str, Str], completing: Str) -> Analysis
     uses fs, os {
-    let mut loaded = modules.load_open(path, source, std_dir, open)
+    // Loading parses every module, so load once: with the packages when they
+    // resolve, otherwise the files alone for what they still show.
+    let mut loaded = modules.Loaded { modules: [], order: [], errors: [], warnings: [], node_count: 0 }
     match packages.for_program(path) {
         Ok(pk) => loaded = modules.load_program(path, source, std_dir, open, pk)
         Err(e) => {
+            loaded = modules.load_open(path, source, std_dir, open)
             let at = modules.join(modules.dirname(path), "vela.mod")
             // Only this: without the packages, what imports them cannot load either.
             loaded.errors = [errors.CompileError { code: "E7007", fix: [], path: at, line: 1, col: 1, message: e, warning: false }]

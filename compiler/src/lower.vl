@@ -938,10 +938,9 @@ fn release(g: mut Low, t: Int, v: Val) {
         let last = reg(mut g, ir.INT())
         emit(mut g, ir.inst(ir.Op.RcDec, last, env, -1, 0))
         branch_cmp(mut g, "eq", last, konst(mut g, 0), done)
+        // Through vela_native_bounded: captures can hold closures in turn.
         let drop = load(mut g, env, 8, 8)
-        let mut i = ir.inst(ir.Op.CallInd, -1, drop, -1, 0)
-        i.args = [env]
-        emit(mut g, i)
+        ccall(mut g, "vela_native_bounded", [env, drop], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
         place_label(mut g, done)
         return
     }
@@ -987,9 +986,7 @@ fn share(g: mut Low, t: Int, v: Val) {
         let was = mark_shared(mut g, env)
         branch_cmp(mut g, "eq", was, konst(mut g, 0), done)
         let mark = load(mut g, env, 16, 8)
-        let mut i = ir.inst(ir.Op.CallInd, -1, mark, -1, 0)
-        i.args = [env]
-        emit(mut g, i)
+        ccall(mut g, "vela_native_bounded", [env, mark], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
         place_label(mut g, done)
         return
     }
@@ -1104,16 +1101,32 @@ fn box_tail(g: mut Low, t: Int, vi: Int) -> Int {
     return tail
 }
 
+// Whether a variant of t holds anything managed besides its tail: then a
+// walk can recurse into it and starts through vela_native_bounded.
+fn walk_recurses(g: mut Low, t: Int) -> Bool {
+    let variants = types.get(g.k.table, t).variants
+    for vi in 0..len(variants) {
+        let v = variants[vi]
+        let tail = box_tail(mut g, t, vi)
+        for i in 0..len(v.payload) {
+            if i != tail && (layout.is_boxed(g.l, t, v.name, i) || managed(mut g, v.payload[i])) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+// The walk from a box whose count says to visit it (release: the last
+// reference; share: newly shared): its other parts, then along the tail
+// while each next box's count says to visit that one too. name_free or
+// name_mark, taking the box.
 fn box_walk(g: mut Low, t: Int, name: Str, size: Int, op: Str) {
-    let current = helper(mut g, name + "_" + op, 1, -1)[0]
+    let mut walk = name + "_free"
+    if op == "share" { walk = name + "_mark" }
+    let current = helper(mut g, walk, 1, -1)[0]
     let head = label(mut g); let done = label(mut g)
     place_label(mut g, head)
-    let mut active = -1
-    if op == "release" {
-        active = reg(mut g, ir.INT())
-        emit(mut g, ir.inst(ir.Op.RcDec, active, current, -1, 0))
-    } else { active = mark_shared(mut g, current) }
-    branch_cmp(mut g, "eq", active, konst(mut g, 0), done)
     let variants = types.get(g.k.table, t).variants
     let s = shape(mut g, t)
     let tag = load(mut g, current, 8, 4)
@@ -1127,13 +1140,42 @@ fn box_walk(g: mut Low, t: Int, name: Str, size: Int, op: Str) {
             if i != tail { slot_op(mut g, t, v.name, i, v.payload[i], mem_val(current, 8 + s.payloads[vi][i], v.payload[i]), op) }
         }
         if op == "release" { ccall(mut g, "vela_native_box_free", [current, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }
-        if tail >= 0 { emit(mut g, ir.inst(ir.Op.Move, current, child, -1, 0)); jump(mut g, head) } else { jump(mut g, done) }
+        if tail >= 0 {
+            let mut visit = -1
+            if op == "release" {
+                visit = reg(mut g, ir.INT())
+                emit(mut g, ir.inst(ir.Op.RcDec, visit, child, -1, 0))
+            } else { visit = mark_shared(mut g, child) }
+            branch_cmp(mut g, "eq", visit, konst(mut g, 0), done)
+            emit(mut g, ir.inst(ir.Op.Move, current, child, -1, 0)); jump(mut g, head)
+        } else { jump(mut g, done) }
         place_label(mut g, next)
     }
     // Well-typed enums always match an arm. Keep ordinary cleanup for any
     // unmatched tag just as the original helper did.
     if op == "release" { ccall(mut g, "vela_native_box_free", [current, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }
     place_label(mut g, done); ret(mut g, -1); finish(mut g)
+}
+
+// name_release or name_share: decide whether to visit the box, then visit it
+// with `walk`, through vela_native_bounded when the visit can recurse.
+fn box_entry(g: mut Low, name: Str, op: Str, walk: Str, bounded: Bool) {
+    let p = helper(mut g, name + "_" + op, 1, -1)[0]
+    let mut visit = -1
+    if op == "release" {
+        visit = reg(mut g, ir.INT())
+        emit(mut g, ir.inst(ir.Op.RcDec, visit, p, -1, 0))
+    } else { visit = mark_shared(mut g, p) }
+    let done = label(mut g)
+    branch_cmp(mut g, "eq", visit, konst(mut g, 0), done)
+    if bounded {
+        ccall(mut g, "vela_native_bounded", [p, sym_addr(mut g, walk)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+    } else {
+        call(mut g, walk, [p], -1)
+    }
+    place_label(mut g, done)
+    ret(mut g, -1)
+    finish(mut g)
 }
 
 fn memory_functions(g: mut Low) {
@@ -1211,29 +1253,29 @@ fn memory_functions(g: mut Low) {
         finish(mut g)
         let mut walking = false
         if ti.tag == types.Tag.Enum { for vi in 0..len(ti.variants) { if box_tail(mut g, t, vi) >= 0 { walking = true } } }
+        // What a box holds can hold boxes in turn, as deep as the program
+        // made it: a visit that can recurse goes through vela_native_bounded,
+        // which keeps the stack bounded (vela_rt.h).
         if walking {
             box_walk(mut g, t, b, size, "release")
             box_walk(mut g, t, b, size, "share")
+            let recurses = walk_recurses(mut g, t)
+            box_entry(mut g, b, "release", b + "_free", recurses)
+            box_entry(mut g, b, "share", b + "_mark", recurses)
         } else {
-            // release: the value, and the box, when this was the last reference.
-            let r = helper(mut g, b + "_release", 1, -1)[0]
-            let last = reg(mut g, ir.INT())
-            emit(mut g, ir.inst(ir.Op.RcDec, last, r, -1, 0))
-            let done = label(mut g)
-            branch_cmp(mut g, "eq", last, konst(mut g, 0), done)
+            let holds = managed(mut g, t)
+            // free: the value, and the box, after its last reference.
+            let r = helper(mut g, b + "_free", 1, -1)[0]
             release(mut g, t, mem_val(r, 8, t))
             ccall(mut g, "vela_native_box_free", [r, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
-            place_label(mut g, done)
             ret(mut g, -1)
             finish(mut g)
-            let s = helper(mut g, b + "_share", 1, -1)[0]
-            let was = mark_shared(mut g, s)
-            let after = label(mut g)
-            branch_cmp(mut g, "eq", was, konst(mut g, 0), after)
+            let s = helper(mut g, b + "_mark", 1, -1)[0]
             share(mut g, t, mem_val(s, 8, t))
-            place_label(mut g, after)
             ret(mut g, -1)
             finish(mut g)
+            box_entry(mut g, b, "release", b + "_free", holds)
+            box_entry(mut g, b, "share", b + "_mark", holds)
         }
         // unique: copy-on-write, given where the box pointer is.
         let pp = helper(mut g, b + "_unique", 1, -1)[0]
