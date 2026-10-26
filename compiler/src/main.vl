@@ -1057,7 +1057,7 @@ fn check_json(path: Str, root: Str) uses fs, os {
         }
         Ok(source) => {
             // Loading parses every module: once, with the packages when they resolve.
-            let mut loaded = modules.Loaded { modules: [], order: [], errors: [], warnings: [], node_count: 0 }
+            let mut loaded = modules.Loaded { modules: [], order: [], errors: [], warnings: [], node_count: 0, stack: 0 }
             match packages.for_program(path) {
                 Ok(pk) => loaded = modules.load_program(path, source, modules.join(root, "std"), [:], pk)
                 Err(e) => {

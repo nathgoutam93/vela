@@ -410,6 +410,10 @@ same standard file through another spelling must not produce a self-shadow
 warning. Dependencies are declared in vela.mod (`package`, `use`, `link`) and
 pinned by vela.lock. Local and git sources are supported; builds do not fetch.
 System libraries use `link z`; relative library paths resolve at the manifest.
+A program's own vela.mod may say `stack SIZE` (1M to 64G, as `512M` or `1G`):
+its main then runs on a thread with a stack of that size, reserved and used
+as needed. It does not change semantics; where no such thread can be made,
+main runs on the system's stack. A dependency's `stack` line has no effect.
 `json` is a separate package. The module/package resolver's selected source
 set is part of a build's meaning; a changed dependency is not the same input.
 

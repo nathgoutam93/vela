@@ -49,6 +49,7 @@ pub type Manifest = struct {
     package: Str  // its own name, or ""
     deps: [Dep]
     links: [Str]
+    stack: Int  // bytes for the program's main thread (`stack 1G`), or 0 for the system's
 }
 
 pub type Locked = struct {
@@ -173,9 +174,37 @@ pub fn bad_name(name: Str) -> Str {
     return ""
 }
 
+// A stack size such as 512M or 1G in bytes, or 0 when it is not one from
+// 1M to 64G.
+fn stack_size(word: Str) -> Int {
+    let n = len(word)
+    if n < 2 || n > 6 {
+        return 0
+    }
+    let mut unit = 0
+    if word[n - 1] == 'M' {
+        unit = 1048576
+    } else if word[n - 1] == 'G' {
+        unit = 1073741824
+    } else {
+        return 0
+    }
+    let mut size = 0
+    for c in word[0..n - 1] {
+        if c < '0' || c > '9' {
+            return 0
+        }
+        size = size * 10 + int(c - '0')
+    }
+    if size * unit < 1048576 || size * unit > 64 * 1073741824 {
+        return 0
+    }
+    return size * unit
+}
+
 // vela.mod's text; `file` names it in messages, as "dir/vela.mod".
 pub fn parse_manifest(text: Str, file: Str) -> Result[Manifest, Str] {
-    let mut m = Manifest { package: "", deps: [], links: [] }
+    let mut m = Manifest { package: "", deps: [], links: [], stack: 0 }
     let ls = lines(text)
     for i in 0..len(ls) {
         let w = words(uncommented(ls[i]))
@@ -198,6 +227,14 @@ pub fn parse_manifest(text: Str, file: Str) -> Result[Manifest, Str] {
                 if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '-' || ch == '+' || ch == '.' || ch == '/') { return Err(at + "invalid C library name or path") }
             }
             push(mut m.links, w[1])
+        } else if w[0] == "stack" {
+            if len(w) != 2 || m.stack != 0 {
+                return Err(at + "write `stack SIZE` once, as stack 512M or stack 1G")
+            }
+            m.stack = stack_size(w[1])
+            if m.stack == 0 {
+                return Err(at + "'" + w[1] + "' is not a stack size from 1M to 64G, as 512M or 1G")
+            }
         } else if w[0] == "use" {
             if len(w) != 3 && len(w) != 4 {
                 return Err(at + "write `use NAME URL REF` for a git repository, or `use NAME DIRECTORY`")
@@ -227,7 +264,7 @@ pub fn parse_manifest(text: Str, file: Str) -> Result[Manifest, Str] {
             }
             push(mut m.deps, Dep { name: w[1], source: w[2], ref: ref, line: i + 1 })
         } else {
-            return Err(at + "a line is `package NAME` or `use NAME SOURCE [REF]`, not '" + w[0] + "'")
+            return Err(at + "a line is `package NAME`, `use NAME SOURCE [REF]`, `link LIBRARY` or `stack SIZE`, not '" + w[0] + "'")
         }
     }
     return Ok(m)
@@ -368,7 +405,7 @@ fn manifest_in(dir: Str) -> Result[Manifest, Str] uses fs {
     let path = modules.join(dir, "vela.mod")
     match files.read(path) {
         Ok(text) => return parse_manifest(text, path)
-        Err(_) => return Ok(Manifest { package: "", deps: [], links: [] })
+        Err(_) => return Ok(Manifest { package: "", deps: [], links: [], stack: 0 })
     }
 }
 
@@ -391,7 +428,7 @@ pub fn for_program(main_path: Str) -> Result[modules.Packages, Str] uses fs, os 
         Ok(t) => locked = parse_lock(t, lock_path)?
         Err(_) => {}
     }
-    let mut out = modules.Packages { deps: [], all: [:] }
+    let mut out = modules.Packages { deps: [], all: [:], stack: root.stack }
     for d in root.deps {
         push(mut out.deps, d.name)
     }
@@ -755,7 +792,7 @@ fn manifest_or_fail(text: Str) -> Manifest {
             assert(false)
         }
     }
-    return Manifest { package: "", deps: [], links: [] }
+    return Manifest { package: "", deps: [], links: [], stack: 0 }
 }
 
 fn error_of(text: Str) -> Str {
@@ -778,12 +815,19 @@ test "vela.mod" {
     assert(error_of("use x https://example.com/x.git --upload-pack=sh") ==
         "vela.mod:1: '--upload-pack=sh' starts with '-'; a source or ref cannot")
     assert(error_of("use x -C") == "vela.mod:1: '-C' starts with '-'; a source or ref cannot")
+    assert(manifest_or_fail("package p\nstack 512M\n").stack == 536870912)
+    assert(manifest_or_fail("stack 2G").stack == 2147483648)
+    assert(manifest_or_fail("package p").stack == 0)
+    for bad in ["stack 0M", "stack 512", "stack 1.5G", "stack 65G", "stack 512K", "stack -1G", "stack 1G 2G", "stack 1G\nstack 1G"] {
+        assert(error_of(bad) != "no error")
+    }
     assert(error_of("use os ../x") == "vela.mod:1: 'os' is the name of a built-in module")
     assert(error_of("use a ../a\nuse a ../b") == "vela.mod:2: 'a' is already used, on line 1")
     assert(error_of("use a https://h/r//../x v1.0.0") == "vela.mod:1: after `//` comes a directory in the repository, as " +
         "URL//packages/json")
     assert(error_of("use a /r// main") == "vela.mod:1: after `//` comes a directory in the repository, as URL//packages/json")
-    assert(error_of("require a ../a") == "vela.mod:1: a line is `package NAME` or `use NAME SOURCE [REF]`, not 'require'")
+    assert(error_of("require a ../a") ==
+        "vela.mod:1: a line is `package NAME`, `use NAME SOURCE [REF]`, `link LIBRARY` or `stack SIZE`, not 'require'")
 }
 
 test "vela.lock" {

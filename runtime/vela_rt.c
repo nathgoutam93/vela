@@ -1132,6 +1132,39 @@ void vela_thread_guard(void) {}
 static void guard_stacks(void) {}
 #endif
 
+// A program whose vela.mod says `stack SIZE` runs main on a thread with a
+// stack of that size, reserved and filled only as it is used: the main
+// thread's own is fixed when the process starts. Where no thread can be
+// made (WASI, or a reservation the system refuses) main runs as usual.
+static void (*main_function)(void);
+
+static void *main_thread(void *unused) {
+    (void)unused;
+    vela_thread_guard();
+    main_function();
+    return NULL;
+}
+
+void vela_main_stack(void (*f)(void), int64_t bytes) {
+#if !defined(__wasi__)
+    pthread_attr_t attr;
+    pthread_t t;
+    main_function = f;
+    if (pthread_attr_init(&attr) == 0) {
+        bool started = pthread_attr_setstacksize(&attr, (size_t)bytes) == 0 &&
+                       pthread_create(&t, &attr, main_thread, NULL) == 0;
+        pthread_attr_destroy(&attr);
+        if (started) {
+            pthread_join(t, NULL);
+            return;
+        }
+    }
+#else
+    (void)bytes;
+#endif
+    f();
+}
+
 void vela_init(int argc, char **argv) {
     guard_stacks();
     // Keep terminal output line buffered. Redirected output uses a larger

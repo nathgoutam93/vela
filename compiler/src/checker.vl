@@ -99,6 +99,7 @@ pub type Checked = struct {
     closures: Map[Int, ClosureInfo]  // by node id
     completion: Completion
     escaped: Map[Int, Bool]
+    stack: Int  // bytes for main's thread (vela.mod `stack`), or 0 for the system's
 }
 
 // What is in scope where the name being completed is (M12b, complete.vl):
@@ -151,6 +152,8 @@ type Checker = struct {
     loops: [Loop]
     undefined: [Str]  // unknown names already reported in this function
     targs: [[Int]]
+    literal: [Int]  // by node id: 1 for an integer literal expression (is_int_lit), 2 for not, 0 not yet known
+    chained: [Bool]  // by node id: a left operand inferred ahead by `chain`, its type in ty
     type_scope: Map[Str, Int]  // the type parameters in scope, by name
     effects_used: Map[Str, Bool]  // by the function being checked
     effects_reported: Map[Str, Bool]  // missing from its `uses`, and already said so
@@ -183,17 +186,19 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
     let mut refs: [Ref] = []
     let mut breaks: [Bool] = []
     let mut targs: [[Int]] = []
+    let mut literal: [Int] = []
     for _ in 0..loaded.node_count {
         push(mut ty, -2)
         push(mut refs, Ref.NoRef)
         push(mut breaks, false)
         push(mut targs, [])
+        push(mut literal, 0)
     }
     let mut c = Checker {
         target: target, library: for_tests, unsafe_depth: 0, escaped: [:], signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, generic_uses: [], loops: [],
-        undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
+        undefined: [], targs: targs, literal: literal, chained: breaks, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
         in_closures: [], pending: [], defining: -1, expected: -2,
         completion: Completion { name: name, module: -1, visible: [], type_params: [], object: [] },
     }
@@ -220,7 +225,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
         target: target,
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
         locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
-        completion: c.completion, escaped: c.escaped,
+        completion: c.completion, escaped: c.escaped, stack: loaded.stack,
     }
 }
 
@@ -2226,6 +2231,10 @@ fn value(c: mut Checker, e: ast.Expr) -> Int {
 fn infer(c: mut Checker, e: ast.Expr) -> Int {
     let expected = c.expected
     c.expected = -2
+    if c.chained[e.id] {
+        c.chained[e.id] = false
+        return c.ty[e.id]
+    }
     let t = infer_type(mut c, e, expected)
     set_ty(mut c, e, t)
     return t
@@ -2305,29 +2314,85 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
     }
 }
 
-fn is_int_lit(e: ast.Expr) -> Bool {
-    return match e.kind {
+// Whether `e` is made only of unsuffixed integer literals, such as 2 * -3,
+// which take their type from the context. Remembered, since each operator
+// of a long chain asks it of the rest of the chain.
+fn is_int_lit(c: mut Checker, e: ast.Expr) -> Bool {
+    if c.literal[e.id] != 0 {
+        return c.literal[e.id] == 1
+    }
+    let yes = match e.kind {
         ast.ExprKind.IntLit(_) => true
         ast.ExprKind.FixedIntLit(_, name, _) => name == ""
-        ast.ExprKind.Unary(op, x) => (op == "-" || op == "~") && is_int_lit(x)
-        ast.ExprKind.Binary(op, l, r) => (is_arithmetic(op) || is_bitwise(op)) && is_int_lit(l) && is_int_lit(r)
+        ast.ExprKind.Unary(op, x) => (op == "-" || op == "~") && is_int_lit(mut c, x)
+        ast.ExprKind.Binary(op, l, r) => (is_arithmetic(op) || is_bitwise(op)) && is_int_lit(mut c, l) && is_int_lit(mut c, r)
         _ => false
     }
+    c.literal[e.id] = 2
+    if yes {
+        c.literal[e.id] = 1
+    }
+    return yes
+}
+
+// a + b + c + ... nests to the left, as ((a + b) + c) + ..., and checking
+// it by recursion takes stack in proportion to its length: a few thousand
+// terms of generated code overflowed it. A left operand that is not made
+// of literals is inferred with no expected type (`operands`, `binary`), so
+// the chain's left operands are inferred beforehand from the innermost
+// out, each finding its own left operand done: the same order, types and
+// diagnostics, with the stack of one operator.
+fn chain(c: mut Checker, l: ast.Expr) {
+    let mut spine: [ast.Expr] = []
+    let mut x = l
+    for {
+        match x.kind {
+            ast.ExprKind.Binary(_, inner, _) => {
+                if c.chained[x.id] {
+                    break
+                }
+                push(mut spine, x)
+                x = inner
+            }
+            _ => break
+        }
+    }
+    if len(spine) < 2 {
+        return
+    }
+    // Literal parts sit at the bottom of the spine, and take their type
+    // from the context: leave them to the operator above. Asked from the
+    // bottom up, so that is_int_lit never walks the whole spine.
+    let mut top = len(spine)
+    for k in 0..len(spine) {
+        let i = len(spine) - 1 - k
+        if is_int_lit(mut c, spine[i]) {
+            top = i
+        }
+    }
+    let saved = c.expected
+    for k in 0..top {
+        let i = top - 1 - k
+        c.expected = -2
+        let _ = value(mut c, spine[i])
+        c.chained[spine[i].id] = true
+    }
+    c.expected = saved
 }
 
 // The operands' types. A literal number next to a Byte is a Byte.
 fn operands(c: mut Checker, l: ast.Expr, r: ast.Expr, expected: Int) -> [Int] {
-    if (types.is_integer(expected) || expected == types.FLOAT()) && is_int_lit(l) && is_int_lit(r) {
+    if (types.is_integer(expected) || expected == types.FLOAT()) && is_int_lit(mut c, l) && is_int_lit(mut c, r) {
         check_expr(mut c, l, expected, msg("expected " + show(c, expected) + ", found ", ""))
         check_expr(mut c, r, expected, msg("expected " + show(c, expected) + ", found ", ""))
         return [expected, expected]
     }
-    if is_int_lit(l) && !is_int_lit(r) {
+    if is_int_lit(mut c, l) && !is_int_lit(mut c, r) {
         let right = value(mut c, r)
         return [literal_like(mut c, l, right), right]
     }
     let left = value(mut c, l)
-    if is_int_lit(r) {
+    if is_int_lit(mut c, r) {
         return [left, literal_like(mut c, r, left)]
     }
     return [left, value(mut c, r)]
@@ -2365,8 +2430,9 @@ fn comparable(c: Checker, t: Int) -> Bool {
 fn is_bitwise(op: Str) -> Bool { return op == "&" || op == "|" || op == "^" || op == "<<" || op == ">>" }
 
 fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr, expected: Int) -> Int {
+    chain(mut c, l)
     if op == "<<" || op == ">>" {
-        if types.is_integer(expected) && is_int_lit(l) { c.expected = expected }
+        if types.is_integer(expected) && is_int_lit(mut c, l) { c.expected = expected }
         let left = value(mut c, l)
         let right = value(mut c, r)
         if (!types.is_integer(left) || !types.is_integer(right)) && left != types.ERROR() && right != types.ERROR() {
@@ -3966,7 +4032,7 @@ fn integer_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], exp
     if target < 0 && types.is_builtin_enum(c.table, expected) && types.get(c.table, expected).name == "Option" {
         context = types.get(c.table, expected).args[0]
     }
-    if types.is_integer(context) && is_int_lit(args[0]) { c.expected = context }
+    if types.is_integer(context) && is_int_lit(mut c, args[0]) { c.expected = context }
     let t = value(mut c, args[0])
     if !types.is_integer(t) && t != types.ERROR() {
         report_at(mut c, args[0], "E3184", "integer conversion and arithmetic functions require an integer")

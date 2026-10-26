@@ -47,10 +47,11 @@ pub type Package = struct {
 pub type Packages = struct {
     deps: [Str]  // the packages the program's own modules may import
     all: Map[Str, Package]  // every package of the program, by name
+    stack: Int  // the program's vela.mod `stack`: bytes for main's thread, or 0
 }
 
 pub fn no_packages() -> Packages {
-    return Packages { deps: [], all: [:] }
+    return Packages { deps: [], all: [:], stack: 0 }
 }
 
 pub type Loaded = struct {
@@ -59,6 +60,7 @@ pub type Loaded = struct {
     errors: [errors.CompileError]  // sorted
     warnings: [errors.CompileError]  // sorted
     node_count: Int  // syntax tree ids handed out, across all files
+    stack: Int  // bytes for the program's main thread (vela.mod `stack`), or 0
 }
 
 type Loader = struct {
@@ -143,7 +145,7 @@ pub fn load_program(path: Str, source: Str, std_dir: Str, open: Map[Str, Str], p
     file(mut ld, "", "", path, source, path)
     return Loaded {
         modules: ld.modules, order: ld.order, errors: errors.sorted(ld.errors), warnings: errors.sorted(ld.warnings),
-        node_count: ld.next_id,
+        node_count: ld.next_id, stack: packages.stack,
     }
 }
 

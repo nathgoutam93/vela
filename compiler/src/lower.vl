@@ -243,7 +243,13 @@ fn entry(g: mut Low, for_tests: Bool, tests: [Int]) {
     ccall(mut g, "vela_init", [argc, argv], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
     if g.mode > 0 { ccall(mut g, "vela_observe_init", [konst(mut g, g.mode), cptr(mut g, g.report)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }
     if !for_tests {
-        call(mut g, "f_main", [], -1)
+        if g.k.stack > 0 {
+            // vela.mod's `stack`: main runs on a thread with that stack.
+            ccall(mut g, "vela_main_stack", [sym_addr(mut g, "f_main"), konst(mut g, g.k.stack)], [ir.KIND_INT(), ir.KIND_INT()],
+                ir.RET_NONE(), -1)
+        } else {
+            call(mut g, "f_main", [], -1)
+        }
         ret(mut g, konst(mut g, 0))
         finish(mut g)
         return

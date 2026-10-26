@@ -2443,6 +2443,77 @@ the same entry. Close it with a commit or validation result; keep its history.
   previous compiler and passes now. The `packages.vl` unit tests cover the
   messages.
 
+### TL-092: Long expressions overflowed the compiler's stack
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** second post-M30 review, compiling generated sources.
+- **Evidence:** on the system's 8 MB main stack, `vela check` panicked with
+  `vela runtime: panic: stack overflow` on a chain of about 2,500 terms, such
+  as a 3,000-piece string concatenation `"p0" + "p1" + ...`, and the parser on
+  3,000 nested parentheses. The checker took five frames (3.4 KB) per
+  operator. Its `is_int_lit` walked the rest of the chain at every operator,
+  so checking was also quadratic: 569 s for 100,000 terms with the stack
+  limit removed. About 20 later passes (mono, both lowerings, C generation,
+  ranges, call graph and others) recurse once per operator too; mono
+  overflowed next, at about 7,800 terms. Range analysis re-ran `stable`
+  (`ast.has_mut` over the whole subtree) at every level of `refine` and
+  `limit`, so a 4,000-term `a && b && ...` took 310 s.
+- **Impact:** generated code, the case agents produce, could not be compiled
+  beyond a few thousand terms, with no diagnostic saying why.
+- **Workaround:** split long expressions with temporaries.
+- **Resolution:**
+  - `is_int_lit` remembers its answer per node.
+  - The checker infers a left-nested chain's left operands from the innermost
+    out before the outermost operator, each finding its own left operand
+    done. A non-literal left operand is always inferred with no expected type,
+    so types, diagnostics and their order are unchanged.
+  - A program's vela.mod may say `stack SIZE` (1M to 64G). Its main then runs
+    on a thread with that stack (`vela_main_stack` in the runtime, emitted by
+    both backends), falling back to the main thread where no thread can be
+    made. The compiler's vela.mod says `stack 1G`, which holds about 160,000
+    terms in the remaining recursive passes.
+  - `refine` and `limit` check stability once: has_mut is compositional, so
+    the parts of a stable expression are stable.
+- **Verification:**
+  - With the system's 8 MB stack, the compiler checks and generates C and
+    native code for a 20,000-term string chain, a 4,000-term `&&` chain, a
+    3,000-term Int sum and 10,000 nested parentheses
+    (`tests/stack_overflow_test.py`); compilers built from the previous seed
+    panic on them.
+  - `vela check` of 100,000 terms takes 0.25 s; a 4,000-term `&&` chain
+    compiles and runs in 3.5 s.
+  - `tests/run/main_stack` recurses 40,000 levels of 256-byte frames under
+    `stack 1G`, and overflows without it, on C and native at both
+    optimization settings; it also passes under ASan and TSan. (TSan cannot
+    follow about 100,000 frames even on the main thread, so the fixture uses
+    large frames instead of a deep count.) `--debug` stacks and `vela profile`
+    work on the `stack` thread.
+  - An overflow on the `stack` thread is still reported as a panic, also from
+    a built executable and under `--deny fs`, `--allow fs:DIR` and
+    `--deny net`.
+  - The guide stays within its 32,000-byte budget.
+
+### TL-093: Compile time grows faster than linearly on very long expressions
+
+- **Status:** open; found while resolving TL-092.
+- **Evidence:**
+  - Native `vela run` of `x = x + 1 + 1 + ...`: 3,000 terms 3.7 s, 20,000
+    terms 118 s. Samples are in `ranges.limit`/`cannot_fail`, which compute
+    the range of the remaining chain at every level.
+  - A 20,000-term `&&` chain takes 35 s: `refine` still walks each left
+    operand's chain once per level.
+  - On the C backend, gcc -O2 takes 45 s for the C of a 5,000-term string
+    chain and more than 9 minutes for 20,000 terms.
+  - String chains are fine natively: 20,000 terms in 5 s.
+- **Impact:** very long generated integer or Boolean expressions compile
+  slowly; nothing is miscompiled.
+- **Workaround:** split them with temporaries, or use the native backend.
+- **Proposed improvement:** cache each expression's range during a walk
+  instead of recomputing it from syntax; refine a chain of `&&` once per
+  chain; split very large generated C functions.
+- **Verify:** time the commands above at 20,000 terms; expect them to scale
+  near-linearly.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
