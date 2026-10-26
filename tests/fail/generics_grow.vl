@@ -1,6 +1,8 @@
 // Generic functions that call each other with ever bigger types would need
-// copies without end; the code generator stops and says where it starts.
-// err: generics_grow.vl:12:12: error: 'f' is called here with types that grow without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]]) [E7006]
+// copies without end. The checker reports every call that grows the types
+// around the cycle, so `vela check` and the editor agree with `vela build`.
+// err: generics_grow.vl:10:12: error: 'g' is called here with types that grow without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]]) [E7006]
+// err: generics_grow.vl:14:12: error: 'f' is called here with types that grow without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]]) [E7006]
 fn f[T](x: T, n: Int) -> Int {
     if n == 0 {
         return 0

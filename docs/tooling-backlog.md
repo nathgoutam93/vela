@@ -2375,6 +2375,43 @@ the same entry. Close it with a commit or validation result; keep its history.
   --json` 472 → 344 ms, `refs` 904 → 551 ms; 100k-line `impact` 1,544 → 827 ms
   and `summary` 851 → 530 ms.
 
+### TL-090: Growing generic cycles passed check and failed build
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** post-M30 review, comparing `vela check` with `vela build` on
+  generic recursion.
+- **Evidence:** `fn f[T](x: T, n: Int) -> Int` calling `g([x], n - 1)`, with
+  `fn g[U](y: U, n: Int) -> Int` calling `f(y, n)`, passed `vela check`,
+  `check --json` and the language server, and `vela build`/`run` failed with
+  E7006. The checker's E3145 only covered a function calling itself; growth
+  around a cycle of several functions was found only when monomorphization
+  reached its depth limit, and only in code reachable from `main`.
+- **Impact:** the editor and agents reported success for programs that could
+  not be built. A cycle that `main` did not reach yet was accepted until a
+  later change made it reachable.
+- **Workaround:** run `vela build`, not only `vela check`.
+- **Resolution:** the checker records every generic function a generic
+  function calls or uses as a value, including from closures, with its type
+  arguments. Each type parameter is a node; a use links each caller parameter
+  to each callee parameter whose argument mentions it, and the link grows when
+  the argument is not the parameter itself. A growing link inside a strongly
+  connected component (Tarjan) is reported as E7006 at the call, using
+  monomorphization's message: the expanding-cycle rule C# uses for generic
+  types. Self-calls keep E3145. Monomorphization's depth limit stays as a
+  backstop; an attempt to grow types through interface dispatch is already
+  rejected by bound checking (E3031). Under the compatibility policy this
+  rejects programs that violate the specification's rule that generic
+  recursion must not generate an unbounded sequence of larger type arguments,
+  also in unreachable code. Migration: pass the same type parameter around the
+  cycle, or hold the growing part in a recursive data type.
+- **Verification:** `tests/fail/generics_grow.vl` keeps its original E7006 and
+  now also reports the other growing call; `tests/fail/generics_grow_cycle.vl`
+  covers three functions, a closure, a function used as a value, an unreached
+  cycle and non-growing calls that must stay accepted. The previous seed's
+  `check` accepts both reproducers while its `run` reports E7006. Both
+  bootstrap fixed points pass, and the complete C and native suites pass
+  319/319 on Linux x86-64.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures

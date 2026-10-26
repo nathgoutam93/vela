@@ -54,6 +54,17 @@ pub type Ref = enum {
     Method(Int, Str)  // receiver type and statically dispatched method name
 }
 
+// A generic function called or used as a value inside another function, with
+// its type arguments, which can mention the caller's type parameters.
+type GenericUse = struct {
+    caller: Int
+    callee: Int
+    args: [Int]
+    module: Int
+    line: Int
+    col: Int
+}
+
 // A closure, by the node id of its expression.
 pub type ClosureInfo = struct {
     params: [Int]  // locals
@@ -136,6 +147,7 @@ type Checker = struct {
     breaks: [Bool]
     scopes: [Map[Str, Int]]  // local ids, innermost last
     current_fn: Int  // the function being checked
+    generic_uses: [GenericUse]  // generic functions called or used as values, for expanding_cycles
     loops: [Loop]
     undefined: [Str]  // unknown names already reported in this function
     targs: [[Int]]
@@ -180,7 +192,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
     let mut c = Checker {
         target: target, library: for_tests, unsafe_depth: 0, escaped: [:], signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
-        fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, loops: [],
+        fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, generic_uses: [], loops: [],
         undefined: [], targs: targs, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
         in_closures: [], pending: [], defining: -1, expected: -2,
         completion: Completion { name: name, module: -1, visible: [], type_params: [], object: [] },
@@ -201,6 +213,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
     c.order = order
     push(mut c.modules, prelude)
     program(mut c, for_tests)
+    expanding_cycles(mut c)
     validate_fixed(mut c)
     return Checked {
         proved_contracts: [:],
@@ -209,6 +222,150 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
         locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
         completion: c.completion, escaped: c.escaped,
     }
+}
+
+// ---- Generic instantiation cycles ----
+
+fn note_generic_use(c: mut Checker, e: ast.Expr, callee: Int, args: [Int]) {
+    if c.current_fn >= 0 && len(c.fns[c.current_fn].type_params) > 0 {
+        push(mut c.generic_uses, GenericUse { caller: c.current_fn, callee: callee, args: args, module: c.current,
+            line: e.line, col: e.col })
+    }
+}
+
+// Generic functions that use each other with type arguments growing around
+// a cycle (f[T] using g[[T]], g[U] using f[U]) would need endless copies.
+// Each type parameter of each generic function is a node; a use of g inside
+// f links each of f's parameters to each of g's that its argument mentions,
+// expanding when the argument is bigger than the parameter itself. An
+// expanding link inside a strongly connected component never stops growing
+// (the expanding-cycle rule of C#'s generics). A function using itself is
+// E3145; methods resolved through interfaces are left to monomorphization's
+// depth limit (mono.vl), which reports the same error.
+fn expanding_cycles(c: mut Checker) {
+    if len(c.generic_uses) == 0 {
+        return
+    }
+    let mut first: Map[Int, Int] = [:]  // a function's first node
+    let mut n = 0
+    for u in c.generic_uses {
+        for f in [u.caller, u.callee] {
+            if !maps.has(first, f) {
+                first[f] = n
+                n = n + len(c.fns[f].type_params)
+            }
+        }
+    }
+    let mut next: [[Int]] = []
+    for _ in 0..n {
+        let none: [Int] = []
+        push(mut next, none)
+    }
+    let mut edges: [[Int]] = []  // from, to, the use's index, 1 when expanding
+    for k in 0..len(c.generic_uses) {
+        let u = c.generic_uses[k]
+        let from = c.fns[u.caller].type_params
+        for j in 0..len(u.args) {
+            for i in 0..len(from) {
+                if types.mentions(c.table, u.args[j], from[i]) {
+                    let a = first[u.caller] + i
+                    let b = first[u.callee] + j
+                    push(mut next[a], b)
+                    let mut growing = 0
+                    if u.args[j] != from[i] {
+                        growing = 1
+                    }
+                    push(mut edges, [a, b, k, growing])
+                }
+            }
+        }
+    }
+    let component = components(next)
+    let mut reported: Map[Int, Bool] = [:]
+    let saved = c.current
+    for edge in edges {
+        let u = c.generic_uses[edge[2]]
+        if edge[3] == 1 && component[edge[0]] == component[edge[1]] && u.caller != u.callee && !maps.has(reported, edge[2]) {
+            reported[edge[2]] = true
+            c.current = u.module
+            report(mut c, u.line, u.col, "E7006", "'" + c.fns[u.callee].decl.name + "' is called here with types that grow " +
+                "without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]])")
+        }
+    }
+    c.current = saved
+}
+
+// Strongly connected components (Tarjan's algorithm, iteratively): each
+// node's component number.
+fn components(next: [[Int]]) -> [Int] {
+    let n = len(next)
+    let mut index: [Int] = []
+    let mut low: [Int] = []
+    let mut on_stack: [Bool] = []
+    let mut component: [Int] = []
+    for _ in 0..n {
+        push(mut index, -1)
+        push(mut low, 0)
+        push(mut on_stack, false)
+        push(mut component, -1)
+    }
+    let mut stack: [Int] = []
+    let mut counter = 0
+    let mut found = 0
+    for root in 0..n {
+        if index[root] >= 0 {
+            continue
+        }
+        // The depth-first path: nodes and how many of their links are done.
+        let mut path: [Int] = [root]
+        let mut done: [Int] = [0]
+        index[root] = counter
+        low[root] = counter
+        counter = counter + 1
+        push(mut stack, root)
+        on_stack[root] = true
+        for len(path) > 0 {
+            let v = path[len(path) - 1]
+            let d = done[len(done) - 1]
+            if d < len(next[v]) {
+                done[len(done) - 1] = d + 1
+                let w = next[v][d]
+                if index[w] < 0 {
+                    index[w] = counter
+                    low[w] = counter
+                    counter = counter + 1
+                    push(mut stack, w)
+                    on_stack[w] = true
+                    push(mut path, w)
+                    push(mut done, 0)
+                } else if on_stack[w] && index[w] < low[v] {
+                    low[v] = index[w]
+                }
+                continue
+            }
+            path = path[0..len(path) - 1]
+            done = done[0..len(done) - 1]
+            if len(path) > 0 {
+                let parent = path[len(path) - 1]
+                if low[v] < low[parent] {
+                    low[parent] = low[v]
+                }
+            }
+            if low[v] == index[v] {
+                for {
+                    let w = stack[len(stack) - 1]
+                    stack = stack[0..len(stack) - 1]
+                    on_stack[w] = false
+                    component[w] = found
+                    if w == v {
+                        break
+                    }
+                }
+                found = found + 1
+            }
+        }
+    }
+    return component
 }
 
 // ---- Small helpers ----
@@ -3248,6 +3405,9 @@ fn generic_call(c: mut Checker, e: ast.Expr, id: Int, name: Str, args: [ast.Expr
             check_bounds(mut c, e.line, e.col, "'" + name + "'", tp[i], bound[i])
         }
     }
+    if ok {
+        note_generic_use(mut c, e, id, bound)
+    }
     if id == c.current_fn && ok {
         // f[T] calling f[[T]], which calls f[[[T]]]...: there would be no end
         // to the copies.
@@ -3677,6 +3837,7 @@ fn fn_value(c: mut Checker, e: ast.Expr, id: Int, name: Str, expected: Int) -> I
             check_bounds(mut c, e.line, e.col, "'" + name + "'", tp[i], bound[i])
         }
         c.targs[e.id] = bound
+        note_generic_use(mut c, e, id, bound)
     }
     let mut params: [Int] = []
     for p in f.params {

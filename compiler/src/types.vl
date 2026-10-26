@@ -470,6 +470,25 @@ fn any_open(table: Table, ts: [Int]) -> Bool {
     return false
 }
 
+// Whether `t` is `p` or is built from it (`[p]`, `Map[Str, p]`, `fn(p) -> Int`).
+pub fn mentions(table: Table, t: Int, p: Int) -> Bool {
+    if t == p {
+        return true
+    }
+    if t < 0 {
+        return false
+    }
+    if table.types[t].result >= 0 && mentions(table, table.types[t].result, p) {
+        return true
+    }
+    for a in table.types[t].args {
+        if mentions(table, a, p) {
+            return true
+        }
+    }
+    return false
+}
+
 // How deeply `t` nests: 1 for Int, 2 for [Int], 3 for Option[[Int]].
 pub fn depth(table: Table, t: Int) -> Int {
     let mut deepest = 0
