@@ -486,6 +486,7 @@ void vela_eprint_float(double x);
 
 // Called by main() before anything else, to keep the command line.
 void vela_init(int argc, char **argv);
+void vela_thread_guard(void);  // a thread about to run Vela code: report its stack overflow (vela_rt.c)
 // os.args(): every argument, the program's own name first.
 vela_array *vela_os_args(void);
 // Absolute, resolved path to the running executable, independent of argv[0].

@@ -80,4 +80,4 @@ Every visit that can reach another goes through it:
   no mechanism is established; it is reported as measured.
 
 Stack overflow from a program's own deep recursion is a separate issue,
-recorded as [TL-088](../tooling-backlog.md#tl-088-stack-overflow-from-program-recursion-is-a-silent-segmentation-fault).
+now reported as a panic ([walkthrough](stack-overflow.md), [TL-088](../tooling-backlog.md#tl-088-stack-overflow-from-program-recursion-is-a-silent-segmentation-fault)).

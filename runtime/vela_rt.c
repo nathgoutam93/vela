@@ -1046,7 +1046,94 @@ vela_str vela_os_executable(void) {
     }
 }
 
+// ---- Stack overflow ----
+//
+// A program recursing too deeply runs off the end of its thread's stack
+// into the guard pages below it, and the system's fault would end it
+// silently. Each thread running Vela code records where its stack ends and
+// gets a small alternate stack to handle the fault on; a fault just below
+// the end of the faulting thread's stack is reported as a Vela panic, so the
+// output is flushed and the failure reads like any other (text, JSON or with
+// the Vela stack). Any other fault (from foreign code, say) gets the default
+// action back and happens again exactly as it would have. Sanitizers report
+// overflows themselves, and Windows and WASI have no POSIX signals.
+#if !defined(_WIN32) && !defined(__wasi__) && !defined(VELA_SANITIZED)
+#include <signal.h>
+#if defined(__APPLE__)
+#include <pthread.h>
+#endif
+#if defined(__linux__)
+#include <ucontext.h>
+#endif
+#define VELA_ALT_STACK ((size_t)64 << 10)
+static _Thread_local uintptr_t stack_end;  // the lowest address of this thread's stack, or 0
+
+void vela_thread_guard(void) {
+    pthread_t self = pthread_self();
+#if defined(__APPLE__)
+    stack_end = (uintptr_t)pthread_get_stackaddr_np(self) - pthread_get_stacksize_np(self);
+#else
+    pthread_attr_t attr;
+    if (pthread_getattr_np(self, &attr) == 0) {
+        void *low = NULL;
+        size_t size = 0;
+        if (pthread_attr_getstack(&attr, &low, &size) == 0) stack_end = (uintptr_t)low;
+        pthread_attr_destroy(&attr);
+    }
+#endif
+    stack_t alternate;
+    alternate.ss_sp = malloc(VELA_ALT_STACK);
+    alternate.ss_size = VELA_ALT_STACK;
+    alternate.ss_flags = 0;
+    if (alternate.ss_sp && sigaltstack(&alternate, NULL) != 0) free(alternate.ss_sp);
+}
+
+// The faulting thread's stack pointer, or 0. Linux finds the main thread's
+// stack through /proc/self/maps, which a filesystem policy can deny; near
+// the stack pointer, only the guard region below the stack can fault.
+static uintptr_t fault_sp(void *context) {
+#if defined(__linux__) && defined(__x86_64__)
+    return (uintptr_t)((ucontext_t *)context)->uc_mcontext.gregs[REG_RSP];
+#elif defined(__linux__) && defined(__aarch64__)
+    return (uintptr_t)((ucontext_t *)context)->uc_mcontext.sp;
+#else
+    (void)context;
+    return 0;
+#endif
+}
+
+static void on_fault(int sig, siginfo_t *info, void *context) {
+    uintptr_t at = (uintptr_t)info->si_addr;
+    uintptr_t near = (uintptr_t)64 << 10;
+    bool overflow = false;
+    if (stack_end) {
+        // A frame can reach well below the last page before touching it.
+        overflow = at < stack_end + near && at + ((uintptr_t)1 << 20) >= stack_end;
+    } else {
+        uintptr_t sp = fault_sp(context);
+        overflow = sp && at < sp + near && at + near >= sp;
+    }
+    if (overflow) vela_panic("vela runtime", "stack overflow");
+    signal(sig, SIG_DFL);
+}
+
+static void guard_stacks(void) {
+    struct sigaction action;
+    memset(&action, 0, sizeof action);
+    action.sa_sigaction = on_fault;
+    action.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&action.sa_mask);
+    sigaction(SIGSEGV, &action, NULL);
+    sigaction(SIGBUS, &action, NULL);
+    vela_thread_guard();
+}
+#else
+void vela_thread_guard(void) {}
+static void guard_stacks(void) {}
+#endif
+
 void vela_init(int argc, char **argv) {
+    guard_stacks();
     // Keep terminal output line buffered. Redirected output uses a larger
     // stdio buffer; the existing read, panic and exit paths flush it.
     static char output_buffer[65536];
@@ -1751,6 +1838,7 @@ static void close_job(task_job *j) {
 
 static void *pool_thread(void *unused) {
     (void)unused;
+    vela_thread_guard();
     pthread_mutex_lock(&pool_lock);
     for (;;) {
         if (!open_jobs) {

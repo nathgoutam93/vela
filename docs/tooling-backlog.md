@@ -2304,7 +2304,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-088: Stack overflow from program recursion is a silent segmentation fault
 
-- **Status:** open; discovered in the post-M30 review. Not addressed by TL-087.
+- **Status:** resolved in a post-M30 fix on Linux; macOS was not rerun, and
+  Windows/WASI are unchanged. Discovered in the post-M30 review.
 - **Evidence:** `fn down(n: Int) -> Int { if n == 0 { return 0 }; return 1 +
   down(n - 1) }` called with 10,000,000 exits 139 on both backends, including
   with `--debug` and `VELA_PANIC=json`. No message, Vela stack or JSON
@@ -2320,6 +2321,27 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Verification:** the program above exits 101 with a stack-overflow panic on
   both backends and in workers, text and JSON; ordinary segmentation faults
   from foreign code are not misreported.
+- **Resolution:** `vela_init` installs a SIGSEGV/SIGBUS handler on an
+  alternate signal stack, and `vela_thread_guard` records each thread's stack
+  end and alternate stack for the main thread and task workers. A fault from
+  1 MB below to 64 KB above the end becomes `vela runtime: panic: stack
+  overflow`, exit 101; other faults get the default action back and recur.
+  Under a filesystem policy, Linux cannot read `/proc/self/maps` for the main
+  thread's stack. The first version then still crashed silently under `--deny
+  fs`; the handler now falls back to the faulting stack pointer. Sanitizer
+  builds keep their own reports. See the
+  [walkthrough](history/stack-overflow.md).
+- **Validation:** `tests/stack_overflow_test.py` passes C/native at opt=1/0
+  (text with flushed output, JSON, `--debug`, workers, `vela test`, built
+  executables, `--deny fs`, `--allow fs:DIR`, `--deny net`). A foreign
+  bad-address read still ends with SIGSEGV and no report. The script fails on
+  the previous runtime with a silent exit 139. Complete C/native suites pass
+  317/318 (the known M24 latency gate, VAL-007). Sanitizer suites are unchanged
+  at 315/318 (LeakSanitizer inside sandboxes) with no reports, TSan passes,
+  and M27 with gdb passes on both backends.
+- **Remaining:** the report runs the stdio panic path from the handler, which
+  can fail to appear if the overflow occurs while the C library holds a lock.
+  Windows needs structured exception handling.
 
 ## Outstanding validation
 
