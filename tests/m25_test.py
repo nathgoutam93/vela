@@ -2,6 +2,7 @@
 """Native allocation, loop sharing and checked-operation regression oracles."""
 from pathlib import Path
 import os
+import random
 import subprocess
 import sys
 import tempfile
@@ -134,8 +135,22 @@ fn main() {
 
 
 def strength(c, work, env):
+    # Python is an independent full-width oracle for constant reciprocal
+    # division, signed truncation and remainders. Include multiplier sign
+    # corrections, large divisors and values near quotient boundaries.
+    rng = random.Random(825)
+    divisors = [1, 2, 4, 256, 2**32, 2**62,
+                3, 5, 6, 7, 9, 10, 14, 25, 37, 63, 65, 100, 255, 257,
+                1000, 65535, 65537, 2**31-1, 2**31+1, 2**32-1,
+                2**32+1, 2**62-1, 2**62+1, 2**63-1,
+                -3, -7, -10, -2**63]
+    divisors += [rng.randrange(3, 2**63) for _ in range(16)]
     values = [-2**63, -2**63+1, -123, -1, 0, 1, 123, 2**63-1]
-    divisors = [1, 2, 4, 256, 2**32, 2**62]
+    values += [rng.randrange(-2**63, 2**63) for _ in range(32)]
+    for d in divisors:
+        if d > 1:
+            values += [-d-1, -d, -d+1, d-1, d, min(d+1, 2**63-1)]
+    values = list(dict.fromkeys(n for n in values if -2**63 <= n < 2**63))
     source = ['fn probe(x: Int) {']
     for d in divisors:
         source += [f'print(x / {d}); print(x % {d})']
@@ -144,7 +159,7 @@ def strength(c, work, env):
     for x in values:
         source.append(f'f({x})')
         for d in divisors:
-            q = abs(x) // d * (-1 if x < 0 else 1)
+            q = abs(x) // abs(d) * (-1 if (x < 0) != (d < 0) else 1)
             expected += [str(q), str(x - q*d)]
     source += ['print(u8(18446744073709551615u64 & 255u64))',
                'assert(18446744073709551615u64 > 9223372036854775807u64)',

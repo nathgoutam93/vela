@@ -52,6 +52,8 @@ for day-to-day work.
 | [M30](m30-specification.md) | Specification and compatibility |
 | [Next performance round](performance-next-round.md) | implementation, review and results |
 | [tooling-followup-before-m30](tooling-followup-before-m30.md) | Tooling follow-up before M30 |
+| [Networking runtime performance](network-runtime-performance.md) | Socket allocation, writes and operation lifetimes |
+| [Native performance follow-up](native-performance-followup.md) | Immutable string metadata, bounded recursive inlining and iterative enum cleanup |
 
 Retained reports live in [bench/results/](../../bench/results/README.md) and
 [evaluation/results/](../../evaluation/results/README.md). Their embedded paths and source

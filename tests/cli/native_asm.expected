@@ -7,7 +7,9 @@ f_count:
     push rbp
     mov rbp, rsp
     push rbx
-    sub rsp, 8
+    push r12
+    push r13
+    push r14
     mov r10, rdi
     cmp r10, 0
     jle .L0_0
@@ -17,19 +19,70 @@ f_count:
     jmp .LR0
 .L0_1:
     sub r10, 1
+    cmp r10, 0
+    jle .L0_3
+    jmp .L0_4
+.L0_3:
+    xor ebx, ebx
+    jmp .L0_6
+.L0_4:
+    sub r10, 1
+    cmp r10, 0
+    jle .L0_7
+    jmp .L0_8
+.L0_7:
+    xor r12d, r12d
+    jmp .L0_14
+.L0_8:
+    sub r10, 1
+    cmp r10, 0
+    jle .L0_10
+    jmp .L0_11
+.L0_10:
+    xor r13d, r13d
+    jmp .L0_13
+.L0_11:
+    sub r10, 1
     mov rdi, r10
     call f_count
-    mov rbx, rax
-    add rbx, 1
+    mov r14, rax
+    mov r13, r14
+    add r13, 1
     jo .LP0_1
+.L0_13:
+    mov r12, r13
+    add r12, 1
+    jo .LP0_2
+.L0_14:
+    mov rbx, r12
+    add rbx, 1
+    jo .LP0_3
+.L0_6:
+    add rbx, 1
+    jo .LP0_4
     mov rax, rbx
     jmp .LR0
 .LR0:
-    lea rsp, [rbp - 8]
+    lea rsp, [rbp - 32]
+    pop r14
+    pop r13
+    pop r12
     pop rbx
     pop rbp
     ret
 .LP0_1:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
+.LP0_2:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
+.LP0_3:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
+.LP0_4:
     lea rdi, [rip + .Lc1]
     lea rsi, [rip + .Lmsg_overflow]
     call vela_panic@PLT
@@ -40,9 +93,15 @@ f_count:
 f_main:
     push rbp
     mov rbp, rsp
-    mov rdi, 3
+    mov rdi, 0
     call f_count
     mov r10, rax
+    add r10, 1
+    jo .LP1_1
+    add r10, 1
+    jo .LP1_2
+    add r10, 1
+    jo .LP1_3
     mov rdi, r10
     mov eax, 0
     call vela_print_int@PLT
@@ -51,6 +110,18 @@ f_main:
     mov rsp, rbp
     pop rbp
     ret
+.LP1_1:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
+.LP1_2:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
+.LP1_3:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
     .size f_main, . - f_main
 
     .p2align 4
@@ -67,9 +138,13 @@ main:
     mov rsi, rbx
     mov eax, 0
     call vela_init@PLT
-    mov rdi, 3
+    mov rdi, 1
     call f_count
     mov r10, rax
+    add r10, 1
+    jo .LP2_1
+    add r10, 1
+    jo .LP2_2
     mov rdi, r10
     mov eax, 0
     call vela_print_int@PLT
@@ -80,6 +155,14 @@ main:
     pop rbx
     pop rbp
     ret
+.LP2_1:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
+.LP2_2:
+    lea rdi, [rip + .Lc1]
+    lea rsi, [rip + .Lmsg_overflow]
+    call vela_panic@PLT
     .size main, . - main
 
     .section .rodata

@@ -1,0 +1,19 @@
+// out: empty concatenation passed
+import text
+import tasks
+
+fn left() -> Str { let owner = text.repeat("abcdef", 1000); return "" + owner[1..17] }
+fn right() -> Str { let owner = text.repeat("abcdef", 1000); return owner[1..17] + "" }
+fn escaped() -> fn() -> Str { let s = left(); return fn() => s + "" }
+fn main() {
+    assert("" + "" == "")
+    assert("" + "literal" == "literal" && "literal" + "" == "literal")
+    let a = left()
+    let b = right()
+    let read = escaped()
+    for _ in 0..100 { let pressure = text.repeat("replacement", 1000); assert(len(pressure) == 11000) }
+    assert(a == "bcdefabcdefabcde" && b == a && read() == a)
+    let copies = tasks.map([1, 2, 3, 4], fn(_) => ("" + a) + "")
+    assert(copies[3] == a && a[0] == 98u8)
+    print("empty concatenation passed")
+}

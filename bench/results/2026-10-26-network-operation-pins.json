@@ -1,0 +1,754 @@
+{
+  "format": "vela.network.compare",
+  "version": 1,
+  "complete": true,
+  "machine": {
+    "cpu": "arm",
+    "cores": 8,
+    "os": "Darwin arm64",
+    "gcc": "Apple clang version 17.0.0 (clang-1700.3.19.1)",
+    "rustc": "",
+    "commit": "5450b14",
+    "date": "2026-10-26"
+  },
+  "runtime_sha256": {
+    "ready-write": {
+      "runtime/vela_int.h": "e600cfd5cab132401aba9e03b5e4a3c45995c33cbbab7f8b581739a258d74059",
+      "runtime/vela_observe.inc": "dc40350cf17f4358c505175d5fceb7d50b2f8d4c4e539fdb133c296db842895f",
+      "runtime/vela_policy.inc": "9990ac63b5540c3af53f62a28a7b5b15053d2d42a5ce3086183d78073229fb94",
+      "runtime/vela_policy_portable.inc": "1737295f17af3f86658850d28134a6131387b09a279431340f4e11ad31ccc84d",
+      "runtime/vela_rt.c": "21a948d930a87079b5efb6e88f5a47e01372a16b520cc6c63684bef166eccaac",
+      "runtime/vela_rt.h": "63a3401c2f13319029b972395ccbe79170f4ea04a0f71d6afb64370f81014a11",
+      "runtime/vela_sys.inc": "f058a26ec46b97560d420777c85101e08ce295fec5400a667a07fad323cb6163",
+      "runtime/vela_threads.h": "ac583b3dd0069704b12f2aaa6bf4c0ef282111e7004814ac8306a67b8558f3db",
+      "runtime/vela_windows.h": "e630e02b37a51eca8cfd64d811171734033d83019b0d01f9c01f01155bc225dc",
+      "runtime/vela_windows_net.h": "16591563be67a14e5ff84d4e5e680c700e24f4645c9893071cf67b0e72420e15",
+      "runtime/vela_windows_process.inc": "70dc8c7c9f23874f69c1ae8db52c1f0795d8e1f24029c1a8b942e4dfd2643d9d"
+    },
+    "operation-pins": {
+      "runtime/vela_int.h": "e600cfd5cab132401aba9e03b5e4a3c45995c33cbbab7f8b581739a258d74059",
+      "runtime/vela_observe.inc": "dc40350cf17f4358c505175d5fceb7d50b2f8d4c4e539fdb133c296db842895f",
+      "runtime/vela_policy.inc": "9990ac63b5540c3af53f62a28a7b5b15053d2d42a5ce3086183d78073229fb94",
+      "runtime/vela_policy_portable.inc": "1737295f17af3f86658850d28134a6131387b09a279431340f4e11ad31ccc84d",
+      "runtime/vela_rt.c": "21a948d930a87079b5efb6e88f5a47e01372a16b520cc6c63684bef166eccaac",
+      "runtime/vela_rt.h": "63a3401c2f13319029b972395ccbe79170f4ea04a0f71d6afb64370f81014a11",
+      "runtime/vela_sys.inc": "3cde9270a784f882c8ece71a1f93c53c90e404f0c651904e844022eaead7c6a4",
+      "runtime/vela_threads.h": "ac583b3dd0069704b12f2aaa6bf4c0ef282111e7004814ac8306a67b8558f3db",
+      "runtime/vela_windows.h": "e630e02b37a51eca8cfd64d811171734033d83019b0d01f9c01f01155bc225dc",
+      "runtime/vela_windows_net.h": "16591563be67a14e5ff84d4e5e680c700e24f4645c9893071cf67b0e72420e15",
+      "runtime/vela_windows_process.inc": "70dc8c7c9f23874f69c1ae8db52c1f0795d8e1f24029c1a8b942e4dfd2643d9d"
+    }
+  },
+  "runs": 12,
+  "compiler_sha256": "aa0cf0d4dee0bd838446808fc6077e7fe8abae46f94d11ec141795d8c0f1eed7",
+  "program_sha256": "cbb6d8a07c984105f88702ccf532206ee504508035ce5112e856b05f8ac65be2",
+  "parameters": {
+    "clients": 8,
+    "requests_per_client": 4000,
+    "bytes": 1024
+  },
+  "notes": [
+    "Counter builds are untimed; allocations include process startup and warmup.",
+    "Counters measure source instrumentation sites, not hardware instructions or lock wait time."
+  ],
+  "implementations": {
+    "ready-write/vela": {
+      "command": [
+        "/Users/nathgoutam93/Documents/vela/build/vela",
+        "build",
+        "/Users/nathgoutam93/Documents/vela/bench/real/tcp_echo/main.vl",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-compare-z5cqt9_1/ready-write/vela/tcp_echo-vela"
+      ],
+      "build": {
+        "seconds": 0.46897441701730713,
+        "max_rss_bytes": 84721664,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "binary_bytes": 154192,
+      "binary_sha256": "100771c35a92570dbed85c0ee4bf81d3308e06282b7e4bd775bc19b6ba5480a8",
+      "operation_counts": {
+        "allocations": 64034,
+        "allocated_bytes": 66066615,
+        "string_copy_bytes": 32776203,
+        "descriptor_pins": 64024,
+        "readiness_waits": 32016,
+        "signal_managed_writes": 0,
+        "descriptor_duplicates": 64024
+      },
+      "timing": {
+        "best": 0.201985,
+        "median": 0.2091985,
+        "samples": [
+          {
+            "seconds": 0.203883,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 156952.762,
+            "p50_us": 47.0,
+            "p95_us": 81.0,
+            "p99_us": 100.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.205161,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 155975.064,
+            "p50_us": 48.0,
+            "p95_us": 80.0,
+            "p99_us": 99.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.211508,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 151294.514,
+            "p50_us": 48.0,
+            "p95_us": 83.0,
+            "p99_us": 109.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.207856,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 153952.736,
+            "p50_us": 47.0,
+            "p95_us": 82.0,
+            "p99_us": 103.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.211096,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 151589.798,
+            "p50_us": 47.0,
+            "p95_us": 81.0,
+            "p99_us": 103.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.211554,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 151261.616,
+            "p50_us": 49.0,
+            "p95_us": 82.0,
+            "p99_us": 101.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.201985,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 158427.606,
+            "p50_us": 47.0,
+            "p95_us": 80.0,
+            "p99_us": 98.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.210133,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 152284.505,
+            "p50_us": 47.0,
+            "p95_us": 82.0,
+            "p99_us": 104.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.206566,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 154914.168,
+            "p50_us": 48.0,
+            "p95_us": 81.0,
+            "p99_us": 99.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.209822,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 152510.223,
+            "p50_us": 49.0,
+            "p95_us": 82.0,
+            "p99_us": 100.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.210977,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 151675.301,
+            "p50_us": 49.0,
+            "p95_us": 82.0,
+            "p99_us": 100.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.208575,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 153422.03,
+            "p50_us": 49.0,
+            "p95_us": 81.0,
+            "p99_us": 99.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          }
+        ]
+      },
+      "latency_us": {
+        "p50_us": 48.0,
+        "p95_us": 81.5,
+        "p99_us": 100.0
+      }
+    },
+    "ready-write/vela-native": {
+      "command": [
+        "/Users/nathgoutam93/Documents/vela/build/vela",
+        "build",
+        "/Users/nathgoutam93/Documents/vela/bench/real/tcp_echo/main.vl",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-compare-z5cqt9_1/ready-write/vela-native/tcp_echo-vela-native"
+      ],
+      "build": {
+        "seconds": 0.5006489590159617,
+        "max_rss_bytes": 84492288,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "binary_bytes": 187368,
+      "binary_sha256": "8e00f13cee4e95621ec64db74651ecb72f7888674dbdf2a7ad6ebf7aa1192797",
+      "operation_counts": {
+        "allocations": 64034,
+        "allocated_bytes": 66066622,
+        "string_copy_bytes": 32776203,
+        "descriptor_pins": 64024,
+        "readiness_waits": 32016,
+        "signal_managed_writes": 0,
+        "descriptor_duplicates": 64024
+      },
+      "timing": {
+        "best": 0.200977,
+        "median": 0.2068215,
+        "samples": [
+          {
+            "seconds": 0.205883,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 155428.083,
+            "p50_us": 48.0,
+            "p95_us": 81.0,
+            "p99_us": 99.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.200977,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 159222.2,
+            "p50_us": 47.0,
+            "p95_us": 80.0,
+            "p99_us": 98.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.218119,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 146708.907,
+            "p50_us": 50.0,
+            "p95_us": 87.0,
+            "p99_us": 116.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.206757,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 154771.06,
+            "p50_us": 48.0,
+            "p95_us": 80.0,
+            "p99_us": 100.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.205873,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 155435.633,
+            "p50_us": 48.0,
+            "p95_us": 81.0,
+            "p99_us": 100.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.204437,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 156527.439,
+            "p50_us": 48.0,
+            "p95_us": 80.0,
+            "p99_us": 99.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.205052,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 156057.976,
+            "p50_us": 48.0,
+            "p95_us": 80.0,
+            "p99_us": 99.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.209277,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 152907.391,
+            "p50_us": 47.0,
+            "p95_us": 81.0,
+            "p99_us": 101.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.21161,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 151221.587,
+            "p50_us": 47.0,
+            "p95_us": 84.0,
+            "p99_us": 110.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.209769,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 152548.756,
+            "p50_us": 45.0,
+            "p95_us": 84.0,
+            "p99_us": 113.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.215132,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 148745.886,
+            "p50_us": 49.0,
+            "p95_us": 83.0,
+            "p99_us": 105.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.206886,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 154674.555,
+            "p50_us": 48.0,
+            "p95_us": 80.0,
+            "p99_us": 98.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          }
+        ]
+      },
+      "latency_us": {
+        "p50_us": 48.0,
+        "p95_us": 81.0,
+        "p99_us": 100.0
+      }
+    },
+    "operation-pins/vela": {
+      "command": [
+        "/Users/nathgoutam93/Documents/vela/build/vela",
+        "build",
+        "/Users/nathgoutam93/Documents/vela/bench/real/tcp_echo/main.vl",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-compare-z5cqt9_1/operation-pins/vela/tcp_echo-vela"
+      ],
+      "build": {
+        "seconds": 0.4782550419913605,
+        "max_rss_bytes": 84852736,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "binary_bytes": 154192,
+      "binary_sha256": "b021a12c19603089eb7887ed0b47a7d9e20fa4a0097cfb45491f83c170b521a8",
+      "operation_counts": {
+        "allocations": 64034,
+        "allocated_bytes": 66066690,
+        "string_copy_bytes": 32776203,
+        "descriptor_pins": 64024,
+        "readiness_waits": 32016,
+        "signal_managed_writes": 0,
+        "descriptor_duplicates": 0
+      },
+      "timing": {
+        "best": 0.171315,
+        "median": 0.17549599999999999,
+        "samples": [
+          {
+            "seconds": 0.174921,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 182939.727,
+            "p50_us": 41.0,
+            "p95_us": 67.0,
+            "p99_us": 80.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.178315,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 179457.701,
+            "p50_us": 41.0,
+            "p95_us": 67.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.175091,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 182762.107,
+            "p50_us": 41.0,
+            "p95_us": 66.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.174573,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 183304.406,
+            "p50_us": 40.0,
+            "p95_us": 67.0,
+            "p99_us": 81.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.171315,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 186790.415,
+            "p50_us": 40.0,
+            "p95_us": 66.0,
+            "p99_us": 78.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.179334,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 178437.998,
+            "p50_us": 42.0,
+            "p95_us": 67.0,
+            "p99_us": 80.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.176651,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 181148.14,
+            "p50_us": 41.0,
+            "p95_us": 67.0,
+            "p99_us": 80.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.176169,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 181643.762,
+            "p50_us": 41.0,
+            "p95_us": 67.0,
+            "p99_us": 80.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.174665,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 183207.855,
+            "p50_us": 41.0,
+            "p95_us": 66.0,
+            "p99_us": 78.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.175267,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 182578.58,
+            "p50_us": 40.0,
+            "p95_us": 66.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.176022,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 181795.457,
+            "p50_us": 41.0,
+            "p95_us": 66.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.175725,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 182102.717,
+            "p50_us": 41.0,
+            "p95_us": 67.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          }
+        ]
+      },
+      "latency_us": {
+        "p50_us": 41.0,
+        "p95_us": 67.0,
+        "p99_us": 79.0
+      }
+    },
+    "operation-pins/vela-native": {
+      "command": [
+        "/Users/nathgoutam93/Documents/vela/build/vela",
+        "build",
+        "/Users/nathgoutam93/Documents/vela/bench/real/tcp_echo/main.vl",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-compare-z5cqt9_1/operation-pins/vela-native/tcp_echo-vela-native"
+      ],
+      "build": {
+        "seconds": 0.4991366659523919,
+        "max_rss_bytes": 84590592,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "binary_bytes": 187368,
+      "binary_sha256": "c8796c619ee9d6e36a8b1b5a8f6fd8c73f0b33cf5d202d1a99cdee06fb215073",
+      "operation_counts": {
+        "allocations": 64034,
+        "allocated_bytes": 66066697,
+        "string_copy_bytes": 32776203,
+        "descriptor_pins": 64024,
+        "readiness_waits": 32016,
+        "signal_managed_writes": 0,
+        "descriptor_duplicates": 0
+      },
+      "timing": {
+        "best": 0.170643,
+        "median": 0.1746565,
+        "samples": [
+          {
+            "seconds": 0.179695,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 178079.524,
+            "p50_us": 41.0,
+            "p95_us": 68.0,
+            "p99_us": 83.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.177887,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 179889.48,
+            "p50_us": 41.0,
+            "p95_us": 67.0,
+            "p99_us": 80.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.170643,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 187526.005,
+            "p50_us": 40.0,
+            "p95_us": 65.0,
+            "p99_us": 78.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.180825,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 176966.681,
+            "p50_us": 41.0,
+            "p95_us": 70.0,
+            "p99_us": 87.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.173899,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 184014.859,
+            "p50_us": 40.0,
+            "p95_us": 66.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.173642,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 184287.212,
+            "p50_us": 40.0,
+            "p95_us": 66.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.175414,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 182425.576,
+            "p50_us": 41.0,
+            "p95_us": 66.0,
+            "p99_us": 78.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.173169,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 184790.58,
+            "p50_us": 40.0,
+            "p95_us": 66.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.176218,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 181593.254,
+            "p50_us": 41.0,
+            "p95_us": 66.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.172509,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 185497.568,
+            "p50_us": 40.0,
+            "p95_us": 66.0,
+            "p99_us": 79.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.185103,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 172876.723,
+            "p50_us": 43.0,
+            "p95_us": 69.0,
+            "p99_us": 82.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          },
+          {
+            "seconds": 0.172005,
+            "requests": 32000,
+            "bytes_each_way": 32768000,
+            "requests_per_second": 186041.103,
+            "p50_us": 40.0,
+            "p95_us": 66.0,
+            "p99_us": 78.0,
+            "server_stdout_sha256": "f89e00d088e2a97ef041978e2dd5536d5249265ade65302337b970746347fb28"
+          }
+        ]
+      },
+      "latency_us": {
+        "p50_us": 40.5,
+        "p95_us": 66.0,
+        "p99_us": 79.0
+      }
+    }
+  },
+  "orders": [
+    [
+      "ready-write/vela",
+      "ready-write/vela-native",
+      "operation-pins/vela",
+      "operation-pins/vela-native"
+    ],
+    [
+      "ready-write/vela-native",
+      "operation-pins/vela",
+      "operation-pins/vela-native",
+      "ready-write/vela"
+    ],
+    [
+      "operation-pins/vela",
+      "operation-pins/vela-native",
+      "ready-write/vela",
+      "ready-write/vela-native"
+    ],
+    [
+      "operation-pins/vela-native",
+      "ready-write/vela",
+      "ready-write/vela-native",
+      "operation-pins/vela"
+    ],
+    [
+      "ready-write/vela",
+      "ready-write/vela-native",
+      "operation-pins/vela",
+      "operation-pins/vela-native"
+    ],
+    [
+      "ready-write/vela-native",
+      "operation-pins/vela",
+      "operation-pins/vela-native",
+      "ready-write/vela"
+    ],
+    [
+      "operation-pins/vela",
+      "operation-pins/vela-native",
+      "ready-write/vela",
+      "ready-write/vela-native"
+    ],
+    [
+      "operation-pins/vela-native",
+      "ready-write/vela",
+      "ready-write/vela-native",
+      "operation-pins/vela"
+    ],
+    [
+      "ready-write/vela",
+      "ready-write/vela-native",
+      "operation-pins/vela",
+      "operation-pins/vela-native"
+    ],
+    [
+      "ready-write/vela-native",
+      "operation-pins/vela",
+      "operation-pins/vela-native",
+      "ready-write/vela"
+    ],
+    [
+      "operation-pins/vela",
+      "operation-pins/vela-native",
+      "ready-write/vela",
+      "ready-write/vela-native"
+    ],
+    [
+      "operation-pins/vela-native",
+      "ready-write/vela",
+      "ready-write/vela-native",
+      "operation-pins/vela"
+    ]
+  ]
+}

@@ -1,0 +1,1954 @@
+{
+  "format": "vela.native.experiments.v1",
+  "baseline_compiler": {
+    "path": "/Users/nathgoutam93/Documents/vela/build/native-work/vela-before",
+    "sha256": "065a5f41421672e105df61c0f7895239396628514ff9c2ac9b8d2b8a2606198c",
+    "compiler_source_sha256": {
+      "agent_queries.vl": "9a717de947f1ea4fbf4ad677fa9b6ca731cb15351fb13e59d61ebee84e503bc6",
+      "arm64.vl": "a47e94634e9c1d03a0587a049b879154570c07dce2c232d1b6f638aa92287be1",
+      "ast.vl": "71be5595bf344c9ed88c60276e59789cda435bccc8d19b753b46d68a4fa8b45a",
+      "bits.vl": "8e14141f4f203c1850984ff0355df3d69092ac62327602eeed4fef93314f0b96",
+      "call_graph.vl": "07cf773d2aa93e647983787bfcfcbde08a6aed430e8296d4d8aa7017d2ffd18a",
+      "capabilities.vl": "0fadb0ad3b900d2510ebcbd2e6ba49a2696288085996479de791da88bc74ad82",
+      "cffi.vl": "6b98f14d1e4d85b4a595de6337fa258387fee7160d4e9df2a3816abcedb7f636",
+      "chars.vl": "c42a95f8a5cb41d535981094761ccd447db7eb643ba40a8449b3504e7e7652d9",
+      "checker.vl": "0b7ad768157339beedde715f17774478cd6e78d07a042df067d56ac5d874b9ab",
+      "codegen.vl": "514575388d6b97eb32c86de8e426ef24fe9e0dcd56f47ee83d66a82f8fdf8626",
+      "complete.vl": "99507944d5e2a03249b93154e4dede64c68c5f2d4d8990fee683882bc7b8e4f8",
+      "contract_checks.vl": "8217ea347cd43147a54c21293c9cc9f46cf265f055754e5f7adfefebc2749cc2",
+      "debug_info.vl": "afbc5d8080374561aebcfae0ba7c0e84c492b4c085d26dc454ca737ab96ea8ae",
+      "diagnostics.vl": "efbd34c072253d3151727fb0d0d04f2ae7b7f7d7f281c2d04aa681bf863b0c7d",
+      "errors.vl": "2a31eea563f9ea1b591e700955c82c1ee887bd24b4797bb7c9eb3d5d733a8e27",
+      "evidence.vl": "cf93679034d67041f9ef769586ab59f3cfb4b2474298cdb78f49ac3362b8cd97",
+      "fixer.vl": "7370240f796cc19c3e6b38f0e03dc66061d0e6343154f29b31e7a7d9ac87a2a8",
+      "format.vl": "d8a7a58a851aa909e1e7818a8850888c11998c25c8eee56915cad77c93b5baf0",
+      "guide.vl": "d1fbc5b6f3dd28d3fd5ee479d777321922b9bb220964e583d0f078e166220245",
+      "incremental.vl": "0ac76bf06d3c50617edfea0f30a61b23960077587e3ca30e1e04988a68a4ea32",
+      "index.vl": "974652e9ab5dc963a75fb241ec58f771100efddb58f69f1abf6151e5fb0ba258",
+      "integers.vl": "45739d073e59c93f31718f5f8cf9a9424e192f2157e89d1de8fcdefa7747593a",
+      "interfaces.vl": "990c820ed20895079cc23b0a926d935f32844d30919da49fb91d8f8875af110f",
+      "ir.vl": "cab3dd585329fed7d4f2cf53eeb7d2698b229717895c282e1a5a526d876e99d6",
+      "layout.vl": "2556147fbf66b348ec4b5b00926fdabc0c32b4030f4bd88598ce7eaee5e16b24",
+      "lexer.vl": "b253ef64ffe1a5e5f8466e666c8379010eba177c28d2a619d7a6d666ebfcc2e3",
+      "live.vl": "fb1c6d41eca98fcc39f4c65667bbe43642f3042183d7510707494a8b62ecdda9",
+      "loops.vl": "b0286f5dd7d9edf08d9a6b0a63f97a4638d4f3a00a8a48447c6f436057859a59",
+      "lower.vl": "9f0a00cce22cad7271228f1b70a2f114c5c7c0a2855efd570de1d962ff4af1e8",
+      "lsp.vl": "4c5d880e580b92557dfffcd9eabf6fccc7c3d78130b83148e58c42ef1b1d5ead",
+      "main.vl": "be45b2b82265993113568f8026106e615983b51cacf1d041ff0df0d24431098d",
+      "match_check.vl": "e91be1b1bf88c868bba3b5c986d66834688dc1f626922357d594d781ba4bc8b5",
+      "memops.vl": "938eae0dd685ef057699207b39b259d9ea74604b248e0bbff70e2c69eb1c97ad",
+      "modules.vl": "c0cc4c2320204f5353519a1b68c867646ca101aebcadfee2fd26b941bfd9d6e9",
+      "mono.vl": "be0e0e52218cdf2bf99abc8677c39657992b491cd3d036e90de3894d3bd54265",
+      "opt.vl": "ba42bace372b3582d2f43879e634e9c175074dd47e12e5adf9472714acdbb9e5",
+      "packages.vl": "de2a8e6e42c907b3bbb3a69d9ddef328dfdacdd4c544cd2033f06cf0505ae1f2",
+      "parser.vl": "e714ee9ed7889b9ba33b4878d56e2a6cd432597d904d603e00e1c3ec6bd9f3c7",
+      "profile_report.vl": "610d2168d059d4346420f4c674a0e030f5962877fbd232df2ca24f6b7f698d2a",
+      "promote.vl": "1488e4852cbdbdb5026580d46496930d5514433bc19ad7ec4478d92a40a2992a",
+      "proof_hash.vl": "0bcf5e34ec2c3d55df0ed8367e9dc4a7dd00fe23e3472dd6bc34c895277566a0",
+      "properties.vl": "d06aee7b67a1ad2255d2ddbe39e997857d474512d83167888f74dad288233bc3",
+      "query.vl": "5b004c8594e69c5b0ec84c3ffe5eb9fe0173e51c46b36c3c3376e8af6b255f56",
+      "ranges.vl": "cb71b723cea4c09e6a627b4485aa61c0dccd3fba7440509872d799f5e63a1d62",
+      "regalloc.vl": "46ef0073de3f032f420f75d72a6f2b7eb2a8f549395d1c032c16ebffa43a6133",
+      "rename.vl": "c419d39210d1939fcf8185054890100c14562d3c38b41b0438304290a8d3dfe8",
+      "repairs.vl": "0583b8d36f2795b67e581d504264f6ee15cf2ab19847fa180217190192ee7050",
+      "sysops.vl": "20146b0bc85754a714d3b38a15fa0bd1bce05543b9567c0399a64d2e07a7270d",
+      "targets.vl": "087b0839d331aec59179eac4d461c2dae64b7acabbf318d1dcc865052a07a423",
+      "types.vl": "9c05be4ca1308fe027dff7ac5577e93a964fd2e8f9ff307b3a058266cb6a54fa",
+      "unsafe_query.vl": "08450ad03a8d7f7e6acd5e8e93e52e6156e70bbd50cfa2886e7d0c78c0a9007f",
+      "vela.mod": "7b9d2f4fe2fc8e79007d0ccecb33b1f0a4030f83fe63149777530adf44ea03cc",
+      "verification.vl": "77f4c6a4f8015a0168d9ae6b774e438477ed38971031ce855b6527fd01587ca8",
+      "x64.vl": "c0c457d4a6083e40f376a2aecfea845222800e542344a7170e32b6d91b0f37a9"
+    }
+  },
+  "notes": [
+    "Nine rotated rounds per two-candidate probe; seven per four-limit inline probe. Every timed output is checked. These are separate experiments; compare within each experiment.",
+    "Early experiments do not report RSS because the OS timer probe was unavailable in that execution environment. Do not compare absolute times with earlier historical peer reports.",
+    "The reciprocal division candidate is rejected and is absent from the final compiler.",
+    "Reconstructed string-metadata patch includes later indentation-only cleanup. Compiler binary hashes identify the original measured images."
+  ],
+  "profiles_archive": {
+    "path": "2026-10-26-native-profiles.json.gz",
+    "sha256": "084a9a84e57d0a04e4982d2b9e5364c972f0c45d80470854c877dc1e2db0112f"
+  },
+  "experiments": {
+    "inline": {
+      "report": {
+        "format": "vela.native.inline.probe",
+        "versions": {},
+        "runs": 7,
+        "programs": {
+          "json": {
+            "80": {
+              "build_seconds": 0.7742224590037949,
+              "size": 203216,
+              "sha256": "dc4abd2e1c5cf2a23588fee87126c5868dfa323954b62b84aeabda5d909be8a2",
+              "samples": [
+                {
+                  "seconds": 0.37850866600638255,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3796250419691205,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3796159590128809,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3796707909787074,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.5001340839662589,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3747668750002049,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.37814654200337827,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.3796159590128809
+            },
+            "120": {
+              "build_seconds": 0.41416975000174716,
+              "size": 219728,
+              "sha256": "e82cd56802653c00ed7322f421731b6325552bbee937dabfd8f1b9183eb411ea",
+              "samples": [
+                {
+                  "seconds": 0.3852537909988314,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38345737499184906,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38402820797637105,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3831583330174908,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3897000420256518,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3824763339944184,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38348662503995,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.38348662503995
+            },
+            "160": {
+              "build_seconds": 0.5315502079902217,
+              "size": 252752,
+              "sha256": "fda4372ff016248ffe0d42865c61657bccf92f549e25e05c2806e306bcee41b4",
+              "samples": [
+                {
+                  "seconds": 0.3950324169709347,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3962567920098081,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3934947500238195,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.39444183302111924,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.4342600000090897,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.39311154099414125,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.39213512500282377,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.39444183302111924
+            },
+            "240": {
+              "build_seconds": 0.7011089169536717,
+              "size": 302304,
+              "sha256": "28bbe986b85c9a95778af08bee14930b322b867feddf586b5c3170db05b5f913",
+              "samples": [
+                {
+                  "seconds": 0.39413158304523677,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3962147500133142,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3958027500193566,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.39778174995444715,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.45106904197018594,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.39158825000049546,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3940754579962231,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.3958027500193566
+            }
+          },
+          "trees": {
+            "80": {
+              "build_seconds": 0.18806679197587073,
+              "size": 134064,
+              "sha256": "40d01471b92a9e42869d019827cc5d1d3913130442f6c44882fcf7b51b20b6e3",
+              "samples": [
+                {
+                  "seconds": 0.35685850004665554,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35627983295125887,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.354751875041984,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3558414580184035,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35642349999397993,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.36506774998269975,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.355097541003488,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.35627983295125887
+            },
+            "120": {
+              "build_seconds": 0.15712529100710526,
+              "size": 134064,
+              "sha256": "e773a96555cf9492d55f7631baf365563d45db49580c3c0efccb38f19a1cbe65",
+              "samples": [
+                {
+                  "seconds": 0.356155791960191,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3580168340122327,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35615787497954443,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35558254102943465,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3553603340405971,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3557116669835523,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35532854101620615,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3557116669835523
+            },
+            "160": {
+              "build_seconds": 0.1565222920035012,
+              "size": 134064,
+              "sha256": "41f6d84ba6ad49f2b6b10c3ae72ea74d4d54129c22685a8d9e8542f3ecd11ec4",
+              "samples": [
+                {
+                  "seconds": 0.35682933300267905,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3569730840390548,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3576875409926288,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3555607079761103,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35573283303529024,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35569700004998595,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3570160419913009,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.35682933300267905
+            },
+            "240": {
+              "build_seconds": 0.15614695905242115,
+              "size": 134064,
+              "sha256": "9cf6c82a983d368c46b882414e29c9b19e0d845b728e99e338853afd1269fed6",
+              "samples": [
+                {
+                  "seconds": 0.357556915958412,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3577783750370145,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35658020799746737,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3565445840358734,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3559746249811724,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3562878330121748,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35570937499869615,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3565445840358734
+            }
+          },
+          "varints": {
+            "80": {
+              "build_seconds": 0.16966383304679766,
+              "size": 134112,
+              "sha256": "d43ffc71afc5977e63999a2d3cbed45d6c594ca88946f3825b54b53580148d51",
+              "samples": [
+                {
+                  "seconds": 0.24129654199350625,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23852429096587002,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24197933299001306,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24251829198328778,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23917262500617653,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24084824998863041,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24167479202151299,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.24129654199350625
+            },
+            "120": {
+              "build_seconds": 0.1572380419820547,
+              "size": 134112,
+              "sha256": "7cfc468b59f9b8a2cd282f6694d5b7f73ba33892af79265d08578a7f45c8888d",
+              "samples": [
+                {
+                  "seconds": 0.23522425000555813,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23288733296794817,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23827262496342883,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2380680000060238,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2383900000131689,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23634295904776081,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23402791703119874,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.23634295904776081
+            },
+            "160": {
+              "build_seconds": 0.16737958299927413,
+              "size": 134112,
+              "sha256": "37cbc824b51dcefaa22291f42aaa2e903fbae65d71b14a4725a5253615735a2c",
+              "samples": [
+                {
+                  "seconds": 0.268205999978818,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.27310825005406514,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.26854170800652355,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2725774170248769,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2749348329962231,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.26871454203501344,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.26918491697870195,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.26918491697870195
+            },
+            "240": {
+              "build_seconds": 0.1677894169697538,
+              "size": 134112,
+              "sha256": "c9ad67cd2b4417df2eff3de988d8c4f4d59c473fe6782902bedc95ba2682cee9",
+              "samples": [
+                {
+                  "seconds": 0.2693457910208963,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2758047920069657,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.27246112504508346,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.4019600829924457,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2724372500088066,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.27054125000722706,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2703076670295559,
+                  "max_rss_bytes": null,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.2724372500088066
+            }
+          }
+        }
+      },
+      "driver_python": "import hashlib,json,os,statistics,subprocess,sys,time\nfrom pathlib import Path\nsys.path.insert(0,'bench')\nfrom real_programs import inputs,run,measure,summary\nroot=Path.cwd();w=root/'build/native-work';data=inputs(w,False)\nenv={**os.environ,'VELA_ROOT':str(root),'VELA_BACKEND':'native','VELA_OPT':'1'}\nsources={'json':root/'bench/real/json_service/main.vl','trees':root/'bench/binarytrees/main.vl','varints':root/'bench/varints/main.vl'}\nargs={'json':data['json_service'][0],'trees':['16'],'varints':['262144','32']}\nreport={'format':'vela.native.inline.probe','versions':{},'runs':7,'programs':{}}\nfor name in sources:\n exes={};rows={};expected=None\n for limit in (80,120,160,240):\n  exe=w/(name+'-inline-'+str(limit));settings={**env,'VELA_INLINE':str(limit)}\n  cmd=[str(w/'vela-before'),'build',str(sources[name]),'-o',str(exe)]\n  started=time.perf_counter();run(cmd,settings);build=time.perf_counter()-started\n  out=run([exe,*args[name]],settings).stdout\n  if name=='json':assert out==data['json_service'][1]\n  if expected is None:expected=out\n  assert expected==out\n  exes[limit]=exe;rows[str(limit)]={'build_seconds':build,'size':exe.stat().st_size,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'samples':[]}\n keys=list(exes)\n for trial in range(7):\n  for limit in keys[trial%4:]+keys[:trial%4]:\n   sample,out=measure([str(exes[limit]),*args[name]],env);assert out==expected;rows[str(limit)]['samples'].append(sample)\n for limit,row in rows.items():row['median']=statistics.median(s['seconds'] for s in row['samples'])\n report['programs'][name]=rows;print(name,[(k,round(v['median'],4),v['size']) for k,v in rows.items()],flush=True)\n(w/'inline-probe.json').write_text(json.dumps(report,indent=2)+'\\n')\n",
+      "compiler_sha256": "065a5f41421672e105df61c0f7895239396628514ff9c2ac9b8d2b8a2606198c"
+    },
+    "tail": {
+      "report": {
+        "format": "vela.native.tail.probe",
+        "versions": {},
+        "runs": 9,
+        "programs": {
+          "json": {
+            "before": {
+              "build_seconds": 0.6422179160290398,
+              "size": 203224,
+              "sha256": "363ae6e1201f01e2a45ecfcb495c0ea6d359802c2a9c247f1f4ec0f2a2d28d29",
+              "samples": [
+                {
+                  "seconds": 0.38114762504119426,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3829879590193741,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38260654103942215,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38419733301270753,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3830746249877848,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38246279099257663,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.382605875027366,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3817917080014013,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3828526659635827,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.38260654103942215
+            },
+            "tail": {
+              "build_seconds": 0.3957335829618387,
+              "size": 203224,
+              "sha256": "f8689bbb2b449fc1083c1de4e3f61f912cc7a584f501168cd7b817f3fc064c68",
+              "samples": [
+                {
+                  "seconds": 0.38477833301294595,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3871725000208244,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38245787494815886,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3838380000088364,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38399770797695965,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38221537496428937,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38310325000202283,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38316791696706787,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38314787502167746,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.38316791696706787
+            }
+          },
+          "trees": {
+            "before": {
+              "build_seconds": 0.16454337496543303,
+              "size": 134072,
+              "sha256": "ee374828b924506be944d192af602a8ad709a9bebbb9c485a5df21e81fa5c074",
+              "samples": [
+                {
+                  "seconds": 0.35927204199833795,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3594034999841824,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35961650003446266,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3594974590232596,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35997612500796095,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3591333329677582,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35903841705294326,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3594472500262782,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.359841791971121,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3594472500262782
+            },
+            "tail": {
+              "build_seconds": 0.16281754203373566,
+              "size": 134072,
+              "sha256": "ff234a0891487a6259cb29ff8bb4f2f9912134da74ded6008fdbfac9a009132c",
+              "samples": [
+                {
+                  "seconds": 0.3558138339431025,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.355605166987516,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3558514579781331,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3559128340566531,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3564243329456076,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3557652499875985,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35599199996795505,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35575870802858844,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3557941250037402,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3558138339431025
+            }
+          },
+          "varints": {
+            "before": {
+              "build_seconds": 0.15638175001367927,
+              "size": 134120,
+              "sha256": "20840d231895a3c6505355237e92c5e2b42353e8b9035de34bb0d391b62cd686",
+              "samples": [
+                {
+                  "seconds": 0.24339558300562203,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24422441702336073,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24352508399169892,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2439224169938825,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24330404098145664,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24334154202369973,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24455570802092552,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24379908299306408,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24547612498281524,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.24379908299306408
+            },
+            "tail": {
+              "build_seconds": 0.1576861249632202,
+              "size": 134120,
+              "sha256": "14b4d39f726970d426272cb7798db02b08229a46d6f6b15883ee3b0a16468dd5",
+              "samples": [
+                {
+                  "seconds": 0.24585141602437943,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24329487496288493,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2448830830398947,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24328424996929243,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24295791698386893,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24356866598827764,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2431250829831697,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24379237496759742,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2444494579685852,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.24356866598827764
+            }
+          }
+        }
+      },
+      "driver_python": "import hashlib,json,os,statistics,subprocess,sys,time\nfrom pathlib import Path\nsys.path.insert(0,'bench')\nfrom real_programs import inputs,run,measure,summary\nroot=Path.cwd();w=root/'build/native-work';data=inputs(w,False)\nenv={**os.environ,'VELA_ROOT':str(root),'VELA_BACKEND':'native','VELA_OPT':'1'}\nsources={'json':root/'bench/real/json_service/main.vl','trees':root/'bench/binarytrees/main.vl','varints':root/'bench/varints/main.vl'}\nargs={'json':data['json_service'][0],'trees':['16'],'varints':['262144','32']}\nreport={'format':'vela.native.tail.probe','versions':{},'runs':9,'programs':{}}\nfor name in sources:\n exes={};rows={};expected=None\n for limit in ('before','tail'):\n  exe=w/(name+'-tail-probe-'+limit);settings=env\n  cmd=[str(w/('vela-'+limit)),'build',str(sources[name]),'-o',str(exe)]\n  started=time.perf_counter();run(cmd,settings);build=time.perf_counter()-started\n  out=run([exe,*args[name]],settings).stdout\n  if name=='json':assert out==data['json_service'][1]\n  if expected is None:expected=out\n  assert expected==out\n  exes[limit]=exe;rows[str(limit)]={'build_seconds':build,'size':exe.stat().st_size,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'samples':[]}\n keys=list(exes)\n for trial in range(9):\n  for limit in keys[trial%2:]+keys[:trial%2]:\n   sample,out=measure([str(exes[limit]),*args[name]],env);assert out==expected;rows[str(limit)]['samples'].append(sample)\n for limit,row in rows.items():row['median']=statistics.median(s['seconds'] for s in row['samples'])\n report['programs'][name]=rows;print(name,[(k,round(v['median'],4),v['size']) for k,v in rows.items()],flush=True)\n(w/'tail-probe.json').write_text(json.dumps(report,indent=2)+'\\n')\n",
+      "compiler_sha256": "89945134fc701eb989ab33f97566403e663bff67bd332902b8b500ebb0dff23e"
+    },
+    "str": {
+      "report": {
+        "format": "vela.native.str.probe",
+        "versions": {},
+        "runs": 9,
+        "programs": {
+          "json": {
+            "before": {
+              "build_seconds": 0.38663266703952104,
+              "size": 203224,
+              "sha256": "8490e6c7a35dd671c97f8d66493ee8f87e9105596d02cb554c0c4e81f7c70421",
+              "samples": [
+                {
+                  "seconds": 0.3812908750260249,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38253237499156967,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3820129999658093,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38233254197984934,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38333341700490564,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38229012495139614,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3830800830037333,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3835166670032777,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3817580410395749,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.38233254197984934
+            },
+            "str": {
+              "build_seconds": 0.9615503749810159,
+              "size": 203216,
+              "sha256": "239765af728566c1a0dcde3da8653c44163e8fd27bc3a419b7e946238d419422",
+              "samples": [
+                {
+                  "seconds": 0.3764942499692552,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3781754589872435,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.37866779102478176,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3783157079597004,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.37861549999797717,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.37856091605499387,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3776206659968011,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.37903937499504536,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.37780233297962695,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.3783157079597004
+            }
+          },
+          "trees": {
+            "before": {
+              "build_seconds": 0.15827783301938325,
+              "size": 134072,
+              "sha256": "612c8f65b5827621df49c90f01e61996664b5fa8444915fd38d18ab928b4eb36",
+              "samples": [
+                {
+                  "seconds": 0.3590177500154823,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3586033749743365,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35916383302537724,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35882508399663493,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35915833298349753,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3586406250251457,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3588613329920918,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35875466698780656,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35977308300789446,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3588613329920918
+            },
+            "str": {
+              "build_seconds": 0.15517858299426734,
+              "size": 134064,
+              "sha256": "784133a83ba28bee734af42a37028cd171546eb4986f6daadd4945b381668f16",
+              "samples": [
+                {
+                  "seconds": 0.35543458303436637,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3557652090094052,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.355531333014369,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3554644579999149,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3555957920034416,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3564298750134185,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35567341704154387,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35765887500019744,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3556018329691142,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3556018329691142
+            }
+          },
+          "varints": {
+            "before": {
+              "build_seconds": 0.15437987499171868,
+              "size": 134120,
+              "sha256": "f76ef90cadd0e7ecf64e403837e8b0b0c3a05c3c02d256212ffd3d95ca7a2d98",
+              "samples": [
+                {
+                  "seconds": 0.24422699998831376,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24405729194404557,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2430348329944536,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24456529098097235,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24314749997574836,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24443500000052154,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2440042920061387,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24318733299151063,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24347841698909178,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.2440042920061387
+            },
+            "str": {
+              "build_seconds": 0.15483670902904123,
+              "size": 134120,
+              "sha256": "9967b2bbb95573c93a4753bf20b3f4ee10924a324f430aaf68c1fe6b911a8290",
+              "samples": [
+                {
+                  "seconds": 0.230603166972287,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2312899999669753,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.22999129199888557,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23095124994870275,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23106312495656312,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23016237502451986,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23029854201013222,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23128654202446342,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23196200001984835,
+                  "max_rss_bytes": 6422528,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.23095124994870275
+            }
+          }
+        }
+      },
+      "driver_python": "import hashlib,json,os,statistics,subprocess,sys,time\nfrom pathlib import Path\nsys.path.insert(0,'bench')\nfrom real_programs import inputs,run,measure,summary\nroot=Path.cwd();w=root/'build/native-work';data=inputs(w,False)\nenv={**os.environ,'VELA_ROOT':str(root),'VELA_BACKEND':'native','VELA_OPT':'1'}\nsources={'json':root/'bench/real/json_service/main.vl','trees':root/'bench/binarytrees/main.vl','varints':root/'bench/varints/main.vl'}\nargs={'json':data['json_service'][0],'trees':['16'],'varints':['262144','32']}\nreport={'format':'vela.native.str.probe','versions':{},'runs':9,'programs':{}}\nfor name in sources:\n exes={};rows={};expected=None\n for limit in ('before','str'):\n  exe=w/(name+'-str-probe-'+limit);settings=env\n  cmd=[str(w/('vela-'+limit)),'build',str(sources[name]),'-o',str(exe)]\n  started=time.perf_counter();run(cmd,settings);build=time.perf_counter()-started\n  out=run([exe,*args[name]],settings).stdout\n  if name=='json':assert out==data['json_service'][1]\n  if expected is None:expected=out\n  assert expected==out\n  exes[limit]=exe;rows[str(limit)]={'build_seconds':build,'size':exe.stat().st_size,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'samples':[]}\n keys=list(exes)\n for trial in range(9):\n  for limit in keys[trial%2:]+keys[:trial%2]:\n   sample,out=measure([str(exes[limit]),*args[name]],env);assert out==expected;rows[str(limit)]['samples'].append(sample)\n for limit,row in rows.items():row['median']=statistics.median(s['seconds'] for s in row['samples'])\n report['programs'][name]=rows;print(name,[(k,round(v['median'],4),v['size']) for k,v in rows.items()],flush=True)\n(w/'str-probe.json').write_text(json.dumps(report,indent=2)+'\\n')\n",
+      "compiler_sha256": "32418d6b23df4424a09ef2e830b1d62f02f56c9172d4218da822469f8b25de9c"
+    },
+    "div": {
+      "report": {
+        "format": "vela.native.div.probe",
+        "versions": {},
+        "runs": 9,
+        "programs": {
+          "json": {
+            "before": {
+              "build_seconds": 0.4229820829932578,
+              "size": 203224,
+              "sha256": "790b5acfc162063353fc791db14c3b4774bf221c2c7a2166a02e709085891294",
+              "samples": [
+                {
+                  "seconds": 0.38131579203763977,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3811827909667045,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3835882080020383,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3829157499712892,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3831988329766318,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3812057090108283,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3822635840042494,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3823202909552492,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38078350003343076,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.3822635840042494
+            },
+            "div": {
+              "build_seconds": 0.390713999979198,
+              "size": 203216,
+              "sha256": "855d3332cbe092f3e306fa92a4add3c53d3606cfc3a5ede34c83df61a6702ab7",
+              "samples": [
+                {
+                  "seconds": 0.38728274998720735,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38835312495939434,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.388868874986656,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3926416670437902,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3888772499631159,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38840045797405764,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38890791597077623,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3885115830344148,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.387820833013393,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.3885115830344148
+            }
+          },
+          "trees": {
+            "before": {
+              "build_seconds": 0.15912187501089647,
+              "size": 134072,
+              "sha256": "a34a00e428a09031ff4957b1089837f4ebf9fca4f61f731ee000dda57ea72e1e",
+              "samples": [
+                {
+                  "seconds": 0.3593942080042325,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35916424996685237,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3605639999732375,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.36051195801701397,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.36045625002589077,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3582248750026338,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3582169999717735,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35788999998476356,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35839649999979883,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.35916424996685237
+            },
+            "div": {
+              "build_seconds": 0.1608092919923365,
+              "size": 134064,
+              "sha256": "9ca1106a19e9a6dafb150e3b0ba817e4b7870cb7c510e9840635ce9544e5f3ac",
+              "samples": [
+                {
+                  "seconds": 0.356209666992072,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3559507089667022,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3563782919663936,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3578666659886949,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3556418329826556,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35598100000061095,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3556740839849226,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35527350002666935,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3553693749709055,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3559507089667022
+            }
+          },
+          "varints": {
+            "before": {
+              "build_seconds": 0.1583002909901552,
+              "size": 134120,
+              "sha256": "0101b79bbd3fa1401b807390fe5c38e4ee51c7518a7f3aa3bb9359711a4ca52d",
+              "samples": [
+                {
+                  "seconds": 0.24195258296094835,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24629599996842444,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24192991596646607,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24514337501022965,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24534337501972914,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24223845801316202,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24209700000938028,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24221741704968736,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24186158302472904,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.24221741704968736
+            },
+            "div": {
+              "build_seconds": 0.16022354102460667,
+              "size": 134120,
+              "sha256": "e9767dcd94d251ce0a3f8f5943d1f6d771535fd13cf91c95554c0693a670160d",
+              "samples": [
+                {
+                  "seconds": 0.23154745798092335,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23019600001862273,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23238250002032146,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23005399998510256,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23040629201568663,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24692375003360212,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.228784957958851,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23116066603688523,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.22903987497556955,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.23040629201568663
+            }
+          }
+        }
+      },
+      "driver_python": "import hashlib,json,os,statistics,subprocess,sys,time\nfrom pathlib import Path\nsys.path.insert(0,'bench')\nfrom real_programs import inputs,run,measure,summary\nroot=Path.cwd();w=root/'build/native-work';data=inputs(w,False)\nenv={**os.environ,'VELA_ROOT':str(root),'VELA_BACKEND':'native','VELA_OPT':'1'}\nsources={'json':root/'bench/real/json_service/main.vl','trees':root/'bench/binarytrees/main.vl','varints':root/'bench/varints/main.vl'}\nargs={'json':data['json_service'][0],'trees':['16'],'varints':['262144','32']}\nreport={'format':'vela.native.div.probe','versions':{},'runs':9,'programs':{}}\nfor name in sources:\n exes={};rows={};expected=None\n for limit in ('before','div'):\n  exe=w/(name+'-div-probe-'+limit);settings=env\n  cmd=[str(w/('vela-'+limit)),'build',str(sources[name]),'-o',str(exe)]\n  started=time.perf_counter();run(cmd,settings);build=time.perf_counter()-started\n  out=run([exe,*args[name]],settings).stdout\n  if name=='json':assert out==data['json_service'][1]\n  if expected is None:expected=out\n  assert expected==out\n  exes[limit]=exe;rows[str(limit)]={'build_seconds':build,'size':exe.stat().st_size,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'samples':[]}\n keys=list(exes)\n for trial in range(9):\n  for limit in keys[trial%2:]+keys[:trial%2]:\n   sample,out=measure([str(exes[limit]),*args[name]],env);assert out==expected;rows[str(limit)]['samples'].append(sample)\n for limit,row in rows.items():row['median']=statistics.median(s['seconds'] for s in row['samples'])\n report['programs'][name]=rows;print(name,[(k,round(v['median'],4),v['size']) for k,v in rows.items()],flush=True)\n(w/'div-probe.json').write_text(json.dumps(report,indent=2)+'\\n')\n",
+      "compiler_sha256": "1020dae5d6ad74de9ca1b6d6d8fca448d67e9c387b2cb4dec800182cad84c3b9"
+    },
+    "recursive": {
+      "report": {
+        "format": "vela.native.recursive.probe",
+        "versions": {},
+        "runs": 9,
+        "programs": {
+          "json": {
+            "before": {
+              "build_seconds": 0.39774154202314094,
+              "size": 203224,
+              "sha256": "2f0c703eb6637e825a2aa8d7b8c5281832d247cfb59aabfc6058c8dd6f2cc182",
+              "samples": [
+                {
+                  "seconds": 0.38034162495750934,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38229483301984146,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3820934590185061,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.380977041029837,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3822777080349624,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3812787080532871,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3805310840252787,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38240008300635964,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.381424541992601,
+                  "max_rss_bytes": 5341184,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.381424541992601
+            },
+            "recursive": {
+              "build_seconds": 0.9980915829655714,
+              "size": 203232,
+              "sha256": "7b999b54bcf6390784e17d4eb24b6918ccd613d476c11ce107a39c9c06da1e76",
+              "samples": [
+                {
+                  "seconds": 0.38050391600700095,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3770059589878656,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.37677016598172486,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.37663491698913276,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3768565829959698,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3762937920400873,
+                  "max_rss_bytes": 5357568,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3756411250215024,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.38738837494747713,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                },
+                {
+                  "seconds": 0.3804523749859072,
+                  "max_rss_bytes": 5373952,
+                  "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+                }
+              ],
+              "median": 0.3768565829959698
+            }
+          },
+          "trees": {
+            "before": {
+              "build_seconds": 0.15757041599135846,
+              "size": 134080,
+              "sha256": "3664faf87eacb113a10e483aac2dcef16c176d1f9e4ccd344783d379833e1cec",
+              "samples": [
+                {
+                  "seconds": 0.3587335830088705,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3589204160380177,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3593399999663234,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35892116598552093,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35884945903671905,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3590504169696942,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35739750001812354,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3591686669969931,
+                  "max_rss_bytes": 9830400,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.35819774999981746,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3589204160380177
+            },
+            "recursive": {
+              "build_seconds": 0.16269433399429545,
+              "size": 134080,
+              "sha256": "453733d33cec780d427996c7921ad014487a98fde8fd3fa4bc3dbbda5dd94fcf",
+              "samples": [
+                {
+                  "seconds": 0.31280825001886114,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3141860829782672,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3359902499942109,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.31709887500619516,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3135812079999596,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3126790840178728,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.31172133301151916,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3117127919686027,
+                  "max_rss_bytes": 9846784,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                },
+                {
+                  "seconds": 0.3135361659806222,
+                  "max_rss_bytes": 9863168,
+                  "stdout_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c"
+                }
+              ],
+              "median": 0.3135361659806222
+            }
+          },
+          "varints": {
+            "before": {
+              "build_seconds": 0.1542838750174269,
+              "size": 134128,
+              "sha256": "c37d1705e671d8501c7d5c35d76ebb9170a36fe6b24361d0491d3f3dae996337",
+              "samples": [
+                {
+                  "seconds": 0.24204745795577765,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24235929100541398,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2423059999709949,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24318804102949798,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2407252499833703,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24255341599928215,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24161154095781967,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2420402920106426,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.24382466700626537,
+                  "max_rss_bytes": 6438912,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.2423059999709949
+            },
+            "recursive": {
+              "build_seconds": 0.15339158300776035,
+              "size": 134128,
+              "sha256": "e7200c730fced417f629c83258e2d13fd12e9d6390e319a7f5944d8798e0c93c",
+              "samples": [
+                {
+                  "seconds": 0.22834700002567843,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23094987502554432,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2296892080339603,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23106212500715628,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.22865420900052413,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.23029704199871048,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.22918741597095504,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.230358625005465,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                },
+                {
+                  "seconds": 0.2299470420111902,
+                  "max_rss_bytes": 6455296,
+                  "stdout_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d"
+                }
+              ],
+              "median": 0.2299470420111902
+            }
+          }
+        }
+      },
+      "driver_python": "import hashlib,json,os,statistics,subprocess,sys,time\nfrom pathlib import Path\nsys.path.insert(0,'bench')\nfrom real_programs import inputs,run,measure,summary\nroot=Path.cwd();w=root/'build/native-work';data=inputs(w,False)\nenv={**os.environ,'VELA_ROOT':str(root),'VELA_BACKEND':'native','VELA_OPT':'1'}\nsources={'json':root/'bench/real/json_service/main.vl','trees':root/'bench/binarytrees/main.vl','varints':root/'bench/varints/main.vl'}\nargs={'json':data['json_service'][0],'trees':['16'],'varints':['262144','32']}\nreport={'format':'vela.native.recursive.probe','versions':{},'runs':9,'programs':{}}\nfor name in sources:\n exes={};rows={};expected=None\n for limit in ('before','recursive'):\n  exe=w/(name+'-recursive-probe-'+limit);settings=env\n  cmd=[str(w/('vela-'+limit)),'build',str(sources[name]),'-o',str(exe)]\n  started=time.perf_counter();run(cmd,settings);build=time.perf_counter()-started\n  out=run([exe,*args[name]],settings).stdout\n  if name=='json':assert out==data['json_service'][1]\n  if expected is None:expected=out\n  assert expected==out\n  exes[limit]=exe;rows[str(limit)]={'build_seconds':build,'size':exe.stat().st_size,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'samples':[]}\n keys=list(exes)\n for trial in range(9):\n  for limit in keys[trial%2:]+keys[:trial%2]:\n   sample,out=measure([str(exes[limit]),*args[name]],env);assert out==expected;rows[str(limit)]['samples'].append(sample)\n for limit,row in rows.items():row['median']=statistics.median(s['seconds'] for s in row['samples'])\n report['programs'][name]=rows;print(name,[(k,round(v['median'],4),v['size']) for k,v in rows.items()],flush=True)\n(w/'recursive-probe.json').write_text(json.dumps(report,indent=2)+'\\n')\n",
+      "compiler_sha256": "03420dc08afe31df0838ea2fd3643a8e6440d6feda4de42a51a8614d5255e49b"
+    }
+  },
+  "patches": {
+    "tail": "--- build/native-work/compiler-before/lower.vl\n+++ build/native-work/lower-tail.vl\n@@ -1089,6 +1089,53 @@\n \n // retain, release and share for every managed type and function type,\n // taking a pointer to the value; the helpers of every boxed type.\n+// A final managed self field can transfer its existing ownership to a loop.\n+// Preserve the order of other managed fields, including external resources.\n+fn box_tail(g: mut Low, t: Int, vi: Int) -> Int {\n+    let v = types.get(g.k.table, t).variants[vi]\n+    let mut tail = -1\n+    for i in 0..len(v.payload) {\n+        let boxed = layout.is_boxed(g.l, t, v.name, i)\n+        if boxed || managed(mut g, v.payload[i]) {\n+            tail = -1\n+            if boxed && v.payload[i] == t { tail = i }\n+        }\n+    }\n+    return tail\n+}\n+\n+fn box_walk(g: mut Low, t: Int, name: Str, size: Int, op: Str) {\n+    let current = helper(mut g, name + \"_\" + op, 1, -1)[0]\n+    let head = label(mut g); let done = label(mut g)\n+    place_label(mut g, head)\n+    let mut active = -1\n+    if op == \"release\" {\n+        active = reg(mut g, ir.INT())\n+        emit(mut g, ir.inst(ir.Op.RcDec, active, current, -1, 0))\n+    } else { active = mark_shared(mut g, current) }\n+    branch_cmp(mut g, \"eq\", active, konst(mut g, 0), done)\n+    let variants = types.get(g.k.table, t).variants\n+    let s = shape(mut g, t)\n+    let tag = load(mut g, current, 8, 4)\n+    for vi in 0..len(variants) {\n+        let v = variants[vi]; let next = label(mut g)\n+        branch_cmp(mut g, \"ne\", tag, konst(mut g, vi), next)\n+        let tail = box_tail(mut g, t, vi)\n+        let mut child = -1\n+        if tail >= 0 { child = load(mut g, current, 8 + s.payloads[vi][tail], 8) }\n+        for i in 0..len(v.payload) {\n+            if i != tail { slot_op(mut g, t, v.name, i, v.payload[i], mem_val(current, 8 + s.payloads[vi][i], v.payload[i]), op) }\n+        }\n+        if op == \"release\" { ccall(mut g, \"vela_native_box_free\", [current, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }\n+        if tail >= 0 { emit(mut g, ir.inst(ir.Op.Move, current, child, -1, 0)); jump(mut g, head) } else { jump(mut g, done) }\n+        place_label(mut g, next)\n+    }\n+    // Well-typed enums always match an arm. Keep ordinary cleanup for any\n+    // unmatched tag just as the original helper did.\n+    if op == \"release\" { ccall(mut g, \"vela_native_box_free\", [current, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }\n+    place_label(mut g, done); ret(mut g, -1); finish(mut g)\n+}\n+\n fn memory_functions(g: mut Low) {\n     for t in g.l.funcs {\n         let n = layout.name_of(g.l, t)\n@@ -1162,6 +1209,12 @@\n         copy_mem(mut g, add_imm(mut g, box, 8), v, size)\n         ret(mut g, box)\n         finish(mut g)\n+        let mut walking = false\n+        if ti.tag == types.Tag.Enum { for vi in 0..len(ti.variants) { if box_tail(mut g, t, vi) >= 0 { walking = true } } }\n+        if walking {\n+            box_walk(mut g, t, b, size, \"release\")\n+            box_walk(mut g, t, b, size, \"share\")\n+        } else {\n         // release: the value, and the box, when this was the last reference.\n         let r = helper(mut g, b + \"_release\", 1, -1)[0]\n         let last = reg(mut g, ir.INT())\n@@ -1181,6 +1234,7 @@\n         place_label(mut g, after)\n         ret(mut g, -1)\n         finish(mut g)\n+        }\n         // unique: copy-on-write, given where the box pointer is.\n         let pp = helper(mut g, b + \"_unique\", 1, -1)[0]\n         let old = load(mut g, pp, 0, 8)\n",
+    "string_metadata_after_tail": "--- build/native-work/lower-tail.vl\n+++ compiler/src/lower.vl\n@@ -1215,25 +1215,25 @@\n             box_walk(mut g, t, b, size, \"release\")\n             box_walk(mut g, t, b, size, \"share\")\n         } else {\n-        // release: the value, and the box, when this was the last reference.\n-        let r = helper(mut g, b + \"_release\", 1, -1)[0]\n-        let last = reg(mut g, ir.INT())\n-        emit(mut g, ir.inst(ir.Op.RcDec, last, r, -1, 0))\n-        let done = label(mut g)\n-        branch_cmp(mut g, \"eq\", last, konst(mut g, 0), done)\n-        release(mut g, t, mem_val(r, 8, t))\n-        ccall(mut g, \"vela_native_box_free\", [r, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)\n-        place_label(mut g, done)\n-        ret(mut g, -1)\n-        finish(mut g)\n-        let s = helper(mut g, b + \"_share\", 1, -1)[0]\n-        let was = mark_shared(mut g, s)\n-        let after = label(mut g)\n-        branch_cmp(mut g, \"eq\", was, konst(mut g, 0), after)\n-        share(mut g, t, mem_val(s, 8, t))\n-        place_label(mut g, after)\n-        ret(mut g, -1)\n-        finish(mut g)\n+            // release: the value, and the box, when this was the last reference.\n+            let r = helper(mut g, b + \"_release\", 1, -1)[0]\n+            let last = reg(mut g, ir.INT())\n+            emit(mut g, ir.inst(ir.Op.RcDec, last, r, -1, 0))\n+            let done = label(mut g)\n+            branch_cmp(mut g, \"eq\", last, konst(mut g, 0), done)\n+            release(mut g, t, mem_val(r, 8, t))\n+            ccall(mut g, \"vela_native_box_free\", [r, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)\n+            place_label(mut g, done)\n+            ret(mut g, -1)\n+            finish(mut g)\n+            let s = helper(mut g, b + \"_share\", 1, -1)[0]\n+            let was = mark_shared(mut g, s)\n+            let after = label(mut g)\n+            branch_cmp(mut g, \"eq\", was, konst(mut g, 0), after)\n+            share(mut g, t, mem_val(s, 8, t))\n+            place_label(mut g, after)\n+            ret(mut g, -1)\n+            finish(mut g)\n         }\n         // unique: copy-on-write, given where the box pointer is.\n         let pp = helper(mut g, b + \"_unique\", 1, -1)[0]\n@@ -1490,6 +1490,11 @@\n     if mutable || in_memory(g, t) {\n         let p = ir.param(mut g.fs.f, ir.INT())\n         g.fs.locals[lid] = mem_val(p, 0, t)\n+        // The descriptor of an immutable, unescaped Str parameter cannot\n+        // change across calls. Keep its data and length available to loops.\n+        if !mutable && t == types.STR() && !maps.has(g.fs.taken, lid) && !maps.has(g.k.escaped, lid) {\n+            g.fs.cached[lid] = Cached { data: load(mut g, p, 8, 8), length: load(mut g, p, 16, 8) }\n+        }\n         return\n     }\n     let p = ir.param(mut g.fs.f, class_of(t))\n@@ -2813,13 +2818,14 @@\n     let t = ty(g, obj)\n     if t == types.STR() {\n         let ix = scalar(mut g, expr(mut g, i))\n+        let parts = str_parts(mut g, o, obj)\n         let ok = label(mut g)\n         if !access_safe(g, e) {\n-            branch_cmp(mut g, \"ult\", ix, load(mut g, o.reg, o.off + 16, 8), ok)\n+            branch_cmp(mut g, \"ult\", ix, parts.length, ok)\n             noreturn(mut g, \"vela_str_at\", [address(mut g, o), ix, loc_of(mut g, e)], [ir.KIND_STR(), ir.KIND_INT(), ir.KIND_INT()])\n             place_label(mut g, ok)\n         }\n-        let data = load(mut g, o.reg, o.off + 8, 8)\n+        let data = parts.data\n         let mut out = reg_val(load(mut g, op2(mut g, ir.Op.Add, data, ix), 0, 1), types.BYTE())\n         out.temp = true\n         return out\n@@ -2835,6 +2841,16 @@\n     let ix = scalar(mut g, expr(mut g, i))\n     if types.is_fixed(g.k.table, t) { return fresh(mut g, mem_val(fixed_at(mut g, o, ix, t, e), 0, et)) }\n     return fresh(mut g, mem_val(element_at(mut g, scalar(mut g, o), ix, et, e), 0, et))\n+}\n+\n+fn str_parts(g: mut Low, value: Val, source: ast.Expr) -> Cached {\n+    match source.kind {\n+        ast.ExprKind.Name(_) => {\n+            match maps.get(g.fs.cached, local_of(g, source.id)) { Some(c) => return c, None => {} }\n+        }\n+        _ => {}\n+    }\n+    return Cached { data: load(mut g, value.reg, value.off + 8, 8), length: load(mut g, value.reg, value.off + 16, 8) }\n }\n \n // An enum value, owned; `args` are already consumed.\n@@ -3324,7 +3340,7 @@\n         let arg = expr(mut g, args[0])\n         if types.is_fixed(g.k.table, arg.ty) { return reg_val(konst(mut g, types.get(g.k.table, arg.ty).length), types.INT()) }\n         if arg.ty == types.STR() {\n-            return reg_val(load(mut g, arg.reg, arg.off + 16, 8), types.INT())\n+            return reg_val(str_parts(mut g, arg, args[0]).length, types.INT())\n         }\n         return reg_val(load(mut g, scalar(mut g, arg), 8, 8), types.INT())\n     }\n",
+    "rejected_arm64_division": "--- build/native-work/compiler-before/arm64.vl\n+++ build/native-work/arm64-division-rejected.vl\n@@ -6,6 +6,7 @@\n import maps\n import strings\n import text\n+import ints\n \n type Pass = struct { bank: Int, at: Int, size: Int, copy: Int }\n type Plan = struct { args: [Pass], bytes: Int }\n@@ -22,6 +23,51 @@\n fn constant(o: mut Out, r: Str, n: Int) {\n     emit(mut o, \"movz \" + r + \", #\" + num(n & 65535))\n     for shift in [16, 32, 48] { let part = (n >> shift) & 65535; if part != 0 { emit(mut o, \"movk \" + r + \", #\" + num(part) + \", lsl #\" + num(shift)) } }\n+}\n+\n+// Signed reciprocal division (Hacker's Delight, chapter 10). Compute the\n+// multiplier with unsigned 64-bit arithmetic; the emitted multiply takes\n+// the signed high half. Restrict this path to positive non-power divisors.\n+fn reciprocal(divisor: Int) -> [Int] {\n+    let d = u64(divisor); let top = 9223372036854775808u64\n+    let nc = top - 1u64 - top % d\n+    let mut q1 = top / nc; let mut r1 = top % nc\n+    let mut q2 = top / d; let mut r2 = top % d\n+    let mut p = 63\n+    for {\n+        p = p + 1\n+        q1 = ints.wrapping_mul(q1, 2u64); r1 = r1 * 2u64\n+        if r1 >= nc { q1 = ints.wrapping_add(q1, 1u64); r1 = r1 - nc }\n+        q2 = ints.wrapping_mul(q2, 2u64); r2 = r2 * 2u64\n+        if r2 >= d { q2 = ints.wrapping_add(q2, 1u64); r2 = r2 - d }\n+        let delta = d - r2\n+        if q1 > delta || q1 == delta && r1 != 0u64 { break }\n+    }\n+    let unsigned = ints.wrapping_add(q2, 1u64)\n+    let mut signed = 0\n+    if unsigned >= top { signed = -9223372036854775808 + int(unsigned - top) } else { signed = int(unsigned) }\n+    return [signed, p - 64]\n+}\n+\n+fn constant_division(o: mut Out, i: ir.Inst) -> Bool {\n+    if i.op != ir.Op.Div && i.op != ir.Op.Rem && i.op != ir.Op.DivChk && i.op != ir.Op.RemChk { return false }\n+    if o.locs[i.b].kind != 2 { return false }\n+    let d = o.locs[i.b].off\n+    if d <= 1 || (d & (d - 1)) == 0 { return false }\n+    let magic = reciprocal(d)\n+    let a = source(mut o, i.a, \"x9\")\n+    constant(mut o, \"x10\", magic[0])\n+    emit(mut o, \"smulh x11, \" + a + \", x10\")\n+    if magic[0] < 0 { emit(mut o, \"add x11, x11, \" + a) }\n+    if magic[1] > 0 { emit(mut o, \"asr x11, x11, #\" + num(magic[1])) }\n+    // Round toward zero, including the most negative Int.\n+    emit(mut o, \"add x11, x11, x11, lsr #63\")\n+    if i.op == ir.Op.Rem || i.op == ir.Op.RemChk {\n+        constant(mut o, \"x10\", d)\n+        emit(mut o, \"msub x11, x11, x10, \" + a)\n+    }\n+    put(mut o, i.dst, \"x11\")\n+    return true\n }\n // x17 is reserved for large displacements, x15 for effective addresses.\n fn address(o: mut Out, r: Str, base: Str, off: Int) {\n@@ -142,6 +188,7 @@\n }\n fn instruction(o: mut Out, i: ir.Inst) {\n     let op = i.op\n+    if constant_division(mut o, i) { return }\n     if op == ir.Op.Source { emit(mut o, \".loc \" + num(o.files[i.sym]) + \" \" + num(i.imm) + \" \" + num(i.imm2)); return }\n     if op == ir.Op.Label { push(mut o.lines, ir_label(o, i.imm) + \":\"); return }\n     if op == ir.Op.Const { if o.locs[i.dst].kind >= 2 { return }; let r = result(o, i.dst, \"x9\"); constant(mut o, r, i.imm); put(mut o, i.dst, r); return }\n",
+    "accepted_recursive_inlining": "--- build/native-work/compiler-before/opt.vl\n+++ compiler/src/opt.vl\n@@ -4,7 +4,8 @@\n //   with its registers, slots and labels renumbered: the function's\n //   parameters are set from the arguments, and each return sets the\n //   call's result and jumps to after the call. Small means at most\n-//   inline_limit() instructions and not calling itself; the functions\n+//   inline_limit() instructions; recursive bodies have a smaller limit\n+//   and a separate per-caller expansion budget. The functions\n //   lowering writes for memory (rc_retain_T, box helpers) are mostly\n //   such, and so are accessors and the many one-line functions of a\n //   program. Two rounds, so that what an inlined body calls can be\n@@ -41,13 +42,18 @@\n     for _ in 0..rounds {\n         let before = funcs\n         let mut small: Map[Str, Bool] = [:]\n+        let mut recursive: Map[Str, Bool] = [:]\n         for f in before {\n-            if len(f.insts) <= limit && !calls(f, f.name) && !f.public {\n+            let self_call = calls(f, f.name)\n+            // A bounded expansion of small recursive bodies exposes their\n+            // base cases without raising the general inlining threshold.\n+            if len(f.insts) <= limit && (!self_call || len(f.insts) <= 40) && !f.public {\n                 small[f.name] = true\n+                if self_call { recursive[f.name] = true }\n             }\n         }\n         for i in 0..len(funcs) {\n-            funcs[i] = simplify(inline_calls(funcs[i], before, index, small))\n+            funcs[i] = simplify(inline_calls(funcs[i], before, index, small, recursive))\n         }\n     }\n     for i in 0..len(funcs) { funcs[i] = compact_slots(forward_destinations(hoist_floats(funcs[i]))) }\n@@ -65,15 +71,20 @@\n \n // ---- Inlining ----\n \n-fn inline_calls(f: ir.Func, all: [ir.Func], index: Map[Str, Int], small: Map[Str, Bool]) -> ir.Func {\n+fn inline_calls(f: ir.Func, all: [ir.Func], index: Map[Str, Int], small: Map[Str, Bool], recursive: Map[Str, Bool]) -> ir.Func {\n     let mut out = f\n     out.insts = []\n-    for i in f.insts {\n-        if i.op != ir.Op.Call || i.sym == f.name || !maps.has(small, i.sym) {\n+    let mut recursive_budget = 160\n+    for i in f.insts {\n+        if i.op != ir.Op.Call || !maps.has(small, i.sym) {\n             push(mut out.insts, i)\n             continue\n         }\n         let g = all[index[i.sym]]\n+        if maps.has(recursive, i.sym) {\n+            if len(g.insts) > recursive_budget { push(mut out.insts, i); continue }\n+            recursive_budget = recursive_budget - len(g.insts)\n+        }\n         let regs = len(out.classes)\n         for c in g.classes {\n             push(mut out.classes, c)\n"
+  }
+}

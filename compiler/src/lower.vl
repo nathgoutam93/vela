@@ -1089,6 +1089,53 @@ fn helper(g: mut Low, name: Str, nparams: Int, class: Int) -> [Int] {
 
 // retain, release and share for every managed type and function type,
 // taking a pointer to the value; the helpers of every boxed type.
+// A final managed self field can transfer its existing ownership to a loop.
+// Preserve the order of other managed fields, including external resources.
+fn box_tail(g: mut Low, t: Int, vi: Int) -> Int {
+    let v = types.get(g.k.table, t).variants[vi]
+    let mut tail = -1
+    for i in 0..len(v.payload) {
+        let boxed = layout.is_boxed(g.l, t, v.name, i)
+        if boxed || managed(mut g, v.payload[i]) {
+            tail = -1
+            if boxed && v.payload[i] == t { tail = i }
+        }
+    }
+    return tail
+}
+
+fn box_walk(g: mut Low, t: Int, name: Str, size: Int, op: Str) {
+    let current = helper(mut g, name + "_" + op, 1, -1)[0]
+    let head = label(mut g); let done = label(mut g)
+    place_label(mut g, head)
+    let mut active = -1
+    if op == "release" {
+        active = reg(mut g, ir.INT())
+        emit(mut g, ir.inst(ir.Op.RcDec, active, current, -1, 0))
+    } else { active = mark_shared(mut g, current) }
+    branch_cmp(mut g, "eq", active, konst(mut g, 0), done)
+    let variants = types.get(g.k.table, t).variants
+    let s = shape(mut g, t)
+    let tag = load(mut g, current, 8, 4)
+    for vi in 0..len(variants) {
+        let v = variants[vi]; let next = label(mut g)
+        branch_cmp(mut g, "ne", tag, konst(mut g, vi), next)
+        let tail = box_tail(mut g, t, vi)
+        let mut child = -1
+        if tail >= 0 { child = load(mut g, current, 8 + s.payloads[vi][tail], 8) }
+        for i in 0..len(v.payload) {
+            if i != tail { slot_op(mut g, t, v.name, i, v.payload[i], mem_val(current, 8 + s.payloads[vi][i], v.payload[i]), op) }
+        }
+        if op == "release" { ccall(mut g, "vela_native_box_free", [current, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }
+        if tail >= 0 { emit(mut g, ir.inst(ir.Op.Move, current, child, -1, 0)); jump(mut g, head) } else { jump(mut g, done) }
+        place_label(mut g, next)
+    }
+    // Well-typed enums always match an arm. Keep ordinary cleanup for any
+    // unmatched tag just as the original helper did.
+    if op == "release" { ccall(mut g, "vela_native_box_free", [current, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1) }
+    place_label(mut g, done); ret(mut g, -1); finish(mut g)
+}
+
 fn memory_functions(g: mut Low) {
     for t in g.l.funcs {
         let n = layout.name_of(g.l, t)
@@ -1162,25 +1209,32 @@ fn memory_functions(g: mut Low) {
         copy_mem(mut g, add_imm(mut g, box, 8), v, size)
         ret(mut g, box)
         finish(mut g)
-        // release: the value, and the box, when this was the last reference.
-        let r = helper(mut g, b + "_release", 1, -1)[0]
-        let last = reg(mut g, ir.INT())
-        emit(mut g, ir.inst(ir.Op.RcDec, last, r, -1, 0))
-        let done = label(mut g)
-        branch_cmp(mut g, "eq", last, konst(mut g, 0), done)
-        release(mut g, t, mem_val(r, 8, t))
-        ccall(mut g, "vela_native_box_free", [r, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
-        place_label(mut g, done)
-        ret(mut g, -1)
-        finish(mut g)
-        let s = helper(mut g, b + "_share", 1, -1)[0]
-        let was = mark_shared(mut g, s)
-        let after = label(mut g)
-        branch_cmp(mut g, "eq", was, konst(mut g, 0), after)
-        share(mut g, t, mem_val(s, 8, t))
-        place_label(mut g, after)
-        ret(mut g, -1)
-        finish(mut g)
+        let mut walking = false
+        if ti.tag == types.Tag.Enum { for vi in 0..len(ti.variants) { if box_tail(mut g, t, vi) >= 0 { walking = true } } }
+        if walking {
+            box_walk(mut g, t, b, size, "release")
+            box_walk(mut g, t, b, size, "share")
+        } else {
+            // release: the value, and the box, when this was the last reference.
+            let r = helper(mut g, b + "_release", 1, -1)[0]
+            let last = reg(mut g, ir.INT())
+            emit(mut g, ir.inst(ir.Op.RcDec, last, r, -1, 0))
+            let done = label(mut g)
+            branch_cmp(mut g, "eq", last, konst(mut g, 0), done)
+            release(mut g, t, mem_val(r, 8, t))
+            ccall(mut g, "vela_native_box_free", [r, konst(mut g, 8 + size)], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+            place_label(mut g, done)
+            ret(mut g, -1)
+            finish(mut g)
+            let s = helper(mut g, b + "_share", 1, -1)[0]
+            let was = mark_shared(mut g, s)
+            let after = label(mut g)
+            branch_cmp(mut g, "eq", was, konst(mut g, 0), after)
+            share(mut g, t, mem_val(s, 8, t))
+            place_label(mut g, after)
+            ret(mut g, -1)
+            finish(mut g)
+        }
         // unique: copy-on-write, given where the box pointer is.
         let pp = helper(mut g, b + "_unique", 1, -1)[0]
         let old = load(mut g, pp, 0, 8)
@@ -1436,6 +1490,11 @@ fn param_local(g: mut Low, lid: Int, t: Int, mutable: Bool) {
     if mutable || in_memory(g, t) {
         let p = ir.param(mut g.fs.f, ir.INT())
         g.fs.locals[lid] = mem_val(p, 0, t)
+        // The descriptor of an immutable, unescaped Str parameter cannot
+        // change across calls. Keep its data and length available to loops.
+        if !mutable && t == types.STR() && !maps.has(g.fs.taken, lid) && !maps.has(g.k.escaped, lid) {
+            g.fs.cached[lid] = Cached { data: load(mut g, p, 8, 8), length: load(mut g, p, 16, 8) }
+        }
         return
     }
     let p = ir.param(mut g.fs.f, class_of(t))
@@ -2759,13 +2818,14 @@ fn index(g: mut Low, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Val {
     let t = ty(g, obj)
     if t == types.STR() {
         let ix = scalar(mut g, expr(mut g, i))
+        let parts = str_parts(mut g, o, obj)
         let ok = label(mut g)
         if !access_safe(g, e) {
-            branch_cmp(mut g, "ult", ix, load(mut g, o.reg, o.off + 16, 8), ok)
+            branch_cmp(mut g, "ult", ix, parts.length, ok)
             noreturn(mut g, "vela_str_at", [address(mut g, o), ix, loc_of(mut g, e)], [ir.KIND_STR(), ir.KIND_INT(), ir.KIND_INT()])
             place_label(mut g, ok)
         }
-        let data = load(mut g, o.reg, o.off + 8, 8)
+        let data = parts.data
         let mut out = reg_val(load(mut g, op2(mut g, ir.Op.Add, data, ix), 0, 1), types.BYTE())
         out.temp = true
         return out
@@ -2781,6 +2841,16 @@ fn index(g: mut Low, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Val {
     let ix = scalar(mut g, expr(mut g, i))
     if types.is_fixed(g.k.table, t) { return fresh(mut g, mem_val(fixed_at(mut g, o, ix, t, e), 0, et)) }
     return fresh(mut g, mem_val(element_at(mut g, scalar(mut g, o), ix, et, e), 0, et))
+}
+
+fn str_parts(g: mut Low, value: Val, source: ast.Expr) -> Cached {
+    match source.kind {
+        ast.ExprKind.Name(_) => {
+            match maps.get(g.fs.cached, local_of(g, source.id)) { Some(c) => return c, None => {} }
+        }
+        _ => {}
+    }
+    return Cached { data: load(mut g, value.reg, value.off + 8, 8), length: load(mut g, value.reg, value.off + 16, 8) }
 }
 
 // An enum value, owned; `args` are already consumed.
@@ -3270,7 +3340,7 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
         let arg = expr(mut g, args[0])
         if types.is_fixed(g.k.table, arg.ty) { return reg_val(konst(mut g, types.get(g.k.table, arg.ty).length), types.INT()) }
         if arg.ty == types.STR() {
-            return reg_val(load(mut g, arg.reg, arg.off + 16, 8), types.INT())
+            return reg_val(str_parts(mut g, arg, args[0]).length, types.INT())
         }
         return reg_val(load(mut g, scalar(mut g, arg), 8, 8), types.INT())
     }

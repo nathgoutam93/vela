@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import random
+import shlex
 import shutil
 import socket
 import subprocess
@@ -250,6 +251,146 @@ def duplex(c,w,env):
     finally:thread.join(3)
     assert not errors,errors
 
+def socket_storage(c,w,env):
+    # A short read with a large limit must retain exactly its received value
+    # across further reads, a timeout, EOF and task captures.
+    listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen();port=listener.getsockname()[1];errors=[]
+    def peer():
+        try:
+            listener.settimeout(10)
+            with listener.accept()[0] as connection:
+                connection.settimeout(5);connection.sendall(b'\xff')
+                assert connection.recv(1)==b'a';connection.sendall(b'\0Z')
+                assert connection.recv(1)==b'b'
+        except Exception as e:errors.append(e)
+        finally:listener.close()
+    thread=threading.Thread(target=peer);thread.start()
+    source='import net\nimport tasks\n'+HELPER+f'''\nfn main(){{
+        let s=get(net.connect("127.0.0.1",{port}));get(s.timeout(1000))
+        let first=get(s.read(67108864));assert(len(first)==1 && first[0]==255u8)
+        let saved=fn()=>first
+        get(s.write("a"));let zero=get(s.read(1));assert(len(zero)==1 && zero[0]==0u8);assert(get(s.read(1))=="Z")
+        get(s.timeout(20));bad(s.read(1024));get(s.timeout(1000))
+        let copies=tasks.map([1,2],fn(_)=>saved());assert(copies[1]==first && first[0]==255u8)
+        get(s.write("b"));assert(get(s.read(4096))=="");assert(get(s.read(1))=="")
+        get(s.close());bad(s.read(1));assert(saved()==first)
+    }}'''
+    try:program(c,w,env,source)
+    finally:thread.join(6)
+    assert not thread.is_alive() and not errors,errors
+
+def socket_sigpipe(c,w,env):
+    if os.name=='nt':return  # Winsock has no SIGPIPE.
+    provider=w/'socket_signal.c'
+    provider.write_text('''#define _POSIX_C_SOURCE 200809L
+#include <signal.h>
+#include <pthread.h>
+static sigset_t original;
+static void handler(int n) { (void)n; }
+int signal_default(void) { struct sigaction a; return !sigaction(SIGPIPE,0,&a) && a.sa_handler==SIG_DFL; }
+int signal_prepare(void) {
+    struct sigaction a={0};a.sa_handler=handler;sigemptyset(&a.sa_mask);
+    if(sigaction(SIGPIPE,&a,0))return 0;
+    sigset_t s;sigemptyset(&s);sigaddset(&s,SIGPIPE);sigaddset(&s,SIGUSR1);
+    if(pthread_sigmask(SIG_BLOCK,&s,&original))return 0;
+    return !raise(SIGPIPE);
+}
+int signal_preserved(void) {
+    struct sigaction a;sigset_t mask,pending,one;int n;
+    if(sigaction(SIGPIPE,0,&a)||a.sa_handler!=handler)return 0;
+    if(pthread_sigmask(SIG_BLOCK,0,&mask)||sigpending(&pending))return 0;
+    if(!sigismember(&mask,SIGPIPE)||!sigismember(&mask,SIGUSR1)||!sigismember(&pending,SIGPIPE))return 0;
+    sigemptyset(&one);sigaddset(&one,SIGPIPE);
+    return !sigwait(&one,&n) && n==SIGPIPE && !pthread_sigmask(SIG_SETMASK,&original,0);
+}
+''')
+    subprocess.run([os.environ.get('VELA_CC','cc'),'-std=c11','-O2','-pthread','-c',str(provider),'-o',str(w/'socket_signal.o')],check=True,capture_output=True)
+    subprocess.run(['ar','rcs',str(w/'libsocket_signal.a'),str(w/'socket_signal.o')],check=True,capture_output=True)
+    manifest=w/'vela.mod';manifest.write_text('link ./libsocket_signal.a\n')
+    source='''import c
+import files
+import net
+import os
+import text
+import strings
+extern fn signal_default()->c.Int uses unsafe
+extern fn signal_prepare()->c.Int uses unsafe
+extern fn signal_preserved()->c.Int uses unsafe
+'''+HELPER+'''
+fn main(){
+    let args=os.args();let mut s:Option[net.Tcp]=None
+    if args[1]=="accept" {
+        let l=get(net.listen("127.0.0.1",0));get(files.write(args[2],strings.from_int(get(l.port()))));s=Some(get(l.accept()));get(l.close())
+    } else {match text.parse_int(args[2]){Some(p)=>s=Some(get(net.connect("127.0.0.1",p))),None=>assert(false)}}
+    match s {Some(connection)=>{
+        unsafe {assert(signal_default()==1);if args[3]=="pending"{assert(signal_prepare()==1)}}
+        // The peer sends one byte before resetting, so the connection is live
+        // before we exercise repeated writes after the reset is observed.
+        assert(get(connection.read(1))=="x");let _=connection.read(1)
+        let mut failed=false
+        for _ in 0..8 {match connection.write("payload"){Ok(_)=>{},Err(_)=>failed=true}}
+        assert(failed);get(connection.close())
+        unsafe {if args[3]=="pending"{assert(signal_preserved()==1)}else{assert(signal_default()==1)}}
+    },None=>assert(false)}
+}
+'''
+    try:
+        _,exe=build(c,w,env,source)
+        for mode in ('connect','accept'):
+            for pending in ('default','pending'):
+                errors=[];ready=w/'signal-ready';ready.unlink(missing_ok=True)
+                listener=None
+                if mode=='connect':
+                    listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen();argument=str(listener.getsockname()[1])
+                else:argument=str(ready)
+                def peer():
+                    try:
+                        if listener is not None:
+                            listener.settimeout(10);connection=listener.accept()[0]
+                        else:
+                            deadline=time.monotonic()+10
+                            while not ready.exists() or not ready.read_text():
+                                if time.monotonic()>deadline:raise TimeoutError('Vela SIGPIPE listener not ready')
+                                time.sleep(.005)
+                            connection=socket.create_connection(('127.0.0.1',int(ready.read_text())),timeout=5)
+                        with connection:
+                            connection.sendall(b'x')
+                            # Reset after the byte is acknowledged by TCP. A
+                            # short delay avoids discarding the queued byte.
+                            time.sleep(.03)
+                            import struct
+                            connection.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack('ii',1,0))
+                    except Exception as e:errors.append(e)
+                    finally:
+                        if listener is not None:listener.close()
+                thread=threading.Thread(target=peer);thread.start()
+                try:
+                    result=subprocess.run([str(exe),mode,argument,pending],env=env,capture_output=True,text=True,timeout=20)
+                    assert result.returncode==0,(mode,pending,result.returncode,result.stdout,result.stderr)
+                finally:thread.join(11)
+                assert not thread.is_alive() and not errors,errors
+    finally:manifest.unlink(missing_ok=True)
+
+def socket_close_race(c,w,env):
+    if os.name=='nt':return  # The deterministic kernel oracle uses socketpair.
+    runtime=w/'close-runtime';shutil.copytree(ROOT/'runtime',runtime)
+    source=(runtime/'vela_sys.inc').read_text()
+    signature='bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {'
+    assert source.count(signature)==1
+    source=source.replace(signature,'static ssize_t net_test_recv(sys_fd,void*,size_t,int);\n'+signature)
+    start=source.index(signature);end=source.index('bool vela_sys_net_write',start)
+    body=source[start:end]
+    assert body.count('recv(fd,')==1
+    source=source[:start]+body.replace('recv(fd,','net_test_recv(fd,')+source[end:]
+    (runtime/'vela_sys.inc').write_text(source)
+    exe=w/'close-race'
+    command=[os.environ.get('VELA_CC','cc'),'-std=c11','-O2','-pthread','-Wall','-Wextra','-Werror','-pedantic',
+             *shlex.split(env.get('VELA_CFLAGS','')),'-I',str(runtime),str(ROOT/'tests/fixtures/network/close_race.c'),'-lm','-o',str(exe)]
+    compiled=subprocess.run(command,env=env,capture_output=True,text=True,timeout=60)
+    assert compiled.returncode==0,compiled.stderr
+    result=subprocess.run([str(exe)],env=env,capture_output=True,text=True,timeout=20)
+    assert (result.returncode,result.stdout)==(0,'close race passed\n'),(result.returncode,result.stdout,result.stderr)
+
 def cache(c,w,env):
     installed=w/'install';shutil.copytree(ROOT/'runtime',installed/'runtime');shutil.copytree(ROOT/'std',installed/'std')
     cache=w/'include-cache';e={**env,'VELA_ROOT':str(installed),'VELA_CACHE':str(cache)}
@@ -288,7 +429,7 @@ def main():
         for backend in backends:
             w=Path(td)/backend;w.mkdir();env={**os.environ,'VELA_BACKEND':backend,'VELA_CACHE':str(w/'cache')}
             env.pop('VELA_ROOT',None)
-            for fn in (fakes,unicode_oracle,http_oracle,real_processes,real_directories,real_network,duplex,cache,tooling,negative):
+            for fn in (fakes,unicode_oracle,http_oracle,real_processes,real_directories,real_network,duplex,socket_storage,socket_sigpipe,socket_close_race,cache,tooling,negative):
                 fn(c,w,env);print(backend+': '+fn.__name__+' passed',flush=True)
     print('M23 systems library checks passed: '+', '.join(backends)+'.')
 if __name__=='__main__':main()

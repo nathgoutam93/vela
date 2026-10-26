@@ -1,0 +1,29 @@
+// out: recursive calls passed
+import text
+
+fn fib(n: Int) -> Int {
+    if n < 2 { return n }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn prefix(n: Int, s: Str) -> Str {
+    if n == 0 { return s }
+    return prefix(n - 1, s + "x")
+}
+
+fn update(n: Int, value: mut Str) {
+    if n == 0 { return }
+    value = value + "y"
+    update(n - 1, mut value)
+}
+
+fn main() {
+    assert(fib(17) == 1597)
+    let original = text.repeat("a", 21)
+    assert(prefix(13, original) == original + text.repeat("x", 13))
+    let mut changed = original
+    update(19, mut changed)
+    assert(changed == original + text.repeat("y", 19))
+    assert(len(original) == 21)
+    print("recursive calls passed")
+}

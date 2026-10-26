@@ -4,7 +4,8 @@
 //   with its registers, slots and labels renumbered: the function's
 //   parameters are set from the arguments, and each return sets the
 //   call's result and jumps to after the call. Small means at most
-//   inline_limit() instructions and not calling itself; the functions
+//   inline_limit() instructions; recursive bodies have a smaller limit
+//   and a separate per-caller expansion budget. The functions
 //   lowering writes for memory (rc_retain_T, box helpers) are mostly
 //   such, and so are accessors and the many one-line functions of a
 //   program. Two rounds, so that what an inlined body calls can be
@@ -41,13 +42,18 @@ pub fn optimize_with(p: ir.Program, limit: Int, rounds: Int) -> ir.Program {
     for _ in 0..rounds {
         let before = funcs
         let mut small: Map[Str, Bool] = [:]
+        let mut recursive: Map[Str, Bool] = [:]
         for f in before {
-            if len(f.insts) <= limit && !calls(f, f.name) && !f.public {
+            let self_call = calls(f, f.name)
+            // A bounded expansion of small recursive bodies exposes their
+            // base cases without raising the general inlining threshold.
+            if len(f.insts) <= limit && (!self_call || len(f.insts) <= 40) && !f.public {
                 small[f.name] = true
+                if self_call { recursive[f.name] = true }
             }
         }
         for i in 0..len(funcs) {
-            funcs[i] = simplify(inline_calls(funcs[i], before, index, small))
+            funcs[i] = simplify(inline_calls(funcs[i], before, index, small, recursive))
         }
     }
     for i in 0..len(funcs) { funcs[i] = compact_slots(forward_destinations(hoist_floats(funcs[i]))) }
@@ -65,15 +71,20 @@ fn calls(f: ir.Func, name: Str) -> Bool {
 
 // ---- Inlining ----
 
-fn inline_calls(f: ir.Func, all: [ir.Func], index: Map[Str, Int], small: Map[Str, Bool]) -> ir.Func {
+fn inline_calls(f: ir.Func, all: [ir.Func], index: Map[Str, Int], small: Map[Str, Bool], recursive: Map[Str, Bool]) -> ir.Func {
     let mut out = f
     out.insts = []
+    let mut recursive_budget = 160
     for i in f.insts {
-        if i.op != ir.Op.Call || i.sym == f.name || !maps.has(small, i.sym) {
+        if i.op != ir.Op.Call || !maps.has(small, i.sym) {
             push(mut out.insts, i)
             continue
         }
         let g = all[index[i.sym]]
+        if maps.has(recursive, i.sym) {
+            if len(g.insts) > recursive_budget { push(mut out.insts, i); continue }
+            recursive_budget = recursive_budget - len(g.insts)
+        }
         let regs = len(out.classes)
         for c in g.classes {
             push(mut out.classes, c)

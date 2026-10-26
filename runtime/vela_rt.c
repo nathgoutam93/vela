@@ -223,6 +223,10 @@ void vela_str_release(vela_str s) {
 
 vela_str vela_str_concat(vela_str a, vela_str b) {
     VELA_PROFILE_SCOPE("strings");
+    // Strings are immutable. Keep the other operand alive when no bytes need
+    // joining, including slices whose storage belongs to a larger string.
+    if (a.len == 0) { vela_str_retain(b); return b; }
+    if (b.len == 0) { vela_str_retain(a); return a; }
     int64_t len;
     if (__builtin_add_overflow(a.len, b.len, &len)) vela_panic("vela runtime", "string too long");
     vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
@@ -1278,7 +1282,9 @@ static vela_str message(const char *a, vela_str b, const char *c) {
     return s;
 }
 
+#if !defined(__wasi__)
 static pthread_mutex_t fork_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 // Runs `command`, waits for it and sets *code. When `captured` is not NULL
 // the program's stdout goes into *captured instead of ours. False, with a

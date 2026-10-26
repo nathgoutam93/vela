@@ -99,6 +99,19 @@ static ssize_t sys_write_fd(sys_fd fd,const void *p,size_t n) {
     return r;
 #endif
 }
+// Socket-specific suppression leaves the calling thread's signal mask and
+// unrelated pipe behavior alone. SO_NOSIGPIPE is set when sockets are created.
+static ssize_t sys_send_fd(sys_fd fd,const void *p,size_t n) {
+#if defined(_WIN32)
+    return sys_write_fd(fd,p,n);
+#elif defined(MSG_NOSIGNAL)
+    return send(fd,p,n,MSG_NOSIGNAL);
+#elif defined(SO_NOSIGPIPE)
+    return send(fd,p,n,0);
+#else
+    return sys_write_fd(fd,p,n);
+#endif
+}
 #endif
 // Fakes are protected by fake_lock; a scope owns one reference, each socket another.
 typedef struct sys_fake {
@@ -236,7 +249,7 @@ struct vela_io_handle {
     sys_fd fd;
     int kind,family;
     bool closed;
-    int64_t timeout,port,row,pos;
+    int64_t timeout,port,row,pos,active;
     vela_str host;
     sys_fake *fake;
 };
@@ -302,10 +315,18 @@ static int64_t sys_claim(sys_fake *f,const char *kind,vela_str host,int64_t port
     return found;
 }
 #if !defined(__wasi__)
+static int sys_socket_flags(sys_fd fd) {
+    if (fcntl(fd,F_SETFD,FD_CLOEXEC)<0 || fcntl(fd,F_SETFL,O_NONBLOCK)<0) return -1;
+#if defined(SO_NOSIGPIPE) && !defined(_WIN32)
+    int yes=1;
+    if (setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof yes)<0) return -1;
+#endif
+    return 0;
+}
 static sys_fd sys_socket(int family,int type) {
     pthread_mutex_lock(&fork_lock);
     sys_fd fd=socket(family,type,0);
-    if (fd>=0 && (fcntl(fd,F_SETFD,FD_CLOEXEC)<0 || fcntl(fd,F_SETFL,O_NONBLOCK)<0)) {
+    if (fd>=0 && sys_socket_flags(fd)<0) {
         int e=errno;
         sys_close(fd);
         fd=-1;
@@ -418,15 +439,23 @@ bool vela_sys_tcp_listen(vela_str h,int64_t p,int64_t t,vela_io_handle **o,vela_
 bool vela_sys_udp_bind(vela_str h,int64_t p,vela_io_handle **o,vela_str *e) {
     return sys_open(h,p,5000,3,o,e);
 }
-// Pin the open file description for an operation, then release the handle lock.
-// This permits full duplex I/O and prevents close/reuse races. Closing an alias
-// rejects subsequent operations; an already-running operation finishes/times out.
+// Pin an operation under the handle lock, then release that lock for I/O.
+// Logical close rejects new operations immediately. The actual descriptor is
+// closed after the last in-flight operation finishes, preserving full duplex
+// and close/reuse safety without duplicating a descriptor for every call.
 #if !defined(__wasi__)
 static sys_fd sys_borrow_fd(vela_io_handle *h) {
-    pthread_mutex_lock(&fork_lock);
-    sys_fd fd=fcntl(h->fd,F_DUPFD_CLOEXEC,3);
-    pthread_mutex_unlock(&fork_lock);
-    return fd;
+    h->active++;
+    return h->fd;
+}
+static void sys_return_fd(vela_io_handle *h) {
+    pthread_mutex_lock(&h->lock);
+    h->active--;
+    if (h->closed && !h->active && h->fd>=0) {
+        sys_close(h->fd);
+        h->fd=-1;
+    }
+    pthread_mutex_unlock(&h->lock);
 }
 #endif
 bool vela_sys_accept(vela_io_handle *h,vela_io_handle **o,vela_str *e) {
@@ -463,7 +492,7 @@ bool vela_sys_accept(vela_io_handle *h,vela_io_handle **o,vela_str *e) {
             }
             pthread_mutex_lock(&fork_lock);
             accepted=accept(fd,NULL,NULL);
-            if (accepted>=0 && (fcntl(accepted,F_SETFD,FD_CLOEXEC)<0 || fcntl(accepted,F_SETFL,O_NONBLOCK)<0)) {
+            if (accepted>=0 && sys_socket_flags(accepted)<0) {
                 int saved=errno;
                 sys_close(accepted);
                 accepted=-1;
@@ -478,7 +507,7 @@ bool vela_sys_accept(vela_io_handle *h,vela_io_handle **o,vela_str *e) {
         }
         if (ok) *o=sys_handle(accepted,1,h->family,sys_bound_port(accepted),h->host,NULL,-1,timeout);
     }
-    if (fd>=0)sys_close(fd);
+    if (fd>=0)sys_return_fd(h);
     return ok;
 #endif
 }
@@ -510,16 +539,30 @@ bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {
     }
     pthread_mutex_unlock(&h->lock);
     if (ok) {
-        char *buf=vela_alloc((size_t)max);
+        // Receive into the owned string instead of copying a temporary buffer.
+        vela_strobj *obj=vela_alloc(checked_bytes((uint64_t)max,1,sizeof(vela_strobj)));
+        obj->rc=1;
         int64_t deadline=sys_now()+timeout;
         for (; ; ) {
             if (!sys_wait(fd,POLLIN,deadline,e)) {
                 ok=false;
                 break;
             }
-            ssize_t n=recv(fd,buf,(size_t)max,0);
+            ssize_t n=recv(fd,obj->bytes,(size_t)max,0);
             if (n>=0) {
-                *o=str_from(buf,(size_t)n);
+                if (n==0) {
+                    free(obj);
+                    obj=NULL;
+                    *o=VELA_STR("",0);
+                } else {
+                    // A large requested limit must not retain a large buffer
+                    // after a short read. A failed shrink leaves valid storage.
+                    if (n<max) {
+                        vela_strobj *smaller=realloc(obj,sizeof(vela_strobj)+(size_t)n);
+                        if (smaller) obj=smaller;
+                    }
+                    *o=(vela_str){obj,obj->bytes,n};
+                }
                 break;
             }
             if (errno!=EINTR && errno!=EAGAIN && errno!=EWOULDBLOCK) {
@@ -527,9 +570,9 @@ bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {
                 break;
             }
         }
-        free(buf);
+        if (!ok) free(obj);
     }
-    if (fd>=0)sys_close(fd);
+    if (fd>=0)sys_return_fd(h);
     return ok;
 #endif
 }
@@ -564,20 +607,18 @@ bool vela_sys_net_write(vela_io_handle *h,vela_str data,int64_t *o,vela_str *e) 
     if (ok) {
         int64_t pos=0,deadline=sys_now()+timeout;
         while (pos<data.len) {
-            if (!sys_wait(fd,POLLOUT,deadline,e)) {
-                ok=false;
-                break;
-            }
-            ssize_t n=sys_write_fd(fd,data.data+pos,(size_t)(data.len-pos));
+            ssize_t n=sys_send_fd(fd,data.data+pos,(size_t)(data.len-pos));
             if (n>0) pos+=n;
-            else if (n==0 || (errno!=EINTR && errno!=EAGAIN && errno!=EWOULDBLOCK)) {
+            else if (n<0 && (errno==EINTR || errno==EAGAIN || errno==EWOULDBLOCK)) {
+                if (!sys_wait(fd,POLLOUT,deadline,e)) {ok=false;break;}
+            } else {
                 ok=sys_errno(e);
                 break;
             }
         }
         if (ok)*o=pos;
     }
-    if (fd>=0)sys_close(fd);
+    if (fd>=0)sys_return_fd(h);
     return ok;
 #endif
 }
@@ -588,7 +629,7 @@ bool vela_sys_net_close(vela_io_handle *h,vela_unit *o,vela_str *e) {
         ok=sys_error(e,"socket does not belong to the active network scope");
     } else if (!h->closed) {
         h->closed=true;
-        if (h->fd>=0) {sys_close(h->fd);h->fd=-1;}
+        if (!h->active && h->fd>=0) {sys_close(h->fd);h->fd=-1;}
     }
     unlock_fakes();pthread_mutex_unlock(&h->lock);*o=0;return ok;
 }
@@ -676,7 +717,7 @@ bool vela_sys_udp_send(vela_io_handle *h,vela_str host,int64_t port,vela_str dat
         }
     }
     free(name);
-    if (fd>=0)sys_close(fd);
+    if (fd>=0)sys_return_fd(h);
     return ok;
 #endif
 }
@@ -747,7 +788,7 @@ bool vela_sys_udp_receive(vela_io_handle *h,int64_t max,vela_array **o,vela_str 
         }
         free(buf);
     }
-    if (fd>=0)sys_close(fd);
+    if (fd>=0)sys_return_fd(h);
     return ok;
 #endif
 }

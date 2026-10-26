@@ -599,6 +599,14 @@ the same entry. Close it with a commit or validation result; keep its history.
   already in progress finish or time out without descriptor-reuse races.
 - **Acceptance:** the two-task loopback oracle passes, as do alias close,
   timeout, repeated automatic descriptor drop, and nested fake-scope checks.
+- **Post-M30 performance follow-up:** TL-079 replaces per-operation descriptor
+  duplication with a handle-local count of active operations. Logical close
+  still rejects new calls; the physical close waits for the last active call.
+  A deterministic gated-receive regression closes an alias, forces descriptor
+  reuse pressure, and checks both the in-flight receive and later rejection.
+  This preserves the original full-duplex fix rather than holding the mutex
+  over blocking I/O again. See the
+  [networking performance walkthrough](history/network-runtime-performance.md).
 
 ### TL-023: Long literals fail the strict C warning gate
 
@@ -822,6 +830,14 @@ the same entry. Close it with a commit or validation result; keep its history.
   passes the complete gate at 1.4603; bench/results/m25-spill-rejected.json retains
   a genuine failed full gate. Final broader local M25 validation also passes;
   commands and result fingerprints are in bench/results/m25-validation.json.
+- **Post-M30 measurement support:** `bench/compare.py` previously supported
+  only C-generated programs. The native follow-up adds `--backend native`,
+  rotated raw samples, medians, binary sizes/hashes and source checks. Its
+  historical C goal remains specific to C; native A/B results require the
+  separate unchanged `run.py --require-native-parity` acceptance command.
+  An incomplete report is marked `complete: false` before work starts.
+  C/native quick smoke checks and a missing-compiler/stale-report probe pass;
+  the nine-round full native A/B completes with source checks unchanged.
 
 ### TL-031: Native lowering omits existing enum memory optimizations
 
@@ -853,6 +869,21 @@ the same entry. Close it with a commit or validation result; keep its history.
   checks each, UBSan passes 125, and binarytrees measures 0.80 times C. The
   x64 correction cross-assembles; Linux execution remains VAL-001. See
   [M25 validation](../bench/results/m25-validation.json).
+- **Post-M30 native performance recurrence (2026-10-26):** sampling
+  `bench/binarytrees/main.vl` shows native box cleanup among its hottest
+  functions. `layout.compact_helpers` already iterates through a recursive
+  child; `lower.memory_functions` still recursively cleans both children.
+  Native lowering now loops through a final managed self-boxed field for
+  release and sharing, preserving the order of other managed fields. The
+  change also covers enums with several recursive variants; a recursive
+  field followed by another managed field retains ordinary cleanup.
+  `tests/run/recursive_tail_lifetimes.vl` covers 120,000-node chains,
+  snapshots, shared children, multiple variants and worker publication.
+  C/native execution passes with optimization on/off, including UBSan.
+  Both fixed points pass and all 315 checks per backend are covered through
+  full runs plus documented focused reruns. The unchanged native and M29
+  gates pass; [results](../bench/results/2026-10-26-native-performance.md)
+  retain the exact counts, failed runs and limitations.
 
 
 ### TL-032: Native pushes miss the existing known-size fast path
@@ -1904,6 +1935,225 @@ the same entry. Close it with a commit or validation result; keep its history.
   before changing timeouts or runtime behavior.
 - **Acceptance:** the standalone M27 check passes on native Windows, or a
   phase-specific reproducer identifies and fixes the cause.
+
+### TL-077: Foundation JSON duplicate keys differ from the comparison oracle
+
+- **Status:** resolved in the post-M30 Go/Swift benchmark comparison; no
+  language semantics or release gates changed.
+- **Evidence:** the initial Swift Foundation `JSONSerialization` implementation
+  failed `bench/peers.py --quick --check` on request 27 (zero-based). For
+  `{"id":1,"id":2,"threshold":0,"values":[]}` it returned id 1; the existing
+  Python/C/Rust/Vela workload requires id 2. This is observed on Apple Swift
+  6.2 / macOS ARM64, not a claim about all Foundation versions or JSON libraries.
+  Reproduce with `import Foundation; let d = Data("{\"id\":1,\"id\":2}".utf8);
+  print(try JSONSerialization.jsonObject(with: d))` in a Swift program.
+- **Impact:** timing that implementation as if it did equivalent work would
+  compare different request semantics. Dropping the duplicate-key case would
+  weaken the existing benchmark's oracle.
+- **Workaround:** reject the nonmatching implementation before timing.
+- **Resolution:** use a standalone full Swift parser in
+  `bench/real/json_service/main.swift`, analogous to the C/Rust references,
+  preserving last-key lookup and the original input. Add untimed independent
+  probes for integer-vs-real distinctions, integer boundaries, duplicate and
+  escaped keys, and malformed/trailing input. Record parser/library differences
+  explicitly rather than treating application results as language rankings.
+- **Validation:** the complete twelve-round six-implementation run in
+  `bench/results/2026-10-25-peers-macos.json` passes all probes and full-output
+  checks. Recheck with `python3 bench/peers.py --quick --check --workloads
+  json_service --languages c rust go swift vela vela-native --json
+  build/peers-json-check.json` (set `RUSTC` if needed).
+
+### TL-078: Early peer-benchmark failure can leave stale successful evidence
+
+- **Status:** resolved during the post-M30 Go/Swift comparison.
+- **Evidence:** review of the first `bench/peers.py` runner found it only wrote
+  the report after finishing a workload. Thus a missing requested compiler
+  could exit before replacing an existing `complete: true` report. This is a
+  report-lifecycle issue, not an observed incorrect compiler timing.
+- **Reproducer:** `tests/bench_test.py` seeds a successful JSON report, invokes
+  `bench/peers.py --languages rust --quick --check --json REPORT` with `RUSTC`
+  pointing to a nonexistent executable, and requires exit 2 plus a false
+  completion marker. It does not require Rust to be installed.
+- **Impact:** consumers looking only at the output path could mistake a prior
+  run for a new successful comparison after the new command failed.
+- **Workaround:** check process exit, completion marker and source identities
+  together; use a fresh output path for each run.
+- **Resolution:** invalidate the requested report immediately after argument
+  parsing, keep `complete: false` during work, and set it true only after all
+  requested workloads and the unchanged-source check pass. Keep the failure
+  regression in the existing default benchmark integration test.
+- **Validation:** the missing-tool regression passes; the completed runner's
+  twelve-round measurement is retained in the linked
+  [peer report](../bench/results/2026-10-25-peers-macos.md). Existing benchmark
+  regression results are recorded there separately from performance evidence.
+
+### TL-079: Socket hot paths allocate, poll and duplicate unnecessarily
+
+- **Status:** resolved locally in the user-requested post-M30 networking pass;
+  foreign-host and unavailable sanitizer obligations remain separately tracked.
+- **Evidence:** `bench/results/2026-10-25-peers-macos.json` measures the unchanged
+  eight-client echo workload at about 241 ms through either Vela backend,
+  versus 217 ms for Go and 164 ms for Swift. Source inspection finds a
+  temporary receive buffer copied into Str, per-call descriptor duplication,
+  write-readiness polling before every send, and per-write signal-mask work.
+  Separate untimed instrumentation on the original runtime counts 96,042
+  allocations, about 65.6 MB of string copying, 64,024 descriptor duplications,
+  64,024 readiness-wait entries and 32,008 signal-managed writes, including
+  startup and warmup. These counts are instrumentation sites, not hardware
+  instruction counts or lock-wait measurements.
+- **Reproducer:** save the original runtime/std/packages from commit `5450b14`
+  in a separate root, then run `python3 bench/network_compare.py --variant
+  before=BEFORE_ROOT --variant after=. --runs 12 --counts --json
+  build/network-runtime.json`. The Vela source and shared client stay identical.
+- **Impact:** overhead in each small request limits both C/native networking
+  throughput. Direct-read timing alone stays within noise; operation counts
+  identify allocation/copy savings separately from throughput claims.
+- **Workaround:** use existing timeouts and bounded request sizes; avoid
+  claiming that C/native code generation alone explains this runtime gap.
+- **Resolution:** receive directly into owned string storage, shrink short
+  reads and use an immortal empty string for EOF; retain the nonempty operand
+  of empty-string concatenation; suppress SIGPIPE per socket/call; attempt
+  nonblocking sends before waiting; pin operation lifetimes under the handle
+  lock and defer physical close until active operations finish. Preserve the
+  capability checks, fakes, full-duplex behavior and TL-022 close guarantees.
+- **Acceptance:** C/native bootstrap fixed points; both complete suites;
+  optimized/unoptimized storage, binary, timeout, EOF, SIGPIPE, full-duplex and
+  fake-scope checks; deterministic close/reuse pressure; available sanitizer
+  validation; interleaved original/final measurements and the peer matrix.
+  Linux/Windows execution and unavailable sanitizers remain separate validation
+  obligations. No new ownership types, I/O API or architecture is introduced.
+- **Deferred investigation:** the global fake-state lock remains on the real
+  network path. Its contention has not been isolated; do not remove its
+  synchronization or weaken scope restoration merely from a total time.
+- **Validation/results:** both bootstrap fixed points pass; both complete
+  suites pass 312/312; the corrected UBSan selection passes 122/122, including
+  linked C/native runtime cases. Final optimizer-off UBSan storage/signal/fake/
+  duplex checks and the strengthened two-receive close/reuse fixture pass.
+  Strict Linux/Windows/WASI objects compile; ASan empty-probe timeout and TSan
+  empty-probe SIGSEGV remain unavailable validation, not passes. Twelve-round
+  original/final timing falls from 236.16 to 172.76 ms through C and 237.05 to
+  171.88 ms natively. The fresh peer matrix and unchanged 1.4609× C release
+  gate pass. See the [retained report](../bench/results/2026-10-26-network-runtime.md)
+  and [walkthrough](history/network-runtime-performance.md) for raw evidence,
+  counter limitations and exact validation scopes.
+
+### TL-080: Strict WASI runtime compilation sees an unused fork mutex
+
+- **Status:** resolved during the post-M30 networking follow-up.
+- **Evidence:** Zig 0.17.0 compiling `runtime/vela_rt.c` for wasm32-wasi with
+  `-std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic` rejects the
+  unconditional static fork_lock as unused. Repeating that command on the
+  original runtime snapshot from `5450b14` reports the same warning: this is
+  pre-existing behavior, separate from the Windows unused-helper regression
+  found and corrected during TL-079.
+- **Impact:** a strict cross-target runtime object check fails before it can
+  validate the networking changes' conditional compilation.
+- **Workaround:** the old non-strict cross-build can compile, but does not
+  establish the strict-warning check.
+- **Resolution:** declare the fork mutex only outside WASI, matching all of
+  its existing uses. Keep Windows' socket send routed through its existing
+  Winsock write adapter so the static helper remains used.
+- **Validation:** strict runtime objects compile for Linux x86-64, Windows
+  x86-64 and wasm32-wasi with no diagnostics. Local macOS preprocessed runtime
+  bytes are identical before/after these platform-only follow-ups, so the
+  passing C/native full-suite path is unchanged. These are compile checks,
+  not native foreign-host or kernel-policy execution acceptance.
+
+### TL-081: Custom sanitizer flags replace the runner's warning policy
+
+- **Status:** workaround documented; an additive flag interface is deferred.
+- **Evidence:** invoking the networking UBSan selection with VELA_CFLAGS set to
+  fresh `-Wall -Wextra -Werror -Wshadow -pedantic` plus sanitizer flags yields
+  95 passes and 27 generated-C compilation failures for unused variables and
+  parameters. `run_tests.py` uses `env.setdefault("VELA_CFLAGS", STRICT_CFLAGS)`;
+  the explicit value omits its documented exceptions for legal Vela constructs.
+  This is a flag-setup error in the validation invocation, not evidence of a
+  runtime sanitizer finding.
+- **Reproducer:** run `tests/run/concat_empty.vl` through the runner with that
+  replacement flag set; generated discard/loop bindings become C warnings.
+- **Impact:** custom sanitizer commands can accidentally change warning policy
+  and obscure whether runtime instrumentation itself succeeds.
+- **Workaround:** import `run_tests.STRICT_CFLAGS` and append the desired
+  sanitizer flags in the subprocess environment; preserve the original failed
+  log and distinguish the corrected run.
+- **Proposed improvement:** consider an explicit UBSan mode or additive C flags
+  option, retaining the established exceptions. This proposal does not
+  authorize implementing another CLI feature during networking work.
+- **Verification:** a corrected UBSan selection and the existing normal suites
+  pass under the same warning policy; retain the exact environment and counts
+  with the networking validation record.
+- **Validation:** importing STRICT_CFLAGS and appending UBSan flags produces
+  122 passes with no failures/skips. Both normal suites pass 312/312. The
+  original failed invocation remains embedded in
+  `bench/results/2026-10-26-network-validation.json`.
+
+### TL-082: Native string loops reload immutable parameter metadata
+
+- **Status:** resolved locally in the post-M30 native optimization pass;
+  foreign native execution remains VAL-001.
+- **Evidence:** `build/vela ir bench/varints/main.vl` reloads the immutable
+  `parse(data: Str)` parameter's length and data pointer inside its nested
+  loops. Native process samples place nearly all decoder time in `parse`.
+  This establishes repeated metadata work, not its whole contribution to
+  the C/native timing difference.
+- **Impact:** string parsers retain avoidable loop loads and dependencies.
+- **Workaround:** the C backend can keep these fields in registers.
+- **Resolution:** load immutable Str parameter metadata at function entry and
+  reuse it for indexing/len. Exclude mutable, address-taken and escaped
+  parameters; preserve bounds checks and ordinary evaluation for other values.
+  The existing optimizer removes unused loads. The representation and RC
+  rules are unchanged.
+- **Verification:** mutation, slices, embedded zero bytes, empty strings and
+  task captures in `tests/run/string_metadata.vl`; both optimization settings,
+  bootstrap fixed points, full suites and unchanged performance thresholds.
+  Final nine-round comparisons reduce varint elapsed time by 5.5%.
+  Both fixed points, complete-suite checks plus focused reruns, 126 UBSan
+  checks and unchanged native/M29 gates pass. See the
+  [validation record](../bench/results/2026-10-26-native-validation.json).
+
+### TL-083: Native inlining excludes every directly recursive function
+
+- **Status:** resolved locally in the post-M30 native optimization pass;
+  foreign native execution remains VAL-001.
+- **Evidence:** `opt.optimize_with` excludes `calls(f, f.name)` and
+  `inline_calls` also excludes self calls. Native tree samples show `make`,
+  `check` and recursive cleanup prominently. Raising the global inline limit
+  from 80 to 120/160/240 does not consistently improve the measured workloads
+  and expands JSON code; that experiment is rejected.
+- **Impact:** small recursive bodies cannot expose even one level of base
+  cases and call-site optimization.
+- **Workaround:** retain the existing defaults while comparing bounded changes.
+- **Resolution:** permit recursive candidates of at most 40 IR
+  instructions, with at most 160 added recursive-body instructions per
+  caller per round. Keep the existing two rounds, general limit and public
+  function boundary. This bounds expansion independently of recursion depth.
+- **Verification:** recursive arithmetic, borrowed/returned strings and mut
+  parameters in `tests/run/recursive_calls.vl`; existing ABI, snapshot,
+  task/closure checks, both emitters, fixed points and unchanged release gates.
+  Final A/B reduces arena trees 31.0% and binary trees 12.7%. Both fixed
+  points, 126 UBSan checks, opt=0 new fixtures, x86 cross-assembly and unchanged
+  native/M29 gates pass; full-suite corrections are recorded below and in the
+  [walkthrough](history/native-performance-followup.md).
+- **Rejected arithmetic experiment:** positive constant signed division using
+  a reciprocal multiply passes the extended Python full-width arithmetic
+  oracle, but regresses JSON in the isolated ARM64 experiment. Keep hardware
+  division unchanged; correctness alone is insufficient to accept it.
+- **Assembly oracle update:** the first full C run passes 314/315 checks;
+  `tests/cli/native_asm.expected` still describes an unexpanded recursive
+  `count`. Review confirms base-case branches, callee saves and per-level
+  overflow checks; the new output cross-assembles as Linux x86-64. Update the
+  expected instructions, retaining the source and explicit target. Its focused
+  C rerun passes; the native-built full suite passes the updated snapshot.
+- **Native validation timeout:** the first native-built full suite passes
+  314/315 checks. M30's final identity property subprocess returns `unknown`
+  with `process timeout` (configured 5,000 ms; report elapsed 541,531 ms).
+  Its frozen corpus passes C/native opt=1/0. The long elapsed interval alone
+  does not establish compiler slowdown or a scheduling cause. Preserve the
+  failure and rerun M30 in isolation without changing its timeout/budget.
+  The isolated rerun passes, and M30 passes again in the 126-check UBSan
+  selection. Both initial suites have 314 passes plus their passing focused
+  correction/rerun; all 315 checks per backend are covered without hiding
+  either initial failure.
 
 ## Outstanding validation
 

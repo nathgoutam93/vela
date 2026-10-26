@@ -1,0 +1,41 @@
+import files
+import net
+import os
+import strings
+import tasks
+import text
+
+fn number(s: Str) -> Int { match text.parse_int(s) { Some(n) => { assert(n > 0); return n }, None => { assert(false); return 0 } } }
+fn serve(socket: net.Tcp, rounds: Int, size: Int) -> Result[Int, Str] uses net {
+    for _ in 0..rounds {
+        let mut data = ""
+        for len(data) < size {
+            let part = socket.read(size - len(data))?
+            if len(part) == 0 { return Err("unexpected EOF") }
+            data = data + part
+        }
+        let mut sent = 0
+        for sent < size { let n = socket.write(data[sent..size])?; if n == 0 { return Err("zero write") }; sent = sent + n }
+    }
+    socket.close()?
+    return Ok(rounds * size)
+}
+fn run(ready: Str, clients: Int, rounds: Int, size: Int) -> Result[Int, Str] uses net, fs {
+    let listener = net.listen("127.0.0.1", 0)?
+    listener.timeout(30000)?
+    files.write(ready, strings.from_int(listener.port()?) + "\n")?
+    let mut sockets: [net.Tcp] = []
+    for _ in 0..clients { let s = listener.accept()?; s.timeout(30000)?; push(mut sockets, s) }
+    listener.close()?
+    let results = tasks.map(sockets, fn(s: net.Tcp) -> Result[Int, Str] { return serve(s, rounds, size) })
+    let mut total = 0
+    for result in results { total = total + result? }
+    return Ok(total)
+}
+fn main() {
+    let args = os.args(); assert(len(args) == 5)
+    match run(args[1], number(args[2]), number(args[3]), number(args[4])) {
+        Ok(n) => print(n)
+        Err(e) => { os.eprint(e); os.exit(1) }
+    }
+}

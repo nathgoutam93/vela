@@ -1,0 +1,302 @@
+{
+  "format": "vela.network.validation",
+  "version": 1,
+  "date": "2026-10-26",
+  "base_commit": "5450b14",
+  "compiler_sha256": "065a5f41421672e105df61c0f7895239396628514ff9c2ac9b8d2b8a2606198c",
+  "bootstraps": {
+    "command": "sh compiler/bootstrap/bootstrap.sh --native",
+    "c_lines": 156447,
+    "native_lines": 2408268,
+    "seed_up_to_date": true,
+    "log": "generation 1: the seed, compiled by cc\ngeneration 2: built by generation 1\ngeneration 3: built by generation 2\nfixed point: generations 2 and 3 write identical C (  156447 lines)\nthe seed is up to date\nbuilt build/vela\nnative 1: built by build/vela with VELA_BACKEND=native\nnative 2: built by native 1\nnative fixed point: natives 1 and 2 write identical assembly ( 2408268 lines)\nbuilt build/vela-native\n"
+  },
+  "normal_suites": {
+    "c": {
+      "command": "PATH=/private/tmp/vela-rust-toolchain/rustc-1.99.1-aarch64-apple-darwin/rustc/bin:$PATH python3 -u run_tests.py --backend c --jobs 4",
+      "passed": 312,
+      "failed": 0,
+      "skipped": 0,
+      "log": "312 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n"
+    },
+    "native": {
+      "command": "PATH=/private/tmp/vela-rust-toolchain/rustc-1.99.1-aarch64-apple-darwin/rustc/bin:$PATH python3 -u run_tests.py --backend native --jobs 4",
+      "passed": 312,
+      "failed": 0,
+      "skipped": 0,
+      "log": "312 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n"
+    }
+  },
+  "ubsan_initial_invalid_flags": {
+    "passed": 95,
+    "failed": 27,
+    "cause": "Custom VELA_CFLAGS replaced standard warning exceptions; generated-C compile failures, not runtime sanitizer findings.",
+    "log": "FAIL  tests/m23_test.py\n      Traceback (most recent call last):\n        File \"/Users/nathgoutam93/Documents/vela/tests/m23_test.py\", line 435, in <module>\n          if __name__=='__main__':main()\n                                  ~~~~^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m23_test.py\", line 433, in main\n          fn(c,w,env);print(backend+': '+fn.__name__+' passed',flush=True)\n          ~~^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m23_test.py\", line 117, in fakes\n          test(c,w,env,source)\n          ~~~~^^^^^^^^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m23_test.py\", line 39, in test\n          p=w/'case.vl';p.write_text(source);r=command(c,env,'test',p,code=code);assert error in r.stdout+r.stderr,(r.stdout,r.stderr);return p\n                                               ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m23_test.py\", line 26, in command\n          assert r.returncode==code,(args,r.returncode,r.stdout,r.stderr)\n                 ^^^^^^^^^^^^^^^^^^\n      AssertionError: (('test', PosixPath('/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T/vela-m23-q6a3zdiw/c/case.vl')), 70, '', \"/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:1381:17: error: unused variable 'v__' [-Werror,-Wunused-variable]\\n 1381 |         int64_t v__ = _t5;\\n      |                 ^~~\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:2688:59: error: unused parameter 'v_n' [-Werror,-Wunused-parameter]\\n 2688 | static int64_t vc_vela_test_81_c2(vela_env *env_, int64_t v_n) {\\n      |                                                           ^\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:2741:23: error: unused variable '_t21' [-Werror,-Wunused-variable]\\n 2741 |             vela_unit _t21 = f_get__Unit(_t20);\\n      |                       ^~~~\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:2720:19: error: unused variable '_t11' [-Werror,-Wunused-variable]\\n 2720 |         vela_unit _t11 = f_get__Unit(_t10);\\n      |                   ^~~~\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:2836:60: error: unused parameter 'v_n' [-Werror,-Wunused-parameter]\\n 2836 | static vela_str vc_vela_test_82_c1(vela_env *env_, int64_t v_n) {\\n      |                                                            ^\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:2963:19: error: unused variable '_t50' [-Werror,-Wunused-variable]\\n 2963 |         vela_unit _t50 = f_get__Unit(_t49);\\n      |                   ^~~~\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:2967:19: error: unused variable '_t52' [-Werror,-Wunused-variable]\\n 2967 |         vela_unit _t52 = f_get__Unit(_t51);\\n      |                   ^~~~\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:3154:19: error: unused variable '_t25' [-Werror,-Wunused-variable]\\n 3154 |         vela_unit _t25 = f_get__Unit(_t24);\\n      |                   ^~~~\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:3334:17: error: unused variable '_t15' [-Werror,-Wunused-variable]\\n 3334 |         int64_t _t15 = f_get__Int(_t14);\\n      |                 ^~~~\\n/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c:3446:19: error: unused variable '_t29' [-Werror,-Wunused-variable]\\n 3446 |         vela_unit _t29 = f_get__Unit(_t28);\\n      |                   ^~~~\\n10 errors generated.\\nvela: internal compiler error: the C compiler rejected the generated code\\ncommand: cc -std=c11 -O0 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/case_tests_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BreHqk/part0.o [E6002]\\n\")\nFAIL  tests/m25_test.py\n      M25: c 1 pressure passed\n      Traceback (most recent call last):\n        File \"/Users/nathgoutam93/Documents/vela/tests/m25_test.py\", line 297, in <module>\n          main()\n          ~~~~^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m25_test.py\", line 292, in main\n          test(c, work, env)\n          ~~~~^^^^^^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m25_test.py\", line 43, in sharing\n              invoke(c, work, env, '''import lists\n              ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n          fn main() {\n          ^^^^^^^^^^^\n          ...<24 lines>...\n          }\n          ^\n          ''', expected='sharing passed\\n')\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m19_test.py\", line 111, in invoke\n          assert r.returncode == 0, r.stderr\n                 ^^^^^^^^^^^^^^^^^\n      AssertionError: /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-QoLVEK/case_0.c:190:13: error: unused variable '_t9n' [-Werror,-Wunused-variable]\n        190 |     int64_t _t9n = v_xs->len;\n            |             ^~~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-QoLVEK/case_0.c:326:13: error: unused variable '_t77n' [-Werror,-Wunused-variable]\n        326 |     int64_t _t77n = v_words->len;\n            |             ^~~~~\n      2 errors generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-QoLVEK/case_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-QoLVEK/part0.o [E6002]\n      \nFAIL  tests/m30_test.py\n      m30: frozen inventory passed\n      Traceback (most recent call last):\n        File \"/Users/nathgoutam93/Documents/vela/tests/m30_test.py\", line 418, in <module>\n          raise SystemExit(main())\n                           ~~~~^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m30_test.py\", line 401, in main\n          corpus(c, manifest)\n          ~~~~~~^^^^^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m30_test.py\", line 128, in corpus\n          c.run('build', p, '-o', exe, env=env)\n          ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m30_test.py\", line 63, in run\n          assert r.returncode == code, (args, r.returncode, r.stdout[-5000:], r.stderr[-5000:])\n                 ^^^^^^^^^^^^^^^^^^^^\n      AssertionError: (('build', PosixPath('/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T/vela-m30-0t3sldac/v1/contracts.vl'), '-o', PosixPath('/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T/vela-m30-0t3sldac/program')), 70, '', \"/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-GROwXs/contracts_0.c:69:17: error: unused variable 'v_result' [-Werror,-Wunused-variable]\\n   69 |         int64_t v_result = _t2;\\n      |                 ^~~~~~~~\\n1 error generated.\\nvela: internal compiler error: the C compiler rejected the generated code\\ncommand: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-GROwXs/contracts_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-GROwXs/part0.o [E6002]\\n\")\nFAIL  tests/run/allocation_heavy.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-CaPCiU/allocation_heavy_0.c:174:17: error: unused variable 'v_i_2' [-Werror,-Wunused-variable]\n        174 |         int64_t v_i_2 = _t12;\n            |                 ^~~~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-CaPCiU/allocation_heavy_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-CaPCiU/part0.o [E6002]\nFAIL  tests/run/calculator/main.vl\n      compiler exited with 70:\n      ast.vl:2:8: warning: 'text' is this program's text.vl, which hides the standard module std/text.vl; rename the file to use the standard one [E7005]\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-iBIxMV/main_0.c:532:19: error: unused variable '_t6' [-Werror,-Wunused-variable]\n        532 |         vela_map *_t6 = v_vars;\n            |                   ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-iBIxMV/main_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-iBIxMV/part0.o [E6002]\nFAIL  tests/run/concat_empty.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BSICeT/concat_empty_0.c:548:17: error: unused variable 'v__' [-Werror,-Wunused-variable]\n        548 |         int64_t v__ = _t5;\n            |                 ^~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BSICeT/concat_empty_0.c:865:54: error: unused parameter 'v__' [-Werror,-Wunused-parameter]\n        865 | static vela_str vc_f_main_c1(vela_env *env_, int64_t v__) {\n            |                                                      ^\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BSICeT/concat_empty_0.c:907:17: error: unused variable 'v__' [-Werror,-Wunused-variable]\n        907 |         int64_t v__ = _t12;\n            |                 ^~~\n      3 errors generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BSICeT/concat_empty_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-BSICeT/part0.o [E6002]\nFAIL  tests/run/cow_hoisted.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-iF5XUD/cow_hoisted_0.c:427:17: error: unused variable 'v_turn' [-Werror,-Wunused-variable]\n        427 |         int64_t v_turn = _t134;\n            |                 ^~~~~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-iF5XUD/cow_hoisted_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-iF5XUD/part0.o [E6002]\nFAIL  tests/run/effect_params.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-Ene94v/effect_params_0.c:474:53: error: unused parameter 'v_x' [-Werror,-Wunused-parameter]\n        474 | static int64_t vc_f_main_c2(vela_env *env_, int64_t v_x) {\n            |                                                     ^\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-Ene94v/effect_params_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-Ene94v/part0.o [E6002]\nFAIL  tests/run/fibonacci.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-0fuFSl/fibonacci_0.c:42:17: error: unused variable 'v_i' [-Werror,-Wunused-variable]\n         42 |         int64_t v_i = _t2;\n            |                 ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-0fuFSl/fibonacci_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-0fuFSl/part0.o [E6002]\nFAIL  tests/run/functions.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-1ezUVS/functions_0.c:48:13: error: unused variable '_t1' [-Werror,-Wunused-variable]\n         48 |     int64_t _t1 = f_noisy();\n            |             ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-1ezUVS/functions_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-1ezUVS/part0.o [E6002]\nFAIL  tests/run/interfaces.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-yrGCoY/interfaces_0.c:297:35: error: unused parameter 'v_value' [-Werror,-Wunused-parameter]\n        297 | uint64_t f_06Record_hash(t_Record v_value) {\n            |                                   ^\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-yrGCoY/interfaces_0.c:438:19: error: unused variable '_t58' [-Werror,-Wunused-variable]\n        438 |         vela_map *_t58 = v_saved;\n            |                   ^~~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-yrGCoY/interfaces_0.c:411:15: error: unused variable '_t41' [-Werror,-Wunused-variable]\n        411 |     vela_map *_t41 = v_values;\n            |               ^~~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-yrGCoY/interfaces_0.c:430:15: error: unused variable '_t51' [-Werror,-Wunused-variable]\n        430 |     vela_map *_t51 = v_values;\n            |               ^~~~\n      4 errors generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-yrGCoY/interfaces_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-yrGCoY/part0.o [E6002]\nFAIL  tests/run/loop_cached_arrays.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-z0u5BU/loop_cached_arrays_0.c:204:17: error: unused variable 'v_n_2' [-Werror,-Wunused-variable]\n        204 |         int64_t v_n_2 = _t67;\n            |                 ^~~~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-z0u5BU/loop_cached_arrays_0.c:234:25: error: unused variable 'v_m' [-Werror,-Wunused-variable]\n        234 |                 int64_t v_m = _t78;\n            |                         ^~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-z0u5BU/loop_cached_arrays_0.c:83:13: error: unused variable '_t14n' [-Werror,-Wunused-variable]\n         83 |     int64_t _t14n = v_a->len;\n            |             ^~~~~\n      3 errors generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-z0u5BU/loop_cached_arrays_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-z0u5BU/part0.o [E6002]\nFAIL  tests/run/loops.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-l8u3v6/loops_0.c:64:17: error: unused variable 'v_a' [-Werror,-Wunused-variable]\n         64 |         int64_t v_a = _t17;\n            |                 ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-l8u3v6/loops_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-l8u3v6/part0.o [E6002]\nFAIL  tests/run/map_found.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p3qqoJ/map_found_0.c:175:15: error: unused variable '_t27' [-Werror,-Wunused-variable]\n        175 |     vela_map *_t27 = v_m;\n            |               ^~~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p3qqoJ/map_found_0.c:380:15: error: unused variable '_t103' [-Werror,-Wunused-variable]\n        380 |     vela_map *_t103 = v_n;\n            |               ^~~~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p3qqoJ/map_found_0.c:412:15: error: unused variable '_t116' [-Werror,-Wunused-variable]\n        412 |     vela_map *_t116 = v_c_3;\n            |               ^~~~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p3qqoJ/map_found_0.c:451:15: error: unused variable '_t131' [-Werror,-Wunused-variable]\n        451 |     vela_map *_t131 = v_r;\n            |               ^~~~~\n      4 errors generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p3qqoJ/map_found_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p3qqoJ/part0.o [E6002]\nFAIL  tests/run/newline_rule_blocks.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-cwINMq/newline_rule_blocks_0.c:25:17: error: unused variable 'v_i' [-Werror,-Wunused-variable]\n         25 |         int64_t v_i = _t4;\n            |                 ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-cwINMq/newline_rule_blocks_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-cwINMq/part0.o [E6002]\nFAIL  tests/run/no_cycles.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-MGxjnf/no_cycles_0.c:275:17: error: unused variable 'v__' [-Werror,-Wunused-variable]\n        275 |         int64_t v__ = _t23;\n            |                 ^~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-MGxjnf/no_cycles_0.c:300:17: error: unused variable 'v___2' [-Werror,-Wunused-variable]\n        300 |         int64_t v___2 = _t35;\n            |                 ^~~~~\n      2 errors generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-MGxjnf/no_cycles_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-MGxjnf/part0.o [E6002]\nFAIL  tests/run/panic_flow_ensures.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-xvCJrx/panic_flow_ensures_0.c:18:21: error: unused variable 'v_result' [-Werror,-Wunused-variable]\n         18 |             int64_t v_result = _t1;\n            |                     ^~~~~~~~\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-xvCJrx/panic_flow_ensures_0.c:34:17: error: unused variable 'v_result' [-Werror,-Wunused-variable]\n         34 |         int64_t v_result = _t6;\n            |                 ^~~~~~~~\n      2 errors generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-xvCJrx/panic_flow_ensures_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-xvCJrx/part0.o [E6002]\nFAIL  tests/run/patterns.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-SbD1GO/patterns_0.c:90:18: error: unused variable 'v_other' [-Werror,-Wunused-variable]\n         90 |         vela_str v_other = v_s;\n            |                  ^~~~~~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-SbD1GO/patterns_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-SbD1GO/part0.o [E6002]\nFAIL  tests/run/prime_sieve.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-E0528O/prime_sieve_0.c:17:17: error: unused variable 'v_i' [-Werror,-Wunused-variable]\n         17 |         int64_t v_i = _t2;\n            |                 ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-E0528O/prime_sieve_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-E0528O/part0.o [E6002]\nFAIL  tests/run/prime_sieve_array.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-tWR1fi/prime_sieve_array_0.c:20:17: error: unused variable 'v_i' [-Werror,-Wunused-variable]\n         20 |         int64_t v_i = _t5;\n            |                 ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-tWR1fi/prime_sieve_array_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-tWR1fi/part0.o [E6002]\nFAIL  tests/run/self_comparison.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-3IXP8J/self_comparison_0.c:23:9: error: explicitly assigning value of variable of type 'int64_t' (aka 'long long') to itself [-Werror,-Wself-assign]\n         23 |     v_x = v_x;\n            |     ~~~ ^ ~~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-3IXP8J/self_comparison_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-3IXP8J/part0.o [E6002]\nFAIL  tests/run/strings_heap.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-E5qSlw/strings_heap_0.c:17:17: error: unused variable 'v_i' [-Werror,-Wunused-variable]\n         17 |         int64_t v_i = _t2;\n            |                 ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-E5qSlw/strings_heap_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-E5qSlw/part0.o [E6002]\nFAIL  tests/run/tasks.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-pdgZgB/tasks_0.c:608:15: error: unused variable '_t4' [-Werror,-Wunused-variable]\n        608 |     vela_map *_t4 = (env->c0);\n            |               ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-pdgZgB/tasks_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-pdgZgB/part0.o [E6002]\nFAIL  tests/run/tasks_shared.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-1eHyEP/tasks_shared_0.c:84:17: error: unused variable 'v__' [-Werror,-Wunused-variable]\n         84 |         int64_t v__ = _t3;\n            |                 ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-1eHyEP/tasks_shared_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-1eHyEP/part0.o [E6002]\nFAIL  tests/run/value_semantics.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p2ENjd/value_semantics_0.c:228:13: error: unused variable '_t2' [-Werror,-Wunused-variable]\n        228 |     int64_t _t2 = f_bump(v_a);\n            |             ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p2ENjd/value_semantics_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-p2ENjd/part0.o [E6002]\nFAIL  tests/run/word_report/main.vl\n      compiler exited with 70:\n      /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-pN2sii/main_0.c:192:21: error: unused variable 'v__' [-Werror,-Wunused-variable]\n        192 |             int64_t v__ = _t21;\n            |                     ^~~\n      1 error generated.\n      vela: internal compiler error: the C compiler rejected the generated code\n      command: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-pN2sii/main_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-pN2sii/part0.o [E6002]\nFAIL  tests/m24_test.py\n      Traceback (most recent call last):\n        File \"/Users/nathgoutam93/Documents/vela/tests/m24_test.py\", line 220, in <module>\n          if __name__=='__main__':main()\n                                  ~~~~^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m24_test.py\", line 218, in main\n          for fn in (basic,file_policy,foreign,fakes,queries,type_impact,measured,cache):fn(c,w,env);print(backend+': '+fn.__name__+' passed',flush=True)\n                                                                                         ~~^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m24_test.py\", line 43, in basic\n          assert command(c,env,'run','--deny','clock',p).stdout=='ok\\n'\n                 ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        File \"/Users/nathgoutam93/Documents/vela/tests/m24_test.py\", line 22, in command\n          assert r.returncode==code,(args,r.returncode,r.stdout,r.stderr)\n                 ^^^^^^^^^^^^^^^^^^\n      AssertionError: (('run', '--deny', 'clock', PosixPath('/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T/vela-m24-el6ha5af/c/case.vl')), 70, '', \"/var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-0as060/case_0.c:990:17: error: unused variable 'v__' [-Werror,-Wunused-variable]\\n  990 |         int64_t v__ = _t5;\\n      |                 ^~~\\n1 error generated.\\nvela: internal compiler error: the C compiler rejected the generated code\\ncommand: cc -std=c11 -O2 -pthread -Wall -Wextra -Werror -Wshadow -pedantic -g -fsanitize=undefined -fno-sanitize-recover=all -I /Users/nathgoutam93/Documents/vela/runtime -c /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-0as060/case_0.c -o /var/folders/ds/sbqn1wzn7m193lb93nt488r40000gn/T//vela-0as060/part0.o [E6002]\\n\")\n95 passed, 27 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n"
+  },
+  "ubsan": {
+    "passed": 122,
+    "failed": 0,
+    "skipped": 0,
+    "flags": "run_tests.STRICT_CFLAGS + -Wshadow -g -fsanitize=undefined -fno-sanitize-recover=all",
+    "selection": [
+      "tests/run/",
+      "m23_test",
+      "m24_test",
+      "m25_test",
+      "m30_test"
+    ],
+    "backend": "c",
+    "jobs": 2,
+    "log": "122 passed, 0 failed, 0 skipped  (compiler: /Users/nathgoutam93/Documents/vela/build/vela)\n",
+    "native_limit": "Selected integration scripts execute both backends. Native assembly itself is not sanitizer-instrumented."
+  },
+  "focused_opt0_ubsan": {
+    "passed": true,
+    "backends": [
+      "c",
+      "native"
+    ],
+    "flags": "run_tests.STRICT_CFLAGS + -g -fsanitize=undefined -fno-sanitize-recover=all",
+    "VELA_OPT": "0",
+    "functions": [
+      "socket_storage",
+      "socket_sigpipe",
+      "socket_close_race",
+      "duplex",
+      "real_network",
+      "fakes"
+    ],
+    "additional_fixture": "tests/run/concat_empty.vl",
+    "close_race": "Two gated concurrent receives; reject later operations; descriptor pressure; first completion must keep second alive; final completion releases connection. 32 rounds."
+  },
+  "asan_empty_probe": {
+    "compile_command": [
+      "cc",
+      "-std=c11",
+      "-g",
+      "-fsanitize=address,undefined",
+      "/Users/nathgoutam93/Documents/vela/build/network-work/asan-probe.c",
+      "-o",
+      "/Users/nathgoutam93/Documents/vela/build/network-work/asan-probe"
+    ],
+    "compile_exit": 0,
+    "compile_stderr": "",
+    "ASAN_OPTIONS": "detect_leaks=0",
+    "timeout": true,
+    "stderr": "Command '['/Users/nathgoutam93/Documents/vela/build/network-work/asan-probe']' timed out after 10 seconds"
+  },
+  "tsan_empty_probe": {
+    "compile_command": [
+      "cc",
+      "-std=c11",
+      "-g",
+      "-fsanitize=thread",
+      "/Users/nathgoutam93/Documents/vela/build/network-work/tsan-probe.c",
+      "-o",
+      "/Users/nathgoutam93/Documents/vela/build/network-work/tsan-probe"
+    ],
+    "compile_exit": 0,
+    "compile_stderr": "",
+    "exit": -11,
+    "stdout": "",
+    "stderr": ""
+  },
+  "cross_compile_initial": [
+    {
+      "target": "x86_64-linux-gnu",
+      "command": [
+        "zig",
+        "cc",
+        "-target",
+        "x86_64-linux-gnu",
+        "-std=c11",
+        "-O2",
+        "-pthread",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wshadow",
+        "-pedantic",
+        "-c",
+        "runtime/vela_rt.c",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-work/x86_64-linux-gnu.o"
+      ],
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "target": "x86_64-windows-gnu",
+      "command": [
+        "zig",
+        "cc",
+        "-target",
+        "x86_64-windows-gnu",
+        "-std=c11",
+        "-O2",
+        "-pthread",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wshadow",
+        "-pedantic",
+        "-c",
+        "runtime/vela_rt.c",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-work/x86_64-windows-gnu.o"
+      ],
+      "exit": 1,
+      "stderr": "In file included from runtime/vela_rt.c:1947:\nruntime/vela_sys.inc:78:16: error: unused function 'sys_write_fd' [-Werror,-Wunused-function]\n   78 | static ssize_t sys_write_fd(sys_fd fd,const void *p,size_t n) {\n      |                ^~~~~~~~~~~~\n1 error generated.\n"
+    },
+    {
+      "target": "wasm32-wasi",
+      "command": [
+        "zig",
+        "cc",
+        "-target",
+        "wasm32-wasi",
+        "-std=c11",
+        "-O2",
+        "-pthread",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wshadow",
+        "-pedantic",
+        "-c",
+        "runtime/vela_rt.c",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-work/wasm32-wasi.o"
+      ],
+      "exit": 1,
+      "stderr": "runtime/vela_rt.c:1285:24: error: unused variable 'fork_lock' [-Werror,-Wunused-variable]\n 1285 | static pthread_mutex_t fork_lock = PTHREAD_MUTEX_INITIALIZER;\n      |                        ^~~~~~~~~\n1 error generated.\n"
+    }
+  ],
+  "cross_compile_final": [
+    {
+      "target": "x86_64-linux-gnu",
+      "command": [
+        "zig",
+        "cc",
+        "-target",
+        "x86_64-linux-gnu",
+        "-std=c11",
+        "-O2",
+        "-pthread",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wshadow",
+        "-pedantic",
+        "-c",
+        "runtime/vela_rt.c",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-work/x86_64-linux-gnu.o"
+      ],
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "target": "x86_64-windows-gnu",
+      "command": [
+        "zig",
+        "cc",
+        "-target",
+        "x86_64-windows-gnu",
+        "-std=c11",
+        "-O2",
+        "-pthread",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wshadow",
+        "-pedantic",
+        "-c",
+        "runtime/vela_rt.c",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-work/x86_64-windows-gnu.o"
+      ],
+      "exit": 0,
+      "stderr": ""
+    },
+    {
+      "target": "wasm32-wasi",
+      "command": [
+        "zig",
+        "cc",
+        "-target",
+        "wasm32-wasi",
+        "-std=c11",
+        "-O2",
+        "-pthread",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wshadow",
+        "-pedantic",
+        "-c",
+        "runtime/vela_rt.c",
+        "-o",
+        "/Users/nathgoutam93/Documents/vela/build/network-work/wasm32-wasi.o"
+      ],
+      "exit": 0,
+      "stderr": ""
+    }
+  ],
+  "macos_preprocessed_runtime": [
+    {
+      "label": "suite-runtime",
+      "sha256": "5240083566011886502f8acc38faf70c31f5287c1d8fb7d83f71b62dd31f37cc"
+    },
+    {
+      "label": "final-runtime",
+      "sha256": "5240083566011886502f8acc38faf70c31f5287c1d8fb7d83f71b62dd31f37cc"
+    }
+  ],
+  "release_gate": {
+    "complete_full_matrix": true,
+    "native_over_c": {
+      "varints": 2.754909258110226,
+      "arena_trees": 1.8505796169659294,
+      "nbody": 1.3470414927744376,
+      "spectralnorm": 0.8757474321858855,
+      "fannkuch": 1.4521643772019694,
+      "binarytrees": 0.7994429798410178,
+      "mandelbrot": 1.4181814535363992,
+      "fasta": 1.5137603116752376,
+      "knucleotide": 1.8345402434057307,
+      "wordfreq": 1.7467715332528524,
+      "sha256": 1.5006982853353892,
+      "crc32": 1.3110941542181778
+    },
+    "geometric_mean": 1.4609033230149584,
+    "limit": 1.5,
+    "programs_passed": true,
+    "native_compiler_faster": true,
+    "same_source_compilers": true,
+    "passed": true
+  },
+  "notes": [
+    "No native Linux/Windows runtime or kernel-policy acceptance is claimed. Cross-target objects only establish compilation.",
+    "The final Windows/WASI guard fixes leave macOS preprocessed bytes identical to the runtime used by the full suites and fixed points.",
+    "ASan timed out on an empty instrumented C program after 10 seconds with leak detection disabled. TSan empty probe exited with SIGSEGV. Causes remain unknown.",
+    "The two-receive race fixture was strengthened after broad-suite launch and passed the corrected UBSan integration and both optimization-off selections.",
+    "Intermediate empty-concat experiment string_copy_bytes were counted at function entry and overcount the optimized fast path. Its timings/allocations remain valid; corrected final A/B counters count the actual copy site."
+  ],
+  "source_sha256": {
+    "runtime/vela_rt.c": "a850ff220e6bfd877a3d8ec1ad1fb450f17e120977e575a13f3d889aef3c21a0",
+    "runtime/vela_sys.inc": "1cbc74baa394c1f025bff4e82894ad45902508cdc0fe4ff1a66b25a5f07d6792",
+    "tests/m23_test.py": "a383a05906921fee4edfe9fbc7ff614642d6422bb1836cfe20d0d48eee9e4295",
+    "tests/run/concat_empty.vl": "d1408673fa0d44e84dc5d5464d78f8b5a7fa7c31ae5d1500de3f3b1849a108cc",
+    "tests/fixtures/network/close_race.c": "fa0ea4e996c72c4f65044aae905e035d724c86ab19bf2aa4d4b22a34a45b2fc0",
+    "bench/network_compare.py": "8f0df7383e4717dd7bf066863d702f5dc97751e80557c644bdb5395ed8ba4fd0"
+  },
+  "logs_sha256": {
+    "tests-native.log": "03a791f6d04acc51372f68fe772b0d31f4b91748d3b9f41405e8e4f98c1fd4c2",
+    "ubsan-final.log": "9824630586f77e778ce622d437f6228c8bb98f2a2b56d7d373fad31504ee8230",
+    "ubsan.log": "af5fce4ac4740d9f7aca84504b4886abcd61a8d3a49b353a6824fd39bb73c7ee",
+    "tests-c.log": "03a791f6d04acc51372f68fe772b0d31f4b91748d3b9f41405e8e4f98c1fd4c2",
+    "release-parity.log": "3f030ec6af1a91e218c9a63b618aa6275fe2031b1f8438073262c439d146e31f",
+    "bootstrap.log": "6d45ed4640139eb6fca4a3610836de1ce71aa303e9069f1e4657e048c4d339d6"
+  }
+}

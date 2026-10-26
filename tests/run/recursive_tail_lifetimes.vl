@@ -1,0 +1,64 @@
+// Deep recursive values must share and release without exhausting the stack.
+// out: recursive lifetimes passed
+import tasks
+import text
+
+type Chain = enum { Empty, Next(Str, Chain) }
+type Mixed = enum { Empty, End(Str), Pair(Str, Mixed, Mixed), After(Mixed, Str), Link(Str, Mixed, Int) }
+
+fn chain(n: Int) -> Chain {
+    let tag = text.repeat("x", 21)
+    let mut result = Chain.Empty
+    for _ in 0..n { result = Chain.Next(tag, result) }
+    return result
+}
+
+fn length(value: Chain) -> Int {
+    let mut current = value
+    let mut count = 0
+    for {
+        match current {
+            Chain.Empty => return count
+            Chain.Next(tag, next) => {
+                assert(len(tag) == 21 && (tag[20] == 'x' || tag[20] == 'y'))
+                current = next
+                count = count + 1
+            }
+        }
+    }
+    return count
+}
+
+fn score(value: Mixed) -> Int {
+    return match value {
+        Mixed.Empty => 0
+        Mixed.End(s) => len(s)
+        Mixed.Pair(s, a, b) => len(s) + score(a) + score(b)
+        Mixed.After(a, s) => score(a) + len(s)
+        Mixed.Link(s, a, n) => len(s) + score(a) + n
+    }
+}
+
+fn main() {
+    // Copies stop cleanup at a shared child; dropping the final owner walks
+    // the entire chain. Task publication also walks deeply when marking RCs.
+    for _ in 0..2 {
+        let mut deep = chain(120000)
+        let snapshot = deep
+        deep = Chain.Next(text.repeat("y", 21), Chain.Empty)
+        assert(length(snapshot) == 120000 && length(deep) == 1)
+        let results = tasks.map([snapshot, snapshot], fn(x) => length(x))
+        assert(len(results) == 2 && results[0] == 120000 && results[1] == 120000)
+    }
+    // Multiple recursive arms, shared subtrees and managed fields following
+    // a recursive child exercise the ordinary and iterative cleanup paths.
+    for _ in 0..100 {
+        let leaf = Mixed.End(text.repeat("z", 31))
+        let a = Mixed.After(leaf, text.repeat("a", 33))
+        let b = Mixed.Link(text.repeat("b", 35), leaf, 7)
+        let pair = Mixed.Pair(text.repeat("p", 37), a, b)
+        let copies = tasks.map([pair, pair], fn(x) => x)
+        assert(score(copies[0]) == 174 && score(copies[1]) == 174 && score(pair) == 174)
+    }
+    print("recursive lifetimes passed")
+}
