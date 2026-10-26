@@ -2343,6 +2343,38 @@ the same entry. Close it with a commit or validation result; keep its history.
   can fail to appear if the overflow occurs while the C library holds a lock.
   Windows needs structured exception handling.
 
+### TL-089: Semantic queries loaded every module twice and indexed by strings
+
+- **Status:** resolved after the post-M30 review; the gates' host evidence is
+  in VAL-007.
+- **Discovery:** profiling the M24 query-latency failures on Linux x86-64.
+- **Evidence:** `query.analyze_completing` (every query and the language
+  server) and `check --json` loaded, lexed and parsed every module with
+  `load_open`/`load`, then discarded that and loaded all of them again with
+  `load_program` whenever the program's `vela.mod` resolved (also when there is
+  none). `index.walk_module` then lexed each module again and built a map from
+  formatted `"line:col"` strings to token indexes, one entry per token. On the
+  compiler's 63 modules, `vela profile` counts 189 lexer runs for one `query
+  impact`.
+- **Impact:** queries, `check --json` and the language server did about twice
+  the necessary loading. The M24 `impact`/`coverage` gate (best of three under
+  1 s) and the M29 100k-line query budget failed on Linux CI and the Linux VM.
+- **Resolution:** load once, falling back to the files alone only when the
+  manifest does not resolve, as the discarded first load was then used.
+  Find a token by binary search over the token list, which is in source order,
+  returning the last token at a position as the map did. The index still lexes
+  each module once; keeping tokens on every module would add about 80 bytes per
+  token to every `check` and `build`.
+- **Verification:** before/after outputs are byte-identical for summary,
+  impact, coverage, `check --json` (compiler, 100k-line project, an example),
+  both manifest-error branches, 240 random `type`/`def`/`refs`/`impact` queries
+  across compiler and std sources, and three cross-module renames. Over 1.0
+  million tokens of repository and benchmark sources, none is out of order and
+  one pair shares a position. Best of seven on the Linux VM: compiler `impact`
+  913 → 575 ms, `coverage` 965 → 518 ms, `summary` 567 → 356 ms, `check
+  --json` 472 → 344 ms, `refs` 904 → 551 ms; 100k-line `impact` 1,544 → 827 ms
+  and `summary` 851 → 530 ms.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
@@ -2392,8 +2424,14 @@ the same entry. Close it with a commit or validation result; keep its history.
   `load_program` whenever a vela.mod resolves; `index.vl` tokenizes each
   module a third time (63 modules, 189 lexer runs under `vela profile`).
   Loading once in a scratch build gives byte-identical output with `impact`
-  1,026 → 559 ms and `summary` 617 → 304 ms on the compiler source. This is an
-  observed redundant cost, not yet a committed fix.
+  1,026 → 559 ms and `summary` 617 → 304 ms on the compiler source. Fixed as
+  [TL-089](#tl-089-semantic-queries-loaded-every-module-twice-and-indexed-by-strings),
+  which also replaces the index's string-keyed token map. After it, both
+  complete suites pass 318/318 on this VM, M24 run alone measures best
+  `impact` 0.55–0.62 s, and the M29 gate passes (`python3
+  bench/real_programs.py --gate --runs 3`: real programs 1.109× C through C
+  and 1.038× natively, 100k-line `impact` median 0.959 s, `summary` 0.532 s,
+  check 0.516 s). The 100k `impact` margin is narrow on this host.
 - **Linux x86-64 release gate:** after TL-084 and TL-086 the unchanged
   `bench/run.py --require-native-parity --runs 5` gate passes on the same VM at
   1.283× C with a faster native-built compiler

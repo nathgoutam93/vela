@@ -67,14 +67,13 @@ type Builder = struct {
     type_params: Map[Str, Int]  // in scope where the walk is, by name
     lines: [[Str]]  // each module's source, by line
     module: Int  // the module being walked
-    tokens: [lexer.Token]  // its tokens
-    token_at: Map[Str, Int]  // their indexes, by "line:col"
+    tokens: [lexer.Token]  // its tokens, in source order
 }
 
 pub fn build(k: checker.Checked) -> Index {
     let mut b = Builder {
         k: k, defs: [], occurrences: [], seen: [:], locals: [:], fns: [:], decls: [:], members: [:], mods: [:], builtins: [:],
-        type_params: [:], lines: [], module: 0, tokens: [], token_at: [:],
+        type_params: [:], lines: [], module: 0, tokens: [],
     }
     for m in k.modules {
         push(mut b.lines, source_lines(m.source))
@@ -643,28 +642,37 @@ fn part(b: Builder, line: Int, col: Int, n: Int) -> Option[lexer.Token] {
     return token_after(b, line, col, 2 * n)
 }
 
-// The token `n` tokens after the one at `line`:`col`, or None.
+// The token `n` tokens after the one at `line`:`col`, or None. Tokens are
+// in source order, so a binary search finds it: the last one there, when an
+// inserted `;` shares its position.
 fn token_after(b: Builder, line: Int, col: Int, n: Int) -> Option[lexer.Token] {
-    match maps.get(b.token_at, strings.from_int(line) + ":" + strings.from_int(col)) {
-        Some(i) => {
-            if i + n < len(b.tokens) {
-                return Some(b.tokens[i + n])
-            }
+    let mut lo = 0
+    let mut hi = len(b.tokens)
+    for lo < hi {
+        let mid = lo + (hi - lo) / 2
+        let t = b.tokens[mid]
+        if t.line < line || t.line == line && t.col <= col {
+            lo = mid + 1
+        } else {
+            hi = mid
         }
-        None => {}
     }
-    return None
+    // lo is the first token after line:col.
+    if lo == 0 {
+        return None
+    }
+    let i = lo - 1
+    let t = b.tokens[i]
+    if t.line != line || t.col != col || i + n >= len(b.tokens) {
+        return None
+    }
+    return Some(b.tokens[i + n])
 }
 
 fn walk_module(b: mut Builder, mi: Int) {
     b.module = mi
     let m = b.k.modules[mi]
     b.tokens = lexer.tokenize(m.source).tokens
-    b.token_at = [:]
-    for i in 0..len(b.tokens) {
-        let t = b.tokens[i]
-        b.token_at[strings.from_int(t.line) + ":" + strings.from_int(t.col)] = i
-    }
     for imp in m.program.imports {
         match maps.get(m.imports, imp.name) {
             Some(target) => add_use(mut b, imp.line, imp.col, imp.name, b.mods[target], "")

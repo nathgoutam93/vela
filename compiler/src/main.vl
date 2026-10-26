@@ -1051,10 +1051,12 @@ fn check_json(path: Str, root: Str) uses fs, os {
             failed = true
         }
         Ok(source) => {
-            let mut loaded = modules.load(path, source, modules.join(root, "std"))
+            // Loading parses every module: once, with the packages when they resolve.
+            let mut loaded = modules.Loaded { modules: [], order: [], errors: [], warnings: [], node_count: 0 }
             match packages.for_program(path) {
                 Ok(pk) => loaded = modules.load_program(path, source, modules.join(root, "std"), [:], pk)
                 Err(e) => {
+                    loaded = modules.load(path, source, modules.join(root, "std"))
                     let at = modules.join(modules.dirname(path), "vela.mod")
                     // Only this: without the packages, what imports them cannot load either.
                     loaded.errors = [errors.CompileError { code: "E7003", fix: [], path: at, line: 1, col: 1, message: e, warning: false }]
