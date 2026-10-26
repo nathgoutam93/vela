@@ -80,6 +80,42 @@ the noise. [TL-085](../tooling-backlog.md#tl-085-x86-64-branch-placement-changes
 records it; enabling the mitigation is deferred because GCC and Clang spell
 the option differently.
 
+## Second pass: layout and addressing
+
+A follow-up targeted varints, fannkuch and CRC-32, still 1.7–2.6× C after the
+first pass. Their hot loops jumped around inline code that only fails or
+returns: each loop test compiled to `jcc cold; jmp hot`, each bounds check
+jumped over its failure call, and each array access computed its address in
+three instructions. Changes, again only in `x64.vl`:
+
+- **Cold blocks after the epilogue.** `layout` finds straight-line blocks
+  that end in `ret` or `unreachable` and either start at a label nothing falls
+  into, or are what a `branch.cmp`/`branch` falls into when its target is the
+  label right after the block. They are written after the epilogue with the
+  panic stubs, and the skipping branch jumps to them on the opposite
+  condition. Allocation is unchanged, because every value has one location for
+  its whole interval. The label a skipped branch now falls into always stays
+  in the main sequence.
+- **Inverted branches.** `branch.cmp c T; jump F; T:` becomes `j!c F`.
+- **Scaled addressing.** `muli i #s` (s = 1, 2, 4, 8), `add base, m` and a
+  load or store through it, with both intermediates read once, become one
+  `[base + i*s + off]` operand. A 4-byte load whose only reader zero-extends
+  it becomes a 32-bit `mov`.
+
+The first version of the layout put the label a skipped branch falls into
+among the cold blocks whenever the instruction before it in the IR was the
+skipped block's `unreachable`. nbody's last store then disappeared, and its
+output differed from C in the eighth digit. The harness checks every output
+before timing, which caught it. `tests/run/x64_layout.vl` reproduces the shape
+and fails on that version.
+
+Results ([report](../../bench/results/2026-10-26-x64-layout.md)): CRC-32 falls
+36%, varints 34% and fannkuch 18% in nine paired rounds, and the unchanged
+release gate passes on Linux x86-64 at 1.283× C. Three other workloads appear
+16–34% slower in the same comparison, but hand-assembled builds of the same
+outputs do not reproduce that. One of them reverses direction under the JCC
+mitigation alone, so TL-085's branch placement decides them.
+
 ## Validation and reproduction
 
 Both fixed points pass (158,266 C and 1,979,441 x86-64 assembly lines). The

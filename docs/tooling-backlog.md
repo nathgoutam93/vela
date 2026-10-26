@@ -2208,6 +2208,39 @@ the same entry. Close it with a commit or validation result; keep its history.
   without benefit.
 - **Verification:** rerun `bench/compare.py --backend native` with and without
   the option on an affected and an unaffected CPU, and both fixed points.
+- **Recurrence (TL-086 pass):** the same varints assembly measures 199 or
+  237 ms through `vela build` depending only on placement, and 170 ms with the
+  mitigation. In a nine-round paired comparison, nbody, wordfreq and
+  knucleotide appear 16–34% slower. Hand-assembled builds of the same
+  outputs show no slowdown, and knucleotide reverses (314 → 389 ms
+  unmitigated, 408 → 326 ms mitigated). A single release-gate or A/B run on
+  this CPU therefore cannot resolve changes under about 30% in one workload;
+  this now limits further x86-64 tuning.
+
+### TL-086: x86-64 hot paths jumped around inline failure blocks
+
+- **Status:** resolved in the second post-M30 x86-64 pass; macOS was not rerun.
+- **Discovery:** profiling varints, fannkuch and CRC-32 after TL-084.
+- **Evidence:** `vela ir bench/varints/main.vl` writes each `Err` return and
+  each bounds-check failure inline, between a loop test and its body; x64
+  emits `jcc cold; jmp hot` per test and a taken `jb` around every failure
+  call. `perm[i]` and `entries[k]` are `imul`, `mov`, `add`, `mov`. ARM64
+  shares the IR layout (varints 2.57× C there); its emitter was not changed.
+- **Impact:** varints 2.54×, fannkuch 1.83× and CRC-32 1.68× C natively on
+  Linux x86-64 after TL-084.
+- **Resolution:** in `x64.vl`, write blocks that only return or fail after the
+  epilogue and jump to them on the opposite condition, invert compare-branches
+  followed by a jump over their own target, and fold scaled indexes into
+  memory operands. Details are in the
+  [walkthrough](history/x64-native-performance.md#second-pass-layout-and-addressing).
+- **Verification:** both fixed points; complete C/native suites 314/316 (the
+  reviewed x86-64 snapshot update passes; the remaining M24 latency failure is
+  VAL-007); `VELA_OPT=0` native selection 255/255; M27 with gdb on both
+  backends; `tests/run/x64_layout.vl`, which fails on the first version's
+  misplaced fall-through label (nbody's dropped store) and passes now. The
+  paired comparison reduces CRC-32 35.7%, varints 33.5% and fannkuch 17.6%;
+  the release gate passes on Linux x86-64 at 1.283×
+  ([report](../bench/results/2026-10-26-x64-layout.md)).
 
 ## Outstanding validation
 
@@ -2260,6 +2293,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   Loading once in a scratch build gives byte-identical output with `impact`
   1,026 → 559 ms and `summary` 617 → 304 ms on the compiler source. This is an
   observed redundant cost, not yet a committed fix.
+- **Linux x86-64 release gate:** after TL-084 and TL-086 the unchanged
+  `bench/run.py --require-native-parity --runs 5` gate passes on the same VM at
+  1.283× C with a faster native-built compiler
+  ([report](../bench/results/2026-10-26-x64-layout-release-parity.json)). Per
+  TL-085, one run on this CPU is not a stable margin; the M24/M29 query budgets
+  above remain failing.
 - **Native Linux handoff:** after `sh compiler/bootstrap/bootstrap.sh --native`,
   run `python3 -u bench/real_programs.py --compiler build/vela --gate --runs 3
   --json build/m29-real-programs-native-linux.json` on the intended host.

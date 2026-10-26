@@ -13,31 +13,24 @@ f_count:
     mov r10, rdi
     cmp r10, 0
     jle .L0_0
-    jmp .L0_1
-.L0_0:
-    mov rax, 0
-    jmp .LR0
 .L0_1:
     sub r10, 1
     cmp r10, 0
-    jle .L0_3
-    jmp .L0_4
+    jg .L0_4
 .L0_3:
     xor ebx, ebx
     jmp .L0_6
 .L0_4:
     sub r10, 1
     cmp r10, 0
-    jle .L0_7
-    jmp .L0_8
+    jg .L0_8
 .L0_7:
     xor r12d, r12d
     jmp .L0_14
 .L0_8:
     sub r10, 1
     cmp r10, 0
-    jle .L0_10
-    jmp .L0_11
+    jg .L0_11
 .L0_10:
     xor r13d, r13d
     jmp .L0_13
@@ -70,6 +63,9 @@ f_count:
     pop rbx
     pop rbp
     ret
+.L0_0:
+    mov rax, 0
+    jmp .LR0
 .LP0_1:
     lea rdi, [rip + .Lc1]
     lea rsi, [rip + .Lmsg_overflow]
