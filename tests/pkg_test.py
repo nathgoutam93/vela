@@ -267,6 +267,27 @@ def scenario(w: World) -> None:
     w.write("eight/vela.mod", f"use nope {w.url('mono')}//nope hi/v1.0.0\n")
     expect("no such directory", "there is no nope.vl in" in w.fails("eight", "get"), True)
 
+    # A source or ref starting with "-" would reach git as an option, and
+    # --upload-pack runs a command: from the program's vela.mod, from a
+    # package's, or from the command line, nothing may run.
+    marker = w.base / "PWNED"
+    inject = f"--upload-pack=touch${{IFS}}{marker}"
+    refused = f"'{inject}' starts with '-'; a source or ref cannot"
+    w.write("nine/main.vl", main_using("greet"))
+    w.write("nine/vela.mod", f"use evil {inject} .\n")
+    expect("an option as a source", refused in w.fails("nine", "get"), True)
+    w.write("nine/vela.mod", f"use evil {w.url('greet')} {inject}\n")
+    expect("an option as a ref", refused in w.fails("nine", "get"), True)
+    w.write("evil/vela.mod", f"package evil\nuse sneaky {inject} .\n")
+    w.write("evil/evil.vl", "pub fn evil() -> Int {\n    return 1\n}\n")
+    w.commit("evil", "v1.0.0")
+    w.write("nine/vela.mod", f"use evil {w.url('evil')} v1.0.0\n")
+    expect("an option in a package's vela.mod", refused in w.fails("nine", "get"), True)
+    w.write("nine/vela.mod", "")
+    expect("an option on the command line", refused in w.fails("nine", "get", "evil", inject, "v1.0.0"), True)
+    expect("vela.mod unchanged by a refused vela get", (w.base / "nine/vela.mod").read_text(), "")
+    expect("no command ran", marker.exists(), False)
+
     # vela query and vela check --json reach into packages.
     q = w.ok("two", "query", "def", "main.vl:6:17")
     expect("a definition in a package", "/pkg/greet@" in q and '"line": 4' in q, True)

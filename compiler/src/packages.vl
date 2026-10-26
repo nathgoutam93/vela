@@ -211,6 +211,13 @@ pub fn parse_manifest(text: Str, file: Str) -> Result[Manifest, Str] {
                     return Err(at + "'" + w[1] + "' is already used, on line " + strings.from_int(d.line))
                 }
             }
+            // git would read a word starting with "-" as an option, such as
+            // --upload-pack=COMMAND, which runs a command.
+            for word in w[2..len(w)] {
+                if word[0] == '-' {
+                    return Err(at + "'" + word + "' starts with '-'; a source or ref cannot")
+                }
+            }
             let mut ref = ""
             if len(w) == 4 {
                 ref = w[3]
@@ -605,7 +612,7 @@ fn resolve(dep: Dep, old: Map[Str, Locked]) -> Result[Str, Str] uses os {
         return Ok(dep.ref)
     }
     let mut listing = ""
-    match os.output(["git", "ls-remote", repository(dep.source), dep.ref]) {
+    match os.output(["git", "ls-remote", "--", repository(dep.source), dep.ref]) {
         Ok(out) => listing = out
         Err(e) => return Err("cannot look up " + dep.ref + " in " + dep.source + ": " + e)
     }
@@ -656,7 +663,7 @@ fn fetch(name: Str, source: Str, commit: Str) -> Result[Str, Str] uses fs, os {
     let partial = dir + ".partial"
     let steps = [
         ["mkdir", "-p", modules.join(home(), "pkg")], ["rm", "-rf", partial], ["rm", "-rf", dir],
-        ["git", "clone", "--quiet", "--no-checkout", repository(source), partial],
+        ["git", "clone", "--quiet", "--no-checkout", "--", repository(source), partial],
         ["git", "-C", partial, "checkout", "--quiet", "--detach", commit], ["mv", partial, dir],
     ]
     for step in steps {
@@ -766,6 +773,11 @@ test "vela.mod" {
     assert(m.deps[1].source == "../shapes" && m.deps[1].ref == "" && m.deps[1].line == 5)
     assert(error_of("use text") == "vela.mod:1: write `use NAME URL REF` for a git repository, or `use NAME DIRECTORY`")
     assert(error_of("use 9x ../x") == "vela.mod:1: '9x' is not a name: letters, digits and _, not starting with a digit")
+    assert(error_of("use x --upload-pack=touch${IFS}/tmp/x .") ==
+        "vela.mod:1: '--upload-pack=touch${IFS}/tmp/x' starts with '-'; a source or ref cannot")
+    assert(error_of("use x https://example.com/x.git --upload-pack=sh") ==
+        "vela.mod:1: '--upload-pack=sh' starts with '-'; a source or ref cannot")
+    assert(error_of("use x -C") == "vela.mod:1: '-C' starts with '-'; a source or ref cannot")
     assert(error_of("use os ../x") == "vela.mod:1: 'os' is the name of a built-in module")
     assert(error_of("use a ../a\nuse a ../b") == "vela.mod:2: 'a' is already used, on line 1")
     assert(error_of("use a https://h/r//../x v1.0.0") == "vela.mod:1: after `//` comes a directory in the repository, as " +
