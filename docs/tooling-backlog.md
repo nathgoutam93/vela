@@ -2155,6 +2155,60 @@ the same entry. Close it with a commit or validation result; keep its history.
   correction/rerun; all 315 checks per backend are covered without hiding
   either initial failure.
 
+### TL-084: The x86-64 emitter lacked the ARM64 allocation and selection work
+
+- **Status:** resolved in the post-M30 x86-64 native pass; macOS was not rerun.
+- **Discovery:** Linux x86-64 review of commit `d9fb025`.
+- **Evidence:** `python3 bench/run.py --compiler build/vela --languages c
+  vela-native --runs 5 --require-native-parity` measures 1.880× C on Linux
+  x86-64 (SHA-256 4.34×, spectral-norm 3.04×) against 1.39× on macOS ARM64
+  from the same IR. `vela asm bench/sha256/main.vl` shows the eight working
+  variables in stack slots and every `and`/`or`/`xor`/shift going through
+  `rax`; spectral-norm's inner loop executes `idiv` for `/ 2`. `x64.vl`
+  allocates six general registers, evicts the longest interval and calls
+  `live.intervals(f, false)`, which counts failed-check reports as clobbering
+  calls. M25's improvements went into `regalloc.vl` and `arm64.vl` only
+  (observed); the release gate was only exercised on ARM64.
+- **Impact:** M25's "within 1.5× C" acceptance did not hold for the x86-64
+  emitter, and Linux native performance was not representative of the design.
+- **Resolution:** in `x64.vl`, exempt non-returning calls from liveness, evict
+  by loop-weighted cost, add `rdi`/`rsi`/`r8`/`r9` as a pool for values no call
+  reads and no returning call or long copy overlaps, compute logic, shift,
+  extension and immediate operations in the result register, use immediate
+  shift counts, strength-reduce power-of-two division/remainder, and port the
+  ARM64 `rotate` and `narrow` peepholes.
+- **Verification:** both fixed points; complete C/native suites (314/315, the
+  remaining M24 latency failure reproduces with the before compiler, VAL-007);
+  `VELA_OPT=0` native selection 254/254; `tests/run/x64_selection.vl`, 789
+  independently computed cases at both optimization settings. A nine-round
+  paired comparison improves the native geometric mean from 1.767× to 1.480× C
+  by medians; see the [walkthrough](history/x64-native-performance.md) and
+  [report](../bench/results/2026-10-26-x64-native-performance.md).
+
+### TL-085: x86-64 branch placement changes native timings by up to 25%
+
+- **Status:** open; discovered in the post-M30 x86-64 native pass.
+- **Evidence:** on an Intel Xeon @ 2.10 GHz (model 207), the varints
+  assembly from the before and after compilers takes 305 and 322 ms. The same
+  files assembled with GNU as `-Wa,-mbranches-within-32B-boundaries` take 256
+  and 232 ms (15 interleaved rounds). Mandelbrot is unaffected. The after code
+  is shorter at every step. The JCC erratum (a jump crossing or ending on a
+  32-byte boundary leaves the µop cache) is the suspected cause; it has not
+  been confirmed with performance counters.
+- **Impact:** unrelated code-layout shifts change x86-64 timings by ±10% or
+  more, making single runs of the release gate unreliable and hiding real
+  improvements as apparent regressions.
+- **Workaround:** use interleaved paired comparisons with repeated rounds and
+  confirm suspected regressions with the mitigation before acting on them.
+- **Proposed improvement:** pass the mitigation when assembling x86-64
+  native output: GCC needs `-Wa,-mbranches-within-32B-boundaries` and Clang
+  `-mbranches-within-32B-boundaries`; each rejects the other spelling, so the
+  driver must detect the compiler family (or the emitter must pad branches
+  itself). Measure on AMD and newer Intel hosts, where the padding is cost
+  without benefit.
+- **Verification:** rerun `bench/compare.py --backend native` with and without
+  the option on an affected and an unaffected CPU, and both fixed points.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
@@ -2196,6 +2250,16 @@ the same entry. Close it with a commit or validation result; keep its history.
   the raw [M29 artifact](https://github.com/nathgoutam93/vela/actions/runs/40215742923/artifacts/12607262926)
   and measure on the intended native Linux host before changing the threshold
   or claiming a compiler regression. The user requested no more workflow runs.
+- **Linux x86-64 host, 2026-10-26:** on a four-CPU Xeon @ 2.10 GHz VM the
+  M24 compiler-query gate fails isolated and in full suites with best-of-three
+  `impact`/`coverage` of 1.00–1.26 s, for both `d9fb025` and the x86-64 pass
+  (966–1,071 ms with the before compiler). `query.vl`'s `analyze_completing`
+  loads every module with `load_open`, then loads all of them again with
+  `load_program` whenever a vela.mod resolves; `index.vl` tokenizes each
+  module a third time (63 modules, 189 lexer runs under `vela profile`).
+  Loading once in a scratch build gives byte-identical output with `impact`
+  1,026 → 559 ms and `summary` 617 → 304 ms on the compiler source. This is an
+  observed redundant cost, not yet a committed fix.
 - **Native Linux handoff:** after `sh compiler/bootstrap/bootstrap.sh --native`,
   run `python3 -u bench/real_programs.py --compiler build/vela --gate --runs 3
   --json build/m29-real-programs-native-linux.json` on the intended host.
