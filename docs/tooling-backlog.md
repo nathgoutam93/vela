@@ -2412,6 +2412,37 @@ the same entry. Close it with a commit or validation result; keep its history.
   bootstrap fixed points pass, and the complete C and native suites pass
   319/319 on Linux x86-64.
 
+### TL-091: vela get passed vela.mod words to git as options
+
+- **Status:** resolved after the post-M30 review; a security fix.
+- **Discovery:** second post-M30 review, reading the git commands in
+  `compiler/src/packages.vl`.
+- **Evidence:** a `use` line's SOURCE and REF went unchecked into
+  `git ls-remote SOURCE REF` and `git clone --quiet --no-checkout SOURCE DIR`.
+  `use evil --upload-pack=touch${IFS}/tmp/PWNED .` made `vela get` run
+  `touch` through the shell git uses for `--upload-pack`. It also ran when
+  that line was in the `vela.mod` of a git package the program used, so
+  fetching a malicious package's dependants ran its command, contrary to the
+  module's statement that a package can do nothing when it is fetched or
+  built. `link` lines already rejected a leading `-`.
+- **Impact:** arbitrary command execution as the user running `vela get`,
+  from any manifest it reads, transitively.
+- **Workaround:** before the fix, read every `vela.mod` a `vela get` would
+  fetch; there was no safe way to fetch an untrusted package.
+- **Resolution:** a `use` line's SOURCE or REF starting with `-` is rejected
+  with the line number, in the program's manifest and in every package's.
+  `vela get NAME SOURCE REF` checks the line before writing it, so
+  `vela.mod` stays unchanged when it is refused. The git commands also put
+  `--` before their arguments; git then refuses a repository named like an
+  option. Commits passed to `git checkout` were already checked to be
+  hexadecimal hashes, and git's default protocol policy refuses `ext::`
+  sources.
+- **Verification:** `tests/pkg_test.py` adds a source, a ref, a git package's
+  own manifest and the command-line form. Each must fail with the message,
+  leave `vela.mod` unchanged and create no marker file. It fails on the
+  previous compiler and passes now. The `packages.vl` unit tests cover the
+  messages.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures

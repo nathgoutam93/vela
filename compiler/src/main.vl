@@ -326,6 +326,11 @@ fn get_command(args: [Str]) uses fs, os {
         if len(rest) == 3 {
             line = line + " " + rest[2]
         }
+        // Checked before it is written, so that vela.mod stays readable.
+        match packages.parse_manifest(line, "vela get") {
+            Ok(_) => {}
+            Err(e) => driver_error(e)
+        }
         let mut text = ""
         match files.read("vela.mod") {
             Ok(t) => text = t
