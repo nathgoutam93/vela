@@ -1,0 +1,96 @@
+// out: 1000000
+// out: 500001
+// out: 500000
+// out: 1000000
+// out: x
+// out: 999999
+// out: 7
+// out: 3000006
+// out: 1000000
+// Releasing or sharing a value visits what it holds, which can be a million
+// levels deep when built in a loop. Every shape must release and share
+// without overflowing the stack, keep anything still referenced, and free
+// the rest (the sanitizer runs check for leaks and double frees).
+import tasks
+
+type List = enum { Nil, Cons(Int, List) }
+type Tree = enum { Leaf, Node(Tree, Int, Tree) }
+type Item = struct { name: Str, next: Chain }
+type Chain = enum { End, Link(Item) }
+type Pair = enum { Done, More(Pair, Str) }
+type Kids = struct { v: Int, kids: [Kids] }
+
+fn list_len(l: List) -> Int {
+    let mut n = 0
+    let mut cur = l
+    for { match cur { List.Nil => { return n }, List.Cons(_, rest) => { n = n + 1; cur = rest } } }
+    return n
+}
+
+fn left_depth(t: Tree) -> Int {
+    let mut d = 0
+    let mut cur = t
+    for { match cur { Tree.Leaf => { return d }, Tree.Node(l, _, _) => { d = d + 1; cur = l } } }
+    return d
+}
+
+fn main() {
+    let n = 1000000
+
+    // A list, keeping its second half alive while the first half is freed.
+    let mut l = List.Nil
+    let mut kept = List.Nil
+    for i in 0..n {
+        l = List.Cons(i, l)
+        if i == n / 2 { kept = l }
+    }
+    print(list_len(l))
+    l = List.Nil
+    print(list_len(kept))
+    match kept { List.Cons(v, _) => print(v), List.Nil => print(-1) }
+    kept = List.Nil
+
+    // Trees deep on the left (the recursive part that is not a tail) and the right.
+    let mut left = Tree.Leaf
+    let mut right = Tree.Leaf
+    for i in 0..n {
+        left = Tree.Node(left, i, Tree.Leaf)
+        right = Tree.Node(Tree.Leaf, i, right)
+    }
+    print(left_depth(left))
+    left = Tree.Leaf
+    right = Tree.Leaf
+
+    // A recursive enum through a struct, and a managed field after the tail.
+    let mut c = Chain.End
+    let mut p = Pair.Done
+    for i in 0..n {
+        c = Chain.Link(Item { name: "x", next: c })
+        p = Pair.More(p, "s")
+    }
+    match c { Chain.Link(item) => print(item.name), Chain.End => print("end") }
+    c = Chain.End
+    p = Pair.Done
+
+    // Nesting through arrays, with no box at all.
+    let mut k = Kids { v: 0, kids: [] }
+    for i in 0..n { k = Kids { v: i, kids: [k] } }
+    print(k.v)
+    k = Kids { v: 0, kids: [] }
+
+    // Closures capturing closures.
+    let mut f = fn(x: Int) -> Int { return x }
+    for i in 0..n {
+        let g = f
+        f = fn(x: Int) -> Int { if x < 0 { return g(x) + i }; return x }
+    }
+    print(f(7))
+    f = fn(x: Int) -> Int { return x }
+
+    // Sharing a deep tree with workers marks every node.
+    let mut t = Tree.Leaf
+    for i in 0..n { t = Tree.Node(t, i, Tree.Leaf) }
+    let depths = tasks.map([1, 2, 3], fn(d: Int) -> Int { return left_depth(t) + d })
+    print(depths[0] + depths[1] + depths[2])
+    print(left_depth(t))
+}

@@ -2268,6 +2268,59 @@ the same entry. Close it with a commit or validation result; keep its history.
   the release gate passes on Linux x86-64 at 1.283×
   ([report](../bench/results/2026-10-26-x64-layout.md)).
 
+### TL-087: Dropping or sharing deep values overflowed the stack
+
+- **Status:** resolved in a post-M30 correctness fix; macOS was not rerun.
+- **Discovery:** the post-M30 review, on Linux x86-64.
+- **Evidence:** a program building one million nodes in a loop exits 139
+  (SIGSEGV, no panic, buffered output lost) when the value is dropped or
+  captured by `tasks.map`. gdb shows `rc_release_t_List` recursing once per
+  node natively. Before this change: a left-deep tree and an enum chain through
+  a struct crash on both backends; `More(Pair, Str)` and closure chains crash
+  natively only; sharing a deep tree with workers crashes on both. Only a
+  single recursive tail was iterative (TL-031's native walk, the C compact
+  helpers).
+- **Impact:** ordinary loop-built data structures crash safe programs, with
+  backend-dependent results.
+- **Workaround:** none in safe code.
+- **Resolution:** add `vela_bounded` to the runtime. It nests release/share
+  visits at most 256 deep per thread, defers deeper ones to a thread-local
+  list, and drains that list before the outermost visit returns. Route the C
+  and native box helpers, the native tail walk and closure environments, and
+  runtime arrays, maps and environments through it. See the
+  [walkthrough](history/deep-release.md).
+- **Verification:** `tests/run/deep_drop.vl` (every shape, one million deep,
+  plus a half-shared list) passes C/native at opt=1/0 and crashes on the
+  previous compiler. Both fixed points pass (159,893 C and 1,976,771 x86-64
+  assembly lines); complete C/native suites 316/317 each, the remaining failure
+  being the known M24 latency gate (VAL-007); `VELA_OPT=0` native selection
+  256/256. Complete ASan/UBSan suites pass 314/317 on both backends with no
+  sanitizer reports; the three failures are LeakSanitizer refusing to run
+  inside `--deny` sandboxes, as before this change. TSan passes the task
+  fixtures and `deep_drop` on both backends. Measured cost is within
+  identical-binary controls except arena_trees (+5% beyond its control with
+  byte-identical code and no bounded visits), recorded without a
+  mechanism.
+
+### TL-088: Stack overflow from program recursion is a silent segmentation fault
+
+- **Status:** open; discovered in the post-M30 review. Not addressed by TL-087.
+- **Evidence:** `fn down(n: Int) -> Int { if n == 0 { return 0 }; return 1 +
+  down(n - 1) }` called with 10,000,000 exits 139 on both backends, including
+  with `--debug` and `VELA_PANIC=json`. No message, Vela stack or JSON
+  failure is produced, and buffered stdout is lost.
+- **Impact:** an agent or user sees a crash rather than the M27 panic report.
+  The compatibility policy excludes resource exhaustion, so this is a
+  diagnostics gap, not a semantic one.
+- **Workaround:** none; reduce recursion depth.
+- **Proposed improvement:** install a SIGSEGV handler on an alternate signal
+  stack (`sigaltstack`) per thread. It recognizes a fault in the guard region
+  of the thread's stack and reports a Vela panic ("stack overflow", exit 101,
+  JSON when requested) after flushing output.
+- **Verification:** the program above exits 101 with a stack-overflow panic on
+  both backends and in workers, text and JSON; ordinary segmentation faults
+  from foreign code are not misreported.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures

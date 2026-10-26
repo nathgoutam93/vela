@@ -725,10 +725,7 @@ fn memory_functions(l: mut Layout) -> [Str] {
         }
         let keep = retain(mut l, t, "copy->value")
         let drop = release(mut l, t, "b->value")
-        let mut mark = share(mut l, t, "b->value")
-        if mark == "" {
-            mark = "(void)0;"
-        }
+        let mark = share(mut l, t, "b->value")
         // A variant without values needs no box of its own: they all share
         // one that is never freed (a count of 0; see vela_rt.h).
         let mut fixed: [Str] = []
@@ -752,12 +749,39 @@ fn memory_functions(l: mut Layout) -> [Str] {
             "    b->value = value;",
             "    return b;",
             "}",
-            "static inline VELA_UNUSED void " + b + "_release(" + b + " *b) {",
-            "    if (vela_rc_dec(&b->rc)) { " + drop + " vela_box_free(b, sizeof(" + b + ")); }",
-            "}",
-            "static inline VELA_UNUSED void " + b + "_share(" + b + " *b) {",
-            "    if (vela_rc_share(&b->rc)) { " + mark + " }",
-            "}",
+        ] {
+            push(mut out, line)
+        }
+        // What a box holds can hold boxes in turn, as deep as the program
+        // made it: freeing or sharing that goes through vela_bounded.
+        if drop == "" {
+            push(mut out, "static inline VELA_UNUSED void " + b + "_release(" + b + " *b) {")
+            push(mut out, "    if (vela_rc_dec(&b->rc)) vela_box_free(b, sizeof(" + b + "));")
+            push(mut out, "}")
+        } else {
+            push(mut out, "static VELA_UNUSED void " + b + "_free(void *p) {")
+            push(mut out, "    " + b + " *b = p;")
+            push(mut out, "    " + drop)
+            push(mut out, "    vela_box_free(b, sizeof(" + b + "));")
+            push(mut out, "}")
+            push(mut out, "static inline VELA_UNUSED void " + b + "_release(" + b + " *b) {")
+            push(mut out, "    if (vela_rc_dec(&b->rc)) vela_bounded(b, " + b + "_free);")
+            push(mut out, "}")
+        }
+        if mark == "" {
+            push(mut out, "static inline VELA_UNUSED void " + b + "_share(" + b + " *b) {")
+            push(mut out, "    (void)vela_rc_share(&b->rc);")
+            push(mut out, "}")
+        } else {
+            push(mut out, "static VELA_UNUSED void " + b + "_mark(void *p) {")
+            push(mut out, "    " + b + " *b = p;")
+            push(mut out, "    " + mark)
+            push(mut out, "}")
+            push(mut out, "static inline VELA_UNUSED void " + b + "_share(" + b + " *b) {")
+            push(mut out, "    if (vela_rc_share(&b->rc)) vela_bounded(b, " + b + "_mark);")
+            push(mut out, "}")
+        }
+        for line in [
             "// Copy-on-write: a box about to change gets a copy if anything else shares it.",
             "static inline VELA_UNUSED void " + b + "_unique(" + b + " **b) {",
             "    if (vela_rc_unique(&(*b)->rc)) return;",
@@ -823,33 +847,49 @@ fn compact_helpers(l: mut Layout, t: Int) -> [Str] {
             tail = i
         }
     }
+    // The tail is followed by a loop; anything else the box holds can be as
+    // deep as the program made it, so then the walk starts through
+    // vela_bounded and each other part goes through its own bounded visit.
     for op in ["release", "share"] {
-        push(mut out, "static inline VELA_UNUSED void " + b + "_" + op + "(" + b + " *b) {")
         let mut check = "vela_rc_dec"
+        let mut walk = b + "_free"
         if op == "share" {
             check = "vela_rc_share"
+            walk = b + "_mark"
         }
-        if tail >= 0 {
-            push(mut out, "    while (b) {")
-            push(mut out, "    if (!" + check + "(&b->rc)) return;")
-            push(mut out, "    " + b + " *next = b->_" + strings.from_int(tail) + ";")
-        } else {
-            push(mut out, "    if (!b || !" + check + "(&b->rc)) return;")
-        }
+        let mut parts: [Str] = []
         for i in 0..len(v.payload) {
-            if i == tail {
-                continue
+            if i != tail {
+                for line in slot_ops(mut l, t, v.name, i, v.payload[i], "b->_" + strings.from_int(i), op) {
+                    push(mut parts, "    " + line)
+                }
             }
-            for line in slot_ops(mut l, t, v.name, i, v.payload[i], "b->_" + strings.from_int(i), op) {
-                push(mut out, "    " + line)
-            }
+        }
+        // The walk from a box whose count says to visit it.
+        push(mut out, "static VELA_UNUSED void " + walk + "(void *p) {")
+        push(mut out, "    " + b + " *b = p;")
+        if tail >= 0 {
+            push(mut out, "    for (;;) {")
+            push(mut out, "    " + b + " *next = b->_" + strings.from_int(tail) + ";")
+        }
+        for line in parts {
+            push(mut out, line)
         }
         if op == "release" {
             push(mut out, "    vela_box_free(b, sizeof(" + b + "));")
         }
         if tail >= 0 {
+            push(mut out, "    if (!next || !" + check + "(&next->rc)) return;")
             push(mut out, "    b = next;")
             push(mut out, "    }")
+        }
+        push(mut out, "}")
+        push(mut out, "static inline VELA_UNUSED void " + b + "_" + op + "(" + b + " *b) {")
+        push(mut out, "    if (!b || !" + check + "(&b->rc)) return;")
+        if len(parts) > 0 {
+            push(mut out, "    vela_bounded(b, " + walk + ");")
+        } else {
+            push(mut out, "    " + walk + "(b);")
         }
         push(mut out, "}")
     }

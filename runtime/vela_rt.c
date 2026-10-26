@@ -86,6 +86,43 @@ static void check_count(int64_t n) {
 
 _Thread_local vela_pool vela_pools;
 
+_Thread_local int64_t vela_visit_depth;
+_Thread_local int64_t vela_visit_waiting;
+typedef struct vela_visit {
+    void *p;
+    vela_visit_fn f;
+} vela_visit;
+static _Thread_local vela_visit *visits;
+static _Thread_local int64_t visit_cap;
+
+void vela_visit_later(void *p, vela_visit_fn f) {
+    if (vela_visit_waiting == visit_cap) {
+        visit_cap = visit_cap ? visit_cap * 2 : 256;
+        vela_visit *grown = realloc(visits, (size_t)visit_cap * sizeof *visits);
+        if (!grown) vela_panic("vela runtime", "out of memory");
+        visits = grown;
+    }
+    visits[vela_visit_waiting++] = (vela_visit){p, f};
+}
+
+// The waiting visits, newest first, one level below the outermost: those
+// that go deep again wait here too. The list is freed once it is empty, so
+// a worker thread that ends keeps nothing.
+void vela_visit_drain(void) {
+    vela_visit_depth = 1;
+    while (vela_visit_waiting > 0) {
+        vela_visit v = visits[--vela_visit_waiting];
+        v.f(v.p);
+    }
+    vela_visit_depth = 0;
+    free(visits);
+    visits = NULL;
+    visit_cap = 0;
+}
+
+void vela_env_drop(void *e) { ((vela_env *)e)->drop(e); }
+void vela_env_mark(void *e) { ((vela_env *)e)->share(e); }
+
 void *vela_alloc(size_t size) {
     VELA_PROFILE_SCOPE("allocation");
     check_size(size);
@@ -325,14 +362,22 @@ static void array_resize(vela_array *a, size_t bytes) {
     }
 }
 
+static void array_free(void *p) {
+    vela_array *a = p;
+    for (int64_t i = 0; i < a->len; i++) a->elem->release(a->data + a->elem->size * (size_t)i);
+    if (a->data != inline_data(a)) free(a->data);
+    vela_box_free(a, (size_t)a->size);
+}
+
 void vela_array_release(vela_array *a) {
     VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_dec(&a->rc)) return;
-    if (a->elem->release) {
-        for (int64_t i = 0; i < a->len; i++) a->elem->release(a->data + a->elem->size * (size_t)i);
+    if (!a->elem->release) {
+        if (a->data != inline_data(a)) free(a->data);
+        vela_box_free(a, (size_t)a->size);
+        return;
     }
-    if (a->data != inline_data(a)) free(a->data);
-    vela_box_free(a, (size_t)a->size);
+    vela_bounded(a, array_free);
 }
 
 void vela_array_unique(vela_array **ap) {
@@ -350,10 +395,15 @@ void vela_array_unique(vela_array **ap) {
     *ap = copy;
 }
 
+static void array_mark(void *p) {
+    vela_array *a = p;
+    for (int64_t i = 0; i < a->len; i++) share_elem(a->elem, a->data + a->elem->size * (size_t)i);
+}
+
 void vela_array_share(vela_array *a) {
     VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_share(&a->rc) || !a->elem->share) return;
-    for (int64_t i = 0; i < a->len; i++) share_elem(a->elem, a->data + a->elem->size * (size_t)i);
+    vela_bounded(a, array_mark);
 }
 
 void *vela_array_at(vela_array *a, int64_t i, const char *loc) {
@@ -491,9 +541,16 @@ vela_map *vela_map_new(const vela_type *key, const vela_type *value) {
     return m;
 }
 
+static void map_free(void *p);
+
 void vela_map_release(vela_map *m) {
     VELA_PROFILE_SCOPE("ref counting");
     if (!vela_rc_dec(&m->rc)) return;
+    vela_bounded(m, map_free);
+}
+
+static void map_free(void *p) {
+    vela_map *m = p;
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
         release_elem(m->key, map_key(m, i));
@@ -522,14 +579,19 @@ void vela_map_unique(vela_map **mp) {
     *mp = copy;
 }
 
-void vela_map_share(vela_map *m) {
-    VELA_PROFILE_SCOPE("ref counting");
-    if (!vela_rc_share(&m->rc)) return;
+static void map_mark(void *p) {
+    vela_map *m = p;
     for (int64_t i = 0; i < m->count; i++) {
         if (!m->live[i]) continue;
         share_elem(m->key, map_key(m, i));
         share_elem(m->value, map_value(m, i));
     }
+}
+
+void vela_map_share(vela_map *m) {
+    VELA_PROFILE_SCOPE("ref counting");
+    if (!vela_rc_share(&m->rc)) return;
+    vela_bounded(m, map_mark);
 }
 
 // The entry number holding `key`, or -1.
@@ -1959,6 +2021,7 @@ void vela_native_rc_inc(int64_t *rc) { vela_rc_inc(rc); }
 bool vela_native_rc_dec(int64_t *rc) { return vela_rc_dec(rc); }
 void *vela_native_box_alloc(int64_t size) { return vela_box_alloc((size_t)size); }
 void vela_native_box_free(void *p, int64_t size) { vela_box_free(p, (size_t)size); }
+void vela_native_bounded(void *p, vela_visit_fn f) { vela_bounded(p, f); }
 
 #ifdef VELA_PROFILE
 void vela_observe_copy(void *dst, const void *src, int64_t size) {
