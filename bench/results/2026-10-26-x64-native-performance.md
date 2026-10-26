@@ -9,7 +9,7 @@ host, not a general language ranking.
 
 The [walkthrough](../../docs/history/x64-native-performance.md) describes the
 changes. [TL-084](../../docs/tooling-backlog.md#tl-084-the-x86-64-emitter-lacked-the-arm64-allocation-and-selection-work)
-records the gap and its validation; [TL-085](../../docs/tooling-backlog.md#tl-085-x86-64-branch-placement-changes-native-timings-by-up-to-25)
+records the gap and its validation; [TL-085](../../docs/tooling-backlog.md#tl-085-single-native-timing-comparisons-cannot-resolve-small-x86-64-changes)
 records the remaining branch-placement sensitivity.
 
 ## Host
@@ -82,3 +82,11 @@ C-built one. The same gate passes at 1.39× on macOS ARM64
   result register, and a u32 mixing loop that emits `ror`, 32-bit `imul`,
   `add` and `sub`. It passes C/native with optimization on and off.
 - The `tests/cli/native_asm.expected` x86-64 snapshot is unchanged.
+
+## Correction
+
+The [timing re-examination](2026-10-26-x64-timing-noise.md) withdraws this
+report's attribution of the varints differences to branch placement and the JCC
+erratum. The host is not a CPU the erratum affects, and byte-identical
+executables vary by up to 3% in median and 17% in best sample on it. Those
+differences are measurement variation; the measurements above are unchanged.

@@ -71,14 +71,14 @@ changes are within this host's variation, and repeated runs disagree in sign.
 The unchanged release gate measures 1.880× before and 1.502× after on this
 host; it is not claimed to pass on Linux x86-64.
 
-Varints exposed a separate effect. Its new code is shorter at every step,
-yet one 21-round run measured it 9% slower. Assembling the same output with
-GNU as `-mbranches-within-32B-boundaries` makes both versions much faster
-(before 305 → 256 ms, after 322 → 232 ms), and the new code then wins.
-Branch placement on this Intel CPU (the JCC erratum) explains a large part of
-the noise. [TL-085](../tooling-backlog.md#tl-085-x86-64-branch-placement-changes-native-timings-by-up-to-25)
-records it; enabling the mitigation is deferred because GCC and Clang spell
-the option differently.
+Varints' new code is shorter at every step, yet one 21-round run measured it
+9% slower. This pass attributed that to branch placement and the JCC erratum.
+A later [re-examination](../../bench/results/2026-10-26-x64-timing-noise.md)
+withdraws that: the host is not a CPU the erratum affects, and byte-identical
+executables vary by up to 3% in median and 17% in best sample here. Such
+single-workload differences are measurement variation;
+[TL-085](../tooling-backlog.md#tl-085-single-native-timing-comparisons-cannot-resolve-small-x86-64-changes)
+records the evidence and why the mitigation is not adopted.
 
 ## Second pass: layout and addressing
 
@@ -113,8 +113,8 @@ Results ([report](../../bench/results/2026-10-26-x64-layout.md)): CRC-32 falls
 36%, varints 34% and fannkuch 18% in nine paired rounds, and the unchanged
 release gate passes on Linux x86-64 at 1.283× C. Three other workloads appear
 16–34% slower in the same comparison, but hand-assembled builds of the same
-outputs do not reproduce that. One of them reverses direction under the JCC
-mitigation alone, so TL-085's branch placement decides them.
+outputs do not reproduce that. They were first attributed to branch
+placement; TL-085's re-examination shows they are within host variation.
 
 ## Validation and reproduction
 

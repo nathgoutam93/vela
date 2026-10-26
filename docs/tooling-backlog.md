@@ -2182,12 +2182,15 @@ the same entry. Close it with a commit or validation result; keep its history.
   `VELA_OPT=0` native selection 254/254; `tests/run/x64_selection.vl`, 789
   independently computed cases at both optimization settings. A nine-round
   paired comparison improves the native geometric mean from 1.767× to 1.480× C
-  by medians; see the [walkthrough](history/x64-native-performance.md) and
+  by medians (single-workload changes under about 10% are within host
+  variation, TL-085); see the [walkthrough](history/x64-native-performance.md) and
   [report](../bench/results/2026-10-26-x64-native-performance.md).
 
-### TL-085: x86-64 branch placement changes native timings by up to 25%
+### TL-085: Single native timing comparisons cannot resolve small x86-64 changes
 
-- **Status:** open; discovered in the post-M30 x86-64 native pass.
+- **Status:** resolved; the proposed JCC mitigation is not adopted. Discovered
+  in the post-M30 x86-64 native pass, originally titled "x86-64 branch
+  placement changes native timings by up to 25%".
 - **Evidence:** on an Intel Xeon @ 2.10 GHz (model 207), the varints
   assembly from the before and after compilers takes 305 and 322 ms. The same
   files assembled with GNU as `-Wa,-mbranches-within-32B-boundaries` take 256
@@ -2216,6 +2219,27 @@ the same entry. Close it with a commit or validation result; keep its history.
   unmitigated, 408 → 326 ms mitigated). A single release-gate or A/B run on
   this CPU therefore cannot resolve changes under about 30% in one workload;
   this now limits further x86-64 tuning.
+- **Re-examination:** the host is an Emerald Rapids guest (family 6, model
+  207, stepping 2, `amx_tile`, `avx512_fp16`), not a Skylake-derived core
+  the erratum affects, so the suspected cause above is withdrawn.
+  Byte-identical executables differ by up to 3% in median and 17% in best
+  sample over 15–21 interleaved rounds. With an identical-binary control, the
+  mitigation changes nbody +3.4%, wordfreq +2.3% and fannkuch −0.8%. SHA-256 is
+  −15.6%, but shifting the whole program by 8 or 16 bytes gives the same time,
+  so that gain is one favorable placement. A compiler passing the option moves
+  the paired twelve-program median geometric mean from 1.300× to 1.319× C.
+  Aligning loop headers to 32 bytes changes means by −2.4% to under 1%.
+  SHA-256 alone is materially placement-sensitive (234–286 ms across shifts).
+  See the [report](../bench/results/2026-10-26-x64-timing-noise.md).
+- **Resolution:** do not pass the mitigation. No measured CPU benefits, and
+  GCC/Clang spellings would need a probe on every native build; a driver
+  implementation was written and measured (gcc, clang, a rejecting toolchain
+  and an opt-out all behaved as intended) but is not committed. The
+  remaining issue is measurement: compare against an identical-binary
+  control, use medians over at least 21 interleaved rounds, and repeat a
+  suspected regression in a separate session. Earlier attributions of
+  apparent slowdowns to branch placement (TL-084 report, TL-086 report and
+  walkthrough) are withdrawn; those differences are within host variation.
 
 ### TL-086: x86-64 hot paths jumped around inline failure blocks
 
@@ -2239,6 +2263,8 @@ the same entry. Close it with a commit or validation result; keep its history.
   backends; `tests/run/x64_layout.vl`, which fails on the first version's
   misplaced fall-through label (nbody's dropped store) and passes now. The
   paired comparison reduces CRC-32 35.7%, varints 33.5% and fannkuch 17.6%;
+  its apparent nbody/wordfreq/knucleotide slowdowns are within host
+  variation (TL-085), not placement effects as first reported;
   the release gate passes on Linux x86-64 at 1.283×
   ([report](../bench/results/2026-10-26-x64-layout.md)).
 
@@ -2297,7 +2323,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   `bench/run.py --require-native-parity --runs 5` gate passes on the same VM at
   1.283× C with a faster native-built compiler
   ([report](../bench/results/2026-10-26-x64-layout-release-parity.json)). Per
-  TL-085, one run on this CPU is not a stable margin; the M24/M29 query budgets
+  TL-085, one run on this host is not a stable margin; the M24/M29 query budgets
   above remain failing.
 - **Native Linux handoff:** after `sh compiler/bootstrap/bootstrap.sh --native`,
   run `python3 -u bench/real_programs.py --compiler build/vela --gate --runs 3
