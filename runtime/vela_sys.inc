@@ -58,6 +58,18 @@ static void sys_push(vela_array *a, vela_str s) {
     vela_array_push(a,&s);
 }
 #if !defined(__wasi__)
+// When a stream read or write starting now must end: after the handle's
+// timeout, or at its overall deadline (sys_net_deadline) if that comes first.
+static int64_t sys_until(int64_t timeout,int64_t opened,int64_t limit) {
+    int64_t end=sys_now()+timeout;
+    if (limit>=0 && opened+limit<end) end=opened+limit;
+    return end;
+}
+// Whether the handle's overall deadline has passed: waiting no longer would
+// still let data that is already there through.
+static bool sys_overdue(int64_t opened,int64_t limit) {
+    return limit>=0 && sys_now()>=opened+limit;
+}
 static bool sys_wait(sys_fd fd, short events, int64_t deadline, vela_str *e) {
     for (; ; ) {
         int64_t left=deadline-sys_now();
@@ -250,14 +262,19 @@ struct vela_io_handle {
     int kind,family;
     bool closed;
     int64_t timeout,port,row,pos,active;
+    int64_t opened;  // sys_now() when it was opened, before a connection's name lookup
+    int64_t limit;  // sys_net_deadline: total milliseconds from opened for reads and writes, or -1
     vela_str host;
     sys_fake *fake;
 };
 static vela_io_handle *sys_handle(sys_fd fd,int kind,int family,int64_t port,vela_str host,sys_fake *fake,int64_t row,int64_t timeout) {
     vela_io_handle *h=vela_alloc(sizeof *h);
     *h=(vela_io_handle) {
-        .rc=1,.fd=fd,.kind=kind,.family=family,.port=port,.host=host,.fake=fake,.row=row,.timeout=timeout
+        .rc=1,.fd=fd,.kind=kind,.family=family,.port=port,.host=host,.fake=fake,.row=row,.timeout=timeout,.limit=-1
     };
+#if !defined(__wasi__)
+    h->opened=sys_now();
+#endif
     vela_str_retain(host);
     pthread_mutex_init(&h->lock,NULL);
     if (fake) fake->refs++;
@@ -378,6 +395,7 @@ static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io
     free(name);
     return sys_error(e,"network sockets are unsupported on WASI preview 1");
 #else
+    int64_t started=sys_now();
     char service[16];
     snprintf(service,sizeof service,"%lld",(long long)port);
     struct addrinfo hints= {
@@ -427,6 +445,7 @@ static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io
         return sys_errno(e);
     }
     *out=sys_handle(fd,kind,family,sys_bound_port(fd),host,NULL,-1,timeout);
+    (*out)->opened=started;
     return true;
 #endif
 }
@@ -532,17 +551,18 @@ bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {
     return sys_error(e,"network sockets are unsupported on WASI preview 1");
 #else
     sys_fd fd=-1;
-    int64_t timeout=h->timeout;
+    int64_t timeout=h->timeout,opened=h->opened,limit=h->limit;
     if (ok) {
         fd=sys_borrow_fd(h);
         if (fd<0)ok=sys_errno(e);
     }
     pthread_mutex_unlock(&h->lock);
+    if (ok && sys_overdue(opened,limit))ok=sys_error(e,"I/O timeout");
     if (ok) {
         // Receive into the owned string instead of copying a temporary buffer.
         vela_strobj *obj=vela_alloc(checked_bytes((uint64_t)max,1,sizeof(vela_strobj)));
         obj->rc=1;
-        int64_t deadline=sys_now()+timeout;
+        int64_t deadline=sys_until(timeout,opened,limit);
         for (; ; ) {
             if (!sys_wait(fd,POLLIN,deadline,e)) {
                 ok=false;
@@ -598,14 +618,15 @@ bool vela_sys_net_write(vela_io_handle *h,vela_str data,int64_t *o,vela_str *e) 
     return sys_error(e,"network sockets are unsupported on WASI preview 1");
 #else
     sys_fd fd=-1;
-    int64_t timeout=h->timeout;
+    int64_t timeout=h->timeout,opened=h->opened,limit=h->limit;
     if (ok) {
         fd=sys_borrow_fd(h);
         if (fd<0)ok=sys_errno(e);
     }
     pthread_mutex_unlock(&h->lock);
+    if (ok && sys_overdue(opened,limit))ok=sys_error(e,"I/O timeout");
     if (ok) {
-        int64_t pos=0,deadline=sys_now()+timeout;
+        int64_t pos=0,deadline=sys_until(timeout,opened,limit);
         while (pos<data.len) {
             ssize_t n=sys_send_fd(fd,data.data+pos,(size_t)(data.len-pos));
             if (n>0) pos+=n;
@@ -648,6 +669,20 @@ bool vela_sys_net_timeout(vela_io_handle *h,int64_t n,vela_unit *o,vela_str *e) 
     lock_fakes();
     bool ok=sys_live(h,0,e);
     if (ok)h->timeout=n;
+    unlock_fakes();
+    pthread_mutex_unlock(&h->lock);
+    *o=0;
+    return ok;
+}
+// Reads and writes on `h` fail once `n` milliseconds have passed since it was
+// opened (its connection began), however the time is spread over them:
+// http.get_limit's timeout covers the whole request.
+bool vela_sys_net_deadline(vela_io_handle *h,int64_t n,vela_unit *o,vela_str *e) {
+    if (!sys_timeout(n,e))return false;
+    pthread_mutex_lock(&h->lock);
+    lock_fakes();
+    bool ok=sys_live(h,0,e);
+    if (ok)h->limit=n;
     unlock_fakes();
     pthread_mutex_unlock(&h->lock);
     *o=0;

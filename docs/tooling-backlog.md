@@ -2563,6 +2563,41 @@ the same entry. Close it with a commit or validation result; keep its history.
   solver. `vela verify --solver Z3` on a clamp function explains itself, and
   `--solver z3` proves it.
 
+### TL-096: http.get_limit's timeout did not bound the request
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** second post-M30 review.
+- **Evidence:** `http.get_limit(url, 1000, 1000)` against a local server
+  sending a valid response one byte every 0.3 s returned it after 15.2 s.
+  `timeout_ms` limited connecting and each read separately, so a server
+  answering slowly but steadily could hold a request open almost
+  indefinitely, within the 64 KiB header and body limits.
+- **Impact:** a program or agent relying on `timeout_ms` could hang on a slow
+  or hostile server.
+- **Workaround:** run the request in a separate process with its own time
+  limit.
+- **Resolution:**
+  - The runtime records when each socket handle was opened (for a connection,
+    before name lookup). A new internal `sysio.net_deadline(handle, ms)` makes
+    reads and writes on that handle fail with `I/O timeout` once `ms` have
+    passed since then. Each wait is shortened to the time left, and an
+    operation after the deadline fails even if data is already waiting.
+  - `http.get_limit` sets the deadline to its `timeout_ms`, so the timeout
+    covers the whole request. Its signature stays `uses net`: the clock is
+    read by the runtime, not by the program.
+  - The guide lists every `sysio` function; to keep it within its 32,000-byte
+    budget, two restating sentences were removed ("No implicit integer
+    conversions.", which the sentence on explicit width changes already says,
+    and "`break`, `continue`, `return value`, and `return` behave as named.").
+- **Verification:**
+  - The reproduction ends after about 1 s with `I/O timeout` on C and native.
+  - `tests/m23_test.py` `http_deadline`: a peer trickles a 6-second response
+    and a 700 ms request must fail with `I/O timeout`, the peer seeing the
+    connection end within 3 s. It fails with the previous `std/http.vl`
+    (the request finishes after 6 s).
+  - The M23 fake-transcript and real-socket HTTP checks pass on both
+    backends, and the guide-budget checks in M17 and M20–M22 pass.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures

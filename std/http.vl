@@ -4,6 +4,7 @@ import text
 import strings
 import maps
 import bytes
+import sysio
 pub type Response = struct { status: Int, headers: Map[Str, Str], body: Str }
 type Url = struct { host: Str, port: Int, authority: Str, target: Str }
 type Stream = struct { socket: net.Tcp, buffer: Str }
@@ -101,6 +102,8 @@ fn response(socket: net.Tcp, limit: Int) -> Result[Response, Str] uses net {
 pub fn get(value: Str) -> Result[Response, Str] uses net { return get_limit(value, 8388608, 5000) }
 pub fn get_limit(value: Str, body_limit: Int, timeout_ms: Int) -> Result[Response, Str] uses net {
     if body_limit < 0 || body_limit > 67108864 { return Err("invalid HTTP body limit") }; let u = url(value)?; let socket = net.connect_timeout(u.host, u.port, timeout_ms)?
+    // timeout_ms covers the whole request, however a server spreads it out.
+    match sysio.net_deadline(socket.handle, timeout_ms) { Err(e) => { let _ = socket.close(); return Err(e) }, Ok(_) => {} }
     let sent = socket.write("GET " + u.target + " HTTP/1.1\r\nHost: " + u.authority + "\r\nConnection: close\r\n\r\n")
     match sent { Err(e) => { let _ = socket.close(); return Err(e) }, Ok(_) => {} }
     let result = response(socket, body_limit); let _ = socket.close(); return result

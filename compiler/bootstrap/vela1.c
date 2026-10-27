@@ -12847,7 +12847,7 @@ vela_array * f_6sysops_functions(vela_str v_module) {
         return _t6;
     }
     // line 4
-    vela_array * _t7 = vela_array_new(&vela_type_str, 17);
+    vela_array * _t7 = vela_array_new(&vela_type_str, 18);
     vela_str _t8 = VELA_STR("tcp_connect", 11);
     vela_push(_t7, &_t8, sizeof(vela_str));
     vela_str _t9 = VELA_STR("tcp_listen", 10);
@@ -12864,26 +12864,28 @@ vela_array * f_6sysops_functions(vela_str v_module) {
     vela_push(_t7, &_t14, sizeof(vela_str));
     vela_str _t15 = VELA_STR("net_timeout", 11);
     vela_push(_t7, &_t15, sizeof(vela_str));
-    vela_str _t16 = VELA_STR("udp_bind", 8);
+    vela_str _t16 = VELA_STR("net_deadline", 12);
     vela_push(_t7, &_t16, sizeof(vela_str));
-    vela_str _t17 = VELA_STR("udp_send", 8);
+    vela_str _t17 = VELA_STR("udp_bind", 8);
     vela_push(_t7, &_t17, sizeof(vela_str));
-    vela_str _t18 = VELA_STR("udp_receive", 11);
+    vela_str _t18 = VELA_STR("udp_send", 8);
     vela_push(_t7, &_t18, sizeof(vela_str));
-    vela_str _t19 = VELA_STR("process", 7);
+    vela_str _t19 = VELA_STR("udp_receive", 11);
     vela_push(_t7, &_t19, sizeof(vela_str));
-    vela_str _t20 = VELA_STR("list", 4);
+    vela_str _t20 = VELA_STR("process", 7);
     vela_push(_t7, &_t20, sizeof(vela_str));
-    vela_str _t21 = VELA_STR("kind", 4);
+    vela_str _t21 = VELA_STR("list", 4);
     vela_push(_t7, &_t21, sizeof(vela_str));
-    vela_str _t22 = VELA_STR("mkdir", 5);
+    vela_str _t22 = VELA_STR("kind", 4);
     vela_push(_t7, &_t22, sizeof(vela_str));
-    vela_str _t23 = VELA_STR("sandbox_run", 11);
+    vela_str _t23 = VELA_STR("mkdir", 5);
     vela_push(_t7, &_t23, sizeof(vela_str));
-    vela_str _t24 = VELA_STR("canonical", 9);
+    vela_str _t24 = VELA_STR("sandbox_run", 11);
     vela_push(_t7, &_t24, sizeof(vela_str));
-    vela_array * _t25 = _t7;
-    return _t25;
+    vela_str _t25 = VELA_STR("canonical", 9);
+    vela_push(_t7, &_t25, sizeof(vela_str));
+    vela_array * _t26 = _t7;
+    return _t26;
 }
 /* vela: part */
 
@@ -12955,77 +12957,84 @@ vela_array * f_6sysops_params(vela_str v_name) {
         int64_t _t28 = 1;
         vela_push(_t26, &_t28, sizeof(int64_t));
         _t1 = _t26;
-    } else if (vela_str_eq(v_name, VELA_STR("udp_bind", 8))) {
+    } else if (vela_str_eq(v_name, VELA_STR("net_deadline", 12))) {
         vela_array * _t29 = vela_array_new(&vela_type_int, 2);
-        int64_t _t30 = 2;
+        int64_t _t30 = 4;
         vela_push(_t29, &_t30, sizeof(int64_t));
         int64_t _t31 = 1;
         vela_push(_t29, &_t31, sizeof(int64_t));
         _t1 = _t29;
-    } else if (vela_str_eq(v_name, VELA_STR("udp_send", 8))) {
-        vela_array * _t32 = vela_array_new(&vela_type_int, 4);
-        int64_t _t33 = 4;
+    } else if (vela_str_eq(v_name, VELA_STR("udp_bind", 8))) {
+        vela_array * _t32 = vela_array_new(&vela_type_int, 2);
+        int64_t _t33 = 2;
         vela_push(_t32, &_t33, sizeof(int64_t));
-        int64_t _t34 = 2;
+        int64_t _t34 = 1;
         vela_push(_t32, &_t34, sizeof(int64_t));
-        int64_t _t35 = 1;
-        vela_push(_t32, &_t35, sizeof(int64_t));
-        int64_t _t36 = 2;
-        vela_push(_t32, &_t36, sizeof(int64_t));
         _t1 = _t32;
+    } else if (vela_str_eq(v_name, VELA_STR("udp_send", 8))) {
+        vela_array * _t35 = vela_array_new(&vela_type_int, 4);
+        int64_t _t36 = 4;
+        vela_push(_t35, &_t36, sizeof(int64_t));
+        int64_t _t37 = 2;
+        vela_push(_t35, &_t37, sizeof(int64_t));
+        int64_t _t38 = 1;
+        vela_push(_t35, &_t38, sizeof(int64_t));
+        int64_t _t39 = 2;
+        vela_push(_t35, &_t39, sizeof(int64_t));
+        _t1 = _t35;
     } else if (vela_str_eq(v_name, VELA_STR("udp_receive", 11))) {
-        vela_array * _t37 = vela_array_new(&vela_type_int, 2);
-        int64_t _t38 = 4;
-        vela_push(_t37, &_t38, sizeof(int64_t));
-        int64_t _t39 = 1;
-        vela_push(_t37, &_t39, sizeof(int64_t));
-        _t1 = _t37;
-    } else if (vela_str_eq(v_name, VELA_STR("sandbox_run", 11))) {
-        vela_array * _t40 = vela_array_new(&vela_type_int, 3);
-        int64_t _t41 = 5;
+        vela_array * _t40 = vela_array_new(&vela_type_int, 2);
+        int64_t _t41 = 4;
         vela_push(_t40, &_t41, sizeof(int64_t));
-        int64_t _t42 = 5;
+        int64_t _t42 = 1;
         vela_push(_t40, &_t42, sizeof(int64_t));
-        int64_t _t43 = 5;
-        vela_push(_t40, &_t43, sizeof(int64_t));
         _t1 = _t40;
+    } else if (vela_str_eq(v_name, VELA_STR("sandbox_run", 11))) {
+        vela_array * _t43 = vela_array_new(&vela_type_int, 3);
+        int64_t _t44 = 5;
+        vela_push(_t43, &_t44, sizeof(int64_t));
+        int64_t _t45 = 5;
+        vela_push(_t43, &_t45, sizeof(int64_t));
+        int64_t _t46 = 5;
+        vela_push(_t43, &_t46, sizeof(int64_t));
+        _t1 = _t43;
     } else if (vela_str_eq(v_name, VELA_STR("canonical", 9))) {
-        vela_array * _t44 = vela_array_new(&vela_type_int, 1);
-        int64_t _t45 = 2;
-        vela_push(_t44, &_t45, sizeof(int64_t));
-        _t1 = _t44;
-    } else if (vela_str_eq(v_name, VELA_STR("process", 7))) {
-        vela_array * _t46 = vela_array_new(&vela_type_int, 4);
-        int64_t _t47 = 5;
-        vela_push(_t46, &_t47, sizeof(int64_t));
+        vela_array * _t47 = vela_array_new(&vela_type_int, 1);
         int64_t _t48 = 2;
-        vela_push(_t46, &_t48, sizeof(int64_t));
-        int64_t _t49 = 1;
-        vela_push(_t46, &_t49, sizeof(int64_t));
-        int64_t _t50 = 1;
-        vela_push(_t46, &_t50, sizeof(int64_t));
-        _t1 = _t46;
+        vela_push(_t47, &_t48, sizeof(int64_t));
+        _t1 = _t47;
+    } else if (vela_str_eq(v_name, VELA_STR("process", 7))) {
+        vela_array * _t49 = vela_array_new(&vela_type_int, 4);
+        int64_t _t50 = 5;
+        vela_push(_t49, &_t50, sizeof(int64_t));
+        int64_t _t51 = 2;
+        vela_push(_t49, &_t51, sizeof(int64_t));
+        int64_t _t52 = 1;
+        vela_push(_t49, &_t52, sizeof(int64_t));
+        int64_t _t53 = 1;
+        vela_push(_t49, &_t53, sizeof(int64_t));
+        _t1 = _t49;
     } else if (vela_str_eq(v_name, VELA_STR("list", 4))) {
-        vela_array * _t51 = vela_array_new(&vela_type_int, 1);
-        int64_t _t52 = 2;
-        vela_push(_t51, &_t52, sizeof(int64_t));
-        _t1 = _t51;
+        vela_array * _t54 = vela_array_new(&vela_type_int, 1);
+        int64_t _t55 = 2;
+        vela_push(_t54, &_t55, sizeof(int64_t));
+        _t1 = _t54;
     } else if (vela_str_eq(v_name, VELA_STR("kind", 4))) {
-        vela_array * _t53 = vela_array_new(&vela_type_int, 1);
-        int64_t _t54 = 2;
-        vela_push(_t53, &_t54, sizeof(int64_t));
-        _t1 = _t53;
+        vela_array * _t56 = vela_array_new(&vela_type_int, 1);
+        int64_t _t57 = 2;
+        vela_push(_t56, &_t57, sizeof(int64_t));
+        _t1 = _t56;
     } else if (vela_str_eq(v_name, VELA_STR("mkdir", 5))) {
-        vela_array * _t55 = vela_array_new(&vela_type_int, 1);
-        int64_t _t56 = 2;
-        vela_push(_t55, &_t56, sizeof(int64_t));
-        _t1 = _t55;
+        vela_array * _t58 = vela_array_new(&vela_type_int, 1);
+        int64_t _t59 = 2;
+        vela_push(_t58, &_t59, sizeof(int64_t));
+        _t1 = _t58;
     } else {
-        vela_array * _t57 = vela_array_new(&vela_type_int, 0);
-        _t1 = _t57;
+        vela_array * _t60 = vela_array_new(&vela_type_int, 0);
+        _t1 = _t60;
     }
-    vela_array * _t58 = _t1;
-    return _t58;
+    vela_array * _t61 = _t1;
+    return _t61;
 }
 /* vela: part */
 
@@ -13051,6 +13060,8 @@ int64_t f_6sysops_result(vela_str v_name) {
     } else if (vela_str_eq(v_name, VELA_STR("net_close", 9))) {
         _t1 = 6;
     } else if (vela_str_eq(v_name, VELA_STR("net_timeout", 11))) {
+        _t1 = 6;
+    } else if (vela_str_eq(v_name, VELA_STR("net_deadline", 12))) {
         _t1 = 6;
     } else if (vela_str_eq(v_name, VELA_STR("sleep_ns", 8))) {
         _t1 = 6;
@@ -115648,7 +115659,7 @@ vela_str f_5guide_reference(vela_str v_root) {
     // line 35
     vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 36
-    vela_builder_add(v_out, VELA_STR("`i8 i16 i32 i64 u8 u16 u32 u64` are fixed-width integers; Int=i64, Byte=u8 (0..255). Arithmetic/indexing panic on overflow/invalid indexes. Decimal, 0x hex and 0b binary literals allow separators/suffixes (255u8, 0xffff_ffffu32); unsuffixed integers infer context or Int. Signed minima/full u64 are supported. Byte literals: 'a', '\\n'. Width changes require explicit checked i8(x)..u64(x); int/byte remain aliases. Float is binary64 (1.5); float(n)/int(x) convert. Bool: true/false. Str is bytes with UTF-8 source literals and escapes \\n \\t \\r \\0 \\\\ \\\". Unit: (). No implicit integer conversions. Import ints: checked_add/sub/mul/div/rem/neg return Option[T]; wrapping_* wrap modulo 2^width; saturating_* clamp. Division by zero panics except checked operations return None. ints.to_str covers all widths. &, |, ^, ~ preserve width. Left shifts discard high bits; signed right shifts sign-extend, unsigned zero-extend. Counts must be in 0..width or panic.\012", 956));
+    vela_builder_add(v_out, VELA_STR("`i8 i16 i32 i64 u8 u16 u32 u64` are fixed-width integers; Int=i64, Byte=u8 (0..255). Arithmetic/indexing panic on overflow/invalid indexes. Decimal, 0x hex and 0b binary literals allow separators/suffixes (255u8, 0xffff_ffffu32); unsuffixed integers infer context or Int. Signed minima/full u64 are supported. Byte literals: 'a', '\\n'. Width changes require explicit checked i8(x)..u64(x); int/byte remain aliases. Float is binary64 (1.5); float(n)/int(x) convert. Bool: true/false. Str is bytes with UTF-8 source literals and escapes \\n \\t \\r \\0 \\\\ \\\". Unit: (). Import ints: checked_add/sub/mul/div/rem/neg return Option[T]; wrapping_* wrap modulo 2^width; saturating_* clamp. Division by zero panics except checked operations return None. ints.to_str covers all widths. &, |, ^, ~ preserve width. Left shifts discard high bits; signed right shifts sign-extend, unsigned zero-extend. Counts must be in 0..width or panic.\012", 923));
     // line 37
     vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 38
@@ -115671,7 +115682,7 @@ vela_str f_5guide_reference(vela_str v_root) {
     // line 43
     vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 44
-    vela_builder_add(v_out, VELA_STR("`[1, 2]` is an array `[Int]`. Annotate an empty array: `let xs: [Int] = []`. Indexes start at 0. `xs[a..b]` copies an array slice; `s[a..b]` shares immutable string bytes. Both exclude b; strings index to Byte and positions count bytes. `len(s)` counts bytes. `for x in xs` visits elements; `for i in 0..n` excludes n; use an explicit bound for an inclusive loop. In match patterns, `a..=b` includes b. `for condition { ... }` is a while loop; `for { ... }` repeats indefinitely. `break`, `continue`, `return value`, and `return` behave as named. `if condition { ... } else if ... else { ... }` controls statements; use a match expression for conditional values.\012", 663));
+    vela_builder_add(v_out, VELA_STR("`[1, 2]` is an array `[Int]`. Annotate an empty array: `let xs: [Int] = []`. Indexes start at 0. `xs[a..b]` copies an array slice; `s[a..b]` shares immutable string bytes. Both exclude b; strings index to Byte and positions count bytes. `len(s)` counts bytes. `for x in xs` visits elements; `for i in 0..n` excludes n; use an explicit bound for an inclusive loop. In match patterns, `a..=b` includes b. `for condition { ... }` is a while loop; `for { ... }` repeats indefinitely. `if condition { ... } else if ... else { ... }` controls statements; use a match expression for conditional values.\012", 596));
     // line 45
     vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 46

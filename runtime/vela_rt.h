@@ -698,6 +698,7 @@ bool vela_sys_net_write(vela_io_handle *, vela_str, int64_t *out, vela_str *erro
 bool vela_sys_net_close(vela_io_handle *, vela_unit *out, vela_str *error);
 bool vela_sys_net_port(vela_io_handle *, int64_t *out, vela_str *error);
 bool vela_sys_net_timeout(vela_io_handle *, int64_t, vela_unit *out, vela_str *error);
+bool vela_sys_net_deadline(vela_io_handle *, int64_t, vela_unit *out, vela_str *error);
 bool vela_sys_udp_bind(vela_str, int64_t, vela_io_handle * *out, vela_str *error);
 bool vela_sys_udp_send(vela_io_handle *, vela_str, int64_t, vela_str, int64_t *out, vela_str *error);
 bool vela_sys_udp_receive(vela_io_handle *, int64_t, vela_array * *out, vela_str *error);
