@@ -2634,6 +2634,49 @@ the same entry. Close it with a commit or validation result; keep its history.
   - The M23 fake-transcript and real-socket HTTP checks pass on both
     backends, and the guide-budget checks in M17 and M20–M22 pass.
 
+### TL-097: nbody trailed C by 1.8x on x86-64
+
+- **Status:** resolved after the post-M30 review (performance).
+- **Discovery:** second post-M30 review: the native nbody run was 1.84x C and
+  2.76x Rust on Linux x86-64, the worst workload.
+- **Evidence:** `advance`'s inner loop was 78 instructions against gcc's 45:
+  - `bodies[j]`'s address (`muli j #56; add base`) was computed again at every
+    field. Value numbering (`opt.reuse`) only reused expressions whose
+    operands had one definition, and `j` is a loop variable.
+  - Float loads went through `xmm15` and a `movapd`; loads read by one
+    arithmetic instruction were separate instructions.
+  - A three-register `add` was `mov` plus `add`.
+  - Every loop ended with `jmp` back to its test.
+- **Impact:** Float-heavy code with arrays of structs.
+- **Resolution:**
+  - `opt.reuse`: operands may be registers defined more than once; what read
+    one is forgotten where it is defined again, so `x[j]`'s address is worked
+    out once per iteration (both backends).
+  - `opt.rotate_loops`: a back-edge `jump` to a header that tests and leaves
+    becomes the opposite test to a label after the header's test, so a turn
+    takes one branch; only integer tests (a Float comparison's opposite is not
+    one with NaN). ARM64 now omits a jump to the label right after it.
+  - x86-64: Float loads, `sqrtsd` go straight to their destination; a Float
+    load read only by the arithmetic after it becomes that instruction's
+    memory operand (either side of `addsd`/`mulsd`, the right of
+    `subsd`/`divsd`); `add d, a, b` in three registers is `lea`.
+- **Verification:**
+  - Paired nine-round comparison against `main` on Linux x86-64
+    (`bench/compare.py --backend native --runs 9`, raw report
+    [2026-10-27-x64-nbody-ab.json](../bench/results/2026-10-27-x64-nbody-ab.json)):
+    nbody 2.035x -> 1.386x C, spectral-norm 1.322x -> 1.166x; the other ten
+    within 3% either way, as this host varies (TL-085); geometric mean
+    1.365x -> 1.301x. The compiler translates itself 4% faster, and the
+    native fixed point is 2.2% shorter (1,944,130 assembly lines).
+  - `tests/run/codegen_loops.vl` checks Float loads on each side of each
+    operator (NaN, -0.0), a loop variable read before and after it changes
+    in one block, zero-iteration, `continue`/`break`, `>=`, `!=`, unsigned
+    and Float-tested loops, against values computed in Python, on C and
+    native at both optimization settings.
+  - `tests/cli/native_ir.expected` shows the turned-around loops.
+  - Both fixed points pass; C and native suites 322/322; `VELA_OPT=0` native
+    selection 254/254. ARM64 output is emitted (M26a) but was not run.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures

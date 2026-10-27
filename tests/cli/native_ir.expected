@@ -20,10 +20,12 @@ fn f_main()
     %5 = move %0
 L0:
     branch.cmp ge %5, %3 L2
+L10:
     %19 = mul %5, %5
     %1 = add.chk .Lc1 %1, %19
     %5 = addi %5 #1
-    jump L0
+    branch.cmp lt %5, %3 L10
+    jump L2
 L2:
     %21 = const #10
     branch.cmp gt %1, %21 L6
@@ -48,10 +50,12 @@ fn main(%0, %1)
     %8 = move %3
 L0:
     branch.cmp ge %8, %6 L2
+L11:
     %24 = mul %8, %8
     %4 = add.chk .Lc1 %4, %24
     %8 = addi %8 #1
-    jump L0
+    branch.cmp lt %8, %6 L11
+    jump L2
 L2:
     %20 = const #10
     branch.cmp gt %4, %20 L6

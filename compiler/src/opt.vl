@@ -56,7 +56,7 @@ pub fn optimize_with(p: ir.Program, limit: Int, rounds: Int) -> ir.Program {
             funcs[i] = simplify(inline_calls(funcs[i], before, index, small, recursive))
         }
     }
-    for i in 0..len(funcs) { funcs[i] = compact_slots(forward_destinations(hoist_floats(funcs[i]))) }
+    for i in 0..len(funcs) { funcs[i] = compact_slots(forward_destinations(hoist_floats(rotate_loops(funcs[i])))) }
     return ir.Program { funcs: funcs, data: p.data }
 }
 
@@ -323,27 +323,107 @@ fn local_copies(f: ir.Func) -> ir.Func {
 // Value numbering within a basic block. Immutable register expressions can
 // survive writes; memory reads cannot. Clear both tables at control-flow
 // boundaries, and all load facts at every possible memory mutation.
+// Block-local value numbering: a pure instruction computing what an earlier
+// one in the block computed reuses its result. Its operands may be
+// registers defined more than once, such as a loop variable: what read one
+// is forgotten where it is defined again (`readers`), so x[j]'s address is
+// worked out once per iteration, not at every field.
 fn reuse(f: ir.Func) -> ir.Func {
     let defs = def_counts(f); let mut values: Map[Str, Int] = [:]; let mut loads: Map[Str, Int] = [:]
+    let mut readers: Map[Int, [Str]] = [:]  // multiply defined register: the keys reading it
     let mut rep: [Int] = []; for r in 0..len(f.classes) { push(mut rep, r) }
     let mut out = f; out.insts = []
     for original in f.insts {
         let i = renamed(original, rep)
-        if i.op == ir.Op.Label || ir.ends_block(i.op) || i.op == ir.Op.BranchCmp { values = [:]; loads = [:] }
+        if i.op == ir.Op.Label || ir.ends_block(i.op) || i.op == ir.Op.BranchCmp { values = [:]; loads = [:]; readers = [:] }
         let reading = i.op == ir.Op.Load || i.op == ir.Op.FLoad
         if i.op == ir.Op.Call || i.op == ir.Op.CallInd || i.op == ir.Op.CCall || i.op == ir.Op.Store || i.op == ir.Op.FStore || i.op == ir.Op.Copy || i.op == ir.Op.RcInc || i.op == ir.Op.RcDec { loads = [:] }
-        let mut candidate = i.dst >= 0 && pure(i.op)
-        if candidate { candidate = defs[i.dst] == 1; for r in ir.reads(i) { if defs[r] != 1 { candidate = false } } }
+        let candidate = i.dst >= 0 && pure(i.op) && defs[i.dst] == 1
         if candidate {
             let key = ir.op_name(i.op) + ":" + strings.from_int(i.a) + ":" + strings.from_int(i.b) + ":" + strings.from_int(i.imm) + ":" + strings.from_int(i.imm2) + ":" + i.sym
             let mut previous = -1
             if reading { match maps.get(loads, key) { Some(v) => previous = v, None => {} } } else { match maps.get(values, key) { Some(v) => previous = v, None => {} } }
             if previous >= 0 { rep[i.dst] = previous; continue }
             if reading { loads[key] = i.dst } else { values[key] = i.dst }
+            for r in ir.reads(i) {
+                if defs[r] != 1 {
+                    let mut keys: [Str] = []
+                    match maps.get(readers, r) { Some(ks) => keys = ks, None => {} }
+                    push(mut keys, key)
+                    readers[r] = keys
+                }
+            }
+        }
+        // A register defined again: nothing computed from its old value holds.
+        if i.dst >= 0 && defs[i.dst] != 1 {
+            match maps.get(readers, i.dst) {
+                Some(keys) => {
+                    for key in keys {
+                        if maps.has(values, key) { maps.remove(mut values, key) }
+                        if maps.has(loads, key) { maps.remove(mut loads, key) }
+                    }
+                    maps.remove(mut readers, i.dst)
+                }
+                None => {}
+            }
         }
         push(mut out.insts, i)
     }
     return out
+}
+
+// A loop jumps back to its header, which tests and leaves:
+//     H: branch.cmp ge i, n, E    ...body...    jump H    E:
+// The jump back can make the test itself, to a label after the header's:
+//     H: branch.cmp ge i, n, E    B: ...body...    branch.cmp lt i, n, B    jump E    E:
+// so a turn takes one branch, not a jump and a branch (the jump to the label
+// right after it is not written). Only integer tests: the opposite of a
+// Float comparison is not one when NaN is involved.
+fn rotate_loops(f: ir.Func) -> ir.Func {
+    let mut label_at: Map[Int, Int] = [:]
+    for k in 0..len(f.insts) {
+        if f.insts[k].op == ir.Op.Label { label_at[f.insts[k].imm] = k }
+    }
+    let mut out = f
+    let mut body: Map[Int, Int] = [:]  // header label: the label after its test
+    let mut insts: [ir.Inst] = []
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        let mut rotated = false
+        if i.op == ir.Op.Jump && maps.has(label_at, i.imm) && label_at[i.imm] < k && label_at[i.imm] + 1 < len(f.insts) {
+            let check = f.insts[label_at[i.imm] + 1]
+            let opposite = inverse(check.sym)
+            if check.op == ir.Op.BranchCmp && opposite != "" && check.a >= 0 && check.b >= 0 &&
+                f.classes[check.a] != ir.FLOAT() && f.classes[check.b] != ir.FLOAT() {
+                if !maps.has(body, i.imm) { body[i.imm] = ir.label(mut out) }
+                let mut back = check
+                back.sym = opposite
+                back.imm = body[i.imm]
+                push(mut insts, back)
+                push(mut insts, ir.inst(ir.Op.Jump, -1, -1, -1, check.imm))
+                rotated = true
+            }
+        }
+        if !rotated { push(mut insts, i) }
+    }
+    if len(body) == 0 { return f }
+    // The new labels, right after their headers' tests.
+    out.insts = []
+    for k in 0..len(insts) {
+        push(mut out.insts, insts[k])
+        if k > 0 && insts[k - 1].op == ir.Op.Label && maps.has(body, insts[k - 1].imm) && insts[k].op == ir.Op.BranchCmp {
+            push(mut out.insts, ir.inst(ir.Op.Label, -1, -1, -1, body[insts[k - 1].imm]))
+        }
+    }
+    return out
+}
+
+// The opposite integer condition, or "".
+fn inverse(cond: Str) -> Str {
+    return match cond {
+        "eq" => "ne", "ne" => "eq", "lt" => "ge", "ge" => "lt", "le" => "gt", "gt" => "le",
+        "ult" => "uge", "uge" => "ult", "ule" => "ugt", "ugt" => "ule", _ => "",
+    }
 }
 
 fn compact_slots(f: ir.Func) -> ir.Func {

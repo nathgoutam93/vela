@@ -326,6 +326,8 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], locals: Map[Str, B
         if i.op == ir.Op.BranchCmp && k + 2 < len(f.insts) && f.insts[k+1].op == ir.Op.Jump && f.insts[k+2].op == ir.Op.Label && f.insts[k+2].imm == i.imm {
             let mut flipped = i; flipped.sym = inverse(branch_condition(i.sym)); flipped.imm = f.insts[k+1].imm; instruction(mut o, flipped); k = k + 2; continue
         }
+        // A jump to the label right after it (a turned-around loop's exit) is not written.
+        if i.op == ir.Op.Jump && next == i.imm { k = k + 1; continue }
         instruction(mut o, i); k = k + 1
     }
     if debug { emit(mut o, ".cfi_remember_state") }

@@ -1,0 +1,143 @@
+// Loop rotation, value numbering over loop variables, Float operands read
+// from memory and three-register additions (native back end, and the
+// shared IR optimizer). Expected values were computed independently.
+// out: 0.024281675386581308
+// out: true
+// out: -0.0
+// out: 70
+// out: 55
+// out: 0
+// out: 867
+// out: 7
+// out: 0
+// out: 0
+// out: 2431
+// out: 45
+// out: 0
+// out: 7
+// out: 0
+// out: 30
+// out: 0
+type P = struct { a: Float, b: Float, c: Float }
+
+fn walk(xs: [P]) -> Float {
+    // Loads on either side of + and *, and on the right of - and /.
+    let mut t = 0.0
+    for i in 0..len(xs) {
+        t = t + xs[i].a * 2.0
+        t = xs[i].b + t
+        t = t - xs[i].c
+        t = t / xs[i].a
+        t = xs[i].c - t
+        t = xs[i].b / (t * t + 1.0)
+    }
+    return t
+}
+
+fn reused(n: Int) -> Int {
+    // i * 7 before and after i changes in the same block: not one value.
+    let mut i = 3
+    let mut s = 0
+    for k in 0..n {
+        let before = i * 7 + k
+        i = i + 1
+        let after = i * 7 + k
+        s = s + after - before
+    }
+    return s
+}
+
+fn countdown(n: Int) -> Int {
+    let mut i = n
+    let mut s = 0
+    for i >= 0 {
+        s = s + i
+        i = i - 1
+    }
+    return s
+}
+
+fn skipping(n: Int) -> Int {
+    let mut s = 0
+    for i in 0..n {
+        if i % 3 == 0 {
+            continue
+        }
+        if i > 50 {
+            break
+        }
+        s = s + i
+    }
+    return s
+}
+
+fn until_equal(a: Int, b: Int) -> Int {
+    let mut x = a
+    let mut steps = 0
+    for x != b {
+        x = x + 1
+        steps = steps + 1
+    }
+    return steps
+}
+
+fn nested(n: Int) -> Int {
+    let mut s = 0
+    for i in 0..n {
+        for j in i..n {
+            s = s + i * j
+        }
+    }
+    return s
+}
+
+fn unsigned_loop(n: u32) -> u32 {
+    let mut i = 0u32
+    let mut s = 0u32
+    for i < n {
+        s = s + i
+        i = i + 1u32
+    }
+    return s
+}
+
+fn float_loop(limit: Float) -> Int {
+    // A Float test is not turned around: NaN never enters.
+    let mut x = 0.0
+    let mut n = 0
+    for x < limit {
+        x = x + 0.5
+        n = n + 1
+    }
+    return n
+}
+
+fn sums(xs: [Int]) -> Int {
+    let mut s = 0
+    for i in 0..len(xs) {
+        s = s + xs[i] + xs[len(xs) - 1 - i]
+    }
+    return s
+}
+
+fn main() {
+    let xs = [P { a: 1.5, b: -2.25, c: 0.75 }, P { a: 3.0, b: 4.5, c: -1.0 }, P { a: 0.5, b: 0.25, c: 2.0 }]
+    print(walk(xs))
+    let nan = 0.0 / 0.0
+    print(walk([P { a: 1.0, b: nan, c: 1.0 }]) != walk([P { a: 1.0, b: nan, c: 1.0 }]))
+    print(walk([P { a: -1.0, b: -0.0, c: 0.0 }]))
+    print(reused(10))
+    print(countdown(10))
+    print(countdown(-1))
+    print(skipping(100))
+    print(until_equal(5, 12))
+    print(until_equal(4, 4))
+    print(nested(0))
+    print(nested(12))
+    print(unsigned_loop(10u32))
+    print(unsigned_loop(0u32))
+    print(float_loop(3.2))
+    print(float_loop(nan))
+    print(sums([1, 2, 3, 4, 5]))
+    print(sums([]))
+}
