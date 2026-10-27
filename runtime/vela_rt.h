@@ -239,6 +239,7 @@ static inline void vela_env_share(vela_env *e) {
 
 // The Str for a C string literal of `n` bytes.
 #define VELA_STR(literal, n) ((vela_str){NULL, (const uint8_t *)(literal), (n)})
+#define VELA_STR_INIT(literal, n) {NULL, (const uint8_t *)(literal), (n)}  // the same, in a static table
 
 static inline void vela_str_retain(vela_str s) {
     VELA_PROFILE_SCOPE("ref counting");
@@ -252,6 +253,7 @@ static inline void vela_str_share(vela_str s) {
 
 void vela_str_release(vela_str s);
 vela_str vela_str_concat(vela_str a, vela_str b);
+vela_str vela_str_join(const vela_str *parts, int64_t n);  // a + b + c + ...
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc);
 uint8_t vela_str_at(vela_str s, int64_t i, const char *loc);
 bool vela_str_eq(vela_str a, vela_str b);
@@ -698,6 +700,7 @@ bool vela_sys_net_write(vela_io_handle *, vela_str, int64_t *out, vela_str *erro
 bool vela_sys_net_close(vela_io_handle *, vela_unit *out, vela_str *error);
 bool vela_sys_net_port(vela_io_handle *, int64_t *out, vela_str *error);
 bool vela_sys_net_timeout(vela_io_handle *, int64_t, vela_unit *out, vela_str *error);
+bool vela_sys_net_deadline(vela_io_handle *, int64_t, vela_unit *out, vela_str *error);
 bool vela_sys_udp_bind(vela_str, int64_t, vela_io_handle * *out, vela_str *error);
 bool vela_sys_udp_send(vela_io_handle *, vela_str, int64_t, vela_str, int64_t *out, vela_str *error);
 bool vela_sys_udp_receive(vela_io_handle *, int64_t, vela_array * *out, vela_str *error);

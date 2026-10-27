@@ -597,6 +597,27 @@ fn own(g: mut Gen, c: Str, t: Int) -> Value {
     return Value { c: c, ty: t, owned: true, is_static: false }
 }
 
+// Release `c` now if it is an owned temporary of the innermost frame,
+// instead of when the frame ends: nothing after this may read it.
+fn release_now(g: mut Gen, c: Str, t: Int) {
+    let items = g.frames[len(g.frames) - 1].items
+    let mut i = len(items) - 1
+    for i >= 0 {
+        if items[i].c == c && items[i].ty == t {
+            let mut kept = items[0..i]
+            for rest in items[i + 1..len(items)] {
+                push(mut kept, rest)
+            }
+            g.frames[len(g.frames) - 1].items = kept
+            if !g.dead {
+                emit(mut g, release(mut g, t, c))
+            }
+            return
+        }
+        i = i - 1
+    }
+}
+
 // Put an expression's value in a fresh temporary, owned.
 fn store(g: mut Gen, t: Int, c_expr: Str) -> Value {
     let temp = new_temp(mut g)
@@ -2161,6 +2182,10 @@ fn arith_name(op: Str) -> Str {
 }
 
 fn binary(g: mut Gen, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Value {
+    let parts = string_parts(g.k, e)
+    if len(parts) >= 3 {
+        return join(mut g, parts)
+    }
     match g.k.refs[e.id] {
         checker.Ref.Method(t, name) => {
             let v = method_value(mut g, e, [l, r], sub(g, t), name)
@@ -2194,6 +2219,101 @@ fn binary(g: mut Gen, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Value {
     return operation(mut g, e, op, left, right, ty(g, l))
 }
 
+// The parts of a + b + c + ... on Strs, left to right; [] for anything else.
+// Such a chain nests to the left, and concatenating at each + copies the
+// string so far: quadratic in the chain, and in generated C thousands of
+// temporaries that C compilers take minutes over. One vela_str_join does it.
+pub fn string_parts(k: checker.Checked, e: ast.Expr) -> [ast.Expr] {
+    let mut rights: [ast.Expr] = []
+    let mut base = e
+    for {
+        match base.kind {
+            ast.ExprKind.Binary(op, x, y) => {
+                if op != "+" || k.ty[base.id] != types.STR() {
+                    break
+                }
+                push(mut rights, y)
+                base = x
+            }
+            _ => break
+        }
+    }
+    if len(rights) == 0 {
+        return []
+    }
+    let mut parts = [base]
+    for n in 0..len(rights) {
+        push(mut parts, rights[len(rights) - 1 - n])
+    }
+    return parts
+}
+
+// Which parts of a join to copy before the parts after them run. Joining in
+// turn copied each part's bytes before the next part ran; together, a part
+// read from a variable must not change or go while a later part runs, as a
+// `mut` argument or C code could make it (binary_left's rule, per part).
+pub fn join_snapshots(k: checker.Checked, parts: [ast.Expr]) -> [Bool] {
+    let mut out: [Bool] = []
+    for _ in parts {
+        push(mut out, false)
+    }
+    let mut later = false
+    for n in 0..len(parts) {
+        let i = len(parts) - 1 - n
+        out[i] = i < len(parts) - 1 && (later || loops.escaped(k, parts[i]))
+        later = later || ast.has_mut(parts[i])
+    }
+    return out
+}
+
+// The parts go in an array for vela_str_join. Literal parts, most of a
+// generated chain, are in a static table, so that C compilers see data
+// rather than thousands of stores; only computed parts are written.
+fn join(g: mut Gen, parts: [ast.Expr]) -> Value {
+    let snapshot = join_snapshots(g.k, parts)
+    let mut cs: [Str] = []
+    let mut computed = 0
+    let mut b = strings.builder()
+    for i in 0..len(parts) {
+        let v = expr(mut g, parts[i])
+        let mut c = v.c
+        if snapshot[i] && !v.owned && !v.is_static {
+            c = store(mut g, types.STR(), consume(mut g, v)).c
+        }
+        if i > 0 {
+            strings.add(mut b, ", ")
+        }
+        if v.is_static && len(c) > 9 && c[0..9] == "VELA_STR(" {
+            strings.add(mut b, "VELA_STR_INIT(" + c[9..len(c)])
+            c = ""
+        } else {
+            strings.add(mut b, "{NULL, NULL, 0}")
+            computed = computed + 1
+        }
+        push(mut cs, c)
+    }
+    let table = new_temp(mut g)
+    emit(mut g, "static const vela_str " + table + "[] = {" + strings.build(b) + "};")
+    let mut array = table
+    if computed > 0 {
+        array = new_temp(mut g)
+        emit(mut g, "vela_str " + array + "[" + strings.from_int(len(cs)) + "];")
+        emit(mut g, "memcpy(" + array + ", " + table + ", sizeof " + array + ");")
+        for i in 0..len(cs) {
+            if cs[i] != "" {
+                emit(mut g, array + "[" + strings.from_int(i) + "] = " + cs[i] + ";")
+            }
+        }
+    }
+    let out = store(mut g, types.STR(), "vela_str_join(" + array + ", " + strings.from_int(len(cs)) + ")")
+    for c in cs {
+        if c != "" {
+            release_now(mut g, c, types.STR())
+        }
+    }
+    return out
+}
+
 fn binary_left(g: mut Gen, l: ast.Expr, r: ast.Expr) -> Value {
     let first = expr(mut g, l)
     let mut left = first.c
@@ -2216,7 +2336,12 @@ fn operation(g: mut Gen, e: ast.Expr, op: Str, left: Str, right: Str, operand: I
             return value(scalar(mut g, operand, "(" + left + " " + op + " " + right + ")"), operand)
         }
         if operand == types.STR() {
-            return store(mut g, types.STR(), "vela_str_concat(" + left + ", " + right + ")")
+            let out = store(mut g, types.STR(), "vela_str_concat(" + left + ", " + right + ")")
+            // The operands' bytes are copied: a + b in a + b + c can go now,
+            // so a long chain keeps one partial string, not all of them.
+            release_now(mut g, left, types.STR())
+            release_now(mut g, right, types.STR())
+            return out
         }
         if types.is_integer(operand) && ranges.cannot_fail(g.k, g.env, e) {
             return value(scalar(mut g, operand, "(" + left + " " + op + " " + right + ")"), operand)

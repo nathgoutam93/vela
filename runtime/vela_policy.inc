@@ -461,6 +461,24 @@ static void cap_linux(cap_policy *p,const char *exe) {
     if (prctl(PR_SET_SECCOMP,SECCOMP_MODE_FILTER,&program))cap_fail("E6011","seccomp enforcement failed");
 }
 #endif
+// Whether a policy with these capabilities is enforced by the kernel
+// (Landlock, seccomp or the macOS sandbox) rather than by the runtime alone.
+static bool cap_kernel(unsigned mask) {
+    return !(mask&CAP_NET) || !(mask&CAP_FS) || (mask&CAP_SCOPED) || !(mask&CAP_OS) || !(mask&CAP_CLOCK);
+}
+
+static bool cap_sandboxed=false;  // this process inherited a kernel-enforced policy
+
+#if defined(VELA_SANITIZED)
+// LeakSanitizer's exit check reads /proc/PID/task and needs ptrace, which a
+// kernel-enforced policy denies, so it would end a sandboxed program with a
+// fatal error instead of a report. Those processes skip it; every other
+// process is checked as before.
+int __lsan_is_turned_off(void) {
+    return cap_sandboxed;
+}
+#endif
+
 static void cap_import(void) {
     const char *raw=getenv("VELA_CAP_MASK");
     if (!raw)return;
@@ -469,6 +487,7 @@ static void cap_import(void) {
     unsigned long mask=strtoul(raw,&end,10);
     if (errno || !*raw || !end || *end || mask>63)cap_fail("E6011","invalid inherited capability mask");
     vela_cap_mask=(unsigned)mask;
+    cap_sandboxed=cap_kernel(vela_cap_mask);
     const char *cwd=getenv("VELA_CAP_CWD");
     if (!cwd || cwd[0]!='/')cap_fail("E6011","invalid inherited working directory");
     vela_cap_cwd=strdup(cwd);
@@ -518,8 +537,7 @@ void vela_policy_init(int argc,char **argv) {
     if (!exe)cap_fail("E6011","cannot resolve policy executable");
     cap_export(&p);
     cap_close_fds(!(p.mask&CAP_NET));
-    bool kernel=!(p.mask&CAP_NET) || !(p.mask&CAP_FS) || (p.mask&CAP_SCOPED) || !(p.mask&CAP_OS) || !(p.mask&CAP_CLOCK);
-    if (kernel) {
+    if (cap_kernel(p.mask)) {
 #if defined(__APPLE__)
         cap_mac(&p,exe);
 #elif defined(__linux__) && defined(__x86_64__)

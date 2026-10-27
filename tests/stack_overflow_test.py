@@ -45,8 +45,8 @@ PROGRAMS = {
 DEEP_SOURCES = {
     'strings.vl': 'fn main() {\n    let s = ' + ' + '.join(f'"p{i % 10}"' for i in range(20000)) +
                   '\n    print(len(s))\n}\n',
-    'conditions.vl': 'fn main() {\n    let a = true\n    let b = ' + ' && '.join(['a'] * 4000) + '\n    print(b)\n}\n',
-    'sums.vl': 'fn main() {\n    let mut x = 0\n    x = ' + ' + '.join(['x'] + ['1'] * 3000) + '\n    print(x)\n}\n',
+    'conditions.vl': 'fn main() {\n    let a = true\n    let b = ' + ' && '.join(['a'] * 20000) + '\n    print(b)\n}\n',
+    'sums.vl': 'fn main() {\n    let mut x = 0\n    x = ' + ' + '.join(['x'] + ['1'] * 20000) + '\n    print(x)\n}\n',
     'parens.vl': 'fn main() {\n    let x = ' + '(' * 10000 + '1' + ')' * 10000 + '\n    print(x)\n}\n',
 }
 
@@ -116,7 +116,10 @@ def check(compiler, w, backend, opt):
 
 def deep_sources(compiler, w):
     """The compiler checks and generates C and native code for deep sources
-    on the system's own 8 MB main stack: its vela.mod asks for more."""
+    on the system's own 8 MB main stack: its vela.mod asks for more. Each
+    step was once quadratic or worse in the chain (TL-093) and would now run
+    into the timeout: range analysis of sums and conditions, and the C
+    compiler on a string chain's temporaries, built here in full."""
     env = {**os.environ, 'VELA_ROOT': str(ROOT)}
     for name, source in DEEP_SOURCES.items():
         path = w / name
@@ -124,9 +127,12 @@ def deep_sources(compiler, w):
         commands = [['check', str(path)], ['c', str(path)]]
         if native_supported():
             commands.append(['asm', str(path)])
+        if name == 'strings.vl':
+            commands.append(['build', str(path), '-o', str(w / 'strings')])
         for args in commands:
-            r = subprocess.run(['sh', '-c', 'ulimit -s 8192 && exec "$0" "$@"', str(compiler), *args], env=env,
-                               capture_output=True, text=True, timeout=600, stdin=subprocess.DEVNULL)
+            r = subprocess.run(['sh', '-c', 'ulimit -s 8192 && exec "$0" "$@"', str(compiler), *args],
+                               env={**env, 'VELA_BACKEND': 'c', 'VELA_CACHE': 'off'}, capture_output=True, text=True,
+                               timeout=120, stdin=subprocess.DEVNULL)
             assert r.returncode == 0, (name, args[0], r.returncode, r.stderr[-2000:])
 
 

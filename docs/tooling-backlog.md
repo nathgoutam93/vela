@@ -1057,6 +1057,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   Workaround: review those outcomes when using the low-level cleanup API;
   defer library handling/explicit-discard changes from this tooling pass.
   Verify any later audit with the HTTP error-path and discarded-Result tests.
+- **Post-M30 resolution:** every program importing `http` showed those two
+  warnings, also in `check --json`, where agents read them as their own. The
+  close outcomes are best effort (the request has already succeeded or
+  failed), so `get_limit` now acknowledges them with `let _ =`. A program
+  importing all 14 std modules checks without a warning.
 
 ### TL-037: Guide contract purity exceeds the implemented check
 
@@ -2495,24 +2500,139 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-093: Compile time grows faster than linearly on very long expressions
 
-- **Status:** open; found while resolving TL-092.
-- **Evidence:**
+- **Status:** resolved after the post-M30 review, except very long C-backend
+  chains of computed Str parts (below); found while resolving TL-092.
+- **Evidence** (Linux x86-64, before the change):
   - Native `vela run` of `x = x + 1 + 1 + ...`: 3,000 terms 3.7 s, 20,000
     terms 118 s. Samples are in `ranges.limit`/`cannot_fail`, which compute
-    the range of the remaining chain at every level.
-  - A 20,000-term `&&` chain takes 35 s: `refine` still walks each left
-    operand's chain once per level.
-  - On the C backend, gcc -O2 takes 45 s for the C of a 5,000-term string
-    chain and more than 9 minutes for 20,000 terms.
-  - String chains are fine natively: 20,000 terms in 5 s.
-- **Impact:** very long generated integer or Boolean expressions compile
-  slowly; nothing is miscompiled.
-- **Workaround:** split them with temporaries, or use the native backend.
-- **Proposed improvement:** cache each expression's range during a walk
-  instead of recomputing it from syntax; refine a chain of `&&` once per
-  chain; split very large generated C functions.
-- **Verify:** time the commands above at 20,000 terms; expect them to scale
-  near-linearly.
+    the range of the remaining chain at every level, and in `ast.has_mut`,
+    which `walk_expr` called on the remaining chain at every operator.
+  - A 20,000-term `&&` chain took 35 s: `refine` re-checked stability and
+    re-walked the conjunction at every operator.
+  - A string chain `"p0" + "p1" + ...` kept every partial string alive until
+    the end of the statement. On the C backend, gcc -O2 took 42 s for 5,000
+    terms and more than 9 minutes for 20,000: thousands of 24-byte `vela_str`
+    temporaries (`expand vars`, alias walking). Natively, 100,000 terms took
+    24 s to compile and the program 48 s to run, copying the string so far at
+    every `+` with nothing freed.
+- **Impact:** long generated expressions compiled slowly or not at all on
+  the C backend, and generated string building was quadratic at run time.
+- **Workaround:** split long expressions with temporaries.
+- **Resolution:**
+  - Range analysis (`ranges.vl`): `stable_at` remembers stability by node
+    within a walk; `stable_limit` follows a chain to its base and works out
+    the steps' ranges once on the way back, with the same conditions and
+    offsets; `exact_limit` asks `limit` once. `refine` uses the 256 parts of
+    an `&&`/`||` chain nearest the top: dropping facts only keeps runtime
+    checks.
+  - A chain of three or more Str `+` operations is one `vela_str_join` over
+    its parts on both backends (`codegen.string_parts`, `join`): one
+    allocation, the same result as concatenating in turn (the only non-empty
+    part when there is one, the last when all are empty), the same "string
+    too long" panic. Parts are evaluated in order; a part read from a variable
+    is copied first when a later part has a `mut` argument or the variable has
+    escaped to C (`join_snapshots`, `binary_left`'s rule per part). In C,
+    literal parts are a static table (`VELA_STR_INIT`) and only computed parts
+    are written.
+  - A two-part concatenation releases an operand temporary right after it
+    (`release_now`), instead of at the end of the statement.
+- **Verification:**
+  - Native `vela run`: 20,000-term sum 2.4 s, 100,000 terms 4.7 s; 20,000-term
+    `&&` 4.2 s, 100,000 terms 13 s; 100,000-term string chain builds in 6.5 s
+    and runs in 7 ms.
+  - C backend `vela run` of the string chain: 5,000 terms 2.2 s, 100,000
+    terms 2.9 s.
+  - `tests/run/string_join.vl` covers empty parts, one non-empty part,
+    evaluation order through a `mut` log, a later part replacing an earlier
+    part's variable, parenthesized chains and calls. Its output is
+    byte-identical to a compiler that concatenates in turn, on both backends
+    and at both optimization settings.
+  - `tests/stack_overflow_test.py` compiles 20,000-term sums and `&&` chains
+    and builds a 20,000-term string chain with the C backend under a 120 s
+    limit per step. The previous compiler times out on the C build.
+- **Remaining:** a C-backend chain of thousands of *computed* Str parts still
+  gives gcc one struct temporary per part: 4,000 parts of
+  `"<td>" + ints.to_str(x + i) + "</td>"` take 15 s on C, against 3.8 s
+  natively. Splitting very large generated C functions would address it.
+
+### TL-094: LeakSanitizer failed every sandboxed program under --sanitize
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** first post-M30 review; noted in TL-087's verification.
+- **Evidence:** `python3 run_tests.py --backend c --sanitize m24_test m27_test
+  m28_test` failed all three on both backends. A program run under a
+  kernel-enforced policy (`--deny fs`, `--deny clock`, `--allow fs:DIR` and
+  similar) ended with `LeakSanitizer has encountered a fatal error` (`Can't open
+  /proc/PID/task`, no ptrace) instead of its result. The policy correctly
+  denies what LeakSanitizer's exit check needs.
+- **Impact:** the complete sanitizer suites could not pass on Linux, so a real
+  failure among the three tests would have gone unnoticed.
+- **Workaround:** run those three tests without `--sanitize`.
+- **Resolution:** under a sanitizer build the runtime defines
+  `__lsan_is_turned_off`, which returns true only in a process that inherited
+  a kernel-enforced policy. The launcher and the inherited mask now share
+  `cap_kernel` to decide that. `VELA_CAP_MASK` alone is not the test: every
+  `vela run` program inherits it, policy or not.
+- **Verification:** the three tests pass under `--sanitize` on both backends.
+  A program leaking three `malloc` blocks through C still reports `192
+  byte(s) leaked` when unrestricted, and runs to completion under `--deny
+  net` and `--allow fs:DIR`. The complete ASan/UBSan suites pass 320/320 on
+  both backends, the first time they have passed in full.
+
+### TL-095: `vela verify --solver Z3`, as the guide wrote it, could not prove anything on Linux
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** first post-M30 review.
+- **Evidence:** `--solver` names a program. The guide and the usage line wrote
+  `--solver Z3`; a case-insensitive macOS filesystem finds `z3` under that
+  name, Linux does not. Every result was then `unknown` with "precondition
+  feasibility unknown or solver failed", and the report's `solver_version` said
+  `unavailable`.
+- **Impact:** an agent following the guide on Linux got no proofs and no
+  reason to suspect the spelling.
+- **Workaround:** pass `--solver z3` or a path.
+- **Resolution:** the guide and usage line say `--solver z3`. When the
+  requested solver cannot be run, each result that needed it gives the reason
+  "solver 'NAME' could not be run; --solver names its program, such as z3, or
+  its path". The outcome is unchanged: unknown, exit 3, as M28 specifies.
+- **Verification:** `tests/m28_test.py` checks the reason for a missing
+  solver. `vela verify --solver Z3` on a clamp function explains itself, and
+  `--solver z3` proves it.
+
+### TL-096: http.get_limit's timeout did not bound the request
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** second post-M30 review.
+- **Evidence:** `http.get_limit(url, 1000, 1000)` against a local server
+  sending a valid response one byte every 0.3 s returned it after 15.2 s.
+  `timeout_ms` limited connecting and each read separately, so a server
+  answering slowly but steadily could hold a request open almost
+  indefinitely, within the 64 KiB header and body limits.
+- **Impact:** a program or agent relying on `timeout_ms` could hang on a slow
+  or hostile server.
+- **Workaround:** run the request in a separate process with its own time
+  limit.
+- **Resolution:**
+  - The runtime records when each socket handle was opened (for a connection,
+    before name lookup). A new internal `sysio.net_deadline(handle, ms)` makes
+    reads and writes on that handle fail with `I/O timeout` once `ms` have
+    passed since then. Each wait is shortened to the time left, and an
+    operation after the deadline fails even if data is already waiting.
+  - `http.get_limit` sets the deadline to its `timeout_ms`, so the timeout
+    covers the whole request. Its signature stays `uses net`: the clock is
+    read by the runtime, not by the program.
+  - The guide lists every `sysio` function; to keep it within its 32,000-byte
+    budget, two restating sentences were removed ("No implicit integer
+    conversions.", which the sentence on explicit width changes already says,
+    and "`break`, `continue`, `return value`, and `return` behave as named.").
+- **Verification:**
+  - The reproduction ends after about 1 s with `I/O timeout` on C and native.
+  - `tests/m23_test.py` `http_deadline`: a peer trickles a 6-second response
+    and a 700 ms request must fail with `I/O timeout`, the peer seeing the
+    connection end within 3 s. It fails with the previous `std/http.vl`
+    (the request finishes after 6 s).
+  - The M23 fake-transcript and real-socket HTTP checks pass on both
+    backends, and the guide-budget checks in M17 and M20–M22 pass.
 
 ## Outstanding validation
 

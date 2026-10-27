@@ -448,7 +448,8 @@ text, views, buffers, arenas, time, unicode, net, http, processes, paths, io
 and property; maps/files/os/strings/tasks/math/c and low-level built-ins use
 compiler metadata. Public APIs follow the compatibility policy. Networking
 is blocking with explicit timeouts; HTTP supports plaintext HTTP/1.1 GET,
-not a TLS stack. Unicode operations explicitly validate UTF-8/scalars.
+not a TLS stack. `http.get_limit`'s timeout bounds the whole request,
+connecting included, however the server spreads out its response. Unicode operations explicitly validate UTF-8/scalars.
 
 Run `python3 tests/m30_test.py build/vela` to check the retained corpus,
 construct inventory, specification examples, generated guide and JSON

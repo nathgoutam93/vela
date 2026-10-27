@@ -251,6 +251,30 @@ def duplex(c,w,env):
     finally:thread.join(3)
     assert not errors,errors
 
+def http_deadline(c,w,env):
+    # timeout_ms bounds the whole request: a server trickling a valid response
+    # one byte at a time, each well inside the timeout, is cut off at it.
+    listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen();port=listener.getsockname()[1];errors=[];held=[]
+    def peer():
+        try:
+            listener.settimeout(30)
+            with listener.accept()[0] as connection:
+                start=time.monotonic();connection.recv(4096)
+                try:
+                    for b in b'HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n01234567890123456789':
+                        connection.sendall(bytes([b]));time.sleep(0.1)
+                    connection.recv(1)
+                except OSError:pass
+                held.append(time.monotonic()-start)
+        except Exception as e:errors.append(e)
+        finally:listener.close()
+    thread=threading.Thread(target=peer);thread.start()
+    source='import http\n'+f'fn main(){{match http.get_limit("http://127.0.0.1:{port}/",100,700){{Ok(_)=>print("finished"),Err(e)=>print(e)}}}}'
+    try:program(c,w,env,source,'I/O timeout\n')
+    finally:thread.join(10)
+    assert not errors,errors
+    assert held and held[0]<3,held  # the whole response takes 6 s
+
 def socket_storage(c,w,env):
     # A short read with a large limit must retain exactly its received value
     # across further reads, a timeout, EOF and task captures.
@@ -429,7 +453,7 @@ def main():
         for backend in backends:
             w=Path(td)/backend;w.mkdir();env={**os.environ,'VELA_BACKEND':backend,'VELA_CACHE':str(w/'cache')}
             env.pop('VELA_ROOT',None)
-            for fn in (fakes,unicode_oracle,http_oracle,real_processes,real_directories,real_network,duplex,socket_storage,socket_sigpipe,socket_close_race,cache,tooling,negative):
+            for fn in (fakes,unicode_oracle,http_oracle,real_processes,real_directories,real_network,http_deadline,duplex,socket_storage,socket_sigpipe,socket_close_race,cache,tooling,negative):
                 fn(c,w,env);print(backend+': '+fn.__name__+' passed',flush=True)
     print('M23 systems library checks passed: '+', '.join(backends)+'.')
 if __name__=='__main__':main()

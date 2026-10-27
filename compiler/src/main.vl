@@ -1338,7 +1338,7 @@ fn verify_command(words: [Str], root: Str) uses fs, os, clock {
                 let mut n=0;match text.parse_int(value){Some(v)=>n=v,None=>verification_error("invalid verification budget")}
                 if n<1||n>60000{verification_error("verification budgets must be 1..60000 milliseconds")};if word=="--timeout"{timeout=n}else{budget=n}
             }
-        }else{if path!=""||text.starts_with(word,"--"){verification_error("usage: vela verify [--json] [--solver Z3] [--report FILE] [--reuse FILE] [--build EXE] SOURCE")};path=word}
+        }else{if path!=""||text.starts_with(word,"--"){verification_error("usage: vela verify [--json] [--solver z3] [--report FILE] [--reuse FILE] [--build EXE] SOURCE")};path=word}
     }
     if path==""{verification_error("missing source file")}
     let k=checked_target(path,root,output=="",target)

@@ -204,7 +204,7 @@ pub fn run(checked: checker.Checked, solver: Str, timeout: Int, budget: Int) -> 
         if w.reason != "" { push(mut rows, row(k, id, "unknown", "unsupported", w.reason, json.null())); continue }
         if w.returns == 0 || pre == "false" { push(mut rows, row(k, id, "unknown", "domain", "no reachable return or unsatisfiable precondition", json.null())); continue }
         let mut status = "unknown"; let mut method = "symbolic"; let mut why = "solver was not requested"; let mut witness = json.null()
-        if pre == "true" && w.bad == "false" { status = "proved"; method = "constant/range"; why = "total scalar expression reduces to true" } else if pre == "true" && w.bad == "true" && len(f.params) == 0 { status = "refuted"; method = "constant"; why = "constant counterexample"; witness = json.array([]) } else if solver != "" {
+        if pre == "true" && w.bad == "false" { status = "proved"; method = "constant/range"; why = "total scalar expression reduces to true" } else if pre == "true" && w.bad == "true" && len(f.params) == 0 { status = "refuted"; method = "constant"; why = "constant counterexample"; witness = json.array([]) } else if solver != "" && solver_version == "unavailable" { why = "solver '" + solver + "' could not be run; --solver names its program, such as z3, or its path" } else if solver != "" {
             let elapsed = clock_ms() - start; let mut limit = timeout; if budget - elapsed < limit { limit = budget - elapsed }
             if start < 0 || limit <= 0 || count > 128 { why = "verification budget exhausted" } else {
                 let mut domain = "sat"; if pre != "true" { match query(solver, declarations, pre, limit, "") { Ok(out) => domain = answer(out), Err(e) => { domain = "unknown"; why = e } } }
