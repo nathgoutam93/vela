@@ -59,7 +59,7 @@ pub fn analyze_completing(path: Str, source: Str, std_dir: Str, open: Map[Str, S
     uses fs, os {
     // Loading parses every module, so load once: with the packages when they
     // resolve, otherwise the files alone for what they still show.
-    let mut loaded = modules.Loaded { modules: [], order: [], errors: [], warnings: [], node_count: 0 }
+    let mut loaded = modules.Loaded { modules: [], order: [], errors: [], warnings: [], node_count: 0, stack: 0 }
     match packages.for_program(path) {
         Ok(pk) => loaded = modules.load_program(path, source, std_dir, open, pk)
         Err(e) => {

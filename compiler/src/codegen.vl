@@ -305,8 +305,12 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int,
             push(mut out, line)
         }
     } else {
-        for line in ["", "int main(int argc, char **argv) {", "    vela_init(argc, argv);", "    f_main();",
-            "    return 0;", "}", ""] {
+        // vela.mod's `stack`: main runs on a thread with that stack.
+        let mut start = "    f_main();"
+        if k.stack > 0 {
+            start = "    vela_main_stack(f_main, " + strings.from_int(k.stack) + ");"
+        }
+        for line in ["", "int main(int argc, char **argv) {", "    vela_init(argc, argv);", start, "    return 0;", "}", ""] {
             push(mut out, line)
         }
     }

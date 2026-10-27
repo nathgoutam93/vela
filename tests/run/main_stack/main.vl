@@ -1,0 +1,32 @@
+// vela.mod says `stack 1G`, so main's recursion can go far deeper than
+// the system's main thread allows; without that line this overflows.
+// Output written before and after, workers and the exit all still work.
+// out: before
+// out: 40000
+// out: 14
+// out: after
+import tasks
+
+// Each call keeps 256 bytes alive across the next, so even inlined levels
+// need their own stack: 40000 of them need more than 8 MB. (Sanitizers
+// limit the depth they can follow, so the frames are large instead.)
+fn down(n: Int) -> Int {
+    if n == 0 {
+        return 0
+    }
+    let pad: [Int; 32] = [
+        n, n + 1, n + 2, n + 3, n + 4, n + 5, n + 6, n + 7, n + 8, n + 9, n + 10, n + 11, n + 12,
+        n + 13, n + 14, n + 15, n + 16, n + 17, n + 18, n + 19, n + 20, n + 21, n + 22, n + 23, n + 24,
+        n + 25, n + 26, n + 27, n + 28, n + 29, n + 30, n + 31
+    ]
+    let below = down(n - 1)
+    return below + pad[n % 32] - n - n % 32 + 1
+}
+
+fn main() {
+    print("before")
+    print(down(40000))
+    let squares = tasks.map([1, 2, 3], fn(x: Int) -> Int { return x * x })
+    print(squares[0] + squares[1] + squares[2])
+    print("after")
+}

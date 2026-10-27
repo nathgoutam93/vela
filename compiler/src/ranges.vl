@@ -531,6 +531,11 @@ fn limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
     if !stable(e) {
         return None
     }
+    return stable_limit(k, env, e)
+}
+
+// limit for a stable `e`, whose parts are then stable too.
+fn stable_limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
     match e.kind {
         ast.ExprKind.Name(_) => {
             let local = local_of(k, e.id)
@@ -553,7 +558,7 @@ fn limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
         ast.ExprKind.Binary(op, x, y) => {
             let r = of(k, env, y)
             if r.lo == r.hi && (op == "+" || op == "-") && cannot_fail(k, env, e) {
-                match limit(k, env, x) {
+                match stable_limit(k, env, x) {
                     Some(l) => {
                         let mut offset = sat_add(l.offset, r.lo)
                         if op == "-" {
@@ -768,19 +773,24 @@ fn stable_args(args: [ast.Expr]) -> Bool {
 }
 
 fn refine(w: mut Walk, e: ast.Expr, truth: Bool) {
-    if !stable(e) {
-        return
+    if stable(e) {
+        refine_stable(mut w, e, truth)
     }
+}
+
+// refine for a stable `e`, whose parts are then stable too: asking again at
+// each level made a long a && b && c ... cubic.
+fn refine_stable(w: mut Walk, e: ast.Expr, truth: Bool) {
     match e.kind {
         ast.ExprKind.Unary(op, x) => {
             if op == "!" {
-                refine(mut w, x, !truth)
+                refine_stable(mut w, x, !truth)
             }
         }
         ast.ExprKind.Binary(op, x, y) => {
             if op == "&&" && truth || op == "||" && !truth {
-                refine(mut w, x, truth)
-                refine(mut w, y, truth)
+                refine_stable(mut w, x, truth)
+                refine_stable(mut w, y, truth)
                 return
             }
             let mut cmp = op
