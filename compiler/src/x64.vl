@@ -194,12 +194,79 @@ fn arg_eligible(f: ir.Func, iv: live.Intervals) -> [Bool] {
     return ok
 }
 
+// Which values may live in rdx or in rcx, the argument registers the
+// emitter also borrows: on top of arg_eligible, no instruction inside the
+// interval may use the register itself. rdx: division and remainder (cqo,
+// idiv) and copies (an address); rcx: a shift by a count that is not a
+// constant (cl) and copies (rep movsb's count). [rdx's, rcx's].
+fn scratch_eligible(f: ir.Func, iv: live.Intervals, eligible: [Bool]) -> [[Bool]] {
+    let n = len(f.classes)
+    let mut rdx_uses: [Int] = []
+    let mut rcx_uses: [Int] = []
+    let mut dx = 0
+    let mut cx = 0
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        push(mut rdx_uses, dx)
+        push(mut rcx_uses, cx)
+        if i.op == ir.Op.Div || i.op == ir.Op.Rem || i.op == ir.Op.DivChk || i.op == ir.Op.RemChk || i.op == ir.Op.Copy {
+            dx = dx + 1
+        }
+        if i.op == ir.Op.Copy {
+            cx = cx + 1
+        } else if i.op == ir.Op.Shl || i.op == ir.Op.Shr || i.op == ir.Op.Sar {
+            let mut constant = false
+            if i.b >= 0 && iv.defs[i.b] == 1 && iv.def_at[i.b] >= 0 {
+                let d = f.insts[iv.def_at[i.b]]
+                constant = d.op == ir.Op.Const && d.imm >= 0 && d.imm < 64
+            }
+            if !constant {
+                cx = cx + 1
+            }
+        }
+    }
+    push(mut rdx_uses, dx)
+    push(mut rcx_uses, cx)
+    let mut rdx_ok: [Bool] = []
+    let mut rcx_ok: [Bool] = []
+    for v in 0..n {
+        let s = iv.start[v]
+        let e = iv.end[v]
+        let inside = eligible[v] && e >= s && s > 0
+        push(mut rdx_ok, inside && f.classes[v] != ir.FLOAT() && rdx_uses[e] - rdx_uses[s - 1] == 0)
+        push(mut rcx_ok, inside && f.classes[v] != ir.FLOAT() && rcx_uses[e] - rcx_uses[s - 1] == 0)
+    }
+    return [rdx_ok, rcx_ok]
+}
+
+// A free one of rcx and rdx that v may have, or "".
+fn borrowable(free: [Str], scratch: [[Bool]], v: Int) -> Str {
+    for r in free {
+        if borrow_ok(scratch, v, r) {
+            return r
+        }
+    }
+    return ""
+}
+
+// Whether v may have register r, as far as rcx and rdx go.
+fn borrow_ok(scratch: [[Bool]], v: Int, r: Str) -> Bool {
+    if r == "rdx" {
+        return scratch[0][v]
+    }
+    if r == "rcx" {
+        return scratch[1][v]
+    }
+    return true
+}
+
 fn allocate(f: ir.Func) -> [Loc] {
     let n = len(f.classes)
     // Calls that do not return (a failed check's report) keep no value alive,
     // so they do not force values into callee-saved registers.
     let iv = live.intervals(f, true)
     let eligible = arg_eligible(f, iv)
+    let scratch = scratch_eligible(f, iv, eligible)
     let mut locs: [Loc] = []
     for _ in 0..n {
         push(mut locs, nowhere())
@@ -234,6 +301,7 @@ fn allocate(f: ir.Func) -> [Loc] {
     let order = lists.order(starts)
     let mut free_caller = ["r10"]
     let mut free_args = ["r9", "r8", "rsi", "rdi"]
+    let mut free_borrowed = ["rcx", "rdx"]
     let mut free_callee = ["r15", "r14", "r13", "r12", "rbx"]
     let mut free_float = ["xmm14", "xmm13", "xmm12", "xmm11", "xmm10", "xmm9", "xmm8"]
     let mut active: [Int] = []
@@ -248,6 +316,8 @@ fn allocate(f: ir.Func) -> [Loc] {
                     push(mut free_float, r)
                 } else if is_arg_reg(r) {
                     push(mut free_args, r)
+                } else if r == "rcx" || r == "rdx" {
+                    push(mut free_borrowed, r)
                 } else if is_callee_saved(r) {
                     push(mut free_callee, r)
                 } else {
@@ -268,7 +338,8 @@ fn allocate(f: ir.Func) -> [Loc] {
             if d.dst == v && d.a >= 0 && shares_operand(d.op) {
                 let a = d.a
                 if locs[a].kind == 0 && iv.end[a] == fd && f.classes[a] == f.classes[v] &&
-                    (!cross || is_callee_saved(locs[a].reg)) && (eligible[v] || !is_arg_reg(locs[a].reg)) {
+                    (!cross || is_callee_saved(locs[a].reg)) && (eligible[v] || !is_arg_reg(locs[a].reg)) &&
+                    borrow_ok(scratch, v, locs[a].reg) {
                     got = locs[a].reg
                     let mut kept: [Int] = []
                     for x in active {
@@ -290,6 +361,15 @@ fn allocate(f: ir.Func) -> [Loc] {
         } else if eligible[v] && len(free_args) > 0 {
             got = free_args[len(free_args) - 1]
             free_args = free_args[0..len(free_args) - 1]
+        } else if borrowable(free_borrowed, scratch, v) != "" {
+            got = borrowable(free_borrowed, scratch, v)
+            let mut rest: [Str] = []
+            for r in free_borrowed {
+                if r != got {
+                    push(mut rest, r)
+                }
+            }
+            free_borrowed = rest
         } else if !cross && len(free_caller) > 0 {
             got = free_caller[len(free_caller) - 1]
             free_caller = free_caller[0..len(free_caller) - 1]
@@ -304,7 +384,8 @@ fn allocate(f: ir.Func) -> [Loc] {
             // instead would evict a hot loop's state before its temporaries.
             let mut victim = -1
             for a in active {
-                if f.classes[a] != f.classes[v] || cross && !is_callee_saved(locs[a].reg) || !eligible[v] && is_arg_reg(locs[a].reg) {
+                if f.classes[a] != f.classes[v] || cross && !is_callee_saved(locs[a].reg) || !eligible[v] && is_arg_reg(locs[a].reg) ||
+                    !borrow_ok(scratch, v, locs[a].reg) {
                     continue
                 }
                 if victim < 0 || iv.cost[a] < iv.cost[victim] || iv.cost[a] == iv.cost[victim] && iv.end[a] > iv.end[victim] {
@@ -1682,7 +1763,12 @@ fn indexed(o: mut Out, f: ir.Func, seq: [Int], p: Int, reads: [Int]) -> Int {
     } else if u.imm < 0 {
         disp = " - " + num(0 - u.imm)
     }
-    let operand = ptr_word(size) + "[" + in_reg(mut o, base, "r11") + " + " + in_reg(mut o, m.a, "rdx") + "*" + num(m.imm) + disp + "]"
+    // A spilled index goes through rax, which the access does not need
+    // first; rdx may hold a value (scratch_eligible).
+    if o.locs[m.a].kind != 0 && u.op == ir.Op.Store && o.locs[u.b].kind != 0 && o.locs[u.b].kind != 2 {
+        return 0
+    }
+    let operand = ptr_word(size) + "[" + in_reg(mut o, base, "r11") + " + " + in_reg(mut o, m.a, "rax") + "*" + num(m.imm) + disp + "]"
     if u.op == ir.Op.FLoad {
         let mut d = "xmm15"
         if o.locs[u.dst].kind == 0 {

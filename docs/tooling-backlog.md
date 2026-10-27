@@ -2677,6 +2677,50 @@ the same entry. Close it with a commit or validation result; keep its history.
   - Both fixed points pass; C and native suites 322/322; `VELA_OPT=0` native
     selection 254/254. ARM64 output is emitted (M26a) but was not run.
 
+### TL-098: x86-64 kept rcx and rdx out of register allocation
+
+- **Status:** resolved for the allocation of rcx and rdx after the post-M30
+  review; sha256's remaining gap is open (below).
+- **Discovery:** profiling varints (1.44-1.75x C) and sha256 (1.35-1.78x C)
+  natively on Linux x86-64 after TL-097.
+- **Evidence:** both were short of registers. The emitter reserved rax, rcx,
+  rdx and r11 as scratch, leaving ten registers where gcc uses fourteen.
+  varints' `parse` kept `checksum`, `count`, `last_start` and the data pointer
+  on the stack around its inner loop; sha256's compression loop kept five of
+  its eight working variables on the stack, shuffling them memory to memory
+  every round.
+- **Resolution:** rcx and rdx join the registers values may have
+  (`scratch_eligible`): on top of the argument-register rules, a value may
+  live in rdx when nothing in its interval divides or copies, and in rcx when
+  nothing in it shifts by a count that is not a constant or copies. The
+  scaled-index fusion loads a spilled index through rax instead of rdx (and
+  leaves a store alone when its value is spilled too).
+- **Verification:**
+  - Paired nine rounds against `main`
+    ([report](../bench/results/2026-10-27-x64-scratch-registers-ab.json)):
+    varints 1.654x -> 1.285x C, sha256 1.491x -> 1.401x; geometric mean 1.260x
+    -> 1.227x; the compiler translates itself 9% faster.
+  - mandelbrot (+10%), nbody (+9%) and wordfreq (+12%) measured slower in
+    that run and again over 21 rounds
+    ([recheck](../bench/results/2026-10-27-x64-scratch-registers-recheck.json)).
+    wordfreq's assembly is identical before and after, mandelbrot's differs
+    only in a loop counter moving from r12 to rcx, and nbody's inner loop has
+    the same 57 instructions with rcx/rdx for r13/r14 (and two fewer
+    callee-saved registers to save). These are this host's layout and timing
+    variation (TL-085), not slower code.
+  - Both fixed points pass; C and native suites 322/322; `VELA_OPT=0` native
+    selection 254/254; the native runtime fixtures pass under ASan (127/127);
+    `x64_selection`, `x64_layout` and `codegen_loops` pass at both
+    optimization settings.
+- **Remaining (sha256):** five working variables are still spilled. Values
+  live across the whole block loop (`padded`, `bit_length`, the block
+  counter, array bases) hold registers through the compression loop, where
+  they are not used, because the allocator gives each value one location for
+  its whole interval. Splitting live ranges at loop boundaries, or freeing
+  rbp by addressing the frame through rsp, would address it. A trial that
+  weighted short constant-count loops (`for j in 0..4`) below 8 changed one
+  stack reference and was not kept.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
