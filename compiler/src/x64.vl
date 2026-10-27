@@ -490,6 +490,14 @@ fn set(o: mut Out, v: Int, r: Str) {
 }
 
 // A Float operand: an xmm register, or a stack slot.
+// Where a Float result is computed: its own register, or the scratch.
+fn fresult(o: Out, v: Int) -> Str {
+    if o.locs[v].kind == 0 {
+        return o.locs[v].reg
+    }
+    return "xmm15"
+}
+
 fn fsrc(o: Out, v: Int) -> Str {
     let l = o.locs[v]
     if l.kind == 0 {
@@ -847,8 +855,9 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         return
     }
     if op == ir.Op.FLoad {
-        emit(mut o, "movsd xmm15, " + mem(mut o, i.a, i.imm, 8, "r11"))
-        fset(mut o, i.dst, "xmm15")
+        let d = fresult(o, i.dst)
+        emit(mut o, "movsd " + d + ", " + mem(mut o, i.a, i.imm, 8, "r11"))
+        fset(mut o, i.dst, d)
         return
     }
     if op == ir.Op.FStore {
@@ -858,6 +867,22 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
     }
     if op == ir.Op.Copy {
         copy(mut o, i.a, i.b, i.imm)
+        return
+    }
+    if op == ir.Op.Add && o.locs[i.dst].kind == 0 && o.locs[i.a].kind == 0 && o.locs[i.b].kind == 0 {
+        // Three registers: in place when the result shares one (addition
+        // commutes), else one lea instead of a mov and an add (an address
+        // such as base + i * 56).
+        let d = o.locs[i.dst].reg
+        let ra = o.locs[i.a].reg
+        let rb = o.locs[i.b].reg
+        if d == ra {
+            emit(mut o, "add " + d + ", " + rb)
+        } else if d == rb {
+            emit(mut o, "add " + d + ", " + ra)
+        } else {
+            emit(mut o, "lea " + d + ", [" + ra + " + " + rb + "]")
+        }
         return
     }
     if op == ir.Op.Add || op == ir.Op.Sub || op == ir.Op.Mul || op == ir.Op.AddChk || op == ir.Op.SubChk || op == ir.Op.MulChk {
@@ -1096,7 +1121,12 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         fset(mut o, i.dst, "xmm15")
         return
     }
-    if op == ir.Op.FSqrt { emit(mut o, "sqrtsd xmm15, " + fsrc(o, i.a)); fset(mut o, i.dst, "xmm15"); return }
+    if op == ir.Op.FSqrt {
+        let d = fresult(o, i.dst)
+        emit(mut o, "sqrtsd " + d + ", " + fsrc(o, i.a))
+        fset(mut o, i.dst, d)
+        return
+    }
     if op == ir.Op.FNeg {
         emit(mut o, "movq rax, " + fin_reg(mut o, i.a, "xmm15"))
         emit(mut o, "btc rax, 63")
@@ -1537,6 +1567,11 @@ fn body(o: mut Out, f: ir.Func, seq: [Int], skips: Map[Int, Bool], reads: [Int],
             p = p + 2
             continue
         }
+        if i.op == ir.Op.FLoad && reads[i.dst] == 1 && p + 1 < len(seq) && seq[p + 1] == k + 1 &&
+            float_operand(mut o, i, f.insts[k + 1]) {
+            p = p + 2
+            continue
+        }
         let rotating = rotate(mut o, f, k, reads, known)
         if rotating > 0 {
             p = p + rotating
@@ -1571,6 +1606,40 @@ fn body(o: mut Out, f: ir.Func, seq: [Int], skips: Map[Int, Bool], reads: [Int],
         instruction(mut o, f, i, label_after(f, seq, p))
         p = p + 1
     }
+}
+
+// A Float load only the arithmetic right after it reads: the arithmetic
+// reads the memory itself (subsd xmm1, qword ptr [rax + 8]). Addition and
+// multiplication take the loaded value on either side.
+fn float_operand(o: mut Out, load: ir.Inst, e: ir.Inst) -> Bool {
+    if !(e.op == ir.Op.FAdd || e.op == ir.Op.FSub || e.op == ir.Op.FMul || e.op == ir.Op.FDiv) || e.a == e.b {
+        return false
+    }
+    let mut other = e.a
+    if e.b != load.dst {
+        if e.a != load.dst || e.op == ir.Op.FSub || e.op == ir.Op.FDiv {
+            return false
+        }
+        other = e.b
+    }
+    let name = match e.op {
+        ir.Op.FAdd => "addsd"
+        ir.Op.FSub => "subsd"
+        ir.Op.FMul => "mulsd"
+        _ => "divsd"
+    }
+    let d = fresult(o, e.dst)
+    let lo = o.locs[other]
+    if lo.kind == 0 {
+        if lo.reg != d {
+            emit(mut o, "movapd " + d + ", " + lo.reg)
+        }
+    } else {
+        emit(mut o, "movsd " + d + ", " + fsrc(o, other))
+    }
+    emit(mut o, name + " " + d + ", " + mem(mut o, load.a, load.imm, 8, "r11"))
+    fset(mut o, e.dst, d)
+    return true
 }
 
 // Whether e zero-extends the low 32 bits of v.
