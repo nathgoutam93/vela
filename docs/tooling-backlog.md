@@ -1057,6 +1057,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   Workaround: review those outcomes when using the low-level cleanup API;
   defer library handling/explicit-discard changes from this tooling pass.
   Verify any later audit with the HTTP error-path and discarded-Result tests.
+- **Post-M30 resolution:** every program importing `http` showed those two
+  warnings, also in `check --json`, where agents read them as their own. The
+  close outcomes are best effort (the request has already succeeded or
+  failed), so `get_limit` now acknowledges them with `let _ =`. A program
+  importing all 14 std modules checks without a warning.
 
 ### TL-037: Guide contract purity exceeds the implemented check
 
@@ -2513,6 +2518,50 @@ the same entry. Close it with a commit or validation result; keep its history.
   chain; split very large generated C functions.
 - **Verify:** time the commands above at 20,000 terms; expect them to scale
   near-linearly.
+
+### TL-094: LeakSanitizer failed every sandboxed program under --sanitize
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** first post-M30 review; noted in TL-087's verification.
+- **Evidence:** `python3 run_tests.py --backend c --sanitize m24_test m27_test
+  m28_test` failed all three on both backends. A program run under a
+  kernel-enforced policy (`--deny fs`, `--deny clock`, `--allow fs:DIR` and
+  similar) ended with `LeakSanitizer has encountered a fatal error` (`Can't open
+  /proc/PID/task`, no ptrace) instead of its result. The policy correctly
+  denies what LeakSanitizer's exit check needs.
+- **Impact:** the complete sanitizer suites could not pass on Linux, so a real
+  failure among the three tests would have gone unnoticed.
+- **Workaround:** run those three tests without `--sanitize`.
+- **Resolution:** under a sanitizer build the runtime defines
+  `__lsan_is_turned_off`, which returns true only in a process that inherited
+  a kernel-enforced policy. The launcher and the inherited mask now share
+  `cap_kernel` to decide that. `VELA_CAP_MASK` alone is not the test: every
+  `vela run` program inherits it, policy or not.
+- **Verification:** the three tests pass under `--sanitize` on both backends.
+  A program leaking three `malloc` blocks through C still reports `192
+  byte(s) leaked` when unrestricted, and runs to completion under `--deny
+  net` and `--allow fs:DIR`. The complete ASan/UBSan suites pass 320/320 on
+  both backends, the first time they have passed in full.
+
+### TL-095: `vela verify --solver Z3`, as the guide wrote it, could not prove anything on Linux
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** first post-M30 review.
+- **Evidence:** `--solver` names a program. The guide and the usage line wrote
+  `--solver Z3`; a case-insensitive macOS filesystem finds `z3` under that
+  name, Linux does not. Every result was then `unknown` with "precondition
+  feasibility unknown or solver failed", and the report's `solver_version` said
+  `unavailable`.
+- **Impact:** an agent following the guide on Linux got no proofs and no
+  reason to suspect the spelling.
+- **Workaround:** pass `--solver z3` or a path.
+- **Resolution:** the guide and usage line say `--solver z3`. When the
+  requested solver cannot be run, each result that needed it gives the reason
+  "solver 'NAME' could not be run; --solver names its program, such as z3, or
+  its path". The outcome is unchanged: unknown, exit 3, as M28 specifies.
+- **Verification:** `tests/m28_test.py` checks the reason for a missing
+  solver. `vela verify --solver Z3` on a clamp function explains itself, and
+  `--solver z3` proves it.
 
 ## Outstanding validation
 

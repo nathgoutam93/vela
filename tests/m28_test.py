@@ -158,6 +158,7 @@ fn main(){print(f(2))}
         verify(c,p,e,'--build',exe,code=3)
         assert run([exe],e).stdout=='observable\n2\n'
     d=verify(c,p,env,'--solver',w/'missing-solver',code=3);assert d['status']=='unknown'
+    assert all('could not be run' in r['reason'] for r in d['results'] if r['method']=='symbolic'),d['results']
     p=source(w,'bounded','fn f(x:u8)->u8 requires x<255u8 ensures result>x{return x+1u8}\nfn main(){}\n')
     if os.name!='nt':
         solver=w/'sleep-solver';solver.write_text('#!/bin/sh\nsleep 5\n');solver.chmod(0o755)

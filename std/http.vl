@@ -102,6 +102,6 @@ pub fn get(value: Str) -> Result[Response, Str] uses net { return get_limit(valu
 pub fn get_limit(value: Str, body_limit: Int, timeout_ms: Int) -> Result[Response, Str] uses net {
     if body_limit < 0 || body_limit > 67108864 { return Err("invalid HTTP body limit") }; let u = url(value)?; let socket = net.connect_timeout(u.host, u.port, timeout_ms)?
     let sent = socket.write("GET " + u.target + " HTTP/1.1\r\nHost: " + u.authority + "\r\nConnection: close\r\n\r\n")
-    match sent { Err(e) => { socket.close(); return Err(e) }, Ok(_) => {} }
-    let result = response(socket, body_limit); socket.close(); return result
+    match sent { Err(e) => { let _ = socket.close(); return Err(e) }, Ok(_) => {} }
+    let result = response(socket, body_limit); let _ = socket.close(); return result
 }

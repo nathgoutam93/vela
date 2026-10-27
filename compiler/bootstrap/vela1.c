@@ -115638,7 +115638,7 @@ vela_str f_5guide_reference(vela_str v_root) {
     // line 30
     vela_builder_add(v_out, VELA_STR("Run/test/profile flags before FILE: `--allow unsafe`, `--allow fs:PATH`, `--deny EFFECT`. Unsafe needs allow; standalone builds unrestricted. Deny wins; fs roots narrow access. Unsupported policies fail closed. macOS deny-net forbids unsafe/subprocesses; restricted C needs Linux.\012\012", 282));
     // line 31
-    vela_builder_add(v_out, VELA_STR("E7009: handle discarded Result or acknowledge with repeatable `let _ = call()`; fix never inserts it. `vela verify [--solver Z3] [--reuse REPORT] [--build EXE] [--target TARGET] FILE` reports proved/refuted/unknown (exit 0/1/3); unknown checks stay. Evidence binds sources/target/compiler and is rechecked. `vela test --properties [--cases N] [--seed U64] [--size N] [--shrinks N] FILE` runs bounded contract samples, not proofs or ordinary test blocks. Both accept --json, --report REPORT, --timeout MS, --budget MS. Unsupported/effectful domains stay unknown; normal tests/coverage run separately. property.Generator: sample(Self,u64,Int)->u64; shrink(Self,u64)->[u64].\012\012", 673));
+    vela_builder_add(v_out, VELA_STR("E7009: handle discarded Result or acknowledge with repeatable `let _ = call()`; fix never inserts it. `vela verify [--solver z3] [--reuse REPORT] [--build EXE] [--target TARGET] FILE` reports proved/refuted/unknown (exit 0/1/3); unknown checks stay. Evidence binds sources/target/compiler and is rechecked. `vela test --properties [--cases N] [--seed U64] [--size N] [--shrinks N] FILE` runs bounded contract samples, not proofs or ordinary test blocks. Both accept --json, --report REPORT, --timeout MS, --budget MS. Unsupported/effectful domains stay unknown; normal tests/coverage run separately. property.Generator: sample(Self,u64,Int)->u64; shrink(Self,u64)->[u64].\012\012", 673));
     // line 32
     vela_builder_add(v_out, VELA_STR("## Syntax and values\012", 21));
     // line 33
@@ -148023,287 +148023,302 @@ Result_12verification_Outcome_Str f_12verification_run(t_7checker_Checked v_chec
                 vela_array_release(_t123);
             } else {
                 bool _t125 = !vela_str_eq(v_solver, VELA_STR("", 0));
-                if (_t125) {
-                    // line 208
-                    int64_t _t126 = f_12verification_clock_ms();
-                    int64_t _t127 = _t126;
-                    int64_t _t128 = vela_sub(_t127, v_start, "compiler/src/verification.vl:208:38");
-                    int64_t v_elapsed = _t128;
-                    // line 208
-                    int64_t v_limit = v_timeout;
-                    // line 208
-                    int64_t _t129 = v_budget;
-                    int64_t _t130 = vela_sub(_t129, v_elapsed, "compiler/src/verification.vl:208:82");
-                    int64_t _t131 = _t130;
-                    bool _t132 = _t131 < v_limit;
-                    if (_t132) {
+                bool _t126 = _t125;
+                if (_t126) {
+                    bool _t127 = vela_str_eq(v_solver_version, VELA_STR("unavailable", 11));
+                    _t126 = _t127;
+                }
+                if (_t126) {
+                    // line 207
+                    vela_str _t128 = vela_str_concat(VELA_STR("solver '", 8), v_solver);
+                    vela_str _t129 = vela_str_concat(_t128, VELA_STR("' could not be run; --solver names its program, such as z3, or its path", 71));
+                    vela_str_release(v_why);
+                    v_why = _t129;
+                    vela_str_release(_t128);
+                } else {
+                    bool _t130 = !vela_str_eq(v_solver, VELA_STR("", 0));
+                    if (_t130) {
                         // line 208
-                        int64_t _t133 = v_budget;
-                        int64_t _t134 = vela_sub(_t133, v_elapsed, "compiler/src/verification.vl:208:117");
-                        v_limit = _t134;
-                    }
-                    // line 209
-                    int64_t _t135 = v_start;
-                    bool _t136 = _t135 < 0;
-                    bool _t137 = _t136;
-                    if (!_t137) {
-                        int64_t _t138 = v_limit;
-                        bool _t139 = _t138 <= 0;
-                        _t137 = _t139;
-                    }
-                    bool _t140 = _t137;
-                    if (!_t140) {
-                        int64_t _t141 = v_count;
-                        bool _t142 = _t141 > 128;
-                        _t140 = _t142;
-                    }
-                    if (_t140) {
-                        // line 209
-                        vela_str_release(v_why);
-                        v_why = VELA_STR("verification budget exhausted", 29);
-                    } else {
-                        // line 210
-                        vela_str v_domain = VELA_STR("sat", 3);
-                        // line 210
-                        bool _t143 = !vela_str_eq(v_pre, VELA_STR("true", 4));
-                        if (_t143) {
-                            // line 210
-                            Result_Str_Str _t144 = f_12verification_query(v_solver, v_declarations, v_pre, v_limit, VELA_STR("", 0));
-                            if (_t144.tag == Result_Str_Str_Ok) {
-                                vela_str v_out = _t144.as.m_Ok._0;
-                                vela_str_retain(v_out);
-                                // line 210
-                                vela_str _t145 = f_12verification_answer(v_out);
-                                vela_str_release(v_domain);
-                                v_domain = _t145;
-                                vela_str_release(v_out);
-                            } else {
-                                vela_str v_e_3 = _t144.as.m_Err._0;
-                                vela_str_retain(v_e_3);
-                                // line 210
-                                vela_str_release(v_domain);
-                                v_domain = VELA_STR("unknown", 7);
-                                // line 210
-                                vela_str _t146 = v_e_3;
-                                vela_str_retain(_t146);
-                                vela_str_release(v_why);
-                                v_why = _t146;
-                                vela_str_release(v_e_3);
-                            }
-                            rc_release_Result_Str_Str(_t144);
+                        int64_t _t131 = f_12verification_clock_ms();
+                        int64_t _t132 = _t131;
+                        int64_t _t133 = vela_sub(_t132, v_start, "compiler/src/verification.vl:208:38");
+                        int64_t v_elapsed = _t133;
+                        // line 208
+                        int64_t v_limit = v_timeout;
+                        // line 208
+                        int64_t _t134 = v_budget;
+                        int64_t _t135 = vela_sub(_t134, v_elapsed, "compiler/src/verification.vl:208:82");
+                        int64_t _t136 = _t135;
+                        bool _t137 = _t136 < v_limit;
+                        if (_t137) {
+                            // line 208
+                            int64_t _t138 = v_budget;
+                            int64_t _t139 = vela_sub(_t138, v_elapsed, "compiler/src/verification.vl:208:117");
+                            v_limit = _t139;
                         }
-                        // line 211
-                        bool _t147 = vela_str_eq(v_domain, VELA_STR("unsat", 5));
-                        if (_t147) {
-                            // line 211
+                        // line 209
+                        int64_t _t140 = v_start;
+                        bool _t141 = _t140 < 0;
+                        bool _t142 = _t141;
+                        if (!_t142) {
+                            int64_t _t143 = v_limit;
+                            bool _t144 = _t143 <= 0;
+                            _t142 = _t144;
+                        }
+                        bool _t145 = _t142;
+                        if (!_t145) {
+                            int64_t _t146 = v_count;
+                            bool _t147 = _t146 > 128;
+                            _t145 = _t147;
+                        }
+                        if (_t145) {
+                            // line 209
                             vela_str_release(v_why);
-                            v_why = VELA_STR("unsatisfiable preconditions; vacuity is not certified", 53);
+                            v_why = VELA_STR("verification budget exhausted", 29);
                         } else {
-                            bool _t148 = !vela_str_eq(v_domain, VELA_STR("sat", 3));
+                            // line 210
+                            vela_str v_domain = VELA_STR("sat", 3);
+                            // line 210
+                            bool _t148 = !vela_str_eq(v_pre, VELA_STR("true", 4));
                             if (_t148) {
+                                // line 210
+                                Result_Str_Str _t149 = f_12verification_query(v_solver, v_declarations, v_pre, v_limit, VELA_STR("", 0));
+                                if (_t149.tag == Result_Str_Str_Ok) {
+                                    vela_str v_out = _t149.as.m_Ok._0;
+                                    vela_str_retain(v_out);
+                                    // line 210
+                                    vela_str _t150 = f_12verification_answer(v_out);
+                                    vela_str_release(v_domain);
+                                    v_domain = _t150;
+                                    vela_str_release(v_out);
+                                } else {
+                                    vela_str v_e_3 = _t149.as.m_Err._0;
+                                    vela_str_retain(v_e_3);
+                                    // line 210
+                                    vela_str_release(v_domain);
+                                    v_domain = VELA_STR("unknown", 7);
+                                    // line 210
+                                    vela_str _t151 = v_e_3;
+                                    vela_str_retain(_t151);
+                                    vela_str_release(v_why);
+                                    v_why = _t151;
+                                    vela_str_release(v_e_3);
+                                }
+                                rc_release_Result_Str_Str(_t149);
+                            }
+                            // line 211
+                            bool _t152 = vela_str_eq(v_domain, VELA_STR("unsat", 5));
+                            if (_t152) {
                                 // line 211
                                 vela_str_release(v_why);
-                                v_why = VELA_STR("precondition feasibility unknown or solver failed", 49);
+                                v_why = VELA_STR("unsatisfiable preconditions; vacuity is not certified", 53);
                             } else {
-                                // line 212
-                                int64_t _t149 = v_budget;
-                                int64_t _t150 = f_12verification_clock_ms();
-                                int64_t _t151 = _t150;
-                                int64_t _t152 = vela_sub(_t151, v_start, "compiler/src/verification.vl:212:62");
-                                int64_t _t153 = vela_sub(_t149, _t152, "compiler/src/verification.vl:212:48");
-                                int64_t v_remaining = _t153;
-                                // line 212
-                                int64_t _t154 = v_remaining;
-                                bool _t155 = _t154 > v_timeout;
-                                if (_t155) {
-                                    // line 212
-                                    v_remaining = v_timeout;
-                                }
-                                // line 213
-                                int64_t _t156 = v_remaining;
-                                bool _t157 = _t156 <= 0;
-                                if (_t157) {
-                                    // line 213
+                                bool _t153 = !vela_str_eq(v_domain, VELA_STR("sat", 3));
+                                if (_t153) {
+                                    // line 211
                                     vela_str_release(v_why);
-                                    v_why = VELA_STR("verification budget exhausted", 29);
+                                    v_why = VELA_STR("precondition feasibility unknown or solver failed", 49);
                                 } else {
-                                    // line 213
-                                    Result_Str_Str _t158 = f_12verification_query(v_solver, v_declarations, v_w.m_bad, v_remaining, VELA_STR("", 0));
-                                    if (_t158.tag == Result_Str_Str_Ok) {
-                                        vela_str v_out_2 = _t158.as.m_Ok._0;
-                                        vela_str_retain(v_out_2);
-                                        // line 214
-                                        vela_str _t159 = f_12verification_answer(v_out_2);
-                                        vela_str v_a = _t159;
-                                        // line 214
-                                        bool _t160 = vela_str_eq(v_a, VELA_STR("unsat", 5));
-                                        if (_t160) {
-                                            // line 214
-                                            vela_str_release(v_status);
-                                            v_status = VELA_STR("proved", 6);
-                                            // line 214
-                                            vela_str_release(v_method);
-                                            v_method = VELA_STR("smt-bv", 6);
-                                            // line 214
-                                            vela_str_release(v_why);
-                                            v_why = VELA_STR("no violating defined return or body operation", 45);
-                                        } else {
-                                            bool _t161 = vela_str_eq(v_a, VELA_STR("sat", 3));
-                                            if (_t161) {
-                                                // line 214
-                                                int64_t _t162 = v_f.m_params->len;
-                                                int64_t _t163 = _t162;
-                                                bool _t164 = _t163 == 0;
-                                                if (_t164) {
-                                                    // line 214
-                                                    vela_str_release(v_status);
-                                                    v_status = VELA_STR("refuted", 7);
-                                                    // line 214
-                                                    vela_array * _t165 = vela_array_new(vt_t_4json_Json(), 0);
-                                                    t_4json_Json _t166 = f_4json_array(_t165);
-                                                    rc_release_t_4json_Json(v_witness);
-                                                    v_witness = _t166;
-                                                    vela_array_release(_t165);
-                                                    // line 214
-                                                    vela_str_release(v_why);
-                                                    v_why = VELA_STR("violating execution", 19);
-                                                } else {
-                                                    // line 215
-                                                    int64_t _t167 = v_budget;
-                                                    int64_t _t168 = f_12verification_clock_ms();
-                                                    int64_t _t169 = _t168;
-                                                    int64_t _t170 = vela_sub(_t169, v_start, "compiler/src/verification.vl:215:65");
-                                                    int64_t _t171 = vela_sub(_t167, _t170, "compiler/src/verification.vl:215:51");
-                                                    int64_t v_left = _t171;
-                                                    // line 215
-                                                    int64_t _t172 = v_left;
-                                                    bool _t173 = _t172 > v_timeout;
-                                                    if (_t173) {
-                                                        // line 215
-                                                        v_left = v_timeout;
-                                                    }
-                                                    // line 216
-                                                    int64_t _t174 = v_left;
-                                                    bool _t175 = _t174 > 0;
-                                                    if (_t175) {
-                                                        // line 216
-                                                        vela_str _t176 = vela_str_concat(VELA_STR("(get-value (", 12), v_model_names);
-                                                        vela_str _t177 = vela_str_concat(_t176, VELA_STR("))\012", 3));
-                                                        Result_Str_Str _t178 = f_12verification_query(v_solver, v_declarations, v_w.m_bad, v_left, _t177);
-                                                        if (_t178.tag == Result_Str_Str_Ok) {
-                                                            vela_str v_model = _t178.as.m_Ok._0;
-                                                            vela_str_retain(v_model);
-                                                            // line 217
-                                                            vela_str _t179 = f_12verification_answer(v_model);
-                                                            bool _t180 = vela_str_eq(_t179, VELA_STR("sat", 3));
-                                                            if (_t180) {
-                                                                // line 217
-                                                                Result_4json_Json_Str _t181 = f_12verification_counterexample(v_k, v_id, v_model);
-                                                                if (_t181.tag == Result_4json_Json_Str_Ok) {
-                                                                    t_4json_Json v_args = _t181.as.m_Ok._0;
-                                                                    rc_retain_t_4json_Json(v_args);
-                                                                    // line 217
-                                                                    vela_str_release(v_status);
-                                                                    v_status = VELA_STR("refuted", 7);
-                                                                    // line 217
-                                                                    t_4json_Json _t182 = v_args;
-                                                                    rc_retain_t_4json_Json(_t182);
-                                                                    rc_release_t_4json_Json(v_witness);
-                                                                    v_witness = _t182;
-                                                                    // line 217
-                                                                    vela_str_release(v_method);
-                                                                    v_method = VELA_STR("smt-bv", 6);
-                                                                    // line 217
-                                                                    vela_str_release(v_why);
-                                                                    v_why = VELA_STR("violating execution", 19);
-                                                                    rc_release_t_4json_Json(v_args);
-                                                                } else {
-                                                                    vela_str v_e_4 = _t181.as.m_Err._0;
-                                                                    vela_str_retain(v_e_4);
-                                                                    // line 217
-                                                                    vela_str _t183 = v_e_4;
-                                                                    vela_str_retain(_t183);
-                                                                    vela_str_release(v_why);
-                                                                    v_why = _t183;
-                                                                    vela_str_release(v_e_4);
-                                                                }
-                                                                rc_release_Result_4json_Json_Str(_t181);
-                                                            } else {
-                                                                // line 217
-                                                                vela_str_release(v_why);
-                                                                v_why = VELA_STR("model query did not return sat", 30);
-                                                            }
-                                                            vela_str_release(_t179);
-                                                            vela_str_release(v_model);
-                                                        } else {
-                                                            vela_str v_e_5 = _t178.as.m_Err._0;
-                                                            vela_str_retain(v_e_5);
-                                                            // line 217
-                                                            vela_str _t184 = v_e_5;
-                                                            vela_str_retain(_t184);
-                                                            vela_str_release(v_why);
-                                                            v_why = _t184;
-                                                            vela_str_release(v_e_5);
-                                                        }
-                                                        rc_release_Result_Str_Str(_t178);
-                                                        vela_str_release(_t177);
-                                                        vela_str_release(_t176);
-                                                    } else {
-                                                        // line 218
-                                                        vela_str_release(v_why);
-                                                        v_why = VELA_STR("verification budget exhausted before model", 42);
-                                                    }
-                                                }
-                                            } else {
-                                                // line 219
-                                                vela_str_release(v_why);
-                                                v_why = VELA_STR("solver returned unknown or invalid output", 41);
-                                            }
-                                        }
-                                        vela_str_release(v_a);
-                                        vela_str_release(v_out_2);
-                                    } else {
-                                        vela_str v_e_6 = _t158.as.m_Err._0;
-                                        vela_str_retain(v_e_6);
-                                        // line 220
-                                        vela_str _t185 = v_e_6;
-                                        vela_str_retain(_t185);
-                                        vela_str_release(v_why);
-                                        v_why = _t185;
-                                        vela_str_release(v_e_6);
+                                    // line 212
+                                    int64_t _t154 = v_budget;
+                                    int64_t _t155 = f_12verification_clock_ms();
+                                    int64_t _t156 = _t155;
+                                    int64_t _t157 = vela_sub(_t156, v_start, "compiler/src/verification.vl:212:62");
+                                    int64_t _t158 = vela_sub(_t154, _t157, "compiler/src/verification.vl:212:48");
+                                    int64_t v_remaining = _t158;
+                                    // line 212
+                                    int64_t _t159 = v_remaining;
+                                    bool _t160 = _t159 > v_timeout;
+                                    if (_t160) {
+                                        // line 212
+                                        v_remaining = v_timeout;
                                     }
-                                    rc_release_Result_Str_Str(_t158);
+                                    // line 213
+                                    int64_t _t161 = v_remaining;
+                                    bool _t162 = _t161 <= 0;
+                                    if (_t162) {
+                                        // line 213
+                                        vela_str_release(v_why);
+                                        v_why = VELA_STR("verification budget exhausted", 29);
+                                    } else {
+                                        // line 213
+                                        Result_Str_Str _t163 = f_12verification_query(v_solver, v_declarations, v_w.m_bad, v_remaining, VELA_STR("", 0));
+                                        if (_t163.tag == Result_Str_Str_Ok) {
+                                            vela_str v_out_2 = _t163.as.m_Ok._0;
+                                            vela_str_retain(v_out_2);
+                                            // line 214
+                                            vela_str _t164 = f_12verification_answer(v_out_2);
+                                            vela_str v_a = _t164;
+                                            // line 214
+                                            bool _t165 = vela_str_eq(v_a, VELA_STR("unsat", 5));
+                                            if (_t165) {
+                                                // line 214
+                                                vela_str_release(v_status);
+                                                v_status = VELA_STR("proved", 6);
+                                                // line 214
+                                                vela_str_release(v_method);
+                                                v_method = VELA_STR("smt-bv", 6);
+                                                // line 214
+                                                vela_str_release(v_why);
+                                                v_why = VELA_STR("no violating defined return or body operation", 45);
+                                            } else {
+                                                bool _t166 = vela_str_eq(v_a, VELA_STR("sat", 3));
+                                                if (_t166) {
+                                                    // line 214
+                                                    int64_t _t167 = v_f.m_params->len;
+                                                    int64_t _t168 = _t167;
+                                                    bool _t169 = _t168 == 0;
+                                                    if (_t169) {
+                                                        // line 214
+                                                        vela_str_release(v_status);
+                                                        v_status = VELA_STR("refuted", 7);
+                                                        // line 214
+                                                        vela_array * _t170 = vela_array_new(vt_t_4json_Json(), 0);
+                                                        t_4json_Json _t171 = f_4json_array(_t170);
+                                                        rc_release_t_4json_Json(v_witness);
+                                                        v_witness = _t171;
+                                                        vela_array_release(_t170);
+                                                        // line 214
+                                                        vela_str_release(v_why);
+                                                        v_why = VELA_STR("violating execution", 19);
+                                                    } else {
+                                                        // line 215
+                                                        int64_t _t172 = v_budget;
+                                                        int64_t _t173 = f_12verification_clock_ms();
+                                                        int64_t _t174 = _t173;
+                                                        int64_t _t175 = vela_sub(_t174, v_start, "compiler/src/verification.vl:215:65");
+                                                        int64_t _t176 = vela_sub(_t172, _t175, "compiler/src/verification.vl:215:51");
+                                                        int64_t v_left = _t176;
+                                                        // line 215
+                                                        int64_t _t177 = v_left;
+                                                        bool _t178 = _t177 > v_timeout;
+                                                        if (_t178) {
+                                                            // line 215
+                                                            v_left = v_timeout;
+                                                        }
+                                                        // line 216
+                                                        int64_t _t179 = v_left;
+                                                        bool _t180 = _t179 > 0;
+                                                        if (_t180) {
+                                                            // line 216
+                                                            vela_str _t181 = vela_str_concat(VELA_STR("(get-value (", 12), v_model_names);
+                                                            vela_str _t182 = vela_str_concat(_t181, VELA_STR("))\012", 3));
+                                                            Result_Str_Str _t183 = f_12verification_query(v_solver, v_declarations, v_w.m_bad, v_left, _t182);
+                                                            if (_t183.tag == Result_Str_Str_Ok) {
+                                                                vela_str v_model = _t183.as.m_Ok._0;
+                                                                vela_str_retain(v_model);
+                                                                // line 217
+                                                                vela_str _t184 = f_12verification_answer(v_model);
+                                                                bool _t185 = vela_str_eq(_t184, VELA_STR("sat", 3));
+                                                                if (_t185) {
+                                                                    // line 217
+                                                                    Result_4json_Json_Str _t186 = f_12verification_counterexample(v_k, v_id, v_model);
+                                                                    if (_t186.tag == Result_4json_Json_Str_Ok) {
+                                                                        t_4json_Json v_args = _t186.as.m_Ok._0;
+                                                                        rc_retain_t_4json_Json(v_args);
+                                                                        // line 217
+                                                                        vela_str_release(v_status);
+                                                                        v_status = VELA_STR("refuted", 7);
+                                                                        // line 217
+                                                                        t_4json_Json _t187 = v_args;
+                                                                        rc_retain_t_4json_Json(_t187);
+                                                                        rc_release_t_4json_Json(v_witness);
+                                                                        v_witness = _t187;
+                                                                        // line 217
+                                                                        vela_str_release(v_method);
+                                                                        v_method = VELA_STR("smt-bv", 6);
+                                                                        // line 217
+                                                                        vela_str_release(v_why);
+                                                                        v_why = VELA_STR("violating execution", 19);
+                                                                        rc_release_t_4json_Json(v_args);
+                                                                    } else {
+                                                                        vela_str v_e_4 = _t186.as.m_Err._0;
+                                                                        vela_str_retain(v_e_4);
+                                                                        // line 217
+                                                                        vela_str _t188 = v_e_4;
+                                                                        vela_str_retain(_t188);
+                                                                        vela_str_release(v_why);
+                                                                        v_why = _t188;
+                                                                        vela_str_release(v_e_4);
+                                                                    }
+                                                                    rc_release_Result_4json_Json_Str(_t186);
+                                                                } else {
+                                                                    // line 217
+                                                                    vela_str_release(v_why);
+                                                                    v_why = VELA_STR("model query did not return sat", 30);
+                                                                }
+                                                                vela_str_release(_t184);
+                                                                vela_str_release(v_model);
+                                                            } else {
+                                                                vela_str v_e_5 = _t183.as.m_Err._0;
+                                                                vela_str_retain(v_e_5);
+                                                                // line 217
+                                                                vela_str _t189 = v_e_5;
+                                                                vela_str_retain(_t189);
+                                                                vela_str_release(v_why);
+                                                                v_why = _t189;
+                                                                vela_str_release(v_e_5);
+                                                            }
+                                                            rc_release_Result_Str_Str(_t183);
+                                                            vela_str_release(_t182);
+                                                            vela_str_release(_t181);
+                                                        } else {
+                                                            // line 218
+                                                            vela_str_release(v_why);
+                                                            v_why = VELA_STR("verification budget exhausted before model", 42);
+                                                        }
+                                                    }
+                                                } else {
+                                                    // line 219
+                                                    vela_str_release(v_why);
+                                                    v_why = VELA_STR("solver returned unknown or invalid output", 41);
+                                                }
+                                            }
+                                            vela_str_release(v_a);
+                                            vela_str_release(v_out_2);
+                                        } else {
+                                            vela_str v_e_6 = _t163.as.m_Err._0;
+                                            vela_str_retain(v_e_6);
+                                            // line 220
+                                            vela_str _t190 = v_e_6;
+                                            vela_str_retain(_t190);
+                                            vela_str_release(v_why);
+                                            v_why = _t190;
+                                            vela_str_release(v_e_6);
+                                        }
+                                        rc_release_Result_Str_Str(_t163);
+                                    }
                                 }
                             }
+                            vela_str_release(v_domain);
                         }
-                        vela_str_release(v_domain);
                     }
                 }
             }
         }
         // line 225
-        bool _t186 = vela_str_eq(v_status, VELA_STR("proved", 6));
-        if (_t186) {
+        bool _t191 = vela_str_eq(v_status, VELA_STR("proved", 6));
+        if (_t191) {
             // line 225
-            vela_array * _t188 = v_f.m_decl.m_ensures;
-            vela_array_retain(_t188);
-            vela_array * _t187 = _t188;
-            for (int64_t _t189 = 0; _t189 < _t187->len; _t189++) {
-                t_3ast_Expr v_e_7 = ((t_3ast_Expr *)_t187->data)[_t189];
+            vela_array * _t193 = v_f.m_decl.m_ensures;
+            vela_array_retain(_t193);
+            vela_array * _t192 = _t193;
+            for (int64_t _t194 = 0; _t194 < _t192->len; _t194++) {
+                t_3ast_Expr v_e_7 = ((t_3ast_Expr *)_t192->data)[_t194];
                 rc_retain_t_3ast_Expr(v_e_7);
                 // line 225
                 vela_unique_map(&v_k.m_proved_contracts);
-                int64_t _t190 = v_e_7.m_id;
-                bool _t191 = true;
-                vela_map_set(v_k.m_proved_contracts, &_t190, &_t191);
+                int64_t _t195 = v_e_7.m_id;
+                bool _t196 = true;
+                vela_map_set(v_k.m_proved_contracts, &_t195, &_t196);
                 rc_release_t_3ast_Expr(v_e_7);
             }
-            vela_array_release(_t187);
+            vela_array_release(_t192);
         }
         // line 226
-        t_4json_Json _t192 = f_12verification_row(v_k, v_id, v_status, v_method, v_why, v_witness);
-        t_4json_Json _t193 = _t192;
-        vela_push(v_rows, &_t193, sizeof(t_4json_Json));
+        t_4json_Json _t197 = f_12verification_row(v_k, v_id, v_status, v_method, v_why, v_witness);
+        t_4json_Json _t198 = _t197;
+        vela_push(v_rows, &_t198, sizeof(t_4json_Json));
         rc_release_t_4json_Json(v_witness);
         vela_str_release(v_why);
         vela_str_release(v_method);
@@ -148325,212 +148340,212 @@ Result_12verification_Outcome_Str f_12verification_run(t_7checker_Checked v_chec
     // line 228
     int64_t v_undecided = 0;
     // line 229
-    vela_array * _t195 = v_rows;
-    vela_array_retain(_t195);
-    vela_array * _t194 = _t195;
-    for (int64_t _t196 = 0; _t196 < _t194->len; _t196++) {
-        t_4json_Json v_result = ((t_4json_Json *)_t194->data)[_t196];
+    vela_array * _t200 = v_rows;
+    vela_array_retain(_t200);
+    vela_array * _t199 = _t200;
+    for (int64_t _t201 = 0; _t201 < _t199->len; _t201++) {
+        t_4json_Json v_result = ((t_4json_Json *)_t199->data)[_t201];
         rc_retain_t_4json_Json(v_result);
         // line 229
-        t_4json_Json _t197 = f_4json_get(v_result, VELA_STR("status", 6));
-        vela_str _t198 = f_4json_str_or(_t197, VELA_STR("unknown", 7));
-        vela_str v_status_2 = _t198;
-        rc_release_t_4json_Json(_t197);
+        t_4json_Json _t202 = f_4json_get(v_result, VELA_STR("status", 6));
+        vela_str _t203 = f_4json_str_or(_t202, VELA_STR("unknown", 7));
+        vela_str v_status_2 = _t203;
+        rc_release_t_4json_Json(_t202);
         // line 229
-        bool _t199 = vela_str_eq(v_status_2, VELA_STR("proved", 6));
-        if (_t199) {
+        bool _t204 = vela_str_eq(v_status_2, VELA_STR("proved", 6));
+        if (_t204) {
             // line 229
-            int64_t _t200 = v_proved;
-            int64_t _t201 = vela_add(_t200, 1, "compiler/src/verification.vl:229:131");
-            v_proved = _t201;
+            int64_t _t205 = v_proved;
+            int64_t _t206 = vela_add(_t205, 1, "compiler/src/verification.vl:229:131");
+            v_proved = _t206;
         } else {
-            bool _t202 = vela_str_eq(v_status_2, VELA_STR("refuted", 7));
-            if (_t202) {
+            bool _t207 = vela_str_eq(v_status_2, VELA_STR("refuted", 7));
+            if (_t207) {
                 // line 229
-                int64_t _t203 = v_refuted;
-                int64_t _t204 = vela_add(_t203, 1, "compiler/src/verification.vl:229:185");
-                v_refuted = _t204;
+                int64_t _t208 = v_refuted;
+                int64_t _t209 = vela_add(_t208, 1, "compiler/src/verification.vl:229:185");
+                v_refuted = _t209;
             } else {
                 // line 229
-                int64_t _t205 = v_undecided;
-                int64_t _t206 = vela_add(_t205, 1, "compiler/src/verification.vl:229:220");
-                v_undecided = _t206;
+                int64_t _t210 = v_undecided;
+                int64_t _t211 = vela_add(_t210, 1, "compiler/src/verification.vl:229:220");
+                v_undecided = _t211;
             }
         }
         vela_str_release(v_status_2);
         rc_release_t_4json_Json(v_result);
     }
-    vela_array_release(_t194);
+    vela_array_release(_t199);
     // line 230
-    int64_t _t207 = v_undecided;
-    bool _t208 = _t207 > 0;
-    bool _t209 = _t208;
-    if (!_t209) {
-        int64_t _t210 = v_rows->len;
-        int64_t _t211 = _t210;
-        bool _t212 = _t211 == 0;
-        _t209 = _t212;
+    int64_t _t212 = v_undecided;
+    bool _t213 = _t212 > 0;
+    bool _t214 = _t213;
+    if (!_t214) {
+        int64_t _t215 = v_rows->len;
+        int64_t _t216 = _t215;
+        bool _t217 = _t216 == 0;
+        _t214 = _t217;
     }
-    if (_t209) {
+    if (_t214) {
         // line 230
         vela_str_release(v_overall);
         v_overall = VELA_STR("unknown", 7);
     }
     // line 230
-    int64_t _t213 = v_refuted;
-    bool _t214 = _t213 > 0;
-    if (_t214) {
+    int64_t _t218 = v_refuted;
+    bool _t219 = _t218 > 0;
+    if (_t219) {
         // line 230
         vela_str_release(v_overall);
         v_overall = VELA_STR("refuted", 7);
     }
     // line 231
-    vela_array * _t215 = vela_array_new(vt_t_4json_Member(), 17);
-    t_4json_Json _t216 = f_4json_string(v_overall);
-    t_4json_Member _t217 = f_4json_member(VELA_STR("status", 6), _t216);
-    t_4json_Member _t218 = _t217;
-    vela_push(_t215, &_t218, sizeof(t_4json_Member));
-    t_4json_Json _t219 = f_4json_integer(v_proved);
-    t_4json_Member _t220 = f_4json_member(VELA_STR("proved", 6), _t219);
-    t_4json_Member _t221 = _t220;
-    vela_push(_t215, &_t221, sizeof(t_4json_Member));
-    t_4json_Json _t222 = f_4json_integer(v_refuted);
-    t_4json_Member _t223 = f_4json_member(VELA_STR("refuted", 7), _t222);
-    t_4json_Member _t224 = _t223;
-    vela_push(_t215, &_t224, sizeof(t_4json_Member));
-    t_4json_Json _t225 = f_4json_integer(v_undecided);
-    t_4json_Member _t226 = f_4json_member(VELA_STR("unknown", 7), _t225);
-    t_4json_Member _t227 = _t226;
-    vela_push(_t215, &_t227, sizeof(t_4json_Member));
-    t_4json_Json _t228 = f_4json_string(VELA_STR("vela.verify", 11));
-    t_4json_Member _t229 = f_4json_member(VELA_STR("format", 6), _t228);
-    t_4json_Member _t230 = _t229;
-    vela_push(_t215, &_t230, sizeof(t_4json_Member));
-    t_4json_Json _t231 = f_4json_integer(1);
-    t_4json_Member _t232 = f_4json_member(VELA_STR("version", 7), _t231);
-    t_4json_Member _t233 = _t232;
-    vela_push(_t215, &_t233, sizeof(t_4json_Member));
-    t_4json_Member _t234 = f_4json_member(VELA_STR("context", 7), v_context);
+    vela_array * _t220 = vela_array_new(vt_t_4json_Member(), 17);
+    t_4json_Json _t221 = f_4json_string(v_overall);
+    t_4json_Member _t222 = f_4json_member(VELA_STR("status", 6), _t221);
+    t_4json_Member _t223 = _t222;
+    vela_push(_t220, &_t223, sizeof(t_4json_Member));
+    t_4json_Json _t224 = f_4json_integer(v_proved);
+    t_4json_Member _t225 = f_4json_member(VELA_STR("proved", 6), _t224);
+    t_4json_Member _t226 = _t225;
+    vela_push(_t220, &_t226, sizeof(t_4json_Member));
+    t_4json_Json _t227 = f_4json_integer(v_refuted);
+    t_4json_Member _t228 = f_4json_member(VELA_STR("refuted", 7), _t227);
+    t_4json_Member _t229 = _t228;
+    vela_push(_t220, &_t229, sizeof(t_4json_Member));
+    t_4json_Json _t230 = f_4json_integer(v_undecided);
+    t_4json_Member _t231 = f_4json_member(VELA_STR("unknown", 7), _t230);
+    t_4json_Member _t232 = _t231;
+    vela_push(_t220, &_t232, sizeof(t_4json_Member));
+    t_4json_Json _t233 = f_4json_string(VELA_STR("vela.verify", 11));
+    t_4json_Member _t234 = f_4json_member(VELA_STR("format", 6), _t233);
     t_4json_Member _t235 = _t234;
-    vela_push(_t215, &_t235, sizeof(t_4json_Member));
-    t_4json_Json _t236 = f_4json_array(v_rows);
-    t_4json_Member _t237 = f_4json_member(VELA_STR("results", 7), _t236);
+    vela_push(_t220, &_t235, sizeof(t_4json_Member));
+    t_4json_Json _t236 = f_4json_integer(1);
+    t_4json_Member _t237 = f_4json_member(VELA_STR("version", 7), _t236);
     t_4json_Member _t238 = _t237;
-    vela_push(_t215, &_t238, sizeof(t_4json_Member));
-    t_4json_Json _t239 = f_4json_string(v_solver);
-    t_4json_Member _t240 = f_4json_member(VELA_STR("solver", 6), _t239);
-    t_4json_Member _t241 = _t240;
-    vela_push(_t215, &_t241, sizeof(t_4json_Member));
-    t_4json_Json _t242 = f_4json_string(v_solver_version);
-    t_4json_Member _t243 = f_4json_member(VELA_STR("solver_version", 14), _t242);
-    t_4json_Member _t244 = _t243;
-    vela_push(_t215, &_t244, sizeof(t_4json_Member));
-    t_4json_Json _t245 = f_4json_integer(v_timeout);
-    t_4json_Member _t246 = f_4json_member(VELA_STR("timeout_ms", 10), _t245);
-    t_4json_Member _t247 = _t246;
-    vela_push(_t215, &_t247, sizeof(t_4json_Member));
-    t_4json_Json _t248 = f_4json_integer(v_budget);
-    t_4json_Member _t249 = f_4json_member(VELA_STR("budget_ms", 9), _t248);
-    t_4json_Member _t250 = _t249;
-    vela_push(_t215, &_t250, sizeof(t_4json_Member));
-    vela_array * _t251 = vela_array_new(vt_t_4json_Json(), 4);
-    t_4json_Json _t252 = f_4json_string(VELA_STR("fixed-width Vela integers and checked arithmetic", 48));
-    t_4json_Json _t253 = _t252;
-    vela_push(_t251, &_t253, sizeof(t_4json_Json));
-    t_4json_Json _t254 = f_4json_string(VELA_STR("well-defined true preconditions; nonempty domain checked for SMT proofs", 71));
-    t_4json_Json _t255 = _t254;
-    vela_push(_t251, &_t255, sizeof(t_4json_Json));
-    t_4json_Json _t256 = f_4json_string(VELA_STR("trusted explicitly selected solver; cached report claims are never trusted", 74));
-    t_4json_Json _t257 = _t256;
-    vela_push(_t251, &_t257, sizeof(t_4json_Json));
-    t_4json_Json _t258 = f_4json_string(VELA_STR("unsupported calls, effects, loops, memory and generics remain unknown", 69));
-    t_4json_Json _t259 = _t258;
-    vela_push(_t251, &_t259, sizeof(t_4json_Json));
-    t_4json_Json _t260 = f_4json_array(_t251);
-    t_4json_Member _t261 = f_4json_member(VELA_STR("assumptions", 11), _t260);
-    t_4json_Member _t262 = _t261;
-    vela_push(_t215, &_t262, sizeof(t_4json_Member));
-    vela_array * _t263 = vela_array_new(vt_t_4json_Member(), 5);
-    t_4json_Json _t264 = f_4json_integer(512);
-    t_4json_Member _t265 = f_4json_member(VELA_STR("nodes", 5), _t264);
-    t_4json_Member _t266 = _t265;
-    vela_push(_t263, &_t266, sizeof(t_4json_Member));
-    t_4json_Json _t267 = f_4json_integer(64);
-    t_4json_Member _t268 = f_4json_member(VELA_STR("paths", 5), _t267);
-    t_4json_Member _t269 = _t268;
-    vela_push(_t263, &_t269, sizeof(t_4json_Member));
-    t_4json_Json _t270 = f_4json_integer(128);
-    t_4json_Member _t271 = f_4json_member(VELA_STR("expression_fuel", 15), _t270);
-    t_4json_Member _t272 = _t271;
-    vela_push(_t263, &_t272, sizeof(t_4json_Member));
-    t_4json_Json _t273 = f_4json_integer(128);
-    t_4json_Member _t274 = f_4json_member(VELA_STR("solver_memory_mb", 16), _t273);
-    t_4json_Member _t275 = _t274;
-    vela_push(_t263, &_t275, sizeof(t_4json_Member));
-    t_4json_Json _t276 = f_4json_integer(500000);
-    t_4json_Member _t277 = f_4json_member(VELA_STR("solver_resource_limit", 21), _t276);
-    t_4json_Member _t278 = _t277;
-    vela_push(_t263, &_t278, sizeof(t_4json_Member));
-    t_4json_Json _t279 = f_4json_object(_t263);
-    t_4json_Member _t280 = f_4json_member(VELA_STR("limits", 6), _t279);
-    t_4json_Member _t281 = _t280;
-    vela_push(_t215, &_t281, sizeof(t_4json_Member));
-    t_4json_Json _t282 = f_4json_boolean(false);
-    t_4json_Member _t283 = f_4json_member(VELA_STR("property_testing_is_proof", 25), _t282);
-    t_4json_Member _t284 = _t283;
-    vela_push(_t215, &_t284, sizeof(t_4json_Member));
-    t_4json_Json _t285 = f_4json_boolean(false);
-    t_4json_Member _t286 = f_4json_member(VELA_STR("reports_authorize_check_removal", 31), _t285);
-    t_4json_Member _t287 = _t286;
-    vela_push(_t215, &_t287, sizeof(t_4json_Member));
-    int64_t _t288 = f_12verification_clock_ms();
-    int64_t _t289 = _t288;
-    int64_t _t290 = vela_sub(_t289, v_start, "compiler/src/verification.vl:233:845");
-    t_4json_Json _t291 = f_4json_integer(_t290);
-    t_4json_Member _t292 = f_4json_member(VELA_STR("elapsed_ms", 10), _t291);
-    t_4json_Member _t293 = _t292;
-    vela_push(_t215, &_t293, sizeof(t_4json_Member));
-    t_4json_Json _t294 = f_4json_object(_t215);
-    t_4json_Json v_report = _t294;
-    rc_release_t_4json_Json(_t291);
-    rc_release_t_4json_Json(_t285);
-    rc_release_t_4json_Json(_t282);
-    rc_release_t_4json_Json(_t279);
-    rc_release_t_4json_Json(_t276);
-    rc_release_t_4json_Json(_t273);
-    rc_release_t_4json_Json(_t270);
-    rc_release_t_4json_Json(_t267);
-    rc_release_t_4json_Json(_t264);
-    vela_array_release(_t263);
-    rc_release_t_4json_Json(_t260);
-    vela_array_release(_t251);
-    rc_release_t_4json_Json(_t248);
-    rc_release_t_4json_Json(_t245);
-    rc_release_t_4json_Json(_t242);
-    rc_release_t_4json_Json(_t239);
+    vela_push(_t220, &_t238, sizeof(t_4json_Member));
+    t_4json_Member _t239 = f_4json_member(VELA_STR("context", 7), v_context);
+    t_4json_Member _t240 = _t239;
+    vela_push(_t220, &_t240, sizeof(t_4json_Member));
+    t_4json_Json _t241 = f_4json_array(v_rows);
+    t_4json_Member _t242 = f_4json_member(VELA_STR("results", 7), _t241);
+    t_4json_Member _t243 = _t242;
+    vela_push(_t220, &_t243, sizeof(t_4json_Member));
+    t_4json_Json _t244 = f_4json_string(v_solver);
+    t_4json_Member _t245 = f_4json_member(VELA_STR("solver", 6), _t244);
+    t_4json_Member _t246 = _t245;
+    vela_push(_t220, &_t246, sizeof(t_4json_Member));
+    t_4json_Json _t247 = f_4json_string(v_solver_version);
+    t_4json_Member _t248 = f_4json_member(VELA_STR("solver_version", 14), _t247);
+    t_4json_Member _t249 = _t248;
+    vela_push(_t220, &_t249, sizeof(t_4json_Member));
+    t_4json_Json _t250 = f_4json_integer(v_timeout);
+    t_4json_Member _t251 = f_4json_member(VELA_STR("timeout_ms", 10), _t250);
+    t_4json_Member _t252 = _t251;
+    vela_push(_t220, &_t252, sizeof(t_4json_Member));
+    t_4json_Json _t253 = f_4json_integer(v_budget);
+    t_4json_Member _t254 = f_4json_member(VELA_STR("budget_ms", 9), _t253);
+    t_4json_Member _t255 = _t254;
+    vela_push(_t220, &_t255, sizeof(t_4json_Member));
+    vela_array * _t256 = vela_array_new(vt_t_4json_Json(), 4);
+    t_4json_Json _t257 = f_4json_string(VELA_STR("fixed-width Vela integers and checked arithmetic", 48));
+    t_4json_Json _t258 = _t257;
+    vela_push(_t256, &_t258, sizeof(t_4json_Json));
+    t_4json_Json _t259 = f_4json_string(VELA_STR("well-defined true preconditions; nonempty domain checked for SMT proofs", 71));
+    t_4json_Json _t260 = _t259;
+    vela_push(_t256, &_t260, sizeof(t_4json_Json));
+    t_4json_Json _t261 = f_4json_string(VELA_STR("trusted explicitly selected solver; cached report claims are never trusted", 74));
+    t_4json_Json _t262 = _t261;
+    vela_push(_t256, &_t262, sizeof(t_4json_Json));
+    t_4json_Json _t263 = f_4json_string(VELA_STR("unsupported calls, effects, loops, memory and generics remain unknown", 69));
+    t_4json_Json _t264 = _t263;
+    vela_push(_t256, &_t264, sizeof(t_4json_Json));
+    t_4json_Json _t265 = f_4json_array(_t256);
+    t_4json_Member _t266 = f_4json_member(VELA_STR("assumptions", 11), _t265);
+    t_4json_Member _t267 = _t266;
+    vela_push(_t220, &_t267, sizeof(t_4json_Member));
+    vela_array * _t268 = vela_array_new(vt_t_4json_Member(), 5);
+    t_4json_Json _t269 = f_4json_integer(512);
+    t_4json_Member _t270 = f_4json_member(VELA_STR("nodes", 5), _t269);
+    t_4json_Member _t271 = _t270;
+    vela_push(_t268, &_t271, sizeof(t_4json_Member));
+    t_4json_Json _t272 = f_4json_integer(64);
+    t_4json_Member _t273 = f_4json_member(VELA_STR("paths", 5), _t272);
+    t_4json_Member _t274 = _t273;
+    vela_push(_t268, &_t274, sizeof(t_4json_Member));
+    t_4json_Json _t275 = f_4json_integer(128);
+    t_4json_Member _t276 = f_4json_member(VELA_STR("expression_fuel", 15), _t275);
+    t_4json_Member _t277 = _t276;
+    vela_push(_t268, &_t277, sizeof(t_4json_Member));
+    t_4json_Json _t278 = f_4json_integer(128);
+    t_4json_Member _t279 = f_4json_member(VELA_STR("solver_memory_mb", 16), _t278);
+    t_4json_Member _t280 = _t279;
+    vela_push(_t268, &_t280, sizeof(t_4json_Member));
+    t_4json_Json _t281 = f_4json_integer(500000);
+    t_4json_Member _t282 = f_4json_member(VELA_STR("solver_resource_limit", 21), _t281);
+    t_4json_Member _t283 = _t282;
+    vela_push(_t268, &_t283, sizeof(t_4json_Member));
+    t_4json_Json _t284 = f_4json_object(_t268);
+    t_4json_Member _t285 = f_4json_member(VELA_STR("limits", 6), _t284);
+    t_4json_Member _t286 = _t285;
+    vela_push(_t220, &_t286, sizeof(t_4json_Member));
+    t_4json_Json _t287 = f_4json_boolean(false);
+    t_4json_Member _t288 = f_4json_member(VELA_STR("property_testing_is_proof", 25), _t287);
+    t_4json_Member _t289 = _t288;
+    vela_push(_t220, &_t289, sizeof(t_4json_Member));
+    t_4json_Json _t290 = f_4json_boolean(false);
+    t_4json_Member _t291 = f_4json_member(VELA_STR("reports_authorize_check_removal", 31), _t290);
+    t_4json_Member _t292 = _t291;
+    vela_push(_t220, &_t292, sizeof(t_4json_Member));
+    int64_t _t293 = f_12verification_clock_ms();
+    int64_t _t294 = _t293;
+    int64_t _t295 = vela_sub(_t294, v_start, "compiler/src/verification.vl:233:845");
+    t_4json_Json _t296 = f_4json_integer(_t295);
+    t_4json_Member _t297 = f_4json_member(VELA_STR("elapsed_ms", 10), _t296);
+    t_4json_Member _t298 = _t297;
+    vela_push(_t220, &_t298, sizeof(t_4json_Member));
+    t_4json_Json _t299 = f_4json_object(_t220);
+    t_4json_Json v_report = _t299;
+    rc_release_t_4json_Json(_t296);
+    rc_release_t_4json_Json(_t290);
+    rc_release_t_4json_Json(_t287);
+    rc_release_t_4json_Json(_t284);
+    rc_release_t_4json_Json(_t281);
+    rc_release_t_4json_Json(_t278);
+    rc_release_t_4json_Json(_t275);
+    rc_release_t_4json_Json(_t272);
+    rc_release_t_4json_Json(_t269);
+    vela_array_release(_t268);
+    rc_release_t_4json_Json(_t265);
+    vela_array_release(_t256);
+    rc_release_t_4json_Json(_t253);
+    rc_release_t_4json_Json(_t250);
+    rc_release_t_4json_Json(_t247);
+    rc_release_t_4json_Json(_t244);
+    rc_release_t_4json_Json(_t241);
     rc_release_t_4json_Json(_t236);
-    rc_release_t_4json_Json(_t231);
-    rc_release_t_4json_Json(_t228);
-    rc_release_t_4json_Json(_t225);
-    rc_release_t_4json_Json(_t222);
-    rc_release_t_4json_Json(_t219);
-    rc_release_t_4json_Json(_t216);
-    vela_array_release(_t215);
+    rc_release_t_4json_Json(_t233);
+    rc_release_t_4json_Json(_t230);
+    rc_release_t_4json_Json(_t227);
+    rc_release_t_4json_Json(_t224);
+    rc_release_t_4json_Json(_t221);
+    vela_array_release(_t220);
     // line 234
-    t_7checker_Checked _t295 = v_k;
-    rc_retain_t_7checker_Checked(_t295);
-    t_4json_Json _t296 = v_report;
-    rc_retain_t_4json_Json(_t296);
-    t_12verification_Outcome _t297 = (t_12verification_Outcome){ .m_checked = _t295, .m_report = _t296 };
-    Result_12verification_Outcome_Str _t298 = (Result_12verification_Outcome_Str){ .tag = Result_12verification_Outcome_Str_Ok, .as.m_Ok = { ._0 = _t297 } };
-    Result_12verification_Outcome_Str _t299 = _t298;
+    t_7checker_Checked _t300 = v_k;
+    rc_retain_t_7checker_Checked(_t300);
+    t_4json_Json _t301 = v_report;
+    rc_retain_t_4json_Json(_t301);
+    t_12verification_Outcome _t302 = (t_12verification_Outcome){ .m_checked = _t300, .m_report = _t301 };
+    Result_12verification_Outcome_Str _t303 = (Result_12verification_Outcome_Str){ .tag = Result_12verification_Outcome_Str_Ok, .as.m_Ok = { ._0 = _t302 } };
+    Result_12verification_Outcome_Str _t304 = _t303;
     rc_release_t_4json_Json(v_report);
     vela_str_release(v_overall);
     vela_str_release(v_solver_version);
     vela_array_release(v_rows);
     rc_release_t_7checker_Checked(v_k);
     rc_release_t_4json_Json(v_context);
-    return _t299;
+    return _t304;
 }
 /* vela: part */
 
@@ -160170,7 +160185,7 @@ void f_verify_command(vela_array * v_words, vela_str v_root) {
             }
             if (_t47) {
                 // line 1341
-                f_verification_error(VELA_STR("usage: vela verify [--json] [--solver Z3] [--report FILE] [--reuse FILE] [--build EXE] SOURCE", 93));
+                f_verification_error(VELA_STR("usage: vela verify [--json] [--solver z3] [--report FILE] [--reuse FILE] [--build EXE] SOURCE", 93));
             }
             // line 1341
             vela_str _t49 = v_word;
