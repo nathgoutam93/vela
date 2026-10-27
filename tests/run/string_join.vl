@@ -1,0 +1,51 @@
+// A chain a + b + c + ... on Strs is joined in one step; every result must
+// be the one concatenating in turn gives, in the same evaluation order.
+// out: abcde
+// out: 
+// out: 0
+// out: only
+// out: xonly
+// out: first|second|third
+// out: [1][2][3]
+// out: before-after-after
+// out: 1:f,2:s,3:t
+// out: p0p1p2p3p4p5p6p7p8p9
+// out: 60
+import ints
+
+fn noted(log: mut [Str], s: Str) -> Str {
+    push(mut log, s)
+    return s
+}
+
+fn replace(s: mut Str) -> Str {
+    s = "after"
+    return "-"
+}
+
+fn tag(n: Int) -> Str {
+    return "[" + ints.to_str(n) + "]"
+}
+
+fn main() {
+    print("a" + "b" + "c" + "d" + "e")
+    let empty = ""
+    print(empty + empty + empty)
+    print(len(empty + "" + empty + ""))
+    print("" + "only" + empty + "")
+    print("x" + "" + "only" + empty)
+    let mut log: [Str] = []
+    let joined = noted(mut log, "first") + "|" + noted(mut log, "second") + "|" + noted(mut log, "third")
+    print(joined)
+    print(tag(1) + tag(2) + tag(3))
+    // A later part changes the variable an earlier part read.
+    let mut s = "before"
+    print(s + replace(mut s) + s + "-" + s)
+    print("1:" + log[0][0..1] + "," + ("2:" + log[1][0..1]) + "," + "3:" + log[2][0..1])
+    let mut chain = ""
+    for i in 0..10 {
+        chain = chain + "p" + ints.to_str(i) + ""
+    }
+    print(chain)
+    print(len(chain + chain + chain) / 1)
+}

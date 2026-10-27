@@ -353,6 +353,7 @@ type Walk = struct {
     fn_id: Int
     values: Map[Int, Range]
     collect_values: Bool
+    stable: Map[Int, Bool]  // stable(e) by node id, for stable_at
 }
 
 // A call passing an Int in the range r as parameter i of function callee.
@@ -387,7 +388,7 @@ pub fn analyze(k: checker.Checked) -> [[Range]] {
     let mut as_value: Map[Int, Bool] = [:]
     let mut settled = false
     for round in 0..64 {
-        let mut w = Walk { k: k, env: new_env(known), passed: [], as_value: as_value, proven: [:], safe: [:], record: false, detailed: false, dead: false, edges: [], last: full(), fn_id: -1, values: [:], collect_values: false }
+        let mut w = Walk { k: k, env: new_env(known), passed: [], as_value: as_value, proven: [:], safe: [:], record: false, detailed: false, dead: false, edges: [], last: full(), fn_id: -1, values: [:], collect_values: false, stable: [:] }
         for id in 0..len(k.fns) {
             if dirty[id] {
                 w.passed = []
@@ -534,8 +535,74 @@ fn limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
     return stable_limit(k, env, e)
 }
 
-// limit for a stable `e`, whose parts are then stable too.
+// limit for a stable `e`, whose parts are then stable too. A chain
+// base + c1 - c2 + ... adds constants to the base's limit while each step
+// cannot fail. The chain is followed down to its base, which usually has no
+// limit, and then back up once: asking cannot_fail at each step would work
+// out the range of the rest of the chain each time.
 fn stable_limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
+    let mut spine: [ast.Expr] = []
+    let mut base = e
+    for {
+        match base.kind {
+            ast.ExprKind.Binary(op, x, _) => {
+                if op != "+" && op != "-" {
+                    return None
+                }
+                push(mut spine, base)
+                base = x
+            }
+            _ => break
+        }
+    }
+    let mut out = leaf_limit(k, env, base)?
+    if len(spine) == 0 {
+        return Some(out)
+    }
+    // As of and cannot_fail would see them, from the base up.
+    let mut below = of(k, env, base)
+    for n in 0..len(spine) {
+        let step = spine[len(spine) - 1 - n]
+        match step.kind {
+            ast.ExprKind.Binary(op, x, y) => {
+                let r = of(k, env, y)
+                let int_step = is_int(k, step) && is_int(k, x)
+                let mut inner = full()
+                if int_step {
+                    if is_empty(below) || is_empty(r) {
+                        inner = empty()
+                    } else if op == "+" {
+                        inner = add(below, r)
+                    } else {
+                        inner = sub(below, r)
+                    }
+                }
+                let mut safe = int_step && fits_type(inner, k.ty[step.id])
+                match maps.get(env.proven, step.id) {
+                    Some(p) => safe = p
+                    None => {}
+                }
+                if r.lo != r.hi || !safe {
+                    return None
+                }
+                if op == "+" {
+                    out.offset = sat_add(out.offset, r.lo)
+                } else {
+                    out.offset = sat_sub(out.offset, r.lo)
+                }
+                below = inner
+                if is_int(k, step) {
+                    below = clip(inner, k.ty[step.id])
+                }
+            }
+            _ => return None
+        }
+    }
+    return Some(out)
+}
+
+// The limit of a chain's base: a local with one, or len of a local.
+fn leaf_limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
     match e.kind {
         ast.ExprKind.Name(_) => {
             let local = local_of(k, e.id)
@@ -555,35 +622,24 @@ fn stable_limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
                 _ => {}
             }
         }
-        ast.ExprKind.Binary(op, x, y) => {
-            let r = of(k, env, y)
-            if r.lo == r.hi && (op == "+" || op == "-") && cannot_fail(k, env, e) {
-                match stable_limit(k, env, x) {
-                    Some(l) => {
-                        let mut offset = sat_add(l.offset, r.lo)
-                        if op == "-" {
-                            offset = sat_sub(l.offset, r.lo)
-                        }
-                        return Some(Limit { container: l.container, offset: offset })
-                    }
-                    None => {}
-                }
-            }
-        }
         _ => {}
     }
     return None
 }
 
+// The limit of `e` when it is len(...) or an operator chain over it. Every
+// part of a chain with a limit has one, so asking each part first, as this
+// once did, adds nothing to asking the whole.
 fn exact_limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
-    match e.kind {
-        ast.ExprKind.Call(_, _) => return limit(k, env, e)
-        ast.ExprKind.Binary(_, x, _) => {
-            match exact_limit(k, env, x) {
-                Some(_) => return limit(k, env, e)
-                None => return None
-            }
+    let mut base = e
+    for {
+        match base.kind {
+            ast.ExprKind.Binary(_, x, _) => base = x
+            _ => break
         }
+    }
+    match base.kind {
+        ast.ExprKind.Call(_, _) => return limit(k, env, e)
         _ => return None
     }
 }
@@ -763,6 +819,23 @@ fn stable(e: ast.Expr) -> Bool {
     return !ast.has_mut(e)
 }
 
+// stable(e), remembered by node: walk_expr asks it of every operator of a
+// long chain, and has_mut would walk the rest of the chain each time. An
+// operator is stable when its operands are.
+fn stable_at(w: mut Walk, e: ast.Expr) -> Bool {
+    match maps.get(w.stable, e.id) {
+        Some(s) => return s
+        None => {}
+    }
+    let s = match e.kind {
+        ast.ExprKind.Binary(_, l, r) => stable_at(mut w, l) && stable_at(mut w, r)
+        ast.ExprKind.Unary(_, x) => stable_at(mut w, x)
+        _ => stable(e)
+    }
+    w.stable[e.id] = s
+    return s
+}
+
 fn stable_args(args: [ast.Expr]) -> Bool {
     for a in args {
         if !stable(a) {
@@ -773,7 +846,7 @@ fn stable_args(args: [ast.Expr]) -> Bool {
 }
 
 fn refine(w: mut Walk, e: ast.Expr, truth: Bool) {
-    if stable(e) {
+    if stable_at(mut w, e) {
         refine_stable(mut w, e, truth)
     }
 }
@@ -789,8 +862,32 @@ fn refine_stable(w: mut Walk, e: ast.Expr, truth: Bool) {
         }
         ast.ExprKind.Binary(op, x, y) => {
             if op == "&&" && truth || op == "||" && !truth {
-                refine_stable(mut w, x, truth)
-                refine_stable(mut w, y, truth)
+                // a && b && c ... nests to the left, and walk_expr refines at
+                // every operator: using every part each time made a long
+                // chain quadratic. The 256 parts nearest the top are used,
+                // first part first; fewer facts only keep runtime checks.
+                let mut parts: [ast.Expr] = [y]
+                let mut rest = x
+                let mut more = true
+                for more && len(parts) < 256 {
+                    more = false
+                    match rest.kind {
+                        ast.ExprKind.Binary(inner, a, b) => {
+                            if inner == op {
+                                push(mut parts, b)
+                                rest = a
+                                more = true
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                if !more {
+                    push(mut parts, rest)  // the chain's first part
+                }
+                for n in 0..len(parts) {
+                    refine_stable(mut w, parts[len(parts) - 1 - n], truth)
+                }
                 return
             }
             let mut cmp = op
@@ -1210,7 +1307,7 @@ fn walk_arms(w: mut Walk, arms: [ast.Arm]) {
 pub fn function_env(k: checker.Checked, params: [[Range]], id: Int) -> Env { return function_env_mode(k, params, id, false) }
 pub fn native_env(k: checker.Checked, params: [[Range]], id: Int) -> Env { return function_env_mode(k, params, id, true) }
 fn function_env_mode(k: checker.Checked, params: [[Range]], id: Int, values: Bool) -> Env {
-    let mut w = Walk { k: k, env: new_env(params), passed: [], as_value: [:], proven: [:], safe: [:], record: true, detailed: true, dead: false, edges: [], last: full(), fn_id: -1, values: [:], collect_values: values }
+    let mut w = Walk { k: k, env: new_env(params), passed: [], as_value: [:], proven: [:], safe: [:], record: true, detailed: true, dead: false, edges: [], last: full(), fn_id: -1, values: [:], collect_values: values, stable: [:] }
     walk_fn(mut w, id)
     let mut env = new_env(params)
     env.proven = w.proven
@@ -1397,13 +1494,14 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
                             _ => full()
                         }
                     }
-                    if !stable(e) {
+                    let steady = stable_at(mut w, e)
+                    if !steady {
                         result = full()
                     }
                     if w.record && (op == "+" || op == "-" || op == "*" || op == "/" || op == "%") {
                         let mut safe = fits_type(result, w.k.ty[e.id])
                         if op == "/" || op == "%" {
-                            safe = right.lo > 0 && stable(e)
+                            safe = right.lo > 0 && steady
                         }
                         w.proven[e.id] = safe
                     }

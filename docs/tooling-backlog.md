@@ -2500,24 +2500,60 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-093: Compile time grows faster than linearly on very long expressions
 
-- **Status:** open; found while resolving TL-092.
-- **Evidence:**
+- **Status:** resolved after the post-M30 review, except very long C-backend
+  chains of computed Str parts (below); found while resolving TL-092.
+- **Evidence** (Linux x86-64, before the change):
   - Native `vela run` of `x = x + 1 + 1 + ...`: 3,000 terms 3.7 s, 20,000
     terms 118 s. Samples are in `ranges.limit`/`cannot_fail`, which compute
-    the range of the remaining chain at every level.
-  - A 20,000-term `&&` chain takes 35 s: `refine` still walks each left
-    operand's chain once per level.
-  - On the C backend, gcc -O2 takes 45 s for the C of a 5,000-term string
-    chain and more than 9 minutes for 20,000 terms.
-  - String chains are fine natively: 20,000 terms in 5 s.
-- **Impact:** very long generated integer or Boolean expressions compile
-  slowly; nothing is miscompiled.
-- **Workaround:** split them with temporaries, or use the native backend.
-- **Proposed improvement:** cache each expression's range during a walk
-  instead of recomputing it from syntax; refine a chain of `&&` once per
-  chain; split very large generated C functions.
-- **Verify:** time the commands above at 20,000 terms; expect them to scale
-  near-linearly.
+    the range of the remaining chain at every level, and in `ast.has_mut`,
+    which `walk_expr` called on the remaining chain at every operator.
+  - A 20,000-term `&&` chain took 35 s: `refine` re-checked stability and
+    re-walked the conjunction at every operator.
+  - A string chain `"p0" + "p1" + ...` kept every partial string alive until
+    the end of the statement. On the C backend, gcc -O2 took 42 s for 5,000
+    terms and more than 9 minutes for 20,000: thousands of 24-byte `vela_str`
+    temporaries (`expand vars`, alias walking). Natively, 100,000 terms took
+    24 s to compile and the program 48 s to run, copying the string so far at
+    every `+` with nothing freed.
+- **Impact:** long generated expressions compiled slowly or not at all on
+  the C backend, and generated string building was quadratic at run time.
+- **Workaround:** split long expressions with temporaries.
+- **Resolution:**
+  - Range analysis (`ranges.vl`): `stable_at` remembers stability by node
+    within a walk; `stable_limit` follows a chain to its base and works out
+    the steps' ranges once on the way back, with the same conditions and
+    offsets; `exact_limit` asks `limit` once. `refine` uses the 256 parts of
+    an `&&`/`||` chain nearest the top: dropping facts only keeps runtime
+    checks.
+  - A chain of three or more Str `+` operations is one `vela_str_join` over
+    its parts on both backends (`codegen.string_parts`, `join`): one
+    allocation, the same result as concatenating in turn (the only non-empty
+    part when there is one, the last when all are empty), the same "string
+    too long" panic. Parts are evaluated in order; a part read from a variable
+    is copied first when a later part has a `mut` argument or the variable has
+    escaped to C (`join_snapshots`, `binary_left`'s rule per part). In C,
+    literal parts are a static table (`VELA_STR_INIT`) and only computed parts
+    are written.
+  - A two-part concatenation releases an operand temporary right after it
+    (`release_now`), instead of at the end of the statement.
+- **Verification:**
+  - Native `vela run`: 20,000-term sum 2.4 s, 100,000 terms 4.7 s; 20,000-term
+    `&&` 4.2 s, 100,000 terms 13 s; 100,000-term string chain builds in 6.5 s
+    and runs in 7 ms.
+  - C backend `vela run` of the string chain: 5,000 terms 2.2 s, 100,000
+    terms 2.9 s.
+  - `tests/run/string_join.vl` covers empty parts, one non-empty part,
+    evaluation order through a `mut` log, a later part replacing an earlier
+    part's variable, parenthesized chains and calls. Its output is
+    byte-identical to a compiler that concatenates in turn, on both backends
+    and at both optimization settings.
+  - `tests/stack_overflow_test.py` compiles 20,000-term sums and `&&` chains
+    and builds a 20,000-term string chain with the C backend under a 120 s
+    limit per step. The previous compiler times out on the C build.
+- **Remaining:** a C-backend chain of thousands of *computed* Str parts still
+  gives gcc one struct temporary per part: 4,000 parts of
+  `"<td>" + ints.to_str(x + i) + "</td>"` take 15 s on C, against 3.8 s
+  natively. Splitting very large generated C functions would address it.
 
 ### TL-094: LeakSanitizer failed every sandboxed program under --sanitize
 

@@ -273,6 +273,27 @@ vela_str vela_str_concat(vela_str a, vela_str b) {
     return (vela_str){obj, obj->bytes, len};
 }
 
+// a + b + c + ...: one allocation for the whole chain, where concatenating
+// in turn copies the string so far at every +, and the same result: with at
+// most one part not empty, that part (the last when all are empty).
+vela_str vela_str_join(const vela_str *parts, int64_t n) {
+    VELA_PROFILE_SCOPE("strings");
+    int64_t len = 0, filled = 0, only = n - 1;
+    for (int64_t i = 0; i < n; i++) {
+        if (parts[i].len) { filled++; only = i; }
+        if (__builtin_add_overflow(len, parts[i].len, &len)) vela_panic("vela runtime", "string too long");
+    }
+    if (filled <= 1) { vela_str_retain(parts[only]); return parts[only]; }
+    vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
+    obj->rc = 1;
+    int64_t at = 0;
+    for (int64_t i = 0; i < n; i++) {
+        if (parts[i].len) memcpy(obj->bytes + at, parts[i].data, (size_t)parts[i].len);
+        at += parts[i].len;
+    }
+    return (vela_str){obj, obj->bytes, len};
+}
+
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc) {
     VELA_PROFILE_SCOPE("strings");
     return vela_slice(s, lo, hi, loc);

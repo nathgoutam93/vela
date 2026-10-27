@@ -777,6 +777,30 @@ fn release_frame(g: mut Low, frame: Frame) {
     }
 }
 
+// Release `v` now if it is an owned temporary of the innermost frame,
+// instead of when the frame ends: nothing after this may read it.
+fn release_now(g: mut Low, v: Val) {
+    if !v.owned || !v.temp {
+        return
+    }
+    let items = g.fs.frames[len(g.fs.frames) - 1].items
+    let mut i = len(items) - 1
+    for i >= 0 {
+        if items[i].restore == "" && items[i].v.reg == v.reg && items[i].v.off == v.off && items[i].ty == v.ty {
+            let mut kept = items[0..i]
+            for rest in items[i + 1..len(items)] {
+                push(mut kept, rest)
+            }
+            g.fs.frames[len(g.fs.frames) - 1].items = kept
+            if !g.fs.dead {
+                release(mut g, v.ty, items[i].v)
+            }
+            return
+        }
+        i = i - 1
+    }
+}
+
 // Record a new owned temporary in the innermost frame.
 fn own(g: mut Low, v: Val) -> Val {
     let mut out = v
@@ -2976,6 +3000,10 @@ fn branch_on(g: mut Low, e: ast.Expr, yes: Int, no: Int) {
 }
 
 fn binary(g: mut Low, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Val {
+    let parts = codegen.string_parts(g.k, e)
+    if len(parts) >= 3 {
+        return join(mut g, parts)
+    }
     match g.k.refs[e.id] {
         checker.Ref.Method(t, name) => {
             let v = method_value(mut g, e, [l, r], sub(g, t), name)
@@ -3012,6 +3040,33 @@ fn binary(g: mut Low, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr) -> Val {
     let left = binary_left(mut g, l, r)
     let right = expr(mut g, r)
     return operation(mut g, e, op, left, right, ty(g, l))
+}
+
+// a + b + c + ... on Strs: one vela_str_join over the parts, copied into a
+// slot side by side (codegen.string_parts, codegen.join_snapshots).
+fn join(g: mut Low, parts: [ast.Expr]) -> Val {
+    let snapshot = codegen.join_snapshots(g.k, parts)
+    let mut vals: [Val] = []
+    for i in 0..len(parts) {
+        let mut v = expr(mut g, parts[i])
+        if snapshot[i] && !v.owned && !v.is_static {
+            v = own(mut g, consume(mut g, v))
+        }
+        push(mut vals, v)
+    }
+    let s = shape(mut g, types.STR())
+    let slot = ir.slot(mut g.fs.f, s.size * len(vals), s.align)
+    let array = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.SlotAddr, array, -1, -1, slot))
+    for i in 0..len(vals) {
+        copy_mem(mut g, add_imm(mut g, array, i * s.size), address(mut g, vals[i]), s.size)
+    }
+    let out = slot_val(mut g, types.STR())
+    ccall(mut g, "vela_str_join", [array, konst(mut g, len(vals))], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_STR(), out.reg)
+    for v in vals {
+        release_now(mut g, v)
+    }
+    return own(mut g, out)
 }
 
 fn binary_left(g: mut Low, l: ast.Expr, r: ast.Expr) -> Val {
@@ -3086,6 +3141,10 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
             let out = slot_val(mut g, types.STR())
             ccall(mut g, "vela_str_concat", [address(mut g, left), address(mut g, right)], [ir.KIND_STR(), ir.KIND_STR()],
                 ir.RET_STR(), out.reg)
+            // The operands' bytes are copied: a + b in a + b + c can go now,
+            // so a long chain keeps one partial string, not all of them.
+            release_now(mut g, left)
+            release_now(mut g, right)
             return own(mut g, out)
         }
         let at = loc(mut g, e.line, e.col)
