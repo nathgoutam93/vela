@@ -251,12 +251,36 @@ fn forward_destinations(f: ir.Func) -> ir.Func {
     for _ in f.classes { push(mut readers, 0) }
     for i in f.insts { for r in ir.reads(i) { readers[r] = readers[r] + 1 } }
     let mut out = f; out.insts = []; let mut at = 0
+    let mut active: [[Int]] = []  // reads of [0] up to index [2] read [1] instead
     for at < len(f.insts) {
         let mut i = f.insts[at]
-        if i.dst >= 0 && defs[i.dst] == 1 && readers[i.dst] == 1 && at + 1 < len(f.insts) && (pure(i.op) || i.op == ir.Op.AddChk || i.op == ir.Op.SubChk || i.op == ir.Op.MulChk || i.op == ir.Op.DivChk || i.op == ir.Op.RemChk) {
+        let mut still: [[Int]] = []
+        for r in active {
+            if at < r[2] { i = renamed_one(i, r[0], r[1]); push(mut still, r) }
+        }
+        active = still
+        if i.dst >= 0 && defs[i.dst] == 1 && at + 1 < len(f.insts) && (pure(i.op) || i.op == ir.Op.AddChk || i.op == ir.Op.SubChk || i.op == ir.Op.MulChk || i.op == ir.Op.DivChk || i.op == ir.Op.RemChk) {
             let next = f.insts[at + 1]
             if next.op == ir.Op.Move && next.a == i.dst && next.dst != i.dst && f.classes[next.dst] == f.classes[i.dst] {
-                i.dst = next.dst; push(mut out.insts, i); at = at + 2; continue
+                // Other reads of the result later in the block, before the
+                // move's destination changes, read that destination instead
+                // (a loop field's store after its register is set).
+                let d = next.dst
+                let mut k = at + 2
+                let mut later = 0
+                let mut end = at + 2  // after the last of them
+                for k < len(f.insts) && f.insts[k].op != ir.Op.Label {
+                    let x = f.insts[k]
+                    for r in ir.reads(x) {
+                        if r == i.dst { later = later + 1; end = k + 1 }
+                    }
+                    if x.dst == d || ir.ends_block(x.op) || x.op == ir.Op.BranchCmp { break }
+                    k = k + 1
+                }
+                if later + 1 == readers[i.dst] {
+                    if later > 0 { push(mut active, [i.dst, d, end]) }
+                    i.dst = d; push(mut out.insts, i); at = at + 2; continue
+                }
             }
         }
         push(mut out.insts, i); at = at + 1
@@ -584,8 +608,9 @@ fn targets(i: ir.Inst) -> [Int] {
 // are kept: another could point to the same memory. A field the loop stores
 // is a whole word; the store stays, so memory is current after the loop, and
 // also sets the register. Reading a field before the loop must not fault
-// where the loop would not have: the header, which runs whenever the loop
-// is entered, reads through the same pointer at that offset or beyond.
+// where the loop would not have: the pointer is readable throughout the
+// function (`readable_pointers`), or the header, which runs whenever the
+// loop is entered, reads through it at that offset or beyond.
 fn loop_fields(f: ir.Func) -> ir.Func {
     let mut out = f
     let mut changed = true
@@ -597,6 +622,7 @@ fn loop_fields(f: ir.Func) -> ir.Func {
             if g.insts[k].op == ir.Op.Label { label_at[g.insts[k].imm] = k }
         }
         let defs = def_counts(g)
+        let readable = readable_pointers(g, defs)
         let mut defined: [Int] = []  // where each register set once is set; -1 for parameters
         for _ in g.classes { push(mut defined, -1) }
         for k in 0..len(g.insts) {
@@ -608,7 +634,7 @@ fn loop_fields(f: ir.Func) -> ir.Func {
             for t in targets(g.insts[k]) {
                 if maps.has(label_at, t) && label_at[t] <= k { header = label_at[t] }
             }
-            if header >= 0 { changed = promote_loop(g, mut out, label_at, defs, defined, header, k) }
+            if header >= 0 { changed = promote_loop(g, mut out, label_at, defs, defined, readable, header, k) }
             k = k - 1
         }
     }
@@ -617,7 +643,7 @@ fn loop_fields(f: ir.Func) -> ir.Func {
 
 // The loop from the label at `h` to the jump back at `e`; true if `out` is
 // `f` with fields kept in registers.
-fn promote_loop(f: ir.Func, out: mut ir.Func, label_at: Map[Int, Int], defs: [Int], defined: [Int], h: Int, e: Int) -> Bool {
+fn promote_loop(f: ir.Func, out: mut ir.Func, label_at: Map[Int, Int], defs: [Int], defined: [Int], readable: Map[Int, Bool], h: Int, e: Int) -> Bool {
     if h > 0 && ir.ends_block(f.insts[h - 1].op) { return false }  // entered by a jump; at 0, by the call
     let head = f.insts[h].imm
     for k in 0..len(f.insts) {
@@ -658,7 +684,7 @@ fn promote_loop(f: ir.Func, out: mut ir.Func, label_at: Map[Int, Int], defs: [In
         let p = i.a
         if defs[p] != 1 || (defined[p] >= h && defined[p] <= e) || i.imm < 0 { continue }
         if writer >= 0 && writer != p { continue }
-        if !maps.has(reach, p) || i.imm > reach[p] { continue }
+        if !maps.has(readable, p) && (!maps.has(reach, p) || i.imm > reach[p]) { continue }
         let float = i.op == ir.Op.FLoad
         let mut size = 8
         if !float { size = i.imm2 }
@@ -705,17 +731,42 @@ fn promote_loop(f: ir.Func, out: mut ir.Func, label_at: Map[Int, Int], defs: [In
                 continue
             }
         }
-        push(mut insts, i)
         if k >= h && k <= e && (i.op == ir.Op.Store || i.op == ir.Op.FStore) {
             let key = field_key(i.a, i.imm, 8, i.op == ir.Op.FStore)
             if maps.has(kept, key) && (i.op == ir.Op.FStore || i.imm2 == 8) {
+                // The register first, then the store from it: the value
+                // stored then has one reader, and forward_destinations
+                // computes it straight into the register.
                 push(mut insts, ir.inst(ir.Op.Move, kept[key], i.b, -1, 0))
+                let mut stored = i
+                stored.b = kept[key]
+                push(mut insts, stored)
+                continue
             }
         }
+        push(mut insts, i)
     }
     out.insts = []
     for i in insts { push(mut out.insts, renamed(i, rep)) }
     return true
+}
+
+// Pointers that can be read through anywhere in the function: parameters
+// with the address of a whole Vela value (a mut parameter's place, or a
+// value passed by address), the function's own slots, and addresses at an
+// offset into those. A field the loop reads through one exists whether or
+// not the loop runs, so reading it before the loop cannot fault.
+fn readable_pointers(f: ir.Func, defs: [Int]) -> Map[Int, Bool] {
+    let mut out: Map[Int, Bool] = [:]
+    for p in f.refs {
+        if defs[p] == 1 { out[p] = true }
+    }
+    for i in f.insts {
+        if i.dst >= 0 && defs[i.dst] == 1 {
+            if i.op == ir.Op.SlotAddr || i.op == ir.Op.AddImm && i.imm >= 0 && maps.has(out, i.a) { out[i.dst] = true }
+        }
+    }
+    return out
 }
 
 fn field_key(p: Int, offset: Int, size: Int, float: Bool) -> Str {
@@ -1058,6 +1109,19 @@ fn propagate(f: ir.Func) -> ir.Func {
 }
 
 // `i` reading rep[r] for each register r it reads.
+// `i` reading `to` where it read `from`.
+fn renamed_one(i: ir.Inst, from: Int, to: Int) -> ir.Inst {
+    let mut o = i
+    let reads_a = i.a >= 0 && i.op != ir.Op.Label && i.op != ir.Op.Const && i.op != ir.Op.FConst && i.op != ir.Op.SlotAddr &&
+        i.op != ir.Op.SymAddr && i.op != ir.Op.Jump
+    if reads_a && i.a == from { o.a = to }
+    if i.b == from { o.b = to }
+    for k in 0..len(i.args) {
+        if i.args[k] == from { o.args[k] = to }
+    }
+    return o
+}
+
 fn renamed(i: ir.Inst, rep: [Int]) -> ir.Inst {
     let mut o = i
     let reads_a = i.a >= 0 && i.op != ir.Op.Label && i.op != ir.Op.Const && i.op != ir.Op.FConst && i.op != ir.Op.SlotAddr &&

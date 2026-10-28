@@ -1562,6 +1562,7 @@ fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
 fn param_local(g: mut Low, lid: Int, t: Int, mutable: Bool) {
     if mutable || in_memory(g, t) {
         let p = ir.param(mut g.fs.f, ir.INT())
+        push(mut g.fs.f.refs, p)
         g.fs.locals[lid] = mem_val(p, 0, t)
         // The descriptor of an immutable, unescaped Str parameter cannot
         // change across calls. Keep its data and length available to loops.
