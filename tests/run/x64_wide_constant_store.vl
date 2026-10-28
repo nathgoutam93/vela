@@ -1,0 +1,45 @@
+// Found by tests/differential_test.py (seed 9125): x86-64 stored a constant
+// too wide for an immediate into an array element whose index was spilled.
+// Both went through rax, so the store went to data + constant * 8 and
+// crashed. Under register pressure, as here, `push` is such a store.
+// out: 6360451124329696132
+// out: 0
+// out: -1
+import ints
+type Rec = struct { a: Int, b: u8, c: i32 }
+fn main() {
+    let v32: i32 = ints.wrapping_neg(ints.wrapping_sub(ints.wrapping_add(1137148499i32, 561783150i32), ints.saturating_sub((-7i32), 1540149930i32)))
+    let v33: u64 = ints.wrapping_neg(11420386462936377324u64)
+    let mut m34: i8 = ints.wrapping_neg(ints.wrapping_add((-47i8), (~79i8)))
+    for ix39 in 0..8 {
+        let mut arr40: [u8] = [ints.wrapping_add((15u8 & 134u8), ints.wrapping_add(183u8, 1u8)), 227u8, ints.wrapping_add((35u8 ^ 18u8), 16u8)]
+        push(mut arr40, ints.wrapping_mul((2u8 & 241u8), ints.wrapping_sub(11u8, 92u8)))
+        let mut m41: u8 = 0u8
+        for x42 in arr40 { m41 = ints.wrapping_add(m41, x42) }
+        let mut arr43: [u64] = [(ints.wrapping_neg(v33) | ints.wrapping_mul(1870782452635908023u64, v33)), ints.wrapping_add(v33, v33), (16u64 >> ((v33 & 2u64) & 63u64)), (~v33)]
+        push(mut arr43, ints.wrapping_neg(ints.wrapping_neg(6360451124329696132u64)))
+        if ix39 == 7 { print(arr43[4]) }
+        m41 = ints.wrapping_div(87u8, (m41 | 1u8))
+    }
+    let v48: u64 = (match ints.wrapping_mul((match ints.checked_div(16u64, v33) { Some(x) => x, None => 19u64 }), ints.wrapping_neg(v33)) { 12u64 => ints.wrapping_sub(ints.wrapping_add(11u64, v33), (v33 * v33)), _ => (u64(4u16 & 32767u16) >> 23u64) })
+    for ix49 in 0..1 {
+        for ix50 in 0..0 {
+            for ix66 in 0..4 {
+                if ((2636u16 == (match ints.checked_mul(13u16, 53992u16) { Some(x) => x, None => 0u16 })) || (m34 >= m34)) { break }
+            }
+        }
+        for ix75 in 0..4 {
+            let mut m76: u8 = (~(match ((v48 > (~v48)) && (1996938439u32 != 19u32)) { true => (184u8 << 2u8), false => ints.wrapping_neg(206u8) }))
+            let mut w78 = 6
+            for w78 != 7 {
+                let mut st79 = Rec { a: (ints.wrapping_add(w78, ix49) >> ((ix49 >> 19i64) & 63i64)), b: ints.wrapping_add((match ints.checked_div(m76, m76) { Some(x) => x, None => 5u8 }), ints.saturating_add(m76, m76)), c: ints.wrapping_add((v32 >> (v32 & 31i32)), v32) }
+                w78 = w78 + 1
+            }
+        }
+    }
+    print(v48)
+    for ix85 in 0..7 {
+        m34 = ints.wrapping_div((match ints.checked_sub(ints.wrapping_sub(m34, m34), (m34 | m34)) { Some(x) => x, None => 41i8 }), (m34 | 1i8))
+    }
+    print(m34)
+}

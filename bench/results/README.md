@@ -19,6 +19,8 @@ Run tools from [bench/](../README.md) and put fresh scratch reports in `build/`.
 | [`2026-10-26-x64-native-performance.md`](2026-10-26-x64-native-performance.md) and `2026-10-26-x64-*.json` | Linux x86-64 paired native comparison and before/after release gates |
 | [`2026-10-26-x64-layout.md`](2026-10-26-x64-layout.md) and `2026-10-26-x64-layout-*.json` | Linux x86-64 cold-block layout and addressing: paired comparison and release gate |
 | [`2026-10-26-x64-timing-noise.md`](2026-10-26-x64-timing-noise.md) | x86-64 timing variation, layout sensitivity and the rejected JCC mitigation |
+| `2026-10-27-x64-*.json` | Paired native comparisons for TL-097 (nbody) and TL-098 (rcx/rdx allocation), and a 21-round recheck |
+| `2026-10-28-native-loop-fields-ab.json` | Paired native comparison for TL-103 to TL-105 (loop fields, load reuse, known branches, constant division) |
 | `*-validation.json` | Commands, environments, outcomes and validation limits |
 
 Reports retain their original bytes. Paths, commands, source digests and

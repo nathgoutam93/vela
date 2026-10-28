@@ -1,0 +1,164 @@
+// Fields read through a pointer in a loop are kept in registers when the
+// loop cannot change them another way (opt.loop_fields), and loads and tests
+// already made on the way are reused (reuse, known_branches). Each case
+// here must still see every change, on both backends and optimization
+// settings.
+// out: true
+// out: 5
+// out: false
+// out: 0
+// out: 7.5
+// out: 4
+// out: 200
+// out: 3
+// out: 12
+// out: 12
+// out: 3
+// out: 2
+// out: 2
+// out: -1
+// out: 5
+// out: 10
+// out: 20
+// out: 6
+// out: 3
+// err: loop_fields.vl:163:13: panic: index out of range
+// exit: 101
+type Reader = struct {
+    text: Str
+    pos: Int
+}
+
+type Sum = struct {
+    total: Float
+    count: Int
+}
+
+type Small = struct {
+    flag: Byte
+    n: Int
+}
+
+type Counter = struct {
+    n: Int
+    steps: Int
+}
+
+fn digits(r: mut Reader) -> Bool {
+    let start = r.pos
+    for r.pos < len(r.text) && r.text[r.pos] >= '0' && r.text[r.pos] <= '9' {
+        r.pos = r.pos + 1
+    }
+    return r.pos > start
+}
+
+fn add_all(s: mut Sum, xs: [Float]) {
+    for x in xs {
+        s.total = s.total + x
+        s.count = s.count + 1
+    }
+}
+
+// A narrow field written in the loop is not kept; the word beside it is.
+fn narrow(s: mut Small) {
+    for i in 0..3 {
+        s.flag = byte(200)
+        s.n = s.n + 1
+    }
+}
+
+fn bump(c: mut Counter) {
+    c.n = c.n + 3
+}
+
+// A call in the loop changes the struct: nothing is kept.
+fn with_calls(c: mut Counter) {
+    for c.n < 10 {
+        bump(mut c)
+        c.steps = c.steps + 3
+    }
+}
+
+// Leaving early, by break and by return, after the field changed.
+fn first_space(r: mut Reader) -> Int {
+    for r.pos < len(r.text) {
+        if r.text[r.pos] == ' ' {
+            break
+        }
+        r.pos = r.pos + 1
+    }
+    return r.pos
+}
+
+fn find(r: mut Reader, b: Byte) -> Int {
+    for r.pos < len(r.text) {
+        if r.text[r.pos] == b {
+            return r.pos
+        }
+        r.pos = r.pos + 1
+    }
+    return -1
+}
+
+// Two structs written in one loop: either might be the other's memory as far
+// as the loop knows, so neither is kept.
+fn both(a: mut Counter, b: mut Counter) {
+    for i in 0..10 {
+        a.n = a.n + 1
+        b.n = b.n + 2
+    }
+}
+
+fn nested(rows: [[Int]], r: mut Counter) {
+    for row in rows {
+        for x in row {
+            r.n = r.n + x
+        }
+        r.steps = r.steps + 1
+    }
+}
+
+fn main() {
+    let mut r = Reader { text: "12345x", pos: 0 }
+    print(digits(mut r))
+    print(r.pos)
+    let mut e = Reader { text: "x", pos: 0 }
+    print(digits(mut e))
+    print(e.pos)
+    let mut s = Sum { total: 0.0, count: 0 }
+    add_all(mut s, [1.5, 2.0, 2.5, 1.5])
+    print(s.total)
+    print(s.count)
+    let mut small = Small { flag: byte(1), n: 0 }
+    narrow(mut small)
+    print(small.flag)
+    print(small.n)
+    let mut c = Counter { n: 0, steps: 0 }
+    with_calls(mut c)
+    print(c.n)
+    print(c.steps)
+    let mut words = Reader { text: "abc def", pos: 0 }
+    print(first_space(mut words))
+    let mut hello = Reader { text: "hello", pos: 0 }
+    print(find(mut hello, 'l'))
+    print(hello.pos)
+    print(find(mut hello, 'z'))
+    print(hello.pos)
+    let mut a = Counter { n: 0, steps: 0 }
+    let mut b = Counter { n: 0, steps: 0 }
+    both(mut a, mut b)
+    print(a.n)
+    print(b.n)
+    let mut grid = Counter { n: 0, steps: 0 }
+    nested([[1, 2], [3], []], mut grid)
+    print(grid.n)
+    print(grid.steps)
+    // A failed test leaves the opposite known; the access after it must
+    // still be checked.
+    let xs = [1, 2, 3]
+    let i = len(xs) + len(e.text) - 1
+    if i < len(xs) {
+        print(xs[i])
+    }
+    print(xs[i])
+}

@@ -2733,6 +2733,16 @@ the same entry. Close it with a commit or validation result; keep its history.
   rbp by addressing the frame through rsp, would address it. A trial that
   weighted short constant-count loops (`for j in 0..4`) below 8 changed one
   stack reference and was not kept.
+- **Regression (found after merge):** `tests/differential_test.py` seed 9125
+  crashed natively at `VELA_OPT=1` (exit 139). The scaled-index store loaded
+  its spilled index into rax and then built the stored value there too when
+  it was a constant too wide for an immediate (`movabs`), so `push` of
+  6360451124329696132 under register pressure wrote to
+  data + 6360451124329696132 * 8. Such a store now keeps the separate
+  address computation, as a spilled value already did.
+  `tests/run/x64_wide_constant_store.vl` is the reduced program: it crashes
+  with the compiler before the fix and passes on both backends at both
+  optimization settings.
 
 ### TL-099: Back-end agreement was checked only by hand-written fixtures
 
@@ -2852,6 +2862,120 @@ the same entry. Close it with a commit or validation result; keep its history.
   `main.vl`'s dense incremental-build code remains dense; splitting them is
   a formatter change to propose, not part of this fix.
 
+### TL-103: Native code reloaded struct fields and repeated bounds checks
+
+- **Status:** partly resolved after the post-M30 review (real-program
+  measurement, step 4); see Remaining.
+- **Discovery:** `bench/real_programs.py --gate --with-rust` on Linux x86-64:
+  the JSON service took 0.385 s native, 0.332 s through C, 0.349 s for the
+  C reference and 0.172 s in Rust. Under callgrind, `json.number_value` was
+  43% of the native program's instructions, about 340 per number.
+- **Evidence (observed):**
+  - A loop over a `mut` struct parameter's fields, such as
+    `r.pos < len(r.text) && r.text[r.pos] >= '0'`, loaded `r.pos`, the
+    text's data and its length again at every use: five loads of `r.pos` and
+    three of each other field per iteration, though the only store was the
+    `r.pos` increment. `reuse` forgot every load at each label and at any
+    store.
+  - The second `r.text[r.pos]` repeated the bounds check the first had
+    passed.
+  - `byte(0)` in `peek` kept a runtime range check of the constant 0.
+  - Division by a constant used `idiv` (TL-104).
+- **Resolution:**
+  - `opt.loop_fields`: in an innermost loop entered only from its header,
+    with no calls except to panic and stores through at most one pointer, a
+    field read through a pointer set before the loop is read once before it
+    and kept in a register. A field the loop stores is a whole word; the
+    store stays, so memory is current after the loop. A field is read early
+    only when the header, which every entry runs, reads through the same
+    pointer at that offset or beyond, so it cannot fault where the loop
+    would not have.
+  - `opt.reuse`: loads stay known past a label with one way in, and where
+    forward paths join, the loads every way agrees on; a store forgets only
+    loads through other pointers or overlapping it, and a word load of the
+    word just stored is the stored value.
+  - `opt.known_branches`: a test already decided on the way (an earlier
+    bounds check of the same index and length) becomes a jump or goes.
+    Integer registers set once only; Float tests are left alone (NaN).
+  - `opt.fold` folds `tobyte`/`bytechk` of a constant in 0..255.
+  - Not kept: carrying other computed values past labels. It removed a
+    second address computation and byte load in the JSON digit loop (1.6%
+    of its instructions), but lengthened register lives: sha256 ran 2.7%
+    more instructions and fannkuch 1.6%, from spills.
+- **Verification:**
+  - JSON service, native, one round under callgrind: 514M instructions
+    before, 437M after (with TL-104 and TL-105), `number_value` 221M to
+    165M. Gate runs measured native Vela at 0.385 s before and 0.30-0.33 s
+    after, against the C reference's 0.34-0.36 s; Rust took 0.17-0.26 s on
+    the same runs, so this host's speed varied by half.
+  - Paired native comparison over nine rounds
+    ([report](../bench/results/2026-10-28-native-loop-fields-ab.json)):
+    geometric mean 1.262x to 1.253x C, fasta 1.523x to 1.296x (TL-104),
+    the others within this host's noise (TL-085). Instruction counts, which
+    do not vary: sha256 and nbody unchanged, wordfreq 3.2% fewer, fannkuch
+    0.3% fewer, fasta 3% more (multiplies replacing idiv, and faster).
+  - `tests/run/loop_fields.vl`: a scan over a `mut` struct with its result
+    read after the loop, a loop at the start of a function, `break` and
+    early `return` after the field changed, a narrow field written beside a
+    word, a loop calling a function that changes the struct, two structs
+    written in one loop, nested loops, and an index check that must still
+    fail after a test went the other way. It passes on both backends at
+    both optimization settings and under `--sanitize`.
+  - C and native suites 329/329; native `VELA_OPT=0` run fixtures 131/131
+    and under `--sanitize` 131/131; 3,000 differential programs agree in
+    all four configurations; the native fixed point holds.
+- **Remaining:** `number_value` still runs about 250 instructions per
+  number. Two peeks after the digit loop re-test `pos` against the length
+  signed, then unsigned (`ult` cannot follow from `lt` without knowing
+  `pos >= 0`). Each result `Json` is built in a stack slot and copied to the
+  caller word by word, reloading the spilled result pointer, including the
+  enum's unused words. Building a returned aggregate in place and a
+  nonnegative-index fact would address them. Loops whose header does not
+  read through the pointer (`for x in xs { s.total = s.total + x }`) are not
+  promoted.
+
+### TL-104: x86-64 divided by constants with idiv
+
+- **Status:** resolved for x86-64; arm64 is open (below).
+- **Discovery:** TL-103's profile: `json.whole_number` divided by 10 for
+  every digit (`(min + d) / 10`); fasta takes a remainder by a constant for
+  every random number.
+- **Evidence:** the x86-64 emitter turned division by a power of two into
+  shifts but used `idiv` for any other constant; gcc multiplies by a
+  reciprocal.
+- **Resolution:** division and remainder by a positive constant other than a
+  power of two (`/`, `%`, and the unchecked forms) multiply by a magic number
+  (Hacker's Delight 10-1, computed by `x64.magic`): the high word of the
+  product, plus the dividend when the multiplier is negative, shifted
+  arithmetically, plus one for a negative dividend. Such a divisor is
+  neither 0 nor -1, so nothing can panic.
+- **Verification:** the algorithm, written in Python, matches truncating
+  division for 2,300 divisors (3..2,000, 300 random up to 2^63, and edge
+  values up to 2^63 - 1) and 213 dividends each, including both ends of
+  Int. `tests/run/division_constants.vl` hashes quotients and remainders of
+  36 dividends by 20 divisors (3 to 2^63 - 1) and passes on both back ends
+  at both optimization settings; the generated code has no `idiv`. fasta
+  went from 1.47x to 1.24x C.
+- **Remaining:** arm64 still uses `sdiv` for such constants. It is much
+  cheaper there than `idiv`, and this host cannot run arm64 code; change it
+  with the macOS validation.
+
+### TL-105: The json package read every whole number twice
+
+- **Status:** resolved.
+- **Discovery:** TL-103's profile.
+- **Evidence:** `number_value` scanned the digits, sliced the number's text
+  into a new Str, and `whole_number` scanned it again into an
+  `Option[Int]`: a runtime slice call, a retain and release, a second
+  bounds-checked loop and an Option per number.
+- **Resolution:** a whole number's value is worked out as its digits are
+  read, with the same downward count and overflow test. Numbers with a
+  fraction or exponent, or too big for an Int, are still sliced and parsed
+  as Floats.
+- **Verification:** the package's tests pass, with new cases (`-0`, `12e2`,
+  `-0.0`, one below the smallest Int) that also pass against the previous
+  parser; the JSON service's output is byte-identical to the C reference.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
@@ -2919,6 +3043,14 @@ the same entry. Close it with a commit or validation result; keep its history.
   run `python3 -u bench/real_programs.py --compiler build/vela --gate --runs 3
   --json build/m29-real-programs-native-linux.json` on the intended host.
   Retain that report, source commit, CPU, kernel and C compiler version.
+- **Post-M30 real-program runs (TL-103):** on one Linux x86-64 host the
+  gate passed twice with `query impact` at 0.969 s and below, then failed
+  once at 1.107 s (samples 1.013-1.288 s) while Rust's JSON service, which
+  no Vela change affects, slowed from 0.17 s to 0.26 s. Interleaved nine
+  times on the same project right after, the compiler before TL-103 took a
+  median 1.149 s (best 0.950 s) and the one after 1.188 s (best 0.923 s):
+  host variation, not a regression, but the query sits within a few percent
+  of its budget on this host even when it passes.
 
 ### VAL-001: Linux native and sanitizer validation
 

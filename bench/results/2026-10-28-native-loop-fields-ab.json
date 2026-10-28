@@ -1,0 +1,1004 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "os": "Linux x86_64",
+    "gcc": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "commit": "8a83ced",
+    "date": "2026-10-28"
+  },
+  "runs": 9,
+  "quick": false,
+  "backend": "native",
+  "complete": true,
+  "source_sha256": {
+    "bench/arena_trees/main.c": "790c8477cee0dc85f9691d660d37df9131a2396c308ca41dd3cf2716176abbd8",
+    "bench/arena_trees/main.rs": "5a6fe7ee4db16c8654e60caa62b66675a266522c88e3990c157f3983f90579c4",
+    "bench/arena_trees/main.vl": "119a5a953a399f31d490c8be0a4d4a6f0abbea92597d2134fb78ea614bc63f46",
+    "bench/binarytrees/main.c": "807b5207d2e2c909c27a7cd38abc6be7ec8d4dbcaea5f53df09f56e117dd67e9",
+    "bench/binarytrees/main.go": "d9a47ae2c8eba9e04d72ccd6eb325578d9843562c2e176b63f73f1dd6136e073",
+    "bench/binarytrees/main.rs": "18a3f5a701027b80a412ae9c10de12fb2bbe95728fc111b23ad615f87a8717b9",
+    "bench/binarytrees/main.swift": "64ad879f5cef97048c71eaab35cd217b65f92210d9bdcd4b903c6b16dcbcf161",
+    "bench/binarytrees/main.vl": "e3c6a0ca77d1fe82d2faf94934b62c9b0c3117bab8ecb565a33168750362dfc7",
+    "bench/crc32/crc32.vl": "940fa4bc09d8d34ab68ac3fe6df50e70981cbec778b472d827deb62b1f558e57",
+    "bench/crc32/main.c": "64bf516e5d8779b1eedc2e1f021988e1b1e1c3fe342c856911728fa3b4ab62db",
+    "bench/crc32/main.rs": "74a089aa854974eeaf33918a7219fbbd26a9db4b4d45e809df8285b07de8887f",
+    "bench/crc32/main.vl": "659c723a12dbaaf51a65f34d887ec4c65db0596c79af9fbc001b2b82cf535dc5",
+    "bench/fannkuch/main.c": "a1ec5b5c667ece096aa1f2cd04739f76593eea2b43b6372d3058dba6bff0e13e",
+    "bench/fannkuch/main.rs": "3e626af496e38f6b47aa64c539c7d2aecdec033962b6be9c512f5cae516baf9f",
+    "bench/fannkuch/main.vl": "2cb271ad4643034b362d6a8c1a4d91bb3a8cd64be2b37773c277eff0d85e4e90",
+    "bench/fasta/main.c": "03be9f68bd99069af99047436911e760b9d5fb86632ee043a6c70149eaea2792",
+    "bench/fasta/main.rs": "cdff5a5b3d25cf183a8835afd5fb9327e05eb417e4938be4cc7e81460b27b354",
+    "bench/fasta/main.vl": "ee59d048bb7cf3938a8e8225b9e7a5b082e65beeec3467e701ec094219ad8e67",
+    "bench/knucleotide/main.c": "affc9b77f4f43c8301716674e5d33a587a05a02154874e4f579dbc03353a58e0",
+    "bench/knucleotide/main.rs": "39f67eef31b7507d1be74ab6bca7effb41d6847fd1358ad5bb9a7f08d900e056",
+    "bench/knucleotide/main.vl": "5e4a06d16bdf96665e2089a48d7d96652323effe14790953b0e82a34dc6677f0",
+    "bench/mandelbrot/main.c": "70fcbd2ecab80142938a24ff3ba7377fe481ce3ddeb7eba6e99310faf522952d",
+    "bench/mandelbrot/main.rs": "b9db05ae4fa127c31230d8df33b975e6f3aa1dc3fcf1f8f67b19706062011870",
+    "bench/mandelbrot/main.vl": "5a255fd48f78acf90834f647e3a41e086acda9eef15ea0bcd86dc7a655dcd742",
+    "bench/nbody/main.c": "8fcbc5b9479a1586461e0615c34358abbc7b9fd39847372567ab22b09fcb3f7f",
+    "bench/nbody/main.rs": "ebb2be9217c923cc0f109aa96682640208ee8d38e0daa8f01c3ade522f7ecaa0",
+    "bench/nbody/main.vl": "3d4c424478aacba2f38f2bf85a11b7b11a3d695a26c6a03e3afa4ae6d9b9fb8a",
+    "bench/run.py": "d82d0dadcfe908ebe060f0de204b23631d19c4920438bf865c103f85affd2b3d",
+    "bench/sha256/main.c": "1b870bbf6256a16fe2288cc52d03ca3165d91796982d670eafaa3237866bd436",
+    "bench/sha256/main.rs": "42ba06a4758adff7ec42a7db64a4dd10dbc8ced5cb4cdf61774dee852bfd7ae4",
+    "bench/sha256/main.vl": "4e2e40e32af28142fd28a32eaabee00c3ec7f209a5ec3e4b26b87e1392c66858",
+    "bench/sha256/sha256.vl": "b6c34fef785be9a10097bf16a3b265b3dfc9a899dd9b33a7a511bf301429fcd3",
+    "bench/spectralnorm/main.c": "d01b6c87575c26a2e5afa31df0caed6d73a08981c6153486fc1a32748098adc3",
+    "bench/spectralnorm/main.rs": "9ec719ecc97c466308a5e6c0fbfe4a723470f51276e77fea15a628586b655b78",
+    "bench/spectralnorm/main.vl": "c4f949bd409afbd7c1ae84ef6516959db85cbea9ef9e222adc6776f1c3ee44c6",
+    "bench/varints/main.c": "c17814b48cb1c11279da2d1641c5a84f3362d83b719fbb328a95b8299b119640",
+    "bench/varints/main.rs": "6972054b0f58eb681ec5234991904832106baa63fa23be309c9f5d99c10de584",
+    "bench/varints/main.vl": "04bfc7d67540aa0f8090b52d3e890fc27629d6cea1aa1653dbc401011486162d",
+    "bench/varints/varints.vl": "7ceb978c501c606f14d4ff850945de76d90513406bd239700ec5414d2beeb2bf",
+    "bench/wordfreq/main.c": "7789ed080b0ddb73b56ef481655117e012993932bf04bd9fc077a2e02ea32bb2",
+    "bench/wordfreq/main.rs": "0f5adc4d239d122d3880af961131bb4324299f6c588e024932ee2736f8b3eb00",
+    "bench/wordfreq/main.vl": "7f68b12f36f130d2de2390916275c19b10a266ff4e580abca835b48369cb74ff",
+    "compiler/src/agent_queries.vl": "9a717de947f1ea4fbf4ad677fa9b6ca731cb15351fb13e59d61ebee84e503bc6",
+    "compiler/src/arm64.vl": "74400d4dad26339b9ad1eeaf1c0c19fea28bac08920d6256a114e3b28e1328ea",
+    "compiler/src/ast.vl": "71be5595bf344c9ed88c60276e59789cda435bccc8d19b753b46d68a4fa8b45a",
+    "compiler/src/bits.vl": "8e14141f4f203c1850984ff0355df3d69092ac62327602eeed4fef93314f0b96",
+    "compiler/src/call_graph.vl": "07cf773d2aa93e647983787bfcfcbde08a6aed430e8296d4d8aa7017d2ffd18a",
+    "compiler/src/capabilities.vl": "0144e730299587cb00b36e4bfc6bcfc051622a1fd0522aa02b1f8fa934519555",
+    "compiler/src/cffi.vl": "6b98f14d1e4d85b4a595de6337fa258387fee7160d4e9df2a3816abcedb7f636",
+    "compiler/src/chars.vl": "c42a95f8a5cb41d535981094761ccd447db7eb643ba40a8449b3504e7e7652d9",
+    "compiler/src/checker.vl": "ab1f6e488e20fc12b098aab829ecf0ec7d5225ce0fe9ec5b042142a39c41138f",
+    "compiler/src/codegen.vl": "4e9026d7863944d148b2849fcb7e273519da3b8adc72145cbd19c5d4af8d1369",
+    "compiler/src/complete.vl": "99507944d5e2a03249b93154e4dede64c68c5f2d4d8990fee683882bc7b8e4f8",
+    "compiler/src/contract_checks.vl": "8217ea347cd43147a54c21293c9cc9f46cf265f055754e5f7adfefebc2749cc2",
+    "compiler/src/debug_info.vl": "afbc5d8080374561aebcfae0ba7c0e84c492b4c085d26dc454ca737ab96ea8ae",
+    "compiler/src/diagnostics.vl": "efbd34c072253d3151727fb0d0d04f2ae7b7f7d7f281c2d04aa681bf863b0c7d",
+    "compiler/src/errors.vl": "2a31eea563f9ea1b591e700955c82c1ee887bd24b4797bb7c9eb3d5d733a8e27",
+    "compiler/src/evidence.vl": "cf93679034d67041f9ef769586ab59f3cfb4b2474298cdb78f49ac3362b8cd97",
+    "compiler/src/fixer.vl": "7370240f796cc19c3e6b38f0e03dc66061d0e6343154f29b31e7a7d9ac87a2a8",
+    "compiler/src/format.vl": "d8a7a58a851aa909e1e7818a8850888c11998c25c8eee56915cad77c93b5baf0",
+    "compiler/src/guide.vl": "d4189e2f4515904abf9e2985d3c596229f441f7e286b031e5f9adade4b5723e9",
+    "compiler/src/incremental.vl": "790f0082f28929fab4b56d51f013aa49a3bfbdfba8cdbf551cda44dc47e29eb3",
+    "compiler/src/index.vl": "6f2eefb333042ce50c1d9ca374e84afdcfa93352cf07b255e2db9021d51d9a2b",
+    "compiler/src/integers.vl": "45739d073e59c93f31718f5f8cf9a9424e192f2157e89d1de8fcdefa7747593a",
+    "compiler/src/interfaces.vl": "990c820ed20895079cc23b0a926d935f32844d30919da49fb91d8f8875af110f",
+    "compiler/src/ir.vl": "cab3dd585329fed7d4f2cf53eeb7d2698b229717895c282e1a5a526d876e99d6",
+    "compiler/src/layout.vl": "a9ac2d37a3abd85fc5d44689175c21ad2ac080c2686708d6a463e13c8d55e205",
+    "compiler/src/lexer.vl": "b253ef64ffe1a5e5f8466e666c8379010eba177c28d2a619d7a6d666ebfcc2e3",
+    "compiler/src/live.vl": "ee646800be014abb679b7221eb76a747ef77e576ca78e31077b255ee39e2fc21",
+    "compiler/src/loops.vl": "49946114da9d77587087cd10bb75d1141592e5c46d0ef8d7f61119afbc283ed6",
+    "compiler/src/lower.vl": "d92fb62cc2938cefef589635417873208b467d85088b73db51dd3cbdf1702cb7",
+    "compiler/src/lsp.vl": "4c5d880e580b92557dfffcd9eabf6fccc7c3d78130b83148e58c42ef1b1d5ead",
+    "compiler/src/main.vl": "c3b72d639ba120505f1776c84e335ebaef93d569abb9d558e653466f84f5c5a1",
+    "compiler/src/match_check.vl": "e91be1b1bf88c868bba3b5c986d66834688dc1f626922357d594d781ba4bc8b5",
+    "compiler/src/memops.vl": "938eae0dd685ef057699207b39b259d9ea74604b248e0bbff70e2c69eb1c97ad",
+    "compiler/src/modules.vl": "dcfc9b578645b8ae8288947b11245b17ac8432bae505e604d11f2c6f37d87ad2",
+    "compiler/src/mono.vl": "be0e0e52218cdf2bf99abc8677c39657992b491cd3d036e90de3894d3bd54265",
+    "compiler/src/opt.vl": "c1405c357c39f775c16cc7e911f6994ca2700075dc74ee9e93fe89160b774037",
+    "compiler/src/packages.vl": "cd98d157c68171a52844f4f3a788b2e53c6042f16c7828da30e2e698fcdace85",
+    "compiler/src/parser.vl": "e714ee9ed7889b9ba33b4878d56e2a6cd432597d904d603e00e1c3ec6bd9f3c7",
+    "compiler/src/profile_report.vl": "610d2168d059d4346420f4c674a0e030f5962877fbd232df2ca24f6b7f698d2a",
+    "compiler/src/promote.vl": "5ca08aabda7253bc17950b672342d3d3377bd12911132852ddda406409d20947",
+    "compiler/src/proof_hash.vl": "0bcf5e34ec2c3d55df0ed8367e9dc4a7dd00fe23e3472dd6bc34c895277566a0",
+    "compiler/src/properties.vl": "b9eb4ab9427b506b7a070799fe5812cfc69becffee5dc86ebf902dfb8f04d256",
+    "compiler/src/query.vl": "938e5af3e4ada777893cfe2a0ab4df3a9db30340ef1fdd01c92ee092d06fe6ab",
+    "compiler/src/ranges.vl": "a59cbf515dfd7cd689658db64e81c68500e71e5dd0cff615fce05047dd37193a",
+    "compiler/src/regalloc.vl": "35f82f1df1d7c8df219a6a2ec4d337e52f9a724fc6891efd0690911d35341367",
+    "compiler/src/rename.vl": "c419d39210d1939fcf8185054890100c14562d3c38b41b0438304290a8d3dfe8",
+    "compiler/src/repairs.vl": "0583b8d36f2795b67e581d504264f6ee15cf2ab19847fa180217190192ee7050",
+    "compiler/src/sysops.vl": "88ef58a847c9974699e0db2ea975c8f2f7b21bd6a3876b724a38d5a4f0026063",
+    "compiler/src/targets.vl": "087b0839d331aec59179eac4d461c2dae64b7acabbf318d1dcc865052a07a423",
+    "compiler/src/types.vl": "ef9fb29799b2575d8cbebb0c86aefe25d530d83bc99f14c3099fe9f4970037ff",
+    "compiler/src/unsafe_query.vl": "08450ad03a8d7f7e6acd5e8e93e52e6156e70bbd50cfa2886e7d0c78c0a9007f",
+    "compiler/src/vela.mod": "18f82215f73e5afcf851294625b97f44fe3cf82463e23d6a2f4367f7828d36c5",
+    "compiler/src/verification.vl": "b9eb96182c3412b79b6b11e54809bcf2885a34881ab03074eacecbf3ecc57a31",
+    "compiler/src/x64.vl": "2635e59385228871e70b09d6cf38ddce6915c4a24b4e6f49ac04f0992741f401",
+    "packages/json/json.vl": "15933fc4a2d0bcaf8b9f74eb61bb456377b4ff52850c6c9492cfb700738085bf",
+    "packages/json/vela.mod": "e6ac090348f113d70cc4e564e211901c9b8a82d43e26e844d2af3c865568794b",
+    "runtime/vela_int.h": "e600cfd5cab132401aba9e03b5e4a3c45995c33cbbab7f8b581739a258d74059",
+    "runtime/vela_observe.inc": "dc40350cf17f4358c505175d5fceb7d50b2f8d4c4e539fdb133c296db842895f",
+    "runtime/vela_policy.inc": "6190d454af03f53c3f1cbce6042c64059c9b97d09078829278bf9bd80e253338",
+    "runtime/vela_policy_portable.inc": "1737295f17af3f86658850d28134a6131387b09a279431340f4e11ad31ccc84d",
+    "runtime/vela_rt.c": "87100a4cd8a2fd8e5483be93fbaacf7e74be71d364a53ba652058e1bfb5bd4ef",
+    "runtime/vela_rt.h": "9bf8fbaec9c6c2a5a01e4dbd6d46281dacfb465946de362476cfcce54774f8b9",
+    "runtime/vela_sys.inc": "95c6d9f92dd4c0a2e29f44356764d8a96cbec08dc78d65f13b7cc54b00d55989",
+    "runtime/vela_threads.h": "ac583b3dd0069704b12f2aaa6bf4c0ef282111e7004814ac8306a67b8558f3db",
+    "runtime/vela_windows.h": "e630e02b37a51eca8cfd64d811171734033d83019b0d01f9c01f01155bc225dc",
+    "runtime/vela_windows_net.h": "16591563be67a14e5ff84d4e5e680c700e24f4645c9893071cf67b0e72420e15",
+    "runtime/vela_windows_process.inc": "70dc8c7c9f23874f69c1ae8db52c1f0795d8e1f24029c1a8b942e4dfd2643d9d",
+    "std/arenas.vl": "7712c21cd8f2c734be19a0cfe266242b4db4e8d352e48facf8f26678fb340c5e",
+    "std/buffers.vl": "d5f89c0c7efa5a137a6fdc111733aebbba30a82776f6f229b648307339191854",
+    "std/bytes.vl": "2a893336976e500559bd2684d211454bb70226423e53c6f9550911988510d6cc",
+    "std/http.vl": "408d3a5179ce05077b34fef7fcc623e9544df4d07d30b1263e855c185ae3aed4",
+    "std/io.vl": "c258a1047ca0dbc3038a5cb6f85be8c422c15e526dc5db3b5e5f607968c412c4",
+    "std/lists.vl": "dfbc5cf2b06d0b26af0e6e312da5024fb0dd8bba774df005d592712f47996f59",
+    "std/net.vl": "7e39b15bbb0fe1f61f575d55c7552997c20c5cf756460c8aaa75209e720050cb",
+    "std/paths.vl": "0e46f2ae7b152f3127c156279c53662477955d9f037c4334df50937384919812",
+    "std/processes.vl": "cbdb77e8000a706444b415499cbe08109626348f930db25177f5d08c7c28d92e",
+    "std/property.vl": "840f78599482fdc4f82a5b95872b60fe28065b823ec9fdbdb9b2403e1a5d624c",
+    "std/text.vl": "8e3fcd808bfd5d8f8e4f0028e0043850a85173b50c78aaf3d4410e1df0f95bfa",
+    "std/time.vl": "c2183e86f32cc9d10857e0ef606a1e056789938cd0f91d4862d8afa4b7f8c4d5",
+    "std/unicode.vl": "0870ced2fd92f50a354ebe193a663ff7a962d4bf91b24da4c7bd1fb884fec158",
+    "std/views.vl": "63b6c03f6b0c9e3954cef246c2f9e869dc53ac244fe8057168ab40b14188a314"
+  },
+  "results": {
+    "varints": {
+      "samples": {
+        "c": [
+          0.13744011400012823,
+          0.13427169999886246,
+          0.14515862299958826,
+          0.18208861000130128,
+          0.14325952600120218,
+          0.16673975200137647,
+          0.1613007870000729,
+          0.14757589100008772,
+          0.13663675499992678
+        ],
+        "before": [
+          0.2017697749997751,
+          0.23842395199972088,
+          0.18657757700020738,
+          0.2784966449999047,
+          0.2589930079993792,
+          0.17997809699954814,
+          0.18914628200036532,
+          0.1905122610005492,
+          0.17228129800059833
+        ],
+        "after": [
+          0.24370393299977877,
+          0.22946165899884363,
+          0.18401654199988116,
+          0.26317955999911646,
+          0.18328860399924451,
+          0.22504879500047537,
+          0.2138259769999422,
+          0.1847503160006454,
+          0.24050493799950345
+        ]
+      },
+      "best": {
+        "c": 0.13427169999886246,
+        "before": 0.17228129800059833,
+        "after": 0.18328860399924451
+      },
+      "median": {
+        "c": 0.14515862299958826,
+        "before": 0.1905122610005492,
+        "after": 0.22504879500047537
+      },
+      "output_sha256": "0b59aa6dcb264f4cdc14df41a76cdb8b2dc2e0dd31428d9bc6fb76e2dd8c926d",
+      "args": [
+        "262144",
+        "32"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "92198b23bde7410e7fe2a9089eff5b7104747ab372294d820def979b84bec798",
+          "size": 16176,
+          "build_seconds": 0.09937677700145287
+        },
+        "before": {
+          "sha256": "aa2440aea0e8a89b1923730f8b9f92c7ee76ecf6c5f0e97c24404cec43ade160",
+          "size": 136368,
+          "build_seconds": 0.08421694599928742
+        },
+        "after": {
+          "sha256": "aa2440aea0e8a89b1923730f8b9f92c7ee76ecf6c5f0e97c24404cec43ade160",
+          "size": 136368,
+          "build_seconds": 0.13152799299859907
+        }
+      }
+    },
+    "arena_trees": {
+      "samples": {
+        "c": [
+          0.21907572800046182,
+          0.27393328699872654,
+          0.22105109299991454,
+          0.26471078999929887,
+          0.24737119999917923,
+          0.24480400500033284,
+          0.24465560399949027,
+          0.22506874600003357,
+          0.2297443649986235
+        ],
+        "before": [
+          0.24045154200030083,
+          0.22574485699988145,
+          0.2634925509992172,
+          0.17879206200086628,
+          0.27499937399988994,
+          0.26525835700158495,
+          0.24877136899885954,
+          0.23821449400020356,
+          0.17028862200095318
+        ],
+        "after": [
+          0.19973674599896185,
+          0.23175655900013226,
+          0.19766471299953992,
+          0.1794049130003259,
+          0.2617487590014207,
+          0.2594905089990789,
+          0.23546035799881793,
+          0.2095780809995631,
+          0.17890803100090125
+        ]
+      },
+      "best": {
+        "c": 0.21907572800046182,
+        "before": 0.17028862200095318,
+        "after": 0.17890803100090125
+      },
+      "median": {
+        "c": 0.24465560399949027,
+        "before": 0.24045154200030083,
+        "after": 0.2095780809995631
+      },
+      "output_sha256": "0adc47b6158669824a578adcd996772794bb4cb4bf3f606e64b24588f17888c6",
+      "args": [
+        "16"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "43008bd43e2027f751fa052582e9a73312b723d7d732a11e6fafef6caf560234",
+          "size": 16352,
+          "build_seconds": 0.07233386100051575
+        },
+        "before": {
+          "sha256": "d14d722c7297d787f688d32630bcaabd752491b7e44fb9a7b4739ce4154a9830",
+          "size": 136592,
+          "build_seconds": 0.1083389140003419
+        },
+        "after": {
+          "sha256": "2bc0f63dce882a906426f12f9fde316d91962021aad4fe199632f8eeb420aaa9",
+          "size": 136592,
+          "build_seconds": 0.09993914900042
+        }
+      }
+    },
+    "nbody": {
+      "samples": {
+        "c": [
+          0.5389526750004734,
+          0.3538303660006932,
+          0.3635601459991449,
+          0.3056966830008605,
+          0.40822673100046813,
+          0.3165304729991476,
+          0.2892688080009975,
+          0.30458767199888825,
+          0.3047633800015319
+        ],
+        "before": [
+          0.4876173229986307,
+          0.37288658500074234,
+          0.4523677889992541,
+          0.3358511450005608,
+          0.407674310999937,
+          0.3962862820008013,
+          0.3583797040009813,
+          0.4866658920000191,
+          0.3412437930001033
+        ],
+        "after": [
+          0.4728113529999973,
+          0.5058362449999549,
+          0.37832506999984616,
+          0.5221096019995457,
+          0.4048794909995195,
+          0.6544148390003102,
+          0.40261081799872045,
+          0.4129723540008854,
+          0.3376187649992062
+        ]
+      },
+      "best": {
+        "c": 0.2892688080009975,
+        "before": 0.3358511450005608,
+        "after": 0.3376187649992062
+      },
+      "median": {
+        "c": 0.3165304729991476,
+        "before": 0.3962862820008013,
+        "after": 0.4129723540008854
+      },
+      "output_sha256": "a209785651d3f855b56ffcac6bce1eda49dff67124f34418aedd4ddb91c384c8",
+      "args": [
+        "5000000"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "504776ee57a88272c37e9803d82d3315b78ecae429ae6224f2949b3f7174e694",
+          "size": 16144,
+          "build_seconds": 0.12290328499875613
+        },
+        "before": {
+          "sha256": "9b3ab07f6ef9a94e93401bfe3cbb46ce3dc37ea9b02b5de837ad8d33ccbcb09a",
+          "size": 140392,
+          "build_seconds": 0.13728750699920056
+        },
+        "after": {
+          "sha256": "5bcb62bffcae74e49c12f441be15d5824b2d642816c4ed7f8645c3acde24bfd4",
+          "size": 140392,
+          "build_seconds": 0.15481801199894107
+        }
+      }
+    },
+    "spectralnorm": {
+      "samples": {
+        "c": [
+          0.23463764600091963,
+          0.26814460499917914,
+          0.2596812130013859,
+          0.23360358699937933,
+          0.23323163599889085,
+          0.267623822999667,
+          0.2444572340009472,
+          0.2322878960003436,
+          0.2568205589996069
+        ],
+        "before": [
+          0.25528331699933915,
+          0.2481846750015393,
+          0.31651151299956837,
+          0.263945769998827,
+          0.24577924799996254,
+          0.24550336799984507,
+          0.24925849799910793,
+          0.25374463200023456,
+          0.3781143260002864
+        ],
+        "after": [
+          0.2458108920000086,
+          0.3420088509992638,
+          0.3751569310006744,
+          0.3127793509993353,
+          0.2442684380002902,
+          0.23847944799854304,
+          0.2682835220002744,
+          0.29141250099928584,
+          0.2413807730008557
+        ]
+      },
+      "best": {
+        "c": 0.2322878960003436,
+        "before": 0.24550336799984507,
+        "after": 0.23847944799854304
+      },
+      "median": {
+        "c": 0.2444572340009472,
+        "before": 0.25374463200023456,
+        "after": 0.2682835220002744
+      },
+      "output_sha256": "a1c719a1eb113f34314469d275635aa2dbdc6aa02020cd8a6aa4503813e8528f",
+      "args": [
+        "2000"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "50eaca1ff81356919e2fc39f5c34cd329dfda8cbd3a751f9d401c71b5d07a621",
+          "size": 16248,
+          "build_seconds": 0.0899852100010321
+        },
+        "before": {
+          "sha256": "f13ba20f2c224f067a8dab229361b165525f426260331dc1dbc39d7ef31fe4c4",
+          "size": 136160,
+          "build_seconds": 0.10818154600019625
+        },
+        "after": {
+          "sha256": "610483214f52cabdd15af820a80c0f81ef37401028ea5c1932c854e0636a5716",
+          "size": 136160,
+          "build_seconds": 0.1078051950007648
+        }
+      }
+    },
+    "fannkuch": {
+      "samples": {
+        "c": [
+          0.24414988399985305,
+          0.2801255760005006,
+          0.25580404799984535,
+          0.24925804899976356,
+          0.242363588000444,
+          0.2647348119990056,
+          0.24866072700024233,
+          0.25522543599981873,
+          0.29117395100001886
+        ],
+        "before": [
+          0.3788753879998694,
+          0.36480079000102705,
+          0.36120624499926635,
+          0.37751811500129406,
+          0.3620459750000009,
+          0.37139959699925384,
+          0.37743824500103074,
+          0.43105848300001526,
+          0.4517605300006835
+        ],
+        "after": [
+          0.39754601000095136,
+          0.39075520699952904,
+          0.368513241999608,
+          0.3928397279996716,
+          0.36177547100123775,
+          0.3962839800005895,
+          0.42017639099867665,
+          0.36338193499977933,
+          0.39844211699892185
+        ]
+      },
+      "best": {
+        "c": 0.242363588000444,
+        "before": 0.36120624499926635,
+        "after": 0.36177547100123775
+      },
+      "median": {
+        "c": 0.25522543599981873,
+        "before": 0.37743824500103074,
+        "after": 0.3928397279996716
+      },
+      "output_sha256": "26f4debed9b9f8db7609e17f35756a3f72c1d85d40977a4377a1ef34ffc4d4c8",
+      "args": [
+        "10"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "01e6456089cf3cea0d875cb1c0fd549face3d7f4a9acf873570f66d5e6bc3281",
+          "size": 16232,
+          "build_seconds": 0.10421538499940652
+        },
+        "before": {
+          "sha256": "c510558bd1e5bb3470a8edfb4829c5a9aefc1d3ec3aafe91e12a457bc7b16989",
+          "size": 135952,
+          "build_seconds": 0.11199339400081953
+        },
+        "after": {
+          "sha256": "b326fdf8e29775bb722a09c7d3c625dc24cb995fbacdad921a2916dd48d610c2",
+          "size": 135952,
+          "build_seconds": 0.11909002500033239
+        }
+      }
+    },
+    "binarytrees": {
+      "samples": {
+        "c": [
+          0.26155353800095327,
+          0.25642933000017365,
+          0.33172016000025906,
+          0.3837854960002005,
+          0.25532512700010557,
+          0.2837066030006099,
+          0.26151058899995405,
+          0.4170333809997828,
+          0.27725634800117405
+        ],
+        "before": [
+          0.37613854200026253,
+          0.31141742799991334,
+          0.4439874140007305,
+          0.37477548499919067,
+          0.3169628729992837,
+          0.3267201529997692,
+          0.332707315999869,
+          0.422751457999766,
+          0.34896646199922543
+        ],
+        "after": [
+          0.3640127669987123,
+          0.3139337519987748,
+          0.31715617000008933,
+          0.42726055799903406,
+          0.3179007830003684,
+          0.36312905799968576,
+          0.3197198510006274,
+          0.3592450239993923,
+          0.37700718800078903
+        ]
+      },
+      "best": {
+        "c": 0.25532512700010557,
+        "before": 0.31141742799991334,
+        "after": 0.3139337519987748
+      },
+      "median": {
+        "c": 0.27725634800117405,
+        "before": 0.34896646199922543,
+        "after": 0.3592450239993923
+      },
+      "output_sha256": "54f97110e4e3f152294aeebdab4c2bedb78a35915a15be2068e91b0a453dc88c",
+      "args": [
+        "16"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "8ed319f2d2ea493ddd10a381ac1b506602e19135e9b7688f4e08cf97d0d5525c",
+          "size": 20288,
+          "build_seconds": 0.2140525209997577
+        },
+        "before": {
+          "sha256": "c17d56fbe781d65a9835ba28b1217dbc2a1df7a32f35efe50af5d654e7645f84",
+          "size": 136416,
+          "build_seconds": 0.11365342699900793
+        },
+        "after": {
+          "sha256": "c17d56fbe781d65a9835ba28b1217dbc2a1df7a32f35efe50af5d654e7645f84",
+          "size": 136416,
+          "build_seconds": 0.10764899199966749
+        }
+      }
+    },
+    "mandelbrot": {
+      "samples": {
+        "c": [
+          0.30600797700026305,
+          0.2989823170009913,
+          0.3673111859989149,
+          0.3690267740003037,
+          0.3163337980004144,
+          0.32946225100022275,
+          0.4137717369994789,
+          0.294194736999998,
+          0.3096992749997298
+        ],
+        "before": [
+          0.3748585240009561,
+          0.3753928559999622,
+          0.44325272500100255,
+          0.4439984939999704,
+          0.3946886090016051,
+          0.4603177519984456,
+          0.37899150700104656,
+          0.36305709299995215,
+          0.3683122889997321
+        ],
+        "after": [
+          0.37424488499891595,
+          0.41315969599963864,
+          0.4326694960000168,
+          0.4408938600008696,
+          0.37614953000047535,
+          0.3756595639988518,
+          0.36235854500046116,
+          0.41650755499904335,
+          0.3619620780009427
+        ]
+      },
+      "best": {
+        "c": 0.294194736999998,
+        "before": 0.36305709299995215,
+        "after": 0.3619620780009427
+      },
+      "median": {
+        "c": 0.3163337980004144,
+        "before": 0.37899150700104656,
+        "after": 0.37614953000047535
+      },
+      "output_sha256": "519dd85be1bb2ddf04b4123124d9ef60d66d1edd4d7743030fcbaceded0fedcd",
+      "args": [
+        "2000"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "7c3e67b3c2f714751452b57083d24fd3edec32adb9a52635a2ff694d167d193e",
+          "size": 16008,
+          "build_seconds": 0.05988532000083069
+        },
+        "before": {
+          "sha256": "f9c50017aa95d026f3ef29c21e5b7ac7b540978a635ae1a535cb77c1ce6ca868",
+          "size": 131856,
+          "build_seconds": 0.11599227000078827
+        },
+        "after": {
+          "sha256": "f9c50017aa95d026f3ef29c21e5b7ac7b540978a635ae1a535cb77c1ce6ca868",
+          "size": 131856,
+          "build_seconds": 0.10790956399978313
+        }
+      }
+    },
+    "fasta": {
+      "samples": {
+        "c": [
+          0.40133238800081017,
+          0.40575626700046996,
+          0.4582034670002031,
+          0.45242949100065744,
+          0.44652560200120206,
+          0.4549362009984179,
+          0.44388197000080254,
+          0.3884684130007372,
+          0.42235635299948626
+        ],
+        "before": [
+          0.6506611200002226,
+          0.6004970279991539,
+          0.6852362770005129,
+          0.6356688670002768,
+          0.6174832670003525,
+          0.6366084959990985,
+          0.5916650509989267,
+          0.6286176029989292,
+          0.6297040389999893
+        ],
+        "after": [
+          0.5456715170003008,
+          0.5174118790000648,
+          0.5240843610008596,
+          0.5453869880002458,
+          0.5437531600000511,
+          0.5778486389990576,
+          0.5033635269992374,
+          0.5381432819995098,
+          0.5514107369999692
+        ]
+      },
+      "best": {
+        "c": 0.3884684130007372,
+        "before": 0.5916650509989267,
+        "after": 0.5033635269992374
+      },
+      "median": {
+        "c": 0.44388197000080254,
+        "before": 0.6297040389999893,
+        "after": 0.5437531600000511
+      },
+      "output_sha256": "e3600e481ef68b6cd9ac155f93f40ff06a4094128f62895eb37b28ebad7cab72",
+      "args": [
+        "2500000"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "882d97c0a023631d98f4c0eaad1a2cac7e33c52c8b513f48a262f29cbcd0fb37",
+          "size": 16288,
+          "build_seconds": 0.09867332800058648
+        },
+        "before": {
+          "sha256": "0c8c1b5450069a3fc3a41459e472bf7316c4e1edef066e86f5ab33b673100e8e",
+          "size": 136168,
+          "build_seconds": 0.11989828200057673
+        },
+        "after": {
+          "sha256": "d79c4e47056046df39c06c3049939fc85bea8785d121d6b2566b9bf25f407f85",
+          "size": 136168,
+          "build_seconds": 0.1237483559998509
+        }
+      }
+    },
+    "knucleotide": {
+      "samples": {
+        "c": [
+          0.28882658499969693,
+          0.23943288400005258,
+          0.3309050610005215,
+          0.239430990000983,
+          0.2891608619993349,
+          0.23860952300128702,
+          0.2904621910001879,
+          0.23732214600022417,
+          0.23768269100037287
+        ],
+        "before": [
+          0.4503636909994384,
+          0.33046332400044776,
+          0.33238346299913246,
+          0.32742048900036025,
+          0.32522148999851197,
+          0.32567860900053347,
+          0.34887516500020865,
+          0.32720687500113854,
+          0.327740847998939
+        ],
+        "after": [
+          0.3541431180001382,
+          0.3397748089992092,
+          0.3280112440006633,
+          0.3373095339993597,
+          0.3247792340007436,
+          0.3391696279995813,
+          0.33323361200018553,
+          0.32031659099993703,
+          0.32258904300033464
+        ]
+      },
+      "best": {
+        "c": 0.23732214600022417,
+        "before": 0.32522148999851197,
+        "after": 0.32031659099993703
+      },
+      "median": {
+        "c": 0.23943288400005258,
+        "before": 0.327740847998939,
+        "after": 0.33323361200018553
+      },
+      "output_sha256": "492a135fb990bfa65c4fd883e817cbc828862cc384b19dd031c829b82e892f62",
+      "args": [
+        "/tmp/vela-paired-l09k7917/fasta.txt"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "b22e0aca7f8dfe49373df6c3e5636d31e9de530b25084ffe941d2b2c9142a29b",
+          "size": 16632,
+          "build_seconds": 0.11456813400036481
+        },
+        "before": {
+          "sha256": "7d4e8821c4002d63b475177ab4c695fe907bd67d5b90a48c3e587fc9ae4ed064",
+          "size": 140272,
+          "build_seconds": 0.123771829999896
+        },
+        "after": {
+          "sha256": "fd3d6ea8412fa678659f28da5e75144b14adedcf64508c456a0e1d1c464d91d8",
+          "size": 140272,
+          "build_seconds": 0.12361761600004684
+        }
+      }
+    },
+    "wordfreq": {
+      "samples": {
+        "c": [
+          0.16378079599962803,
+          0.17579742000089027,
+          0.16742796700054896,
+          0.17343109200010076,
+          0.1713554470006784,
+          0.1831080159990961,
+          0.16990567900029419,
+          0.1644336339995789,
+          0.2172977459995309
+        ],
+        "before": [
+          0.2742221660009818,
+          0.2841417679992446,
+          0.28369949700027064,
+          0.32852429400008987,
+          0.29860988699874724,
+          0.3360435750000761,
+          0.2933557099986501,
+          0.40434265099975164,
+          0.40454826000132016
+        ],
+        "after": [
+          0.28332664300069155,
+          0.2848825870005385,
+          0.279732414001046,
+          0.3200002029989264,
+          0.29656755199903273,
+          0.3693457629997283,
+          0.3186554749991046,
+          0.3616373249988101,
+          0.3060443859994848
+        ]
+      },
+      "best": {
+        "c": 0.16378079599962803,
+        "before": 0.2742221660009818,
+        "after": 0.279732414001046
+      },
+      "median": {
+        "c": 0.1713554470006784,
+        "before": 0.29860988699874724,
+        "after": 0.3060443859994848
+      },
+      "output_sha256": "0acff5398a8046aaf5f7df17047f9a661e76bf68fd40afe63184e0e0f9f1ae4f",
+      "args": [
+        "/tmp/vela-paired-l09k7917/words.txt"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "01b1c08d2e5b58a7596863e60d999d2d6dd04b4c439aa096fc89dd9df795b685",
+          "size": 16560,
+          "build_seconds": 0.10743872000057308
+        },
+        "before": {
+          "sha256": "3dd624c1ca2fbc5201bafb1a2e078ecf1752c07d7b04f80dd69a3771df1bd01c",
+          "size": 140200,
+          "build_seconds": 0.12427940000088711
+        },
+        "after": {
+          "sha256": "ca5812ec7dd47a94e6fa6d365e9e5e896547c14f99ce837d370876cc28342947",
+          "size": 140200,
+          "build_seconds": 0.13490384199940308
+        }
+      }
+    },
+    "sha256": {
+      "samples": {
+        "c": [
+          0.18933230599941453,
+          0.2289195989997097,
+          0.18854580900006113,
+          0.2017723669996485,
+          0.25638129800063325,
+          0.1771501260009245,
+          0.1943385300000955,
+          0.21137867299876234,
+          0.2212899339992873
+        ],
+        "before": [
+          0.42632931399930385,
+          0.2730469449998054,
+          0.3234509979993163,
+          0.28085632900001656,
+          0.2856612319992564,
+          0.41588544199839816,
+          0.35455686500063166,
+          0.27870158000041556,
+          0.3547666790000221
+        ],
+        "after": [
+          0.2917195209993224,
+          0.271600899999612,
+          0.37439035799980047,
+          0.30562462499983667,
+          0.32216998399962904,
+          0.4243716270011646,
+          0.2947972510010004,
+          0.2785701299999346,
+          0.406096337001145
+        ]
+      },
+      "best": {
+        "c": 0.1771501260009245,
+        "before": 0.2730469449998054,
+        "after": 0.271600899999612
+      },
+      "median": {
+        "c": 0.2017723669996485,
+        "before": 0.3234509979993163,
+        "after": 0.30562462499983667
+      },
+      "output_sha256": "5c1373df72e732eb3cfa429ad89a87ca6930052b081c4aeaf83421dfa7a2f325",
+      "args": [
+        "1048576",
+        "32"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "d8b4d1d84dff5b7d696e002899af7bb0ac48fc9d22e30c180984e52c4cab01f6",
+          "size": 16368,
+          "build_seconds": 0.09333981099916855
+        },
+        "before": {
+          "sha256": "3b16b93608e2a3052a7c1becf7699342afc61a80ce44f5b03cbc262777c812bd",
+          "size": 150376,
+          "build_seconds": 0.1653107620004448
+        },
+        "after": {
+          "sha256": "a39d78cf38b1bda2059340f11125de097c341e45993b73c412181a607ab20456",
+          "size": 150376,
+          "build_seconds": 0.20534903899897472
+        }
+      }
+    },
+    "crc32": {
+      "samples": {
+        "c": [
+          0.3968802770014008,
+          0.40647282200006885,
+          0.3939885140007391,
+          0.39621612500013725,
+          0.3994541690008191,
+          0.3875595909994445,
+          0.4082606730007683,
+          0.4258055299997068,
+          0.4071568039998965
+        ],
+        "before": [
+          0.43006431899993913,
+          0.4443650049997814,
+          0.425952044000951,
+          0.4286319579987321,
+          0.4282087129995489,
+          0.4393932000002678,
+          0.43681549500070105,
+          0.4755497429996467,
+          0.43679773900112195
+        ],
+        "after": [
+          0.4317231429995445,
+          0.4406269639985112,
+          0.43195978199946694,
+          0.4193049060013436,
+          0.45693134300017846,
+          0.4306529719997343,
+          0.43011518200000864,
+          0.44666743599918846,
+          0.4359854970007291
+        ]
+      },
+      "best": {
+        "c": 0.3875595909994445,
+        "before": 0.425952044000951,
+        "after": 0.4193049060013436
+      },
+      "median": {
+        "c": 0.3994541690008191,
+        "before": 0.43679773900112195,
+        "after": 0.43195978199946694
+      },
+      "output_sha256": "96497ff6c9e7116322c69bd77cc7da66d71b1fb02d59e9a0510f130e674a066e",
+      "args": [
+        "4194304",
+        "32"
+      ],
+      "binaries": {
+        "c": {
+          "sha256": "76a32cff9571c83da8e7987a60c0b88be2f4126c9f46a45c1124eac64b92b93a",
+          "size": 16240,
+          "build_seconds": 0.08604095000009693
+        },
+        "before": {
+          "sha256": "afd414400fb3fa07d2f631b0f924e8f012f913e4af483bf686a58dea3efdfe1c",
+          "size": 146240,
+          "build_seconds": 0.14088783499937563
+        },
+        "after": {
+          "sha256": "06f819ced53fb58447ff2888aadcddc2324a605f2df1e6b548756c20a1645bfe",
+          "size": 146240,
+          "build_seconds": 0.18773251899983734
+        }
+      }
+    }
+  },
+  "geomean": {
+    "before": 1.2615653931039015,
+    "after": 1.2527825818540348
+  },
+  "compiler": {
+    "before": [
+      1.0424523679994309,
+      0.9601288009998825,
+      1.0518555500002549,
+      0.9200065309996717,
+      1.0474018610002531,
+      1.0804640449987346,
+      1.06347291900056,
+      0.9422776559986232,
+      0.980846083999495
+    ],
+    "after": [
+      1.053063712999574,
+      1.0862252210008592,
+      1.1217900070005271,
+      0.9814695439999923,
+      1.002912390000347,
+      0.9510187579999183,
+      0.9160977320007078,
+      1.1184604009995383,
+      0.9990414029998647
+    ]
+  },
+  "worst_after": 1.7079683383739404,
+  "self_translation_ratio": 0.9957513355968064,
+  "runtime_goal_met": null,
+  "versions": {
+    "before": {
+      "compiler_sha256": "0a1dcd42ee3449fd821326323f9a6c735c690f60e63f971e0cee3dca1aab66c4",
+      "runtime_sha256": "87100a4cd8a2fd8e5483be93fbaacf7e74be71d364a53ba652058e1bfb5bd4ef",
+      "header_sha256": "9bf8fbaec9c6c2a5a01e4dbd6d46281dacfb465946de362476cfcce54774f8b9"
+    },
+    "after": {
+      "compiler_sha256": "78c3784f85d239664a572f84b702eec29e0122a5a602372fb21fcd821ec28bb1",
+      "runtime_sha256": "87100a4cd8a2fd8e5483be93fbaacf7e74be71d364a53ba652058e1bfb5bd4ef",
+      "header_sha256": "9bf8fbaec9c6c2a5a01e4dbd6d46281dacfb465946de362476cfcce54774f8b9"
+    }
+  }
+}

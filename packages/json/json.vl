@@ -485,18 +485,38 @@ fn object_value(r: mut Reader, depth: Int) -> Json {
     return Json.Null
 }
 
+// A whole number is worked out as its digits are read, counted downwards
+// since the most negative Int has no positive twin. One with a fraction or
+// an exponent, or too big for an Int, is read again as a Float.
 fn number_value(r: mut Reader) -> Json {
     let start = r.pos
-    let mut whole = true
-    if peek(r) == '-' {
+    let negative = peek(r) == '-'
+    if negative {
         r.pos = r.pos + 1
     }
+    let min = -9223372036854775807 - 1
+    let mut n = 0
+    let mut fits = true
     if peek(r) == '0' {
         r.pos = r.pos + 1
-    } else if !digits(mut r) {
-        fail(mut r, "expected a digit")
-        return Json.Null
+    } else {
+        let first = r.pos
+        for r.pos < len(r.text) && r.text[r.pos] >= '0' && r.text[r.pos] <= '9' {
+            let d = int(r.text[r.pos] - '0')
+            if n < (min + d) / 10 {
+                fits = false
+            }
+            if fits {
+                n = n * 10 - d
+            }
+            r.pos = r.pos + 1
+        }
+        if r.pos == first {
+            fail(mut r, "expected a digit")
+            return Json.Null
+        }
     }
+    let mut whole = true
     if peek(r) == '.' {
         whole = false
         r.pos = r.pos + 1
@@ -516,14 +536,13 @@ fn number_value(r: mut Reader) -> Json {
             return Json.Null
         }
     }
-    let text = r.text[start..r.pos]
-    if whole {
-        match whole_number(text) {
-            Some(n) => return Json.Int(n)
-            None => {}
-        }
+    if whole && fits && negative {
+        return Json.Int(n)
     }
-    match strings.parse_float(text) {
+    if whole && fits && n != min {
+        return Json.Int(-n)
+    }
+    match strings.parse_float(r.text[start..r.pos]) {
         Some(x) => return Json.Float(x)
         None => {}
     }
@@ -538,33 +557,6 @@ fn digits(r: mut Reader) -> Bool {
         r.pos = r.pos + 1
     }
     return r.pos > start
-}
-
-// "-12" as an Int, or None when it does not fit in one.
-fn whole_number(s: Str) -> Option[Int] {
-    let negative = s[0] == '-'
-    let mut i = 0
-    if negative {
-        i = 1
-    }
-    // Counted downwards, since the most negative Int has no positive twin.
-    let min = -9223372036854775807 - 1
-    let mut n = 0
-    for i < len(s) {
-        let d = int(s[i] - '0')
-        if n < (min + d) / 10 {
-            return None
-        }
-        n = n * 10 - d
-        i = i + 1
-    }
-    if negative {
-        return Some(n)
-    }
-    if n == min {
-        return None
-    }
-    return Some(-n)
 }
 
 // A string starting at the opening quote; the reader ends after the closing one.
@@ -700,6 +692,8 @@ test "values" {
     assert(int_or(parsed("-9223372036854775808"), 0) == -9223372036854775807 - 1)
     // Too big for an Int: a Float.
     assert(show(parsed("9223372036854775808")) == "9.223372036854776e+18")
+    assert(show(parsed("-9223372036854775809")) == "-9.223372036854776e+18")
+    assert(show(parsed("[0, -0, 7, -7, 1200, 12e2, -0.0]")) == "[0,0,7,-7,1200,1200.0,-0.0]")
     assert(show(parsed("[0.5, -1e3, 2E-2, 1.0]")) == "[0.5,-1000.0,0.02,1.0]")
     match as_float(parsed("7")) {
         Some(x) => assert(x == 7.0)
