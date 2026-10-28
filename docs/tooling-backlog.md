@@ -2946,7 +2946,7 @@ the same entry. Close it with a commit or validation result; keep its history.
   native run fixtures 132/132 at `VELA_OPT=0`, under `--sanitize` and under
   `--tsan`; 2,000 differential programs agree; the native fixed point
   holds.
-- **Remaining:** `number_value` still runs about 230 instructions per
+- **Remaining:** `number_value` still runs about 250 instructions per
   number. Two peeks after the digit loop re-test `pos` against the length
   signed, then unsigned (`ult` cannot follow from `lt` without knowing
   `pos >= 0`); a nonnegative-index fact would address it. Loops whose
