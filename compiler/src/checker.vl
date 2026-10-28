@@ -1530,14 +1530,14 @@ fn let_stmt(c: mut Checker, s: ast.Stmt, name: Str, mutable: Bool, annotation: O
     // Repeated immutable acknowledgements use the existing discard spelling.
     // Keep ordinary local ownership/cleanup; only exempt this name check.
     if name != "_" || mutable {
-    match maps.get(c.scopes[n], name) {
-        Some(first) => {
-            let l = c.locals[first]
-            report(mut c, s.line, s.col, "E3055", "'" + name + "' is already declared in this block, at " +
-                strings.from_int(l.line) + ":" + strings.from_int(l.col))
+        match maps.get(c.scopes[n], name) {
+            Some(first) => {
+                let l = c.locals[first]
+                report(mut c, s.line, s.col, "E3055", "'" + name + "' is already declared in this block, at " +
+                    strings.from_int(l.line) + ":" + strings.from_int(l.col))
+            }
+            None => {}
         }
-        None => {}
-    }
     }
     let mut kind = "let"
     if mutable {
@@ -4032,7 +4032,9 @@ fn integer_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], exp
     if target < 0 && types.is_builtin_enum(c.table, expected) && types.get(c.table, expected).name == "Option" {
         context = types.get(c.table, expected).args[0]
     }
-    if types.is_integer(context) && is_int_lit(mut c, args[0]) { c.expected = context }
+    if types.is_integer(context) && is_int_lit(mut c, args[0]) && (target < 0 || literals_fit(args[0], target)) {
+        c.expected = context
+    }
     let t = value(mut c, args[0])
     if !types.is_integer(t) && t != types.ERROR() {
         report_at(mut c, args[0], "E3184", "integer conversion and arithmetic functions require an integer")
@@ -4042,6 +4044,39 @@ fn integer_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], exp
     if count == 2 { check_expr(mut c, args[1], t, msg("integer operands must have the same type, found ", "")) }
     if integers.mode(short) == 1 { return types.option(mut c.table, t) }
     return t
+}
+
+// Whether a conversion's argument made of numerals may take the conversion's
+// type. A numeral takes the type its context wants only when it fits, so
+// `i32(3000000000 / 2)` computes 1500000000 as an Int and converts that. A
+// lone numeral that does not fit stays an error: converting it always fails.
+fn literals_fit(e: ast.Expr, t: Int) -> Bool {
+    match e.kind {
+        ast.ExprKind.IntLit(_) => return true
+        ast.ExprKind.FixedIntLit(_, _, _) => return true
+        _ => {}
+    }
+    let mut work = [e]
+    let mut i = 0
+    for i < len(work) {
+        let x = work[i]
+        i = i + 1
+        match x.kind {
+            ast.ExprKind.IntLit(n) => {
+                if !integers.fits(n, t, n < 0) { return false }
+            }
+            ast.ExprKind.FixedIntLit(n, _, neg) => {
+                if !integers.fits(n, t, neg) { return false }
+            }
+            ast.ExprKind.Unary(_, y) => push(mut work, y)
+            ast.ExprKind.Binary(_, l, r) => {
+                push(mut work, l)
+                push(mut work, r)
+            }
+            _ => {}
+        }
+    }
+    return true
 }
 
 // A call to a built-in function, written as `written`: one of the

@@ -294,6 +294,13 @@ vela_str vela_str_join(const vela_str *parts, int64_t n) {
     return (vela_str){obj, obj->bytes, len};
 }
 
+// The parts a join owned, in one call rather than a release per part: a
+// chain of thousands of computed parts otherwise gives the C compiler
+// thousands of calls to optimize (TL-093).
+void vela_str_release_parts(const vela_str *parts, const int32_t *at, int64_t n) {
+    for (int64_t i = 0; i < n; i++) vela_str_release(parts[at[i]]);
+}
+
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc) {
     VELA_PROFILE_SCOPE("strings");
     return vela_slice(s, lo, hi, loc);

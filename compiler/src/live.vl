@@ -131,11 +131,11 @@ pub fn intervals(f: ir.Func, helpers: Bool) -> Intervals {
             }
         }
     }
-    let mut depth_at: [Int] = []; for _ in 0..len(f.insts)+3 { push(mut depth_at, 0) }
-    for edge in edges { depth_at[edge[0]] = depth_at[edge[0]] + 1; depth_at[edge[1]+1] = depth_at[edge[1]+1] - 1 }
+    let mut depth_at: [Int] = []; for _ in 0..len(f.insts) + 3 { push(mut depth_at, 0) }
+    for edge in edges { depth_at[edge[0]] = depth_at[edge[0]] + 1; depth_at[edge[1] + 1] = depth_at[edge[1] + 1] - 1 }
     let mut depth = 0
     for k in 0..len(f.insts) {
-        depth = depth + depth_at[k+1]
+        depth = depth + depth_at[k + 1]
         let mut levels = depth; if levels > 4 { levels = 4 }
         let weight = float(1 << (levels * 3))
         let i = f.insts[k]
@@ -145,7 +145,7 @@ pub fn intervals(f: ir.Func, helpers: Bool) -> Intervals {
     // Balance reuse against occupation: total frequency alone can keep long
     // state intervals at the expense of every short intermediate. Squaring
     // before dividing is equivalent to uses/sqrt(length), without a sqrt.
-    for r in 0..n { if end[r] >= start[r] { cost[r] = cost[r] * cost[r] / float(end[r]-start[r]+1) } }
+    for r in 0..n { if end[r] >= start[r] { cost[r] = cost[r] * cost[r] / float(end[r] - start[r] + 1) } }
     return Intervals { start: start, end: end, defs: defs, def_at: def_at, first_def: first_def, calls: calls, cost: cost }
 }
 
@@ -158,4 +158,3 @@ pub fn crosses(iv: Intervals, v: Int) -> Bool {
     }
     return iv.calls[e] - iv.calls[s + 1] > 0
 }
-

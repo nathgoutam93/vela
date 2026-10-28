@@ -269,12 +269,12 @@ fn entry(g: mut Low, for_tests: Bool, tests: [Int]) {
     for i in 0..len(tests) {
         let next = label(mut g)
         branch_cmp(mut g, "ne", which, konst(mut g, i), next)
-        if len(g.k.fns[tests[i]].params)==1 {
-            let missing=label(mut g);branch_cmp(mut g,"le",n,konst(mut g,2),missing)
-            let word = load(mut g,argv,16,8)
-            let index = ccall(mut g,"strtol",[word,konst(mut g,0),konst(mut g,10)],[ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT()],ir.RET_INT(),-1)
-            let result = call(mut g,fn_name(g.k,tests[i]),[index],ir.INT())
-            let skipped=label(mut g);branch_cmp(mut g,"eq",result,konst(mut g,0),skipped);ret(mut g,konst(mut g,0));place_label(mut g,skipped);ret(mut g,konst(mut g,77));place_label(mut g,missing);ret(mut g,konst(mut g,77))
+        if len(g.k.fns[tests[i]].params) == 1 {
+            let missing = label(mut g); branch_cmp(mut g, "le", n, konst(mut g, 2), missing)
+            let word = load(mut g, argv, 16, 8)
+            let index = ccall(mut g, "strtol", [word, konst(mut g, 0), konst(mut g, 10)], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+            let result = call(mut g, fn_name(g.k, tests[i]), [index], ir.INT())
+            let skipped = label(mut g); branch_cmp(mut g, "eq", result, konst(mut g, 0), skipped); ret(mut g, konst(mut g, 0)); place_label(mut g, skipped); ret(mut g, konst(mut g, 77)); place_label(mut g, missing); ret(mut g, konst(mut g, 77))
         } else { call(mut g, fn_name(g.k, tests[i]), [], -1); ret(mut g, konst(mut g, 0)) }
         place_label(mut g, next)
     }
@@ -1540,7 +1540,7 @@ fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
     observe_enter(mut g, codegen.display_name(g.k, id), f.decl.line, f.decl.col)
     if g.coverage { ccall(mut g, "vela_coverage_hit", [konst(mut g, id)], [ir.KIND_INT()], ir.RET_NONE(), -1) }
     for r in f.decl.requires {
-        if contract_checks.removable(g.k,r) { continue }
+        if contract_checks.removable(g.k, r) { continue }
         push_frame(mut g, "stmt")
         assert_code(mut g, r, r, "requires of '" + f.decl.name + "'")
         pop_frame(mut g)
@@ -1608,7 +1608,7 @@ fn ensures_code(g: mut Low, result: Val) {
         g.fs.locals[f.result_local] = r
     }
     for e in f.decl.ensures {
-        if contract_checks.removable(g.k,e) { continue }
+        if contract_checks.removable(g.k, e) { continue }
         assert_code(mut g, e, e, "ensures of '" + f.decl.name + "'")
     }
     pop_frame(mut g)
@@ -2433,7 +2433,7 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
                 [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
             let array = own(mut g, reg_val(a, t))
             let data = load(mut g, array.reg, 32, 8); let size = size_of(mut g, elem_t)
-            for i in 0..len(elems) { let c = consume(mut g, expr(mut g, elems[i])); put(mut g, data, i*size, elem_t, c) }
+            for i in 0..len(elems) { let c = consume(mut g, expr(mut g, elems[i])); put(mut g, data, i * size, elem_t, c) }
             store(mut g, array.reg, 8, 8, konst(mut g, len(elems)))
             return array
         }
@@ -3126,7 +3126,7 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
                 if op == "==" || op == "!=" {
                     if a.hi < b.lo || a.lo > b.hi { answer = 0 }
                     if a.lo == a.hi && b.lo == b.hi && a.lo == b.lo { answer = 1 }
-                    if answer >= 0 && op == "!=" { answer = 1-answer }
+                    if answer >= 0 && op == "!=" { answer = 1 - answer }
                 }
             }
             if answer >= 0 { return reg_val(konst(mut g, answer), types.BOOL()) }
@@ -3214,14 +3214,14 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
 // test. Exact chunks also cover unaligned slices and embedded zero bytes.
 fn literal_test(g: mut Low, path: Val, text: Str, fail: Int) -> Bool {
     let n = len(text); if n > 16 { return false }
-    branch_cmp(mut g, "ne", load(mut g, path.reg, path.off+16, 8), konst(mut g, n), fail)
+    branch_cmp(mut g, "ne", load(mut g, path.reg, path.off + 16, 8), konst(mut g, n), fail)
     if n == 0 { return true }
-    let data = load(mut g, path.reg, path.off+8, 8); let mut at = 0
+    let data = load(mut g, path.reg, path.off + 8, 8); let mut at = 0
     for at < n {
-        let mut width = 1; let remaining = n-at
+        let mut width = 1; let remaining = n - at
         if remaining >= 8 { width = 8 } else if remaining >= 4 { width = 4 } else if remaining >= 2 { width = 2 }
         let mut word = 0
-        for j in 0..width { word = word | (int(text[at+j]) << (j*8)) }
+        for j in 0..width { word = word | (int(text[at + j]) << (j * 8)) }
         if width == 4 && word >= 2147483648 { word = word - 4294967296 }
         branch_cmp(mut g, "ne", load(mut g, data, at, width), konst(mut g, word), fail)
         at = at + width
@@ -3619,7 +3619,7 @@ fn fixed_operation(g: mut Low, e: ast.Expr, t: Int, a: Val, b: Val, op: Int, mod
         if bound.lo < 0 || bound.hi >= width {
             branch_cmp(mut g, "ult", bv, konst(mut g, width), ok)
             noreturn(mut g, "vela_fixed_op", [av, bv, konst(mut g, width), konst(mut g, fixed_sign(t)), konst(mut g, op), konst(mut g, mode), loc_of(mut g, e)],
-                [ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT(),ir.KIND_INT()]); place_label(mut g, ok)
+                [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()]); place_label(mut g, ok)
         }
         let mut code = ir.Op.Shl; if op == 11 { code = ir.Op.Shr; if types.integer_signed(t) { code = ir.Op.Sar } }
         let mut value = op2(mut g, code, av, bv); if op == 10 { value = normalize(mut g, value, t) }; return reg_val(value, t)

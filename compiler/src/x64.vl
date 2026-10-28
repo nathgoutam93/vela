@@ -734,7 +734,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
     if debug { emit(mut o, ".cfi_def_cfa_register rbp") }
     for k in 0..len(saved) {
         emit(mut o, "push " + saved[k])
-        if debug { emit(mut o, ".cfi_offset " + saved[k] + ", -" + num(24+k*8)) }
+        if debug { emit(mut o, ".cfi_offset " + saved[k] + ", -" + num(24 + k * 8)) }
     }
     if total - 8 * len(saved) > 0 {
         emit(mut o, "sub rsp, " + num(total - 8 * len(saved)))

@@ -254,6 +254,7 @@ static inline void vela_str_share(vela_str s) {
 void vela_str_release(vela_str s);
 vela_str vela_str_concat(vela_str a, vela_str b);
 vela_str vela_str_join(const vela_str *parts, int64_t n);  // a + b + c + ...
+void vela_str_release_parts(const vela_str *parts, const int32_t *at, int64_t n);  // parts[at[0..n)]
 vela_str vela_str_slice(vela_str s, int64_t lo, int64_t hi, const char *loc);
 uint8_t vela_str_at(vela_str s, int64_t i, const char *loc);
 bool vela_str_eq(vela_str a, vela_str b);

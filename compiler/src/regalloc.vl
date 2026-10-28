@@ -24,10 +24,10 @@ pub fn allocate(f: ir.Func) -> [Loc] {
         }
         push(mut out, l)
     }
-    let mut gp = ["x28","x27","x26","x25","x24","x23","x22","x21","x20","x19"]
-    let mut gp_caller = ["x16","x14","x8"]
-    let mut fp = ["d15","d14","d13","d12","d11","d10","d9","d8"]
-    let mut caller = ["d31","d30","d29","d28","d27","d26","d25","d24","d23","d22","d21","d20","d19"]
+    let mut gp = ["x28", "x27", "x26", "x25", "x24", "x23", "x22", "x21", "x20", "x19"]
+    let mut gp_caller = ["x16", "x14", "x8"]
+    let mut fp = ["d15", "d14", "d13", "d12", "d11", "d10", "d9", "d8"]
+    let mut caller = ["d31", "d30", "d29", "d28", "d27", "d26", "d25", "d24", "d23", "d22", "d21", "d20", "d19"]
     let mut active: [Int] = []
     for k in lists.order(starts) {
         let v = candidates[k]; let cross = live.crosses(iv, v); let floating = f.classes[v] == ir.FLOAT()
@@ -46,10 +46,10 @@ pub fn allocate(f: ir.Func) -> [Loc] {
                 r = out[a].reg; kept = []; for x in active { if x != a { push(mut kept, x) } }; active = kept
             }
         }
-        if r == "" && !floating && !cross && len(gp_caller) > 0 { r = gp_caller[len(gp_caller)-1]; gp_caller = gp_caller[0..len(gp_caller)-1] }
-        if !floating && r == "" && len(gp) > 0 { r = gp[len(gp)-1]; gp = gp[0..len(gp)-1] }
-        if r == "" && floating && !cross && len(caller) > 0 { r = caller[len(caller)-1]; caller = caller[0..len(caller)-1] }
-        if floating && r == "" && len(fp) > 0 { r = fp[len(fp)-1]; fp = fp[0..len(fp)-1] }
+        if r == "" && !floating && !cross && len(gp_caller) > 0 { r = gp_caller[len(gp_caller) - 1]; gp_caller = gp_caller[0..len(gp_caller) - 1] }
+        if !floating && r == "" && len(gp) > 0 { r = gp[len(gp) - 1]; gp = gp[0..len(gp) - 1] }
+        if r == "" && floating && !cross && len(caller) > 0 { r = caller[len(caller) - 1]; caller = caller[0..len(caller) - 1] }
+        if floating && r == "" && len(fp) > 0 { r = fp[len(fp) - 1]; fp = fp[0..len(fp) - 1] }
         if r == "" {
             let mut victim = -1
             for a in active { if f.classes[a] == f.classes[v] && (!cross || callee(out[a].reg)) && (victim < 0 || iv.cost[a] < iv.cost[victim] || iv.cost[a] == iv.cost[victim] && iv.end[a] > iv.end[victim]) { victim = a } }

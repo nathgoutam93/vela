@@ -398,7 +398,7 @@ class Programs:
             elif c < 0.89:
                 # A string chain: one join of every part.
                 pieces = []
-                for _ in range(r.randint(3, 7)):
+                for _ in range(r.randint(3, 14)):
                     t = r.choice(TYPES)
                     pieces.append(r.choice([f'"{self.fresh("s")}"', '""', f'ints.to_str({self.expr(env, t, 1)})']))
                 out.append(f'{p}print(' + ' + '.join(pieces) + ')')

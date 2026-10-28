@@ -1,0 +1,11 @@
+// A lone numeral that does not fit a conversion's type is an error, as
+// converting it would always fail; run/conversion_literals.vl has the
+// numerals in arithmetic that are converted instead.
+// err: conversion_literal_range.vl:8:15: error: integer literal does not fit in i32 [E3182]
+// err: conversion_literal_range.vl:9:14: error: integer literal does not fit in Byte [E3182]
+// err: conversion_literal_range.vl:10:14: error: integer literal does not fit in i8 [E3182]
+fn main() {
+    print(i32(3000000000))
+    print(u8(300))
+    print(i8(-129))
+}
