@@ -2924,15 +2924,34 @@ the same entry. Close it with a commit or validation result; keep its history.
   - C and native suites 329/329; native `VELA_OPT=0` run fixtures 131/131
     and under `--sanitize` 131/131; 3,000 differential programs agree in
     all four configurations; the native fixed point holds.
-- **Remaining:** `number_value` still runs about 250 instructions per
+- **Returns built in place (follow-up):** a result in memory was built in a
+  stack slot and copied to the caller's address word by word, unused enum
+  words included. `opt.build_in_place` writes it at that address instead
+  when everything else done with the slot is in the same block and only
+  writes it: stores into it or at an offset from it, a runtime call writing
+  its Str result there, or a call given it as its own result's place
+  (`return f(x)`). The caller's address is a fresh slot (`call_result`), so
+  nothing the function can reach points into it; `ir.Func.sret` names that
+  parameter, as a function returning nothing has the same shape, and a
+  `mut` parameter written early could be read afterwards
+  (`r = Pair { a: r.b, b: r.a }`). C callbacks are left alone. In the JSON
+  service, 60 of its 74 result copies go (the rest copy existing values),
+  and it runs 3.5% fewer instructions (437M to 422M); the natively built
+  compiler translating itself runs 0.5% fewer (3,027M to 3,011M) with
+  identical output; the twelve benchmarks rarely return aggregates and are
+  unchanged. `tests/run/return_in_place.vl` covers results assigned back to
+  their argument, built after a `mut` parameter changed, returned from
+  calls and loops, holding a Str, and read by `ensures`; it passes on both
+  backends at both optimization settings. C and native suites 330/330;
+  native run fixtures 132/132 at `VELA_OPT=0`, under `--sanitize` and under
+  `--tsan`; 2,000 differential programs agree; the native fixed point
+  holds.
+- **Remaining:** `number_value` still runs about 230 instructions per
   number. Two peeks after the digit loop re-test `pos` against the length
   signed, then unsigned (`ult` cannot follow from `lt` without knowing
-  `pos >= 0`). Each result `Json` is built in a stack slot and copied to the
-  caller word by word, reloading the spilled result pointer, including the
-  enum's unused words. Building a returned aggregate in place and a
-  nonnegative-index fact would address them. Loops whose header does not
-  read through the pointer (`for x in xs { s.total = s.total + x }`) are not
-  promoted.
+  `pos >= 0`); a nonnegative-index fact would address it. Loops whose
+  header does not read through the pointer
+  (`for x in xs { s.total = s.total + x }`) are not promoted.
 
 ### TL-104: x86-64 divided by constants with idiv
 

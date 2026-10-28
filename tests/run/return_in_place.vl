@@ -1,0 +1,99 @@
+// A result in memory is built at the caller's address rather than copied
+// there (opt.build_in_place). Each value must be the one copying gives,
+// including results made from the arguments a caller assigns them back to.
+// out: 2 1
+// out: 1 12
+// out: 12 1
+// out: item7 14
+// out: 69
+// out: 2 12
+// out: none
+// out: 7
+import ints
+
+type Pair = struct {
+    a: Int
+    b: Int
+}
+
+type Named = struct {
+    name: Str
+    n: Int
+}
+
+type Shape = enum {
+    Dot
+    Line(Int)
+    Box(Int, Int)
+}
+
+fn swap(p: Pair) -> Pair {
+    return Pair { a: p.b, b: p.a }
+}
+
+fn swap_in(p: mut Pair) -> Pair {
+    p.a = p.a + 10
+    return Pair { a: p.b, b: p.a }
+}
+
+fn again(p: Pair) -> Pair {
+    return swap(swap(swap(p)))
+}
+
+fn named(prefix: Str, n: Int) -> Named {
+    return Named { name: prefix + ints.to_str(n), n: n * 2 }
+}
+
+fn shape(k: Int) -> Shape {
+    if k == 0 {
+        return Shape.Dot
+    }
+    if k == 1 {
+        return Shape.Line(k + 41)
+    }
+    return Shape.Box(k, k * k)
+}
+
+fn first_big(xs: [Int]) -> Option[Pair] {
+    for i in 0..len(xs) {
+        if xs[i] > 10 {
+            return Some(Pair { a: i, b: xs[i] })
+        }
+    }
+    return None
+}
+
+fn checked(n: Int) -> Pair ensures result.a + result.b == n {
+    return Pair { a: n - 3, b: 3 }
+}
+
+fn area(s: Shape) -> Int {
+    return match s {
+        Shape.Dot => 0
+        Shape.Line(n) => n
+        Shape.Box(w, h) => w * h
+    }
+}
+
+fn main() {
+    let mut p = Pair { a: 1, b: 2 }
+    p = swap(p)
+    print(ints.to_str(p.a) + " " + ints.to_str(p.b))
+    p = swap_in(mut p)
+    print(ints.to_str(p.a) + " " + ints.to_str(p.b))
+    p = again(p)
+    print(ints.to_str(p.a) + " " + ints.to_str(p.b))
+    let x = named("item", 7)
+    print(x.name + " " + ints.to_str(x.n))
+    print(area(shape(0)) + area(shape(1)) + area(shape(3)))
+    match first_big([3, 4, 12, 50]) {
+        Some(q) => print(ints.to_str(q.a) + " " + ints.to_str(q.b))
+        None => print("none")
+    }
+    match first_big([1]) {
+        Some(_) => print("some")
+        None => print("none")
+    }
+    let c = checked(10)
+    print(c.a)
+}

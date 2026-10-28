@@ -59,7 +59,7 @@ pub fn optimize_with(p: ir.Program, limit: Int, rounds: Int) -> ir.Program {
     for i in 0..len(funcs) {
         let kept = loop_fields(funcs[i])
         if len(kept.classes) != len(funcs[i].classes) { funcs[i] = simplify(kept) }
-        funcs[i] = compact_slots(forward_destinations(hoist_floats(rotate_loops(funcs[i]))))
+        funcs[i] = compact_slots(forward_destinations(hoist_floats(rotate_loops(build_in_place(funcs[i])))))
     }
     return ir.Program { funcs: funcs, data: p.data }
 }
@@ -458,6 +458,113 @@ fn arrive(saved: mut Map[Int, Map[Str, Int]], arrivals: mut Map[Int, Int], label
     }
     saved[label] = out
     arrivals[label] = ways_to(arrivals, label) + 1
+}
+
+// A result in memory is built where the caller wants it. A return copies
+// it there from a slot (`copy sret, slot`). When everything else done with
+// the slot is in the same block and only writes it (stores into it or at an
+// offset from it, a runtime call writing its Str result there, a call given
+// it as its own result's place), that is done to the result's address
+// instead, and the copy goes. The caller's slot is fresh (call_result): no
+// argument or other memory the function can reach points into it, so
+// nothing can see it written a little earlier. Nothing in the block may use
+// the result's address otherwise.
+fn build_in_place(f: ir.Func) -> ir.Func {
+    if f.sret < 0 || len(f.abi) > 0 {
+        return f  // a C callback's caller is not call_result
+    }
+    let defs = def_counts(f)
+    let mut readers: [Int] = []
+    for _ in f.classes { push(mut readers, 0) }
+    for i in f.insts {
+        for r in ir.reads(i) { readers[r] = readers[r] + 1 }
+    }
+    let mut out = f
+    let mut moved: Map[Int, Bool] = [:]  // slot address registers now unused
+    let mut k = len(f.insts) - 1
+    for k >= 0 {
+        let c = out.insts[k]
+        let s = c.b
+        if c.op == ir.Op.Copy && c.a == f.sret && s >= 0 && defs[s] == 1 && slot_of(out, s) >= 0 && c.imm == out.slot_sizes[slot_of(out, s)] {
+            let mut start = k
+            for start > 0 && !boundary(out.insts[start - 1]) {
+                start = start - 1
+            }
+            // The slot's address and addresses into it, and their uses here.
+            let mut derived: Map[Int, Bool] = [:]
+            derived[s] = true
+            let mut seen = 1  // the copy
+            let mut ok = true
+            for x in start..k {
+                let i = out.insts[x]
+                for r in ir.reads(i) {
+                    if r == f.sret {
+                        ok = false
+                    }
+                    if !maps.has(derived, r) {
+                        continue
+                    }
+                    seen = seen + 1
+                    let write = (i.op == ir.Op.Store || i.op == ir.Op.FStore || i.op == ir.Op.Copy) && r == i.a && !maps.has(derived, i.b)
+                    let offset = i.op == ir.Op.AddImm && r == i.a && defs[i.dst] == 1
+                    let runtime = i.op == ir.Op.CCall && r == i.a && !reads_any(i.args, derived)
+                    let result = i.op == ir.Op.Call && len(i.args) > 0 && i.args[0] == r && !reads_any(i.args[1..len(i.args)], derived)
+                    if offset {
+                        derived[i.dst] = true
+                    }
+                    if !(write || offset || runtime || result) {
+                        ok = false
+                    }
+                }
+            }
+            let mut total = 0
+            for d in maps.keys(derived) {
+                total = total + readers[d]
+            }
+            if ok && total == seen {
+                for x in start..k {
+                    let i = out.insts[x]
+                    if i.op != ir.Op.Call && i.a == s && i.op != ir.Op.SlotAddr {
+                        out.insts[x].a = f.sret
+                    } else if i.op == ir.Op.Call && len(i.args) > 0 && i.args[0] == s {
+                        out.insts[x].args[0] = f.sret
+                    }
+                }
+                out.insts[k] = ir.inst(ir.Op.Label, -1, -1, -1, -1)  // removed below
+                moved[s] = true
+            }
+        }
+        k = k - 1
+    }
+    if len(moved) == 0 {
+        return f
+    }
+    let mut insts: [ir.Inst] = []
+    for i in out.insts {
+        let gone = i.op == ir.Op.Label && i.imm == -1 || i.op == ir.Op.SlotAddr && maps.has(moved, i.dst)
+        if !gone { push(mut insts, i) }
+    }
+    out.insts = insts
+    return out
+}
+
+fn boundary(i: ir.Inst) -> Bool {
+    return i.op == ir.Op.Label || ir.ends_block(i.op) || i.op == ir.Op.BranchCmp
+}
+
+fn reads_any(regs: [Int], set: Map[Int, Bool]) -> Bool {
+    for r in regs {
+        if maps.has(set, r) { return true }
+    }
+    return false
+}
+
+// The slot a register set once holds the address of, or -1.
+fn slot_of(f: ir.Func, r: Int) -> Int {
+    for i in f.insts {
+        if i.dst == r && i.op == ir.Op.SlotAddr { return i.imm }
+    }
+    return -1
 }
 
 // The labels an instruction can go to.

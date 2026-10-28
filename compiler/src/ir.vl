@@ -158,6 +158,7 @@ pub type Func = struct {
     slot_aligns: [Int]
     labels: Int  // labels made so far
     abi: [Int]  // C callback parameter widths; empty for the internal convention
+    sret: Int  // the parameter with where a result in memory goes (a fresh slot of the caller's), or -1
 }
 
 // Read-only data: a label and the assembler lines that make it.
@@ -175,7 +176,7 @@ pub type Program = struct {
 pub fn new_func(name: Str, result: Int) -> Func {
     return Func {
         source: "", source_line: 0, display: "", name: name, public: false, params: [], result: result, insts: [], classes: [], slot_sizes: [], slot_aligns: [],
-        labels: 0, abi: [],
+        labels: 0, abi: [], sret: -1,
     }
 }
 
