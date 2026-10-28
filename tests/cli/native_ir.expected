@@ -14,10 +14,9 @@ fn f_square(%0)
     ret %2
 
 fn f_main()
-    %0 = const #0
-    %1 = move %0
+    %1 = const #0
     %3 = const #4
-    %5 = move %0
+    %5 = move %1
 L0:
     branch.cmp ge %5, %3 L2
 L10:
@@ -44,10 +43,9 @@ L5:
 
 fn main(%0, %1)
     ccall vela_init (%0, %1) #0
-    %3 = const #0
-    %4 = move %3
+    %4 = const #0
     %6 = const #4
-    %8 = move %3
+    %8 = move %4
 L0:
     branch.cmp ge %8, %6 L2
 L11:

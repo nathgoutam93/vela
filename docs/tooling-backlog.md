@@ -2966,9 +2966,30 @@ the same entry. Close it with a commit or validation result; keep its history.
   still panics and that a check after a `>=` test going the other way
   stays. C and native suites 331/331; native run fixtures 133/133 at
   `VELA_OPT=0` and under `--sanitize`; 2,000 differential programs agree.
+- **Loops whose header does not read the struct (follow-up):**
+  `for x in xs { s.total = s.total + x }` kept `s.total` in memory: the
+  loop's header tests only the index, so `loop_fields` could not show that
+  reading the field before the loop would not fault. Lowering now records
+  parameters holding the address of a whole Vela value (`ir.Func.refs`: a
+  `mut` parameter's place, or a value passed by address); those, the
+  function's own slots and offsets into either are readable anywhere in the
+  function (`readable_pointers`), so their fields are kept even when the
+  loop may not run. Promoting exposed moves after each store
+  (`s.total = r; kept = r`): the store now reads the register, and
+  `forward_destinations` computes a value straight into a move's
+  destination when its other reads come later in the block, before that
+  destination changes. A loop accumulating a Float, an Int and a maximum
+  into a `mut` struct over 1,000 Floats ran 21% fewer instructions and
+  2.1x faster (median 0.070 s to 0.033 s); fannkuch, fasta, the JSON
+  service and the compiler translating itself run 0.2-0.5% fewer
+  instructions with identical output, and no benchmark runs more.
+  `tests/run/loop_fields.vl` adds a loop that never runs; the IR snapshot
+  `tests/cli/native_ir.expected` loses two moves. C and native suites
+  331/331; native run fixtures 133/133 at `VELA_OPT=0` and under
+  `--sanitize`; 2,000 differential programs agree; the native fixed point
+  holds.
 - **Remaining:** `number_value` still runs about 250 instructions per
-  number. Loops whose header does not read through the pointer
-  (`for x in xs { s.total = s.total + x }`) are not promoted.
+  number.
 
 ### TL-104: x86-64 divided by constants with idiv
 
