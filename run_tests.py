@@ -97,6 +97,7 @@ M30_TEST = TESTS / "m30_test.py"
 STACK_TEST = TESTS / "stack_overflow_test.py"
 DIFFERENTIAL_TEST = TESTS / "differential_test.py"
 FORMAT_TEST = TESTS / "format_test.py"
+MARKDOWN_TEST = TESTS / "markdown_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -218,6 +219,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(DIFFERENTIAL_TEST, compiler, env)
     if path == FORMAT_TEST:
         return run_script(FORMAT_TEST, compiler, env)
+    if path == MARKDOWN_TEST:
+        return run_script(MARKDOWN_TEST, compiler, env)
     if path == M27_TEST:
         return run_script(M27_TEST, compiler, env)
     if path == M26_TEST:
@@ -415,6 +418,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(STACK_TEST)
     tests.append(DIFFERENTIAL_TEST)
     tests.append(FORMAT_TEST)
+    tests.append(MARKDOWN_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

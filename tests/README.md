@@ -26,6 +26,7 @@ platform limits when recording results.
 | [fixtures/](fixtures) | Supporting sources and data for integration scripts |
 | [fixtures/m30/](fixtures/m30) | Pinned candidate 1.0 compatibility corpus and conformance inventory |
 | `m*_test.py` | Active feature/acceptance regressions, named for their discovery milestone |
+| [markdown_test.py](markdown_test.py) | The markdown package against the 652 CommonMark 0.31.2 examples, and pathological inputs within a time limit |
 | [format_test.py](format_test.py) | The compiler, standard library, packages, examples, benchmarks and evaluation tasks are as `vela fmt` writes them |
 | [differential_test.py](differential_test.py) | Generated programs agree across back ends and optimization settings, and integer results match a Python oracle; `--count N` runs more |
 | `*_test.py`, `lsp_client.py`, `nvim_test.lua` | Package, cache, native, benchmark, evaluation and editor integration |

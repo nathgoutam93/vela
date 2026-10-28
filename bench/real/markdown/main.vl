@@ -1,0 +1,19 @@
+// CommonMark to HTML: `markdown FILE` writes FILE's HTML to stdout.
+import files
+import markdown
+import os
+
+fn main() uses fs, os {
+    let args = os.args()
+    if len(args) != 2 {
+        os.eprint("usage: markdown FILE")
+        os.exit(2)
+    }
+    match files.read(args[1]) {
+        Ok(text) => os.write(markdown.to_html(text))
+        Err(e) => {
+            os.eprint(e)
+            os.exit(1)
+        }
+    }
+}

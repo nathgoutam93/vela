@@ -1,0 +1,1135 @@
+// Inline parsing: emphasis, links and images, code spans, autolinks, raw
+// HTML, entities, escapes and line breaks, following commonmark.js. The
+// text of a paragraph or heading becomes inline nodes under it; delimiter
+// runs and brackets wait on stacks until a closer resolves them.
+import maps
+import nodes
+import strings
+import tables
+
+pub type Ref = struct {
+    destination: Str
+    title: Str
+}
+
+// A run of * or _ that may open or close emphasis.
+type Delim = struct {
+    cc: Byte
+    count: Int  // delimiters left
+    orig: Int  // delimiters in the run
+    node: Int
+    prev: Int
+    next: Int
+    can_open: Bool
+    can_close: Bool
+}
+
+// A [ or ![ that may open a link or image.
+type Bracket = struct {
+    node: Int
+    prev_delim: Int  // the delimiter on top when it opened
+    index: Int  // where its [ is
+    image: Bool
+    active: Bool
+    after: Bool  // whether a bracket opened after it
+}
+
+type Parser = struct {
+    s: Str
+    pos: Int
+    delims: [Delim]
+    top: Int  // the last delimiter, or -1
+    brackets: [Bracket]
+    open_brackets: Int  // the live entries of `brackets`, as arrays have no pop
+    // Where the last run of backticks of each length up to 1000 starts, once
+    // the text has been scanned to its end: then a run with no later run of
+    // its length has no closer, without scanning again (as cmark does). Runs
+    // longer than 1000 are scanned for each time.
+    ticks: [Int]
+    ticks_scanned: Bool
+}
+
+fn parser(s: Str) -> Parser {
+    return Parser { s: s, pos: 0, delims: [], top: -1, brackets: [], open_brackets: 0, ticks: [], ticks_scanned: false }
+}
+
+fn peek(p: Parser) -> Int {
+    if p.pos < len(p.s) {
+        return int(p.s[p.pos])
+    }
+    return -1
+}
+
+fn byte_at(s: Str, i: Int) -> Int {
+    if i >= 0 && i < len(s) {
+        return int(s[i])
+    }
+    return -1
+}
+
+// The block's text as inline nodes under it.
+pub fn parse(d: mut nodes.Doc, block: Int, refs: Map[Str, Ref]) {
+    let mut p = parser(nodes.trim(d.data[d.nodes[block].data].content))
+    d.data[d.nodes[block].data].content = ""
+    for p.pos < len(p.s) {
+        inline(mut p, mut d, block, refs)
+    }
+    process_emphasis(mut p, mut d, -1)
+}
+
+fn inline(p: mut Parser, d: mut nodes.Doc, block: Int, refs: Map[Str, Ref]) {
+    let c = p.s[p.pos]
+    let mut done = false
+    if c == '\n' {
+        done = newline(mut p, mut d, block)
+    } else if c == '\\' {
+        done = backslash(mut p, mut d, block)
+    } else if c == '`' {
+        done = backticks(mut p, mut d, block)
+    } else if c == '*' || c == '_' {
+        done = handle_delim(mut p, mut d, block, c)
+    } else if c == '[' {
+        add(mut d, block, nodes.text(mut d, "["))
+        add_bracket(mut p, d.nodes[block].last, p.pos, false)
+        p.pos = p.pos + 1
+        done = true
+    } else if c == '!' {
+        done = bang(mut p, mut d, block)
+    } else if c == ']' {
+        done = close_bracket(mut p, mut d, block, refs)
+    } else if c == '<' {
+        done = autolink(mut p, mut d, block) || html_inline(mut p, mut d, block)
+    } else if c == '&' {
+        done = entity_here(mut p, mut d, block)
+    } else {
+        done = plain(mut p, mut d, block)
+    }
+    if !done {
+        add(mut d, block, nodes.text(mut d, p.s[p.pos..p.pos + 1]))
+        p.pos = p.pos + 1
+    }
+}
+
+fn add(d: mut nodes.Doc, block: Int, node: Int) {
+    nodes.append(mut d, block, node)
+}
+
+fn special(c: Byte) -> Bool {
+    return c == '\n' || c == '`' || c == '[' || c == ']' || c == '\\' || c == '!' || c == '<' || c == '&' || c == '*' ||
+        c == '_' || c == '\'' || c == '"'
+}
+
+// A run of characters with no meaning here.
+fn plain(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
+    let start = p.pos
+    for p.pos < len(p.s) {
+        // Most text is lowercase letters and bytes of UTF-8, all above `,
+        // tested here so the loop makes no call for them.
+        let c = p.s[p.pos]
+        if c <= '`' && (c < 'A' || c > 'Z') && special(c) {
+            break
+        }
+        p.pos = p.pos + 1
+    }
+    if p.pos == start {
+        return false
+    }
+    add(mut d, block, nodes.text(mut d, p.s[start..p.pos]))
+    return true
+}
+
+// A line ending: a hard break after two or more spaces, else a soft one.
+fn newline(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
+    p.pos = p.pos + 1
+    let last = d.nodes[block].last
+    let mut kind = nodes.Kind.Softbreak
+    if last >= 0 && d.nodes[last].kind == nodes.Kind.Text {
+        let t = d.nodes[last].literal
+        if len(t) > 0 && t[len(t) - 1] == ' ' {
+            if len(t) >= 2 && t[len(t) - 2] == ' ' {
+                kind = nodes.Kind.Linebreak
+            }
+            let mut end = len(t)
+            for end > 0 && t[end - 1] == ' ' {
+                end = end - 1
+            }
+            d.nodes[last].literal = t[0..end]
+        }
+    }
+    add(mut d, block, nodes.add(mut d, kind, 0))
+    for p.pos < len(p.s) && p.s[p.pos] == ' ' {
+        p.pos = p.pos + 1
+    }
+    return true
+}
+
+fn backslash(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
+    p.pos = p.pos + 1
+    if p.pos < len(p.s) && p.s[p.pos] == '\n' {
+        p.pos = p.pos + 1
+        add(mut d, block, nodes.add(mut d, nodes.Kind.Linebreak, 0))
+    } else if p.pos < len(p.s) && nodes.is_ascii_punctuation(p.s[p.pos]) {
+        add(mut d, block, nodes.text(mut d, p.s[p.pos..p.pos + 1]))
+        p.pos = p.pos + 1
+    } else {
+        add(mut d, block, nodes.text(mut d, "\\"))
+    }
+    return true
+}
+
+fn run_length(s: Str, at: Int, c: Byte) -> Int {
+    let mut i = at
+    for i < len(s) && s[i] == c {
+        i = i + 1
+    }
+    return i - at
+}
+
+// A code span: a run of backticks up to the next run of the same length.
+fn backticks(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
+    let n = run_length(p.s, p.pos, '`')
+    let after = p.pos + n
+    let mut i = after
+    if p.ticks_scanned && (n >= len(p.ticks) || p.ticks[n] < after) {
+        i = len(p.s)  // no closer
+    }
+    for i < len(p.s) {
+        if p.s[i] != '`' {
+            i = i + 1
+            continue
+        }
+        let k = run_length(p.s, i, '`')
+        if k <= 1000 {
+            for len(p.ticks) <= k {
+                push(mut p.ticks, -1)
+            }
+            p.ticks[k] = i
+        }
+        if k == n {
+            let mut b = strings.builder()
+            for c in p.s[after..i] {
+                if c == '\n' {
+                    strings.add_byte(mut b, ' ')
+                } else {
+                    strings.add_byte(mut b, c)
+                }
+            }
+            let mut content = strings.build(b)
+            if len(content) >= 2 && content[0] == ' ' && content[len(content) - 1] == ' ' && !all_spaces(content) {
+                content = content[1..len(content) - 1]
+            }
+            let code = nodes.add(mut d, nodes.Kind.Code, 0)
+            d.nodes[code].literal = content
+            add(mut d, block, code)
+            p.pos = i + k
+            return true
+        }
+        i = i + k
+    }
+    p.ticks_scanned = true
+    add(mut d, block, nodes.text(mut d, p.s[p.pos..after]))
+    p.pos = after
+    return true
+}
+
+fn all_spaces(s: Str) -> Bool {
+    for c in s {
+        if c != ' ' {
+            return false
+        }
+    }
+    return true
+}
+
+// ---- Emphasis ----
+
+fn whitespace(cp: Int) -> Bool {
+    if cp < 128 {
+        return cp == 32 || cp == 9 || cp == 10 || cp == 12 || cp == 13
+    }
+    return tables.whitespace(cp)
+}
+
+fn punctuation(cp: Int) -> Bool {
+    if cp < 128 {
+        return nodes.is_ascii_punctuation(byte(cp))
+    }
+    return tables.punctuation(cp)
+}
+
+fn handle_delim(p: mut Parser, d: mut nodes.Doc, block: Int, cc: Byte) -> Bool {
+    let start = p.pos
+    let n = run_length(p.s, start, cc)
+    let before = nodes.decode_before(p.s, start)
+    let mut after = 10
+    if start + n < len(p.s) {
+        after = nodes.decode_at(p.s, start + n).cp
+    }
+    let after_space = whitespace(after)
+    let after_punct = punctuation(after)
+    let before_space = whitespace(before)
+    let before_punct = punctuation(before)
+    let left = !after_space && (!after_punct || before_space || before_punct)
+    let right = !before_space && (!before_punct || after_space || after_punct)
+    let mut can_open = left
+    let mut can_close = right
+    if cc == '_' {
+        can_open = left && (!right || before_punct)
+        can_close = right && (!left || after_punct)
+    }
+    p.pos = start + n
+    let node = nodes.text(mut d, p.s[start..p.pos])
+    add(mut d, block, node)
+    if can_open || can_close {
+        push(mut p.delims, Delim { cc: cc, count: n, orig: n, node: node, prev: p.top, next: -1, can_open: can_open, can_close: can_close })
+        let me = len(p.delims) - 1
+        if p.top >= 0 {
+            p.delims[p.top].next = me
+        }
+        p.top = me
+    }
+    return true
+}
+
+fn remove_delim(p: mut Parser, i: Int) {
+    let prev = p.delims[i].prev
+    let next = p.delims[i].next
+    if prev >= 0 {
+        p.delims[prev].next = next
+    }
+    if next < 0 {
+        p.top = prev
+    } else {
+        p.delims[next].prev = prev
+    }
+}
+
+// Pair delimiter runs above `bottom` into emphasis, innermost first.
+fn process_emphasis(p: mut Parser, d: mut nodes.Doc, bottom: Int) {
+    let mut openers_bottom: [Int] = []
+    for _ in 0..14 {
+        push(mut openers_bottom, bottom)
+    }
+    let mut closer = p.top
+    for closer >= 0 && p.delims[closer].prev != bottom {
+        closer = p.delims[closer].prev
+    }
+    for closer >= 0 {
+        let c = p.delims[closer]
+        if !c.can_close {
+            closer = c.next
+            continue
+        }
+        let mut which = 8
+        if c.cc == '_' {
+            which = 2
+        }
+        if c.can_open {
+            which = which + 3
+        }
+        which = which + c.orig % 3
+        let mut opener = c.prev
+        let mut found = false
+        for opener >= 0 && opener != bottom && opener != openers_bottom[which] {
+            let o = p.delims[opener]
+            let odd = (c.can_open || o.can_close) && c.orig % 3 != 0 && (o.orig + c.orig) % 3 == 0
+            if o.cc == c.cc && o.can_open && !odd {
+                found = true
+                break
+            }
+            opener = o.prev
+        }
+        let old = closer
+        if found {
+            let mut use = 1
+            if p.delims[closer].count >= 2 && p.delims[opener].count >= 2 {
+                use = 2
+            }
+            let oi = p.delims[opener].node
+            let ci = p.delims[closer].node
+            p.delims[opener].count = p.delims[opener].count - use
+            p.delims[closer].count = p.delims[closer].count - use
+            let ot = d.nodes[oi].literal
+            d.nodes[oi].literal = ot[0..len(ot) - use]
+            let ct = d.nodes[ci].literal
+            d.nodes[ci].literal = ct[0..len(ct) - use]
+            let mut kind = nodes.Kind.Emph
+            if use == 2 {
+                kind = nodes.Kind.Strong
+            }
+            let emph = nodes.add(mut d, kind, 0)
+            let mut tmp = d.nodes[oi].next
+            for tmp >= 0 && tmp != ci {
+                let next = d.nodes[tmp].next
+                nodes.append(mut d, emph, tmp)
+                tmp = next
+            }
+            nodes.insert_after(mut d, oi, emph)
+            // Delimiters between them can no longer pair.
+            if p.delims[opener].next != closer {
+                p.delims[opener].next = closer
+                p.delims[closer].prev = opener
+            }
+            if p.delims[opener].count == 0 {
+                nodes.unlink(mut d, oi)
+                remove_delim(mut p, opener)
+            }
+            if p.delims[closer].count == 0 {
+                nodes.unlink(mut d, ci)
+                let next = p.delims[closer].next
+                remove_delim(mut p, closer)
+                closer = next
+            }
+        } else {
+            closer = c.next
+            openers_bottom[which] = p.delims[old].prev
+            if !p.delims[old].can_open {
+                remove_delim(mut p, old)
+            }
+        }
+    }
+    for p.top >= 0 && p.top != bottom {
+        remove_delim(mut p, p.top)
+    }
+}
+
+// ---- Links and images ----
+
+fn add_bracket(p: mut Parser, node: Int, index: Int, image: Bool) {
+    if p.open_brackets > 0 {
+        p.brackets[p.open_brackets - 1].after = true
+    }
+    let b = Bracket { node: node, prev_delim: p.top, index: index, image: image, active: true, after: false }
+    if p.open_brackets < len(p.brackets) {
+        p.brackets[p.open_brackets] = b
+    } else {
+        push(mut p.brackets, b)
+    }
+    p.open_brackets = p.open_brackets + 1
+}
+
+fn remove_bracket(p: mut Parser) {
+    p.open_brackets = p.open_brackets - 1
+}
+
+fn bang(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
+    let start = p.pos
+    p.pos = p.pos + 1
+    if peek(p) == int('[') {
+        p.pos = p.pos + 1
+        add(mut d, block, nodes.text(mut d, "!["))
+        add_bracket(mut p, d.nodes[block].last, start + 1, true)
+    } else {
+        add(mut d, block, nodes.text(mut d, "!"))
+    }
+    return true
+}
+
+fn close_bracket(p: mut Parser, d: mut nodes.Doc, block: Int, refs: Map[Str, Ref]) -> Bool {
+    p.pos = p.pos + 1
+    let start = p.pos
+    if p.open_brackets == 0 {
+        add(mut d, block, nodes.text(mut d, "]"))
+        return true
+    }
+    let opener = p.brackets[p.open_brackets - 1]
+    if !opener.active {
+        add(mut d, block, nodes.text(mut d, "]"))
+        remove_bracket(mut p)
+        return true
+    }
+    let mut matched = false
+    let mut dest = ""
+    let mut title = ""
+    let save = p.pos
+    // An inline link: (destination "title").
+    if peek(p) == int('(') {
+        p.pos = p.pos + 1
+        spnl(mut p)
+        match link_destination(mut p) {
+            Some(x) => {
+                dest = x
+                let before_title = p.pos
+                spnl(mut p)
+                if p.pos > before_title {
+                    match link_title(mut p) {
+                        Some(t) => title = t
+                        None => {}
+                    }
+                }
+                spnl(mut p)
+                if peek(p) == int(')') {
+                    p.pos = p.pos + 1
+                    matched = true
+                }
+            }
+            None => {}
+        }
+        if !matched {
+            p.pos = save
+        }
+    }
+    // A reference: [text][label], [label][] or [label].
+    if !matched {
+        let before_label = p.pos
+        let n = link_label(p.s, p.pos)
+        p.pos = p.pos + n
+        let mut label = ""
+        let mut have = false
+        if n > 2 {
+            label = p.s[before_label..before_label + n]
+            have = true
+        } else if !opener.after {
+            label = p.s[opener.index..start]
+            have = true
+        }
+        if n == 0 {
+            p.pos = save
+        }
+        if have {
+            match maps.get(refs, normalize_label(label)) {
+                Some(r) => {
+                    dest = r.destination
+                    title = r.title
+                    matched = true
+                }
+                None => {}
+            }
+        }
+    }
+    if !matched {
+        remove_bracket(mut p)
+        p.pos = start
+        add(mut d, block, nodes.text(mut d, "]"))
+        return true
+    }
+    let mut kind = nodes.Kind.Link
+    if opener.image {
+        kind = nodes.Kind.Image
+    }
+    let link = nodes.add(mut d, kind, 0)
+    d.data[d.nodes[link].data].destination = dest
+    d.data[d.nodes[link].data].title = title
+    let mut tmp = d.nodes[opener.node].next
+    for tmp >= 0 {
+        let next = d.nodes[tmp].next
+        nodes.append(mut d, link, tmp)
+        tmp = next
+    }
+    add(mut d, block, link)
+    process_emphasis(mut p, mut d, opener.prev_delim)
+    remove_bracket(mut p)
+    nodes.unlink(mut d, opener.node)
+    // No links in links: earlier link openers can no longer open one.
+    if !opener.image {
+        for k in 0..p.open_brackets {
+            if !p.brackets[k].image {
+                p.brackets[k].active = false
+            }
+        }
+    }
+    return true
+}
+
+// Spaces and tabs, with at most one line ending.
+fn spnl(p: mut Parser) {
+    for p.pos < len(p.s) && nodes.is_space_or_tab(p.s[p.pos]) {
+        p.pos = p.pos + 1
+    }
+    if p.pos < len(p.s) && p.s[p.pos] == '\n' {
+        p.pos = p.pos + 1
+        for p.pos < len(p.s) && nodes.is_space_or_tab(p.s[p.pos]) {
+            p.pos = p.pos + 1
+        }
+    }
+}
+
+// The length of a link label ([...], at most 999 characters inside, no
+// unescaped brackets) at `at`, or 0.
+pub fn link_label(s: Str, at: Int) -> Int {
+    if at >= len(s) || s[at] != '[' {
+        return 0
+    }
+    let mut i = at + 1
+    for i < len(s) && i - at <= 1000 {
+        let c = s[i]
+        if c == '\\' && i + 1 < len(s) {
+            i = i + 2
+        } else if c == '[' {
+            return 0
+        } else if c == ']' {
+            return i + 1 - at
+        } else {
+            i = i + 1
+        }
+    }
+    return 0
+}
+
+fn link_destination(p: mut Parser) -> Option[Str] {
+    let s = p.s
+    if peek(p) == int('<') {
+        let mut i = p.pos + 1
+        for i < len(s) {
+            let c = s[i]
+            if c == '>' {
+                let raw = s[p.pos + 1..i]
+                p.pos = i + 1
+                return Some(normalize_uri(unescape(raw)))
+            }
+            if c == '<' || c == '\n' {
+                return None
+            }
+            if c == '\\' && i + 1 < len(s) {
+                i = i + 2
+            } else {
+                i = i + 1
+            }
+        }
+        return None
+    }
+    let start = p.pos
+    let mut parens = 0
+    for p.pos < len(s) {
+        let c = s[p.pos]
+        if c == '\\' && p.pos + 1 < len(s) && nodes.is_ascii_punctuation(s[p.pos + 1]) {
+            p.pos = p.pos + 2
+        } else if c == '(' {
+            // At most 32 nested, as cmark allows: scanning on would make
+            // `[a](` repeated quadratic.
+            parens = parens + 1
+            if parens > 32 {
+                p.pos = start
+                return None
+            }
+            p.pos = p.pos + 1
+        } else if c == ')' {
+            if parens < 1 {
+                break
+            }
+            parens = parens - 1
+            p.pos = p.pos + 1
+        } else if c <= ' ' || c == 127 {
+            break
+        } else {
+            p.pos = p.pos + 1
+        }
+    }
+    if p.pos == start && peek(p) != int(')') || parens != 0 {
+        p.pos = start
+        return None
+    }
+    return Some(normalize_uri(unescape(s[start..p.pos])))
+}
+
+fn link_title(p: mut Parser) -> Option[Str] {
+    let s = p.s
+    let open = peek(p)
+    let mut close = open
+    if open == int('(') {
+        close = int(')')
+    } else if open != int('"') && open != int('\'') {
+        return None
+    }
+    let mut i = p.pos + 1
+    for i < len(s) {
+        let c = int(s[i])
+        if c == close {
+            let raw = s[p.pos + 1..i]
+            p.pos = i + 1
+            return Some(unescape(raw))
+        }
+        if open == int('(') && c == int('(') {
+            return None
+        }
+        if c == int('\\') {
+            if i + 1 >= len(s) {
+                return None
+            }
+            i = i + 2
+        } else {
+            i = i + 1
+        }
+    }
+    return None
+}
+
+// ---- Autolinks, HTML and entities ----
+
+fn autolink(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
+    let s = p.s
+    let n = uri_autolink(s, p.pos)
+    let mut dest = ""
+    let mut size = n
+    if n > 0 {
+        dest = normalize_uri(s[p.pos + 1..p.pos + n - 1])
+    } else {
+        size = email_autolink(s, p.pos)
+        if size == 0 {
+            return false
+        }
+        dest = normalize_uri("mailto:" + s[p.pos + 1..p.pos + size - 1])
+    }
+    let link = nodes.add(mut d, nodes.Kind.Link, 0)
+    d.data[d.nodes[link].data].destination = dest
+    nodes.append(mut d, link, nodes.text(mut d, s[p.pos + 1..p.pos + size - 1]))
+    add(mut d, block, link)
+    p.pos = p.pos + size
+    return true
+}
+
+// <scheme:...>: a scheme of 2 to 32 characters, then no spaces, controls or <>.
+fn uri_autolink(s: Str, at: Int) -> Int {
+    let mut i = at + 1
+    if i >= len(s) || !nodes.is_letter(s[i]) {
+        return 0
+    }
+    i = i + 1
+    for i < len(s) && (nodes.is_alnum(s[i]) || s[i] == '+' || s[i] == '.' || s[i] == '-') {
+        i = i + 1
+    }
+    let scheme = i - at - 1
+    if scheme < 2 || scheme > 32 || i >= len(s) || s[i] != ':' {
+        return 0
+    }
+    i = i + 1
+    for i < len(s) {
+        let c = s[i]
+        if c == '>' {
+            return i + 1 - at
+        }
+        if c == '<' || c <= ' ' {
+            return 0
+        }
+        i = i + 1
+    }
+    return 0
+}
+
+fn email_local(c: Byte) -> Bool {
+    return nodes.is_alnum(c) || c == '.' || c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' || c == '*' ||
+        c == '+' || c == '/' || c == '=' || c == '?' || c == '^' || c == '_' || c == '`' || c == '{' || c == '|' || c == '}' ||
+        c == '~' || c == '-'
+}
+
+fn email_autolink(s: Str, at: Int) -> Int {
+    let mut i = at + 1
+    let local = i
+    for i < len(s) && email_local(s[i]) {
+        i = i + 1
+    }
+    if i == local || i >= len(s) || s[i] != '@' {
+        return 0
+    }
+    i = i + 1
+    // Labels of letters, digits and hyphens, not starting or ending with one,
+    // at most 63 long, separated by dots.
+    for {
+        let label = i
+        for i < len(s) && (nodes.is_alnum(s[i]) || s[i] == '-') {
+            i = i + 1
+        }
+        let n = i - label
+        if n == 0 || n > 63 || s[label] == '-' || s[i - 1] == '-' {
+            return 0
+        }
+        if i < len(s) && s[i] == '.' {
+            i = i + 1
+            continue
+        }
+        break
+    }
+    if i < len(s) && s[i] == '>' {
+        return i + 1 - at
+    }
+    return 0
+}
+
+fn html_inline(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
+    let n = html_tag(p.s, p.pos)
+    if n == 0 {
+        return false
+    }
+    let node = nodes.add(mut d, nodes.Kind.HtmlInline, 0)
+    d.nodes[node].literal = p.s[p.pos..p.pos + n]
+    add(mut d, block, node)
+    p.pos = p.pos + n
+    return true
+}
+
+fn html_space(c: Byte) -> Bool {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == 12 || c == 11
+}
+
+fn skip_html_space(s: Str, at: Int) -> Int {
+    let mut i = at
+    for i < len(s) && html_space(s[i]) {
+        i = i + 1
+    }
+    return i
+}
+
+fn tag_name_end(s: Str, at: Int) -> Int {
+    if at >= len(s) || !nodes.is_letter(s[at]) {
+        return -1
+    }
+    let mut i = at + 1
+    for i < len(s) && (nodes.is_alnum(s[i]) || s[i] == '-') {
+        i = i + 1
+    }
+    return i
+}
+
+fn find(s: Str, at: Int, part: Str) -> Int {
+    let mut i = at
+    for i + len(part) <= len(s) {
+        if s[i..i + len(part)] == part {
+            return i
+        }
+        i = i + 1
+    }
+    return -1
+}
+
+// The length of an HTML tag, comment, processing instruction, declaration
+// or CDATA section at `at`, or 0.
+pub fn html_tag(s: Str, at: Int) -> Int {
+    let mut i = at + 1
+    if i >= len(s) {
+        return 0
+    }
+    let c = s[i]
+    if nodes.is_letter(c) {
+        i = tag_name_end(s, i)
+        for {
+            let save = i
+            let j = skip_html_space(s, i)
+            if j == i || j >= len(s) || !(nodes.is_letter(s[j]) || s[j] == '_' || s[j] == ':') {
+                i = save
+                break
+            }
+            i = j + 1
+            for i < len(s) && (nodes.is_alnum(s[i]) || s[i] == '_' || s[i] == '.' || s[i] == ':' || s[i] == '-') {
+                i = i + 1
+            }
+            // An optional value.
+            let k = skip_html_space(s, i)
+            if k < len(s) && s[k] == '=' {
+                let v = skip_html_space(s, k + 1)
+                if v >= len(s) {
+                    return 0
+                }
+                let q = s[v]
+                if q == '"' || q == '\'' {
+                    let e = find(s, v + 1, s[v..v + 1])
+                    if e < 0 {
+                        return 0
+                    }
+                    i = e + 1
+                } else {
+                    let mut e = v
+                    for e < len(s) && s[e] > ' ' && s[e] != '"' && s[e] != '\'' && s[e] != '=' && s[e] != '<' && s[e] != '>' &&
+                        s[e] != '`' {
+                        e = e + 1
+                    }
+                    if e == v {
+                        return 0
+                    }
+                    i = e
+                }
+            }
+        }
+        i = skip_html_space(s, i)
+        if i < len(s) && s[i] == '/' {
+            i = i + 1
+        }
+        if i < len(s) && s[i] == '>' {
+            return i + 1 - at
+        }
+        return 0
+    }
+    if c == '/' {
+        i = tag_name_end(s, i + 1)
+        if i < 0 {
+            return 0
+        }
+        i = skip_html_space(s, i)
+        if i < len(s) && s[i] == '>' {
+            return i + 1 - at
+        }
+        return 0
+    }
+    if c == '?' {
+        let e = find(s, i + 1, "?>")
+        if e < 0 {
+            return 0
+        }
+        return e + 2 - at
+    }
+    if c != '!' {
+        return 0
+    }
+    if find(s, at, "<!-->") == at {
+        return 5
+    }
+    if find(s, at, "<!--->") == at {
+        return 6
+    }
+    if find(s, at, "<!--") == at {
+        let e = find(s, at + 4, "-->")
+        if e < 0 {
+            return 0
+        }
+        return e + 3 - at
+    }
+    if find(s, at, "<![CDATA[") == at {
+        let e = find(s, at + 9, "]]>")
+        if e < 0 {
+            return 0
+        }
+        return e + 3 - at
+    }
+    if i + 1 < len(s) && nodes.is_letter(s[i + 1]) {
+        let e = find(s, i + 1, ">")
+        if e < 0 {
+            return 0
+        }
+        return e + 1 - at
+    }
+    return 0
+}
+
+// The length of an entity or numeric character reference at `at` and its
+// text; 0 when there is none.
+pub type Entity = struct {
+    size: Int
+    text: Str
+}
+
+pub fn entity(s: Str, at: Int) -> Entity {
+    let none = Entity { size: 0, text: "" }
+    if at + 2 >= len(s) || s[at] != '&' {
+        return none
+    }
+    let mut i = at + 1
+    if s[i] == '#' {
+        i = i + 1
+        let mut hex = false
+        if i < len(s) && (s[i] == 'x' || s[i] == 'X') {
+            hex = true
+            i = i + 1
+        }
+        let digits = i
+        let mut cp = 0
+        for i < len(s) && (hex && nodes.is_hex(s[i]) || !hex && nodes.is_digit(s[i])) {
+            let c = s[i]
+            let mut v = int(c - '0')
+            if hex && !nodes.is_digit(c) {
+                v = int(nodes.lower(c) - 'a') + 10
+            }
+            if i - digits < 8 {
+                if hex {
+                    cp = cp * 16 + v
+                } else {
+                    cp = cp * 10 + v
+                }
+            }
+            i = i + 1
+        }
+        let n = i - digits
+        if n == 0 || hex && n > 6 || !hex && n > 7 || i >= len(s) || s[i] != ';' {
+            return none
+        }
+        return Entity { size: i + 1 - at, text: nodes.encode(cp) }
+    }
+    let name = i
+    for i < len(s) && nodes.is_alnum(s[i]) && i - name < 32 {
+        i = i + 1
+    }
+    if i == name || i >= len(s) || s[i] != ';' || !nodes.is_letter(s[name]) {
+        return none
+    }
+    let text = tables.entity(s[name..i])
+    if text == "" {
+        return none
+    }
+    return Entity { size: i + 1 - at, text: text }
+}
+
+fn entity_here(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
+    let e = entity(p.s, p.pos)
+    if e.size == 0 {
+        return false
+    }
+    add(mut d, block, nodes.text(mut d, e.text))
+    p.pos = p.pos + e.size
+    return true
+}
+
+// `s` with backslash escapes and character references replaced.
+pub fn unescape(s: Str) -> Str {
+    let mut special = false
+    for c in s {
+        if c == '\\' || c == '&' {
+            special = true
+            break
+        }
+    }
+    if !special {
+        return s
+    }
+    let mut b = strings.builder()
+    let mut i = 0
+    for i < len(s) {
+        let c = s[i]
+        if c == '\\' && i + 1 < len(s) && nodes.is_ascii_punctuation(s[i + 1]) {
+            strings.add_byte(mut b, s[i + 1])
+            i = i + 2
+            continue
+        }
+        if c == '&' {
+            let e = entity(s, i)
+            if e.size > 0 {
+                strings.add(mut b, e.text)
+                i = i + e.size
+                continue
+            }
+        }
+        strings.add_byte(mut b, c)
+        i = i + 1
+    }
+    return strings.build(b)
+}
+
+// A destination with what URLs may not hold percent-encoded, as
+// commonmark.js does (mdurl's encode): existing %XX escapes stay.
+pub fn normalize_uri(s: Str) -> Str {
+    let hex = "0123456789ABCDEF"
+    let mut b = strings.builder()
+    let mut i = 0
+    for i < len(s) {
+        let c = s[i]
+        if nodes.is_alnum(c) || c == ';' || c == '/' || c == '?' || c == ':' || c == '@' || c == '&' || c == '=' || c == '+' ||
+            c == '$' || c == ',' || c == '-' || c == '_' || c == '.' || c == '!' || c == '~' || c == '*' || c == '\'' || c == '(' ||
+            c == ')' || c == '#' {
+            strings.add_byte(mut b, c)
+        } else if c == '%' && i + 2 < len(s) && nodes.is_hex(s[i + 1]) && nodes.is_hex(s[i + 2]) {
+            strings.add(mut b, s[i..i + 3])
+            i = i + 2
+        } else {
+            strings.add_byte(mut b, '%')
+            strings.add_byte(mut b, hex[int(c >> 4)])
+            strings.add_byte(mut b, hex[int(c & 15)])
+        }
+        i = i + 1
+    }
+    return strings.build(b)
+}
+
+// A label as references are matched: without its brackets, trimmed, inner
+// whitespace collapsed to one space and case-folded.
+pub fn normalize_label(raw: Str) -> Str {
+    let inner = nodes.trim(raw[1..len(raw) - 1])
+    let mut b = strings.builder()
+    let mut i = 0
+    let mut space = false
+    for i < len(inner) {
+        let c = inner[i]
+        if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+            space = true
+            i = i + 1
+            continue
+        }
+        if space {
+            strings.add_byte(mut b, ' ')
+            space = false
+        }
+        if c < 128 {
+            strings.add_byte(mut b, nodes.lower(c))
+            i = i + 1
+            continue
+        }
+        let x = nodes.decode_at(inner, i)
+        let folded = tables.fold(x.cp)
+        if folded == "" {
+            strings.add(mut b, inner[i..i + x.size])
+        } else {
+            strings.add(mut b, folded)
+        }
+        i = i + x.size
+    }
+    return strings.build(b)
+}
+
+// A link reference definition at the start of `s`: the number of bytes it
+// takes, 0 for none. The first definition of a label wins.
+pub fn reference(s: Str, refs: mut Map[Str, Ref]) -> Int {
+    let mut p = parser(s)
+    let n = link_label(s, 0)
+    if n == 0 {
+        return 0
+    }
+    let raw = s[0..n]
+    p.pos = n
+    if peek(p) != int(':') {
+        return 0
+    }
+    p.pos = p.pos + 1
+    spnl(mut p)
+    let mut dest = ""
+    match link_destination(mut p) {
+        Some(x) => dest = x
+        None => return 0
+    }
+    let before_title = p.pos
+    spnl(mut p)
+    let mut title = ""
+    let mut has_title = false
+    if p.pos != before_title {
+        match link_title(mut p) {
+            Some(t) => {
+                title = t
+                has_title = true
+            }
+            None => {}
+        }
+    }
+    if !has_title {
+        p.pos = before_title
+    }
+    // The rest of the line must be blank.
+    let mut at_end = line_end(p.s, p.pos)
+    if at_end < 0 && has_title {
+        title = ""
+        p.pos = before_title
+        at_end = line_end(p.s, p.pos)
+    }
+    if at_end < 0 {
+        return 0
+    }
+    p.pos = at_end
+    let label = normalize_label(raw)
+    if label == "" {
+        return 0
+    }
+    if !maps.has(refs, label) {
+        refs[label] = Ref { destination: dest, title: title }
+    }
+    return p.pos
+}
+
+// After spaces and tabs and a line ending (or the end) from `at`; -1 if
+// something else comes first.
+fn line_end(s: Str, at: Int) -> Int {
+    let mut i = at
+    for i < len(s) && nodes.is_space_or_tab(s[i]) {
+        i = i + 1
+    }
+    if i == len(s) {
+        return i
+    }
+    if s[i] == '\n' {
+        return i + 1
+    }
+    return -1
+}

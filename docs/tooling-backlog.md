@@ -3033,6 +3033,115 @@ the same entry. Close it with a commit or validation result; keep its history.
   `-0.0`, one below the smallest Int) that also pass against the previous
   parser; the JSON service's output is byte-identical to the C reference.
 
+### TL-106: The standard library has no Unicode properties or case folding
+
+- **Status:** open (proposal); worked around in the markdown package.
+- **Discovery:** post-M30 CommonMark port (`packages/markdown`).
+- **Reproduce:** CommonMark decides emphasis by Unicode punctuation (P and S
+  categories) and whitespace (Zs), and matches link labels by Unicode case
+  folding. `std/unicode.vl` offers only `decode`, `encode`, `length`, `at`
+  and `slice`.
+- **Impact:** the port generates `packages/markdown/tables.vl`, 4,034 lines
+  of `match`, from Python's `unicodedata` and `html.entities`
+  (`packages/markdown/tools/tables.py`). Any program needing character
+  classes or case-insensitive Unicode matching must do the same, pinned to
+  whatever Unicode version generated it, and pays TL-107's compile time.
+- **Workaround:** generated tables.
+- **Proposed improvement:** `unicode.category`, whitespace and punctuation
+  predicates and simple/full case folding in std, from compact runtime
+  tables. A library addition for after the 1.0 freeze.
+- **Verify:** the markdown package uses them instead of `tables.vl` and
+  `tests/markdown_test.py` still passes.
+
+### TL-107: Large match tables compile slowly and match strings one by one
+
+- **Status:** open (proposal).
+- **Discovery:** post-M30 CommonMark port.
+- **Evidence (observed):** `packages/markdown/tables.vl` (four functions,
+  about 4,000 arms) takes 3.9 s to build natively and 13.4 s through C on its
+  own; the whole markdown program takes 6.8 s natively and 15.1 s through C,
+  while `vela check` takes 0.3 s. `tables.entity`, a `match` of 2,125 Str
+  arms, makes 100,000 lookups in 0.25 s natively and 1.1 s through C (about
+  11 microseconds each).
+- **Suspected cause:** a Str `match` is lowered to one comparison per arm,
+  and one very large function is slow for gcc.
+- **Impact:** keyword, entity and character tables, the natural shape of
+  such data in Vela (TL-108), are slow to build and to search.
+- **Workaround:** none taken; entities are rare in real text.
+- **Proposed improvement:** lower a large Str `match` to a switch on length
+  and then on bytes (or a perfect hash), and Int range arms to a binary
+  search or jump table. The compiler's own sources match on strings
+  heavily, so its compile time would benefit too.
+- **Verify:** the same build times and lookup timings, and the IR of
+  `tables.entity`.
+
+### TL-108: Tables cannot be module-level constants
+
+- **Status:** open (proposal for after 1.0).
+- **Discovery:** post-M30 CommonMark port.
+- **Evidence:** the HTML block names were an array literal built by
+  `block_names()` on every line starting with `<`; a per-byte table of
+  special characters, as cmark uses, has nowhere to live; Unicode and
+  entity data became functions over `match` (TL-107).
+- **Impact:** a table is either rebuilt on each call or carried in a
+  struct through every function that needs it.
+- **Workaround:** `blocks.Parser.block_names`, built once per parse; the
+  text loop tests character ranges before calling `special`.
+- **Proposed improvement:** immutable module-level `const` values (Str,
+  arrays, maps) initialized once. A language change: recorded, not
+  authorized.
+
+### TL-109: Growable arrays have no pop in the safe language
+
+- **Status:** open (proposal).
+- **Discovery:** post-M30 CommonMark port.
+- **Evidence:** a stack popped as `xs = xs[0..len(xs) - 1]` copies the
+  array, as slices of arrays copy, so a stack becomes quadratic.
+  `memory.truncate` exists but is undocumented and belongs to the memory
+  module.
+- **Workaround:** the port keeps a count of live entries and overwrites the
+  rest (`inlines.Parser.open_brackets`, `blocks.process_inlines`).
+- **Proposed improvement:** `pop(mut xs) -> Option[T]` and a documented
+  truncate in the prelude.
+- **Verify:** the port's stacks use them.
+
+### TL-110: Appending to a Str field copies the whole Str
+
+- **Status:** open (proposal).
+- **Discovery:** post-M30 CommonMark port.
+- **Evidence (observed):** a paragraph collecting its lines as
+  `content = content + line` (or through a builder seeded with `content`)
+  copies everything collected so far for each line: a 2 MB paragraph took
+  2.84 s. Collecting the lines in a `[Str]` and joining them once takes
+  0.05 s (`nodes.Data.pending`, `blocks.flush`). JavaScript engines make
+  repeated `+=` cheap, so a port of JavaScript meets this at once.
+- **Workaround:** collect parts in an array and join once.
+- **Proposed improvement:** when the left operand of `s + t` is a uniquely
+  owned Str with spare capacity (refcount 1), append in place, as arrays
+  already grow; or at least say in the guide that repeated `+` is
+  quadratic.
+- **Verify:** the 2 MB paragraph with `content = content + line` in
+  linear time.
+
+### TL-111: A short-circuit Bool used only by a branch is materialized
+
+- **Status:** open (proposal).
+- **Discovery:** post-M30 CommonMark port: native code of
+  `inlines.plain` (`vela asm bench/real/markdown/main.vl`).
+- **Evidence:** `special(c)`, a chain of `c == x || ...`, inlined into a
+  loop that only branches on it, computes each comparison into a register
+  (`sete`, `movzx`, `test`, `jnz`) instead of branching directly; the
+  bounds check after the loop's signed test is repeated because the index
+  is a copy of the tested register (TL-103's facts follow registers set
+  once).
+- **Impact:** character-classification loops, common in parsers, run
+  about twice the instructions they need.
+- **Workaround:** test the common case before calling the function.
+- **Proposed improvement:** when a Bool phi of a short-circuit expression is
+  only branched on, thread the branches through it; let known facts follow
+  moves.
+- **Verify:** the loop in `inlines.plain` and the markdown throughput.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures

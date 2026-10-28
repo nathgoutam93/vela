@@ -1,0 +1,978 @@
+// Block structure, line by line, following commonmark.js: each line first
+// continues the open containers it can (block quotes, list items, code),
+// then may start new blocks, and what is left is text for the innermost
+// block that takes lines, or a lazy continuation of an open paragraph.
+import inlines
+import nodes
+import strings
+
+pub type Parser = struct {
+    doc: nodes.Doc
+    refs: Map[Str, inlines.Ref]
+    tip: Int
+    oldtip: Int
+    line: Str
+    line_number: Int
+    offset: Int
+    column: Int
+    next_nonspace: Int
+    next_nonspace_column: Int
+    indent: Int
+    indented: Bool
+    blank: Bool
+    partial_tab: Bool  // a tab only partly consumed as columns
+    all_closed: Bool
+    last_matched: Int
+    last_line_length: Int
+    block_names: [Str]  // made once: Vela has no module-level constants
+}
+
+fn code_indent() -> Int {
+    return 4
+}
+
+// The document's blocks, with inline content parsed.
+pub fn parse(text: Str) -> Parser {
+    let mut p = Parser {
+        doc: nodes.new_doc(), refs: [:], tip: 0, oldtip: 0, line: "", line_number: 0, offset: 0, column: 0, next_nonspace: 0,
+        next_nonspace_column: 0, indent: 0, indented: false, blank: false, partial_tab: false, all_closed: true, last_matched: 0,
+        last_line_length: 0, block_names: block_names(),
+    }
+    let lines = split_lines(text, has_nul(text))
+    for line in lines {
+        incorporate(mut p, line)
+    }
+    for p.tip >= 0 {
+        finalize(mut p, p.tip, len(lines))
+    }
+    process_inlines(mut p)
+    return p
+}
+
+// Lines without their endings (\n, \r\n or \r); a final line ending does not
+// start another line. NUL becomes U+FFFD.
+fn has_nul(text: Str) -> Bool {
+    for c in text {
+        if c == 0 {
+            return true
+        }
+    }
+    return false
+}
+
+fn split_lines(text: Str, nul: Bool) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    let mut i = 0
+    for i < len(text) {
+        let c = text[i]
+        if c == '\n' || c == '\r' {
+            push(mut out, without_nul(text[start..i], nul))
+            if c == '\r' && i + 1 < len(text) && text[i + 1] == '\n' {
+                i = i + 1
+            }
+            start = i + 1
+        }
+        i = i + 1
+    }
+    if start < len(text) {
+        push(mut out, without_nul(text[start..len(text)], nul))
+    }
+    return out
+}
+
+fn without_nul(s: Str, nul: Bool) -> Str {
+    if !nul || !has_nul(s) {
+        return s
+    }
+    let mut b = strings.builder()
+    for c in s {
+        if c == 0 {
+            strings.add(mut b, nodes.encode(0xFFFD))
+        } else {
+            strings.add_byte(mut b, c)
+        }
+    }
+    return strings.build(b)
+}
+
+fn kind(p: Parser, n: Int) -> nodes.Kind {
+    return p.doc.nodes[n].kind
+}
+
+fn accepts_lines(k: nodes.Kind) -> Bool {
+    return k == nodes.Kind.Paragraph || k == nodes.Kind.CodeBlock || k == nodes.Kind.HtmlBlock
+}
+
+fn can_contain(parent: nodes.Kind, child: nodes.Kind) -> Bool {
+    if parent == nodes.Kind.Document || parent == nodes.Kind.BlockQuote || parent == nodes.Kind.Item {
+        return child != nodes.Kind.Item
+    }
+    if parent == nodes.Kind.List {
+        return child == nodes.Kind.Item
+    }
+    return false
+}
+
+fn peek_at(p: Parser, i: Int) -> Int {
+    if i < len(p.line) {
+        return int(p.line[i])
+    }
+    return -1
+}
+
+fn find_next_nonspace(p: mut Parser) {
+    // Still ahead of the offset: the same position and column, as cmark
+    // keeps them, rather than scanning a deep indentation for every
+    // container (cubic in nested lists).
+    if p.next_nonspace > p.offset {
+        p.indent = p.next_nonspace_column - p.column
+        p.indented = p.indent >= code_indent()
+        return
+    }
+    let mut i = p.offset
+    let mut cols = p.column
+    for i < len(p.line) {
+        let c = p.line[i]
+        if c == ' ' {
+            i = i + 1
+            cols = cols + 1
+        } else if c == '\t' {
+            i = i + 1
+            cols = cols + 4 - cols % 4
+        } else {
+            break
+        }
+    }
+    p.blank = i >= len(p.line)
+    p.next_nonspace = i
+    p.next_nonspace_column = cols
+    p.indent = cols - p.column
+    p.indented = p.indent >= code_indent()
+}
+
+fn advance_next_nonspace(p: mut Parser) {
+    p.offset = p.next_nonspace
+    p.column = p.next_nonspace_column
+    p.partial_tab = false
+}
+
+// Moves `count` characters on, or `count` columns when `columns`, a tab
+// then counting as the columns to the next tab stop.
+fn advance(p: mut Parser, count: Int, columns: Bool) {
+    let mut n = count
+    for n > 0 && p.offset < len(p.line) {
+        if p.line[p.offset] == '\t' {
+            let to_tab = 4 - p.column % 4
+            if columns {
+                p.partial_tab = to_tab > n
+                let mut step = to_tab
+                if to_tab > n {
+                    step = n
+                }
+                p.column = p.column + step
+                if !p.partial_tab {
+                    p.offset = p.offset + 1
+                }
+                n = n - step
+            } else {
+                p.partial_tab = false
+                p.column = p.column + to_tab
+                p.offset = p.offset + 1
+                n = n - 1
+            }
+        } else {
+            p.partial_tab = false
+            p.offset = p.offset + 1
+            p.column = p.column + 1
+            n = n - 1
+        }
+    }
+}
+
+fn add_line(p: mut Parser) {
+    let mut b = strings.builder()
+    if p.partial_tab {
+        p.offset = p.offset + 1
+        let to_tab = 4 - p.column % 4
+        for _ in 0..to_tab {
+            strings.add_byte(mut b, ' ')
+        }
+    }
+    strings.add(mut b, p.line[p.offset..len(p.line)])
+    strings.add_byte(mut b, '\n')
+    push(mut p.doc.data[p.doc.nodes[p.tip].data].pending, strings.build(b))
+}
+
+// Joins a block's pending lines to its content.
+fn flush(p: mut Parser, n: Int) {
+    if len(p.doc.data[p.doc.nodes[n].data].pending) == 0 {
+        return
+    }
+    let mut b = strings.builder()
+    strings.add(mut b, p.doc.data[p.doc.nodes[n].data].content)
+    for line in p.doc.data[p.doc.nodes[n].data].pending {
+        strings.add(mut b, line)
+    }
+    p.doc.data[p.doc.nodes[n].data].content = strings.build(b)
+    p.doc.data[p.doc.nodes[n].data].pending = []
+}
+
+fn add_child(p: mut Parser, k: nodes.Kind) -> Int {
+    for !can_contain(kind(p, p.tip), k) {
+        finalize(mut p, p.tip, p.line_number - 1)
+    }
+    let n = nodes.add(mut p.doc, k, p.line_number)
+    nodes.append(mut p.doc, p.tip, n)
+    p.tip = n
+    return n
+}
+
+fn close_unmatched(p: mut Parser) {
+    if !p.all_closed {
+        for p.oldtip != p.last_matched {
+            let parent = p.doc.nodes[p.oldtip].parent
+            finalize(mut p, p.oldtip, p.line_number - 1)
+            p.oldtip = parent
+        }
+        p.all_closed = true
+    }
+}
+
+fn last_open_child(p: Parser, n: Int) -> Int {
+    let last = p.doc.nodes[n].last
+    if last >= 0 && p.doc.data[p.doc.nodes[last].data].open {
+        return last
+    }
+    return -1
+}
+
+fn incorporate(p: mut Parser, line: Str) {
+    let mut all_matched = true
+    let mut container = 0
+    p.oldtip = p.tip
+    p.offset = 0
+    p.column = 0
+    p.blank = false
+    p.partial_tab = false
+    p.next_nonspace = 0
+    p.next_nonspace_column = 0
+    p.line_number = p.line_number + 1
+    p.line = line
+    // Continue the open containers.
+    for last_open_child(p, container) >= 0 {
+        container = last_open_child(p, container)
+        find_next_nonspace(mut p)
+        let r = continue_block(mut p, container)
+        if r == 2 {
+            return
+        }
+        if r == 1 {
+            all_matched = false
+            container = p.doc.nodes[container].parent
+            break
+        }
+    }
+    p.all_closed = container == p.oldtip
+    p.last_matched = container
+    let mut matched_leaf = kind(p, container) != nodes.Kind.Paragraph && accepts_lines(kind(p, container))
+    // Start new blocks.
+    for !matched_leaf {
+        find_next_nonspace(mut p)
+        if !p.indented && !maybe_special(p) {
+            advance_next_nonspace(mut p)
+            break
+        }
+        let r = block_start(mut p, container)
+        if r == 0 {
+            advance_next_nonspace(mut p)
+            break
+        }
+        container = p.tip
+        if r == 2 {
+            matched_leaf = true
+        }
+    }
+    // The rest is text.
+    if !p.all_closed && !p.blank && kind(p, p.tip) == nodes.Kind.Paragraph {
+        add_line(mut p)  // a lazy continuation
+    } else {
+        close_unmatched(mut p)
+        let k = kind(p, container)
+        if accepts_lines(k) {
+            add_line(mut p)
+            if k == nodes.Kind.HtmlBlock {
+                let t = p.doc.data[p.doc.nodes[container].data].html_type
+                if t >= 1 && t <= 5 && html_block_ends(t, p.line[p.offset..len(p.line)]) {
+                    p.last_line_length = len(p.line)
+                    finalize(mut p, container, p.line_number)
+                }
+            }
+        } else if p.offset < len(p.line) && !p.blank {
+            let _ = add_child(mut p, nodes.Kind.Paragraph)
+            advance_next_nonspace(mut p)
+            add_line(mut p)
+        }
+    }
+    p.last_line_length = len(line)
+}
+
+fn maybe_special(p: Parser) -> Bool {
+    if p.next_nonspace >= len(p.line) {
+        return false
+    }
+    let c = p.line[p.next_nonspace]
+    return c == '#' || c == '`' || c == '~' || c == '*' || c == '+' || c == '_' || c == '=' || c == '<' || c == '>' || c == '-' ||
+        nodes.is_digit(c)
+}
+
+// 0: the line continues the container; 1: it does not; 2: it closed a
+// fenced code block and nothing is left of it.
+fn continue_block(p: mut Parser, container: Int) -> Int {
+    let k = kind(p, container)
+    if k == nodes.Kind.BlockQuote {
+        if !p.indented && peek_at(p, p.next_nonspace) == int('>') {
+            advance_next_nonspace(mut p)
+            advance(mut p, 1, false)
+            if p.offset < len(p.line) && nodes.is_space_or_tab(p.line[p.offset]) {
+                advance(mut p, 1, true)
+            }
+            return 0
+        }
+        return 1
+    }
+    if k == nodes.Kind.Item {
+        let data = p.doc.data[p.doc.nodes[container].data].list
+        if p.blank {
+            if p.doc.nodes[container].first < 0 {
+                return 1  // a blank line after an empty item
+            }
+            advance_next_nonspace(mut p)
+        } else if p.indent >= data.marker_offset + data.padding {
+            advance(mut p, data.marker_offset + data.padding, true)
+        } else {
+            return 1
+        }
+        return 0
+    }
+    if k == nodes.Kind.Heading || k == nodes.Kind.ThematicBreak {
+        return 1
+    }
+    if k == nodes.Kind.CodeBlock {
+        let n = nodes.data(p.doc, container)
+        if n.fenced {
+            let closing = closing_fence(p.line, p.next_nonspace, n.fence_char)
+            if p.indent <= 3 && closing >= n.fence_length {
+                p.last_line_length = p.offset + p.indent + closing
+                finalize(mut p, container, p.line_number)
+                return 2
+            }
+            let mut i = n.fence_offset
+            for i > 0 && p.offset < len(p.line) && nodes.is_space_or_tab(p.line[p.offset]) {
+                advance(mut p, 1, true)
+                i = i - 1
+            }
+            return 0
+        }
+        if p.indent >= code_indent() {
+            advance(mut p, code_indent(), true)
+        } else if p.blank {
+            advance_next_nonspace(mut p)
+        } else {
+            return 1
+        }
+        return 0
+    }
+    if k == nodes.Kind.HtmlBlock {
+        let t = p.doc.data[p.doc.nodes[container].data].html_type
+        if p.blank && (t == 6 || t == 7) {
+            return 1
+        }
+        return 0
+    }
+    if k == nodes.Kind.Paragraph {
+        if p.blank {
+            return 1
+        }
+        return 0
+    }
+    return 0  // document, list
+}
+
+// The length of a closing fence of `c` at `at` (followed only by spaces and
+// tabs), or 0.
+fn closing_fence(line: Str, at: Int, c: Byte) -> Int {
+    let mut i = at
+    for i < len(line) && line[i] == c {
+        i = i + 1
+    }
+    let n = i - at
+    if n < 3 {
+        return 0
+    }
+    for i < len(line) {
+        if !nodes.is_space_or_tab(line[i]) {
+            return 0
+        }
+        i = i + 1
+    }
+    return n
+}
+
+// Tries each kind of block start; 0 none, 1 a container, 2 a leaf.
+fn block_start(p: mut Parser, container: Int) -> Int {
+    let mut r = block_quote(mut p)
+    if r == 0 { r = atx_heading(mut p) }
+    if r == 0 { r = fenced_code(mut p) }
+    if r == 0 { r = html_block(mut p, container) }
+    if r == 0 { r = setext_heading(mut p, container) }
+    if r == 0 { r = thematic_break(mut p) }
+    if r == 0 { r = list_item(mut p, container) }
+    if r == 0 { r = indented_code(mut p) }
+    return r
+}
+
+fn block_quote(p: mut Parser) -> Int {
+    if p.indented || peek_at(p, p.next_nonspace) != int('>') {
+        return 0
+    }
+    advance_next_nonspace(mut p)
+    advance(mut p, 1, false)
+    if p.offset < len(p.line) && nodes.is_space_or_tab(p.line[p.offset]) {
+        advance(mut p, 1, true)
+    }
+    close_unmatched(mut p)
+    let _ = add_child(mut p, nodes.Kind.BlockQuote)
+    return 1
+}
+
+fn atx_heading(p: mut Parser) -> Int {
+    if p.indented {
+        return 0
+    }
+    let line = p.line
+    let mut i = p.next_nonspace
+    for i < len(line) && line[i] == '#' {
+        i = i + 1
+    }
+    let level = i - p.next_nonspace
+    if level < 1 || level > 6 || i < len(line) && !nodes.is_space_or_tab(line[i]) {
+        return 0
+    }
+    advance_next_nonspace(mut p)
+    advance(mut p, level, false)
+    for p.offset < len(line) && nodes.is_space_or_tab(line[p.offset]) {
+        advance(mut p, 1, false)
+    }
+    close_unmatched(mut p)
+    let h = add_child(mut p, nodes.Kind.Heading)
+    p.doc.data[p.doc.nodes[h].data].level = level
+    p.doc.data[p.doc.nodes[h].data].content = atx_content(line[p.offset..len(line)])
+    advance(mut p, len(line) - p.offset, false)
+    return 2
+}
+
+// A heading's text without its closing sequence of #s.
+fn atx_content(s: Str) -> Str {
+    let mut end = len(s)
+    for end > 0 && nodes.is_space_or_tab(s[end - 1]) {
+        end = end - 1
+    }
+    let mut start = end
+    for start > 0 && s[start - 1] == '#' {
+        start = start - 1
+    }
+    if start == end {
+        return s
+    }
+    let mut before = start
+    for before > 0 && nodes.is_space_or_tab(s[before - 1]) {
+        before = before - 1
+    }
+    if before == 0 {
+        return ""
+    }
+    if before == start {
+        return s  // the #s are part of the text
+    }
+    return s[0..before]
+}
+
+fn fenced_code(p: mut Parser) -> Int {
+    if p.indented {
+        return 0
+    }
+    let line = p.line
+    let at = p.next_nonspace
+    if at >= len(line) || line[at] != '`' && line[at] != '~' {
+        return 0
+    }
+    let c = line[at]
+    let mut i = at
+    for i < len(line) && line[i] == c {
+        i = i + 1
+    }
+    let n = i - at
+    if n < 3 {
+        return 0
+    }
+    if c == '`' {
+        for j in i..len(line) {
+            if line[j] == '`' {
+                return 0
+            }
+        }
+    }
+    close_unmatched(mut p)
+    let b = add_child(mut p, nodes.Kind.CodeBlock)
+    p.doc.data[p.doc.nodes[b].data].fenced = true
+    p.doc.data[p.doc.nodes[b].data].fence_length = n
+    p.doc.data[p.doc.nodes[b].data].fence_char = c
+    p.doc.data[p.doc.nodes[b].data].fence_offset = p.indent
+    advance_next_nonspace(mut p)
+    advance(mut p, n, false)
+    return 2
+}
+
+fn html_block(p: mut Parser, container: Int) -> Int {
+    if p.indented || peek_at(p, p.next_nonspace) != int('<') {
+        return 0
+    }
+    let s = p.line[p.next_nonspace..len(p.line)]
+    let lazy = !p.all_closed && !p.blank && kind(p, p.tip) == nodes.Kind.Paragraph
+    for t in 1..8 {
+        if html_block_starts(t, s, p.block_names) && (t < 7 || kind(p, container) != nodes.Kind.Paragraph && !lazy) {
+            close_unmatched(mut p)
+            let b = add_child(mut p, nodes.Kind.HtmlBlock)
+            p.doc.data[p.doc.nodes[b].data].html_type = t
+            return 2
+        }
+    }
+    return 0
+}
+
+fn block_names() -> [Str] {
+    return ["address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center", "col", "colgroup", "dd",
+        "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer", "form", "frame", "frameset", "h1",
+        "h2", "h3", "h4", "h5", "h6", "head", "header", "hr", "html", "iframe", "legend", "li", "link", "main", "menu",
+        "menuitem", "nav", "noframes", "ol", "optgroup", "option", "p", "param", "search", "section", "summary", "table",
+        "tbody", "td", "tfoot", "th", "thead", "title", "tr", "track", "ul"]
+}
+
+// Whether `name` ends at `at` in `s`: followed by a space, a tab, the end,
+// `>` or (when `slash`) `/>`.
+fn name_ends(s: Str, at: Int, slash: Bool) -> Bool {
+    if at >= len(s) {
+        return true
+    }
+    let c = s[at]
+    return c == ' ' || c == '\t' || c == '>' || slash && c == '/' && at + 1 < len(s) && s[at + 1] == '>'
+}
+
+fn html_block_starts(t: Int, s: Str, names: [Str]) -> Bool {
+    if t == 1 {
+        for name in ["script", "pre", "textarea", "style"] {
+            if nodes.starts_ci(s, 1, name) && name_ends(s, 1 + len(name), false) {
+                return true
+            }
+        }
+        return false
+    }
+    if t == 2 {
+        return text_at(s, 0, "<!--")
+    }
+    if t == 3 {
+        return text_at(s, 0, "<?")
+    }
+    if t == 4 {
+        return len(s) > 2 && s[1] == '!' && nodes.is_letter(s[2])
+    }
+    if t == 5 {
+        return text_at(s, 0, "<![CDATA[")
+    }
+    if t == 6 {
+        let mut at = 1
+        if len(s) > 1 && s[1] == '/' {
+            at = 2
+        }
+        for name in names {
+            if nodes.starts_ci(s, at, name) && name_ends(s, at + len(name), true) {
+                return true
+            }
+        }
+        return false
+    }
+    // 7: a whole open or closing tag, then only spaces and tabs.
+    if len(s) < 2 || !(nodes.is_letter(s[1]) || s[1] == '/') {
+        return false
+    }
+    let n = inlines.html_tag(s, 0)
+    if n == 0 {
+        return false
+    }
+    for i in n..len(s) {
+        if !nodes.is_space_or_tab(s[i]) {
+            return false
+        }
+    }
+    return true
+}
+
+fn text_at(s: Str, at: Int, part: Str) -> Bool {
+    return at + len(part) <= len(s) && s[at..at + len(part)] == part
+}
+
+fn html_block_ends(t: Int, s: Str) -> Bool {
+    if t == 1 {
+        return nodes.contains_ci(s, 0, "</script>") || nodes.contains_ci(s, 0, "</pre>") || nodes.contains_ci(s, 0, "</textarea>") ||
+            nodes.contains_ci(s, 0, "</style>")
+    }
+    if t == 2 {
+        return nodes.contains_ci(s, 0, "-->")
+    }
+    if t == 3 {
+        return nodes.contains_ci(s, 0, "?>")
+    }
+    if t == 4 {
+        return nodes.contains_ci(s, 0, ">")
+    }
+    return nodes.contains_ci(s, 0, "]]>")
+}
+
+fn setext_heading(p: mut Parser, container: Int) -> Int {
+    if p.indented || kind(p, container) != nodes.Kind.Paragraph {
+        return 0
+    }
+    let line = p.line
+    let at = p.next_nonspace
+    if at >= len(line) || line[at] != '=' && line[at] != '-' {
+        return 0
+    }
+    let c = line[at]
+    let mut i = at
+    for i < len(line) && line[i] == c {
+        i = i + 1
+    }
+    for i < len(line) {
+        if !nodes.is_space_or_tab(line[i]) {
+            return 0
+        }
+        i = i + 1
+    }
+    close_unmatched(mut p)
+    flush(mut p, container)
+    // Definitions at the paragraph's start are not part of the heading.
+    let mut content = p.doc.data[p.doc.nodes[container].data].content
+    for len(content) > 0 && content[0] == '[' {
+        let n = inlines.reference(content, mut p.refs)
+        if n == 0 {
+            break
+        }
+        content = content[n..len(content)]
+    }
+    if len(content) == 0 {
+        p.doc.data[p.doc.nodes[container].data].content = content
+        return 0
+    }
+    let h = nodes.add(mut p.doc, nodes.Kind.Heading, p.doc.data[p.doc.nodes[container].data].start_line)
+    p.doc.data[p.doc.nodes[h].data].level = 2
+    if c == '=' {
+        p.doc.data[p.doc.nodes[h].data].level = 1
+    }
+    p.doc.data[p.doc.nodes[h].data].content = content
+    nodes.insert_after(mut p.doc, container, h)
+    nodes.unlink(mut p.doc, container)
+    p.tip = h
+    advance(mut p, len(line) - p.offset, false)
+    return 2
+}
+
+fn thematic_break(p: mut Parser) -> Int {
+    if p.indented {
+        return 0
+    }
+    let line = p.line
+    let at = p.next_nonspace
+    if at >= len(line) || line[at] != '*' && line[at] != '-' && line[at] != '_' {
+        return 0
+    }
+    let c = line[at]
+    let mut count = 0
+    for i in at..len(line) {
+        if line[i] == c {
+            count = count + 1
+        } else if !nodes.is_space_or_tab(line[i]) {
+            return 0
+        }
+    }
+    if count < 3 {
+        return 0
+    }
+    close_unmatched(mut p)
+    let _ = add_child(mut p, nodes.Kind.ThematicBreak)
+    advance(mut p, len(line) - p.offset, false)
+    return 2
+}
+
+fn list_item(p: mut Parser, container: Int) -> Int {
+    if p.indented && kind(p, container) != nodes.Kind.List {
+        return 0
+    }
+    match list_marker(mut p, container) {
+        Some(data) => {
+            close_unmatched(mut p)
+            if kind(p, p.tip) != nodes.Kind.List || !lists_match(p.doc.data[p.doc.nodes[container].data].list, data) {
+                let list = add_child(mut p, nodes.Kind.List)
+                p.doc.data[p.doc.nodes[list].data].list = data
+            }
+            let item = add_child(mut p, nodes.Kind.Item)
+            p.doc.data[p.doc.nodes[item].data].list = data
+            return 1
+        }
+        None => return 0
+    }
+}
+
+fn lists_match(a: nodes.ListData, b: nodes.ListData) -> Bool {
+    return a.ordered == b.ordered && a.delimiter == b.delimiter && a.bullet == b.bullet
+}
+
+fn list_marker(p: mut Parser, container: Int) -> Option[nodes.ListData] {
+    if p.indent >= 4 {
+        return None
+    }
+    let line = p.line
+    let at = p.next_nonspace
+    let mut data = nodes.no_list()
+    data.marker_offset = p.indent
+    let mut size = 0
+    if at < len(line) && (line[at] == '*' || line[at] == '+' || line[at] == '-') {
+        data.bullet = line[at]
+        size = 1
+    } else {
+        let mut i = at
+        let mut n = 0
+        for i < len(line) && nodes.is_digit(line[i]) && i - at < 9 {
+            n = n * 10 + int(line[i] - '0')
+            i = i + 1
+        }
+        if i == at || i >= len(line) || line[i] != '.' && line[i] != ')' {
+            return None
+        }
+        if kind(p, container) == nodes.Kind.Paragraph && n != 1 {
+            return None
+        }
+        data.ordered = true
+        data.start = n
+        data.delimiter = line[i]
+        size = i + 1 - at
+    }
+    // A space, a tab or the end must follow.
+    let after = at + size
+    if after < len(line) && !nodes.is_space_or_tab(line[after]) {
+        return None
+    }
+    // An item interrupting a paragraph cannot start blank.
+    if kind(p, container) == nodes.Kind.Paragraph && nodes.is_blank(line[after..len(line)]) {
+        return None
+    }
+    advance_next_nonspace(mut p)
+    advance(mut p, size, true)
+    let spaces_col = p.column
+    let spaces_offset = p.offset
+    for {
+        advance(mut p, 1, true)
+        if !(p.column - spaces_col < 5 && p.offset < len(line) && nodes.is_space_or_tab(line[p.offset])) {
+            break
+        }
+    }
+    let blank_item = p.offset >= len(line)
+    let spaces = p.column - spaces_col
+    if spaces >= 5 || spaces < 1 || blank_item {
+        data.padding = size + 1
+        p.column = spaces_col
+        p.offset = spaces_offset
+        if p.offset < len(line) && nodes.is_space_or_tab(line[p.offset]) {
+            advance(mut p, 1, true)
+        }
+    } else {
+        data.padding = size + spaces
+    }
+    return Some(data)
+}
+
+fn indented_code(p: mut Parser) -> Int {
+    if !p.indented || kind(p, p.tip) == nodes.Kind.Paragraph || p.blank {
+        return 0
+    }
+    advance(mut p, code_indent(), true)
+    close_unmatched(mut p)
+    let _ = add_child(mut p, nodes.Kind.CodeBlock)
+    return 2
+}
+
+// ---- Closing blocks ----
+
+fn finalize(p: mut Parser, block: Int, line: Int) {
+    let above = p.doc.nodes[block].parent
+    flush(mut p, block)
+    p.doc.data[p.doc.nodes[block].data].open = false
+    p.doc.data[p.doc.nodes[block].data].end_line = line
+    let k = kind(p, block)
+    if k == nodes.Kind.Paragraph {
+        let mut content = p.doc.data[p.doc.nodes[block].data].content
+        let mut defined = false
+        for len(content) > 0 && content[0] == '[' {
+            let n = inlines.reference(content, mut p.refs)
+            if n == 0 {
+                break
+            }
+            content = content[n..len(content)]
+            defined = true
+        }
+        p.doc.data[p.doc.nodes[block].data].content = content
+        if defined && nodes.is_blank(content) {
+            nodes.unlink(mut p.doc, block)
+        }
+    } else if k == nodes.Kind.CodeBlock {
+        finalize_code(mut p, block)
+    } else if k == nodes.Kind.HtmlBlock {
+        let c = p.doc.data[p.doc.nodes[block].data].content
+        let mut end = len(c)
+        // Without the trailing line endings, and the spaces after them.
+        for {
+            let mut e = end
+            for e > 0 && c[e - 1] == ' ' {
+                e = e - 1
+            }
+            if e > 0 && c[e - 1] == '\n' {
+                end = e - 1
+            } else {
+                break
+            }
+        }
+        p.doc.nodes[block].literal = c[0..end]
+        p.doc.data[p.doc.nodes[block].data].content = ""
+    } else if k == nodes.Kind.List {
+        finalize_list(mut p, block)
+    } else if k == nodes.Kind.Item {
+        let last = p.doc.nodes[block].last
+        if last >= 0 {
+            p.doc.data[p.doc.nodes[block].data].end_line = p.doc.data[p.doc.nodes[last].data].end_line
+        } else {
+            p.doc.data[p.doc.nodes[block].data].end_line = p.doc.data[p.doc.nodes[block].data].start_line
+        }
+    }
+    p.tip = above
+}
+
+fn finalize_code(p: mut Parser, block: Int) {
+    let content = p.doc.data[p.doc.nodes[block].data].content
+    if p.doc.data[p.doc.nodes[block].data].fenced {
+        // The first line is the info string.
+        let mut nl = 0
+        for nl < len(content) && content[nl] != '\n' {
+            nl = nl + 1
+        }
+        p.doc.data[p.doc.nodes[block].data].info = inlines.unescape(nodes.trim(content[0..nl]))
+        let mut rest = ""
+        if nl < len(content) {
+            rest = content[nl + 1..len(content)]
+        }
+        p.doc.nodes[block].literal = rest
+    } else {
+        // Without trailing blank lines, which do not belong to it.
+        let mut lines: [Str] = []
+        let mut start = 0
+        for i in 0..len(content) {
+            if content[i] == '\n' {
+                push(mut lines, content[start..i])
+                start = i + 1
+            }
+        }
+        push(mut lines, content[start..len(content)])
+        let mut n = len(lines)
+        for n > 0 && is_space_line(lines[n - 1]) {
+            n = n - 1
+        }
+        let mut b = strings.builder()
+        for i in 0..n {
+            strings.add(mut b, lines[i])
+            strings.add_byte(mut b, '\n')
+        }
+        p.doc.nodes[block].literal = strings.build(b)
+        p.doc.data[p.doc.nodes[block].data].end_line = p.doc.data[p.doc.nodes[block].data].start_line + n - 1
+    }
+    p.doc.data[p.doc.nodes[block].data].content = ""
+}
+
+fn is_space_line(s: Str) -> Bool {
+    for c in s {
+        if !nodes.is_space_or_tab(c) {
+            return false
+        }
+    }
+    return true
+}
+
+// A list is loose when blank lines separate its items, or two blocks
+// directly inside an item.
+fn finalize_list(p: mut Parser, block: Int) {
+    let mut tight = true
+    let mut item = p.doc.nodes[block].first
+    for item >= 0 && tight {
+        let next = p.doc.nodes[item].next
+        if next >= 0 && gap_after(p, item) {
+            tight = false
+        }
+        let mut sub = p.doc.nodes[item].first
+        for sub >= 0 && tight {
+            if p.doc.nodes[sub].next >= 0 && gap_after(p, sub) {
+                tight = false
+            }
+            sub = p.doc.nodes[sub].next
+        }
+        item = next
+    }
+    p.doc.data[p.doc.nodes[block].data].list.tight = tight
+    let last = p.doc.nodes[block].last
+    if last >= 0 {
+        p.doc.data[p.doc.nodes[block].data].end_line = p.doc.data[p.doc.nodes[last].data].end_line
+    }
+}
+
+fn gap_after(p: Parser, n: Int) -> Bool {
+    let next = p.doc.nodes[n].next
+    return p.doc.data[p.doc.nodes[n].data].end_line != p.doc.data[p.doc.nodes[next].data].start_line - 1
+}
+
+// ---- Inline content ----
+
+fn process_inlines(p: mut Parser) {
+    // A stack of blocks to visit; arrays have no pop, so `depth` counts
+    // the live entries and the rest are reused.
+    let mut stack = [0]
+    let mut depth = 1
+    let mut blocks: [Int] = []
+    for depth > 0 {
+        depth = depth - 1
+        let n = stack[depth]
+        let k = kind(p, n)
+        if k == nodes.Kind.Paragraph || k == nodes.Kind.Heading {
+            push(mut blocks, n)
+        }
+        let mut child = p.doc.nodes[n].first
+        for child >= 0 {
+            if depth < len(stack) {
+                stack[depth] = child
+            } else {
+                push(mut stack, child)
+            }
+            depth = depth + 1
+            child = p.doc.nodes[child].next
+        }
+    }
+    for b in blocks {
+        inlines.parse(mut p.doc, b, p.refs)
+    }
+}
