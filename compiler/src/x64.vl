@@ -1064,6 +1064,44 @@ fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
         }
         return
     }
+    if (op == ir.Op.Div || op == ir.Op.Rem || op == ir.Op.DivChk || op == ir.Op.RemChk) && o.locs[i.b].kind == 2 &&
+        o.locs[i.b].off > 2 {
+        // By another positive constant: nothing can fail either, and a
+        // multiply by its reciprocal replaces idiv, as C compilers do. The
+        // quotient is the high word of a times the magic number (plus a when
+        // that number is negative), shifted, plus one for a negative a.
+        let d = o.locs[i.b].off
+        let m = magic(d)
+        let a = in_reg(mut o, i.a, "rax")
+        if a != "r11" {
+            emit(mut o, "mov r11, " + a)
+        }
+        emit(mut o, "movabs rax, " + num(m.multiplier))
+        emit(mut o, "imul r11")
+        if m.multiplier < 0 {
+            emit(mut o, "add rdx, r11")
+        }
+        if m.shift > 0 {
+            emit(mut o, "sar rdx, " + num(m.shift))
+        }
+        emit(mut o, "mov rax, r11")
+        emit(mut o, "shr rax, 63")
+        emit(mut o, "add rdx, rax")
+        if op == ir.Op.Rem || op == ir.Op.RemChk {
+            if d <= 2147483647 {
+                emit(mut o, "imul rdx, rdx, " + num(d))
+            } else {
+                emit(mut o, "movabs rax, " + num(d))
+                emit(mut o, "imul rdx, rax")
+            }
+            emit(mut o, "mov rax, r11")
+            emit(mut o, "sub rax, rdx")
+            set(mut o, i.dst, "rax")
+        } else {
+            set(mut o, i.dst, "rdx")
+        }
+        return
+    }
     if op == ir.Op.DivChk || op == ir.Op.RemChk {
         let b = in_reg(mut o, i.b, "r11")
         if b != "r11" {
@@ -1764,9 +1802,14 @@ fn indexed(o: mut Out, f: ir.Func, seq: [Int], p: Int, reads: [Int]) -> Int {
         disp = " - " + num(0 - u.imm)
     }
     // A spilled index goes through rax, which the access does not need
-    // first; rdx may hold a value (scratch_eligible).
-    if o.locs[m.a].kind != 0 && u.op == ir.Op.Store && o.locs[u.b].kind != 0 && o.locs[u.b].kind != 2 {
-        return 0
+    // first; rdx may hold a value (scratch_eligible). A stored value not in
+    // a register would need rax too: one spilled, or a constant too wide for
+    // an immediate (movabs).
+    if o.locs[m.a].kind != 0 && u.op == ir.Op.Store {
+        let l = o.locs[u.b]
+        if l.kind != 0 && !(l.kind == 2 && fits32(l.off)) {
+            return 0
+        }
     }
     let operand = ptr_word(size) + "[" + in_reg(mut o, base, "r11") + " + " + in_reg(mut o, m.a, "rax") + "*" + num(m.imm) + disp + "]"
     if u.op == ir.Op.FLoad {
@@ -2007,4 +2050,51 @@ fn call(o: mut Out, f: ir.Func, i: ir.Inst) {
         emit(mut o, "movzx eax, al")
     }
     set(mut o, i.dst, "rax")
+}
+
+type Magic = struct {
+    multiplier: Int
+    shift: Int
+}
+
+// The magic number and shift dividing a signed 64-bit value by d >= 3, from
+// Hacker's Delight (10-1): the smallest shift p for which 2^p / d, rounded
+// up, is accurate for every dividend. Shifts of u64 drop the high bits, the
+// unsigned wrapping the algorithm relies on.
+fn magic(d: Int) -> Magic {
+    let two63 = 9223372036854775808u64
+    let ad = u64(d)
+    let anc = two63 - 1u64 - two63 % ad  // the largest dividend with remainder d - 1
+    let mut p = 63
+    let mut q1 = two63 / anc
+    let mut r1 = two63 - q1 * anc
+    let mut q2 = two63 / ad
+    let mut r2 = two63 - q2 * ad
+    for {
+        p = p + 1
+        q1 = q1 << 1u64
+        r1 = r1 << 1u64
+        if r1 >= anc {
+            q1 = q1 + 1u64
+            r1 = r1 - anc
+        }
+        q2 = q2 << 1u64
+        r2 = r2 << 1u64
+        if r2 >= ad {
+            q2 = q2 + 1u64
+            r2 = r2 - ad
+        }
+        let delta = ad - r2
+        if !(q1 < delta || q1 == delta && r1 == 0u64) {
+            break
+        }
+    }
+    let m = q2 + 1u64
+    let mut multiplier = 0
+    if m >= two63 {
+        multiplier = int(m - two63) + (-9223372036854775807 - 1)
+    } else {
+        multiplier = int(m)
+    }
+    return Magic { multiplier: multiplier, shift: p - 64 }
 }

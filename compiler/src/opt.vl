@@ -56,7 +56,11 @@ pub fn optimize_with(p: ir.Program, limit: Int, rounds: Int) -> ir.Program {
             funcs[i] = simplify(inline_calls(funcs[i], before, index, small, recursive))
         }
     }
-    for i in 0..len(funcs) { funcs[i] = compact_slots(forward_destinations(hoist_floats(rotate_loops(funcs[i])))) }
+    for i in 0..len(funcs) {
+        let kept = loop_fields(funcs[i])
+        if len(kept.classes) != len(funcs[i].classes) { funcs[i] = simplify(kept) }
+        funcs[i] = compact_slots(forward_destinations(hoist_floats(rotate_loops(funcs[i]))))
+    }
     return ir.Program { funcs: funcs, data: p.data }
 }
 
@@ -225,6 +229,7 @@ fn simplify(f: ir.Func) -> ir.Func {
         out = scalar_copy(out)
         out = promote.function(out)
         out = reuse(out)
+        out = known_branches(out)
         out = fold(out)
         out = fuse_branches(out)
         out = drop_dead(out)
@@ -328,23 +333,90 @@ fn local_copies(f: ir.Func) -> ir.Func {
 // registers defined more than once, such as a loop variable: what read one
 // is forgotten where it is defined again (`readers`), so x[j]'s address is
 // worked out once per iteration, not at every field.
+fn ways_to(ways: Map[Int, Int], label: Int) -> Int {
+    return match maps.get(ways, label) {
+        Some(n) => n
+        None => 0
+    }
+}
+
+// Loads stay known past a label reached from one place only, when that place
+// comes first: the fall-through into it, or a jump earlier in the function.
+// Everything before that place has run. Where forward paths join, the loads
+// every way in agrees on stay known (`arrive`). Other values are worked out again
+// in each block: keeping them lengthens registers' lives, and in loops short
+// of registers (sha256) the spills cost more than the work saved.
+// A store forgets the loads it could change: those through another pointer,
+// which may point to the same memory, and those overlapping it. A later
+// word load of the word just stored is the stored value.
 fn reuse(f: ir.Func) -> ir.Func {
     let defs = def_counts(f); let mut values: Map[Str, Int] = [:]; let mut loads: Map[Str, Int] = [:]
     let mut readers: Map[Int, [Str]] = [:]  // multiply defined register: the keys reading it
     let mut rep: [Int] = []; for r in 0..len(f.classes) { push(mut rep, r) }
+    let mut ways: Map[Int, Int] = [:]  // label: how many places go to it
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        for t in targets(i) { ways[t] = ways_to(ways, t) + 1 }
+        if i.op == ir.Op.Label && k > 0 && !ir.ends_block(f.insts[k - 1].op) { ways[i.imm] = ways_to(ways, i.imm) + 1 }
+    }
+    let mut saved_loads: Map[Int, Map[Str, Int]] = [:]; let mut saved_readers: Map[Int, Map[Int, [Str]]] = [:]
+    let mut spans: Map[Str, [Int]] = [:]  // load key: pointer, offset, size
+    let mut arrivals: Map[Int, Int] = [:]  // label: ways in seen so far
+    let mut falls = false  // whether the previous instruction goes on to this one
     let mut out = f; out.insts = []
     for original in f.insts {
         let i = renamed(original, rep)
-        if i.op == ir.Op.Label || ir.ends_block(i.op) || i.op == ir.Op.BranchCmp { values = [:]; loads = [:]; readers = [:] }
+        if i.op == ir.Op.Label {
+            let n = ways_to(ways, i.imm)
+            if n == 1 && !falls && maps.has(saved_loads, i.imm) {
+                loads = saved_loads[i.imm]; readers = saved_readers[i.imm]
+            } else if n > 1 {
+                // Where paths join: the loads every way in agrees on, once
+                // every way in has been seen (not a loop's jump back).
+                if falls { arrive(mut saved_loads, mut arrivals, i.imm, loads, spans, defs) }
+                if ways_to(arrivals, i.imm) == n { loads = saved_loads[i.imm] } else { loads = [:] }
+                readers = [:]
+            } else if !falls {
+                loads = [:]; readers = [:]
+            }
+        }
+        if i.op == ir.Op.Label || i.op == ir.Op.BranchCmp {
+            values = [:]
+        }
+        for t in targets(i) {
+            if ways_to(ways, t) == 1 { saved_loads[t] = loads; saved_readers[t] = readers } else { arrive(mut saved_loads, mut arrivals, t, loads, spans, defs) }
+        }
+        falls = !ir.ends_block(i.op)
+        if ir.ends_block(i.op) { values = [:]; loads = [:]; readers = [:] }
         let reading = i.op == ir.Op.Load || i.op == ir.Op.FLoad
-        if i.op == ir.Op.Call || i.op == ir.Op.CallInd || i.op == ir.Op.CCall || i.op == ir.Op.Store || i.op == ir.Op.FStore || i.op == ir.Op.Copy || i.op == ir.Op.RcInc || i.op == ir.Op.RcDec { loads = [:] }
+        if i.op == ir.Op.Call || i.op == ir.Op.CallInd || i.op == ir.Op.CCall || i.op == ir.Op.Copy || i.op == ir.Op.RcInc || i.op == ir.Op.RcDec { loads = [:] }
+        if i.op == ir.Op.Store || i.op == ir.Op.FStore {
+            let mut width = 8
+            if i.op == ir.Op.Store { width = i.imm2 }
+            let mut kept: Map[Str, Int] = [:]
+            for key in maps.keys(loads) {
+                let at = spans[key]
+                if at[0] == i.a && (at[1] + at[2] <= i.imm || i.imm + width <= at[1]) { kept[key] = loads[key] }
+            }
+            loads = kept
+            if i.op == ir.Op.Store && width == 8 && defs[i.a] == 1 && defs[i.b] == 1 {
+                let key = "load:" + strings.from_int(i.a) + ":-1:" + strings.from_int(i.imm) + ":8:"
+                loads[key] = i.b
+                spans[key] = [i.a, i.imm, 8]
+            }
+        }
         let candidate = i.dst >= 0 && pure(i.op) && defs[i.dst] == 1
         if candidate {
             let key = ir.op_name(i.op) + ":" + strings.from_int(i.a) + ":" + strings.from_int(i.b) + ":" + strings.from_int(i.imm) + ":" + strings.from_int(i.imm2) + ":" + i.sym
             let mut previous = -1
             if reading { match maps.get(loads, key) { Some(v) => previous = v, None => {} } } else { match maps.get(values, key) { Some(v) => previous = v, None => {} } }
             if previous >= 0 { rep[i.dst] = previous; continue }
-            if reading { loads[key] = i.dst } else { values[key] = i.dst }
+            if reading {
+                loads[key] = i.dst
+                let mut size = 8
+                if i.op == ir.Op.Load { size = i.imm2 }
+                spans[key] = [i.a, i.imm, size]
+            } else { values[key] = i.dst }
             for r in ir.reads(i) {
                 if defs[r] != 1 {
                     let mut keys: [Str] = []
@@ -370,6 +442,294 @@ fn reuse(f: ir.Func) -> ir.Func {
         push(mut out.insts, i)
     }
     return out
+}
+
+// One more way into `label` with `loads` known: keep the loads every way
+// so far agrees on. Loads through a register set more than once are not
+// kept, as which value it holds may differ by way.
+fn arrive(saved: mut Map[Int, Map[Str, Int]], arrivals: mut Map[Int, Int], label: Int, loads: Map[Str, Int], spans: Map[Str, [Int]], defs: [Int]) {
+    let first = ways_to(arrivals, label) == 0
+    let mut have: Map[Str, Int] = [:]
+    if !first { have = saved[label] }
+    let mut out: Map[Str, Int] = [:]
+    for key in maps.keys(loads) {
+        if defs[spans[key][0]] != 1 { continue }
+        if first || maps.has(have, key) && have[key] == loads[key] { out[key] = loads[key] }
+    }
+    saved[label] = out
+    arrivals[label] = ways_to(arrivals, label) + 1
+}
+
+// The labels an instruction can go to.
+fn targets(i: ir.Inst) -> [Int] {
+    if i.op == ir.Op.Jump || i.op == ir.Op.BranchCmp { return [i.imm] }
+    if i.op == ir.Op.Branch { return [i.imm, i.imm2] }
+    return []
+}
+
+// A field read through a pointer in a loop is read once, before the loop,
+// and kept in a register, when nothing else in the loop can change it:
+// `r.pos < len(r.text) && r.text[r.pos] >= '0'` scanning a `mut Reader`
+// otherwise loads r.pos, r.text's length and its data again at every use.
+// The loop must be innermost, entered only by falling into its header, and
+// make no calls except to panic (those end their path). It may write memory
+// only with stores through one pointer, and then only that pointer's fields
+// are kept: another could point to the same memory. A field the loop stores
+// is a whole word; the store stays, so memory is current after the loop, and
+// also sets the register. Reading a field before the loop must not fault
+// where the loop would not have: the header, which runs whenever the loop
+// is entered, reads through the same pointer at that offset or beyond.
+fn loop_fields(f: ir.Func) -> ir.Func {
+    let mut out = f
+    let mut changed = true
+    for changed {
+        changed = false
+        let g = out
+        let mut label_at: Map[Int, Int] = [:]
+        for k in 0..len(g.insts) {
+            if g.insts[k].op == ir.Op.Label { label_at[g.insts[k].imm] = k }
+        }
+        let defs = def_counts(g)
+        let mut defined: [Int] = []  // where each register set once is set; -1 for parameters
+        for _ in g.classes { push(mut defined, -1) }
+        for k in 0..len(g.insts) {
+            if g.insts[k].dst >= 0 { defined[g.insts[k].dst] = k }
+        }
+        let mut k = len(g.insts) - 1
+        for k >= 0 && !changed {
+            let mut header = -1
+            for t in targets(g.insts[k]) {
+                if maps.has(label_at, t) && label_at[t] <= k { header = label_at[t] }
+            }
+            if header >= 0 { changed = promote_loop(g, mut out, label_at, defs, defined, header, k) }
+            k = k - 1
+        }
+    }
+    return out
+}
+
+// The loop from the label at `h` to the jump back at `e`; true if `out` is
+// `f` with fields kept in registers.
+fn promote_loop(f: ir.Func, out: mut ir.Func, label_at: Map[Int, Int], defs: [Int], defined: [Int], h: Int, e: Int) -> Bool {
+    if h > 0 && ir.ends_block(f.insts[h - 1].op) { return false }  // entered by a jump; at 0, by the call
+    let head = f.insts[h].imm
+    for k in 0..len(f.insts) {
+        for t in targets(f.insts[k]) {
+            if !maps.has(label_at, t) { continue }
+            let at = label_at[t]
+            if at >= h && at <= e && (k < h || k > e) { return false }  // into the loop
+            if k >= h && k <= e && at <= k && t != head { return false }  // an inner loop
+        }
+    }
+    let mut writer = -1
+    for k in h..e + 1 {
+        let i = f.insts[k]
+        if i.op == ir.Op.Call || i.op == ir.Op.CallInd || i.op == ir.Op.Copy || i.op == ir.Op.RcInc || i.op == ir.Op.RcDec { return false }
+        if i.op == ir.Op.CCall && (k + 1 > e || f.insts[k + 1].op != ir.Op.Unreachable) { return false }
+        if i.op == ir.Op.Store || i.op == ir.Op.FStore {
+            if writer >= 0 && writer != i.a { return false }
+            writer = i.a
+        }
+    }
+    // How far each pointer is read in the header, which every entry runs.
+    let mut reach: Map[Int, Int] = [:]
+    let mut k = h + 1
+    for k <= e && !ir.ends_block(f.insts[k].op) && f.insts[k].op != ir.Op.BranchCmp && f.insts[k].op != ir.Op.Label {
+        let i = f.insts[k]
+        if (i.op == ir.Op.Load || i.op == ir.Op.FLoad) && i.imm >= 0 {
+            if !maps.has(reach, i.a) || reach[i.a] < i.imm { reach[i.a] = i.imm }
+        }
+        k = k + 1
+    }
+    // Fields: "pointer:offset:size:float", with the register keeping them.
+    let mut kept: Map[Str, Int] = [:]
+    let mut written: Map[Str, Bool] = [:]
+    let mut order: [Str] = []
+    for k in h..e + 1 {
+        let i = f.insts[k]
+        if i.op != ir.Op.Load && i.op != ir.Op.FLoad { continue }
+        let p = i.a
+        if defs[p] != 1 || (defined[p] >= h && defined[p] <= e) || i.imm < 0 { continue }
+        if writer >= 0 && writer != p { continue }
+        if !maps.has(reach, p) || i.imm > reach[p] { continue }
+        let float = i.op == ir.Op.FLoad
+        let mut size = 8
+        if !float { size = i.imm2 }
+        let key = field_key(p, i.imm, size, float)
+        if maps.has(kept, key) { continue }
+        // The loop's stores to this pointer: none may overlap the field
+        // unless it is the same whole-word field.
+        let mut ok = true
+        let mut stored = false
+        for x in f.insts[h..e + 1] {
+            if (x.op != ir.Op.Store && x.op != ir.Op.FStore) || x.a != p { continue }
+            let mut width = 8
+            if x.op == ir.Op.Store { width = x.imm2 }
+            if x.imm + width <= i.imm || i.imm + size <= x.imm { continue }
+            if x.imm == i.imm && width == 8 && size == 8 && (x.op == ir.Op.FStore) == float { stored = true } else { ok = false }
+        }
+        if !ok { continue }
+        let mut class = ir.INT()
+        if float { class = ir.FLOAT() }
+        kept[key] = ir.reg(mut out, class)
+        written[key] = stored
+        push(mut order, key)
+    }
+    if len(order) == 0 { return false }
+    // Registers a kept field was loaded into, when the loop never stores it.
+    let mut rep: [Int] = []
+    for r in 0..len(out.classes) { push(mut rep, r) }
+    let mut insts: [ir.Inst] = []
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        if k == h {
+            for key in order {
+                let mut load = first_load(f, h, e, key)
+                load.dst = kept[key]
+                push(mut insts, load)
+            }
+        }
+        if k >= h && k <= e && (i.op == ir.Op.Load || i.op == ir.Op.FLoad) {
+            let mut size = 8
+            if i.op == ir.Op.Load { size = i.imm2 }
+            let key = field_key(i.a, i.imm, size, i.op == ir.Op.FLoad)
+            if maps.has(kept, key) {
+                if written[key] || defs[i.dst] != 1 { push(mut insts, ir.inst(ir.Op.Move, i.dst, kept[key], -1, 0)) } else { rep[i.dst] = kept[key] }
+                continue
+            }
+        }
+        push(mut insts, i)
+        if k >= h && k <= e && (i.op == ir.Op.Store || i.op == ir.Op.FStore) {
+            let key = field_key(i.a, i.imm, 8, i.op == ir.Op.FStore)
+            if maps.has(kept, key) && (i.op == ir.Op.FStore || i.imm2 == 8) {
+                push(mut insts, ir.inst(ir.Op.Move, kept[key], i.b, -1, 0))
+            }
+        }
+    }
+    out.insts = []
+    for i in insts { push(mut out.insts, renamed(i, rep)) }
+    return true
+}
+
+fn field_key(p: Int, offset: Int, size: Int, float: Bool) -> Str {
+    let mut kind = "i"
+    if float { kind = "f" }
+    return strings.from_int(p) + ":" + strings.from_int(offset) + ":" + strings.from_int(size) + ":" + kind
+}
+
+// The loop's first load of a field, to repeat before the loop.
+fn first_load(f: ir.Func, h: Int, e: Int, key: Str) -> ir.Inst {
+    for i in f.insts[h..e + 1] {
+        if i.op != ir.Op.Load && i.op != ir.Op.FLoad { continue }
+        let mut size = 8
+        if i.op == ir.Op.Load { size = i.imm2 }
+        if field_key(i.a, i.imm, size, i.op == ir.Op.FLoad) == key { return i }
+    }
+    return f.insts[h]  // not reached: every key comes from such a load
+}
+
+// A test already decided on the way here is not made again: after
+// `branch.cmp ult i, n` has gone to its label, `i <u n` holds there, so the
+// same bounds check on `xs[i]` read a second time always passes. A test
+// leaves its condition known on the way it goes and the opposite one on the
+// other; a label keeps what is known on its one way in, or what every way in
+// agrees on when they all come before it (not a loop's jump back). Only
+// integer registers set once take part, so a fact cannot outlive its
+// values (and a failed Float test does not make the opposite true: NaN).
+fn known_branches(f: ir.Func) -> ir.Func {
+    let defs = def_counts(f)
+    let mut ways: Map[Int, Int] = [:]
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        for t in targets(i) { ways[t] = ways_to(ways, t) + 1 }
+        if i.op == ir.Op.Label && k > 0 && !ir.ends_block(f.insts[k - 1].op) { ways[i.imm] = ways_to(ways, i.imm) + 1 }
+    }
+    let mut facts: Map[Str, Bool] = [:]
+    let mut saved: Map[Int, Map[Str, Bool]] = [:]
+    let mut arrivals: Map[Int, Int] = [:]
+    let mut falls = false
+    let mut changed = false
+    let mut out = f
+    out.insts = []
+    for i in f.insts {
+        if i.op == ir.Op.Label {
+            let n = ways_to(ways, i.imm)
+            if falls { meet(mut saved, mut arrivals, i.imm, facts) }
+            if ways_to(arrivals, i.imm) == n && n > 0 { facts = saved[i.imm] } else { facts = [:] }
+        }
+        if i.op == ir.Op.BranchCmp && i.a >= 0 && i.b >= 0 && defs[i.a] == 1 && defs[i.b] == 1 && inverse(i.sym) != "" &&
+            f.classes[i.a] != ir.FLOAT() && f.classes[i.b] != ir.FLOAT() {
+            let holds = fact(i.sym, i.a, i.b)
+            let fails = fact(inverse(i.sym), i.a, i.b)
+            if maps.has(facts, holds) {
+                changed = true
+                let jump = ir.inst(ir.Op.Jump, -1, -1, -1, i.imm)
+                meet(mut saved, mut arrivals, i.imm, facts)
+                push(mut out.insts, jump)
+                falls = false
+                continue
+            }
+            if maps.has(facts, fails) {
+                changed = true
+                continue  // never taken
+            }
+            let mut taken = facts
+            learn(mut taken, i.sym, i.a, i.b)
+            meet(mut saved, mut arrivals, i.imm, taken)
+            learn(mut facts, inverse(i.sym), i.a, i.b)
+            push(mut out.insts, i)
+            falls = true
+            continue
+        }
+        for t in targets(i) { meet(mut saved, mut arrivals, t, facts) }
+        falls = !ir.ends_block(i.op)
+        push(mut out.insts, i)
+    }
+    if !changed { return f }
+    return out
+}
+
+// The fact that `a cond b`, written one way for each pair of equivalent
+// conditions: a > b is b < a.
+fn fact(cond: Str, a: Int, b: Int) -> Str {
+    let mut c = cond
+    let mut x = a
+    let mut y = b
+    if c == "gt" || c == "ge" || c == "ugt" || c == "uge" {
+        c = match c { "gt" => "lt", "ge" => "le", "ugt" => "ult", _ => "ule" }
+        x = b
+        y = a
+    }
+    if (c == "eq" || c == "ne") && b < a {
+        x = b
+        y = a
+    }
+    return c + ":" + strings.from_int(x) + ":" + strings.from_int(y)
+}
+
+// Know that `a cond b`, and what follows from it directly.
+fn learn(facts: mut Map[Str, Bool], cond: Str, a: Int, b: Int) {
+    facts[fact(cond, a, b)] = true
+    let also = match cond {
+        "lt" => ["le", "ne"], "gt" => ["ge", "ne"], "ult" => ["ule", "ne"], "ugt" => ["uge", "ne"], "eq" => ["le", "ge", "ule", "uge"], _ => [],
+    }
+    for c in also { facts[fact(c, a, b)] = true }
+}
+
+// One more way into `label`, with `facts` known on it: keep what every way so
+// far agrees on.
+fn meet(saved: mut Map[Int, Map[Str, Bool]], arrivals: mut Map[Int, Int], label: Int, facts: Map[Str, Bool]) {
+    if ways_to(arrivals, label) == 0 {
+        saved[label] = facts
+    } else {
+        let have = saved[label]
+        let mut both: Map[Str, Bool] = [:]
+        for key in maps.keys(facts) {
+            if maps.has(have, key) { both[key] = true }
+        }
+        saved[label] = both
+    }
+    arrivals[label] = ways_to(arrivals, label) + 1
 }
 
 // A loop jumps back to its header, which tests and leaves:
@@ -569,6 +929,8 @@ fn fold(f: ir.Func) -> ir.Func {
             let a = known[i.a]; let mut n = a; let mut folded = true
             if i.op == ir.Op.AddImm { n = ints.wrapping_add(a, i.imm) } else if i.op == ir.Op.MulImm { n = ints.wrapping_mul(a, i.imm) } else if i.op == ir.Op.Inv { n = ~a } else if i.op == ir.Op.Extend {
                 if i.imm < 64 { let mask = (1 << i.imm) - 1; n = a & mask; if i.imm2 != 0 { let sign = 1 << (i.imm - 1); n = (n ^ sign) - sign } }
+            } else if (i.op == ir.Op.ToByte || i.op == ir.Op.ByteChk) && a >= 0 && a <= 255 {
+                n = a
             } else if maps.has(known, i.b) {
                 let b = known[i.b]
                 if i.op == ir.Op.Add { n = ints.wrapping_add(a, b) } else if i.op == ir.Op.Sub { n = ints.wrapping_sub(a, b) } else if i.op == ir.Op.Mul { n = ints.wrapping_mul(a, b) } else if i.op == ir.Op.And { n = a & b } else if i.op == ir.Op.Or { n = a | b } else if i.op == ir.Op.Xor { n = a ^ b } else if i.op == ir.Op.Shl && b >= 0 && b < 64 { n = a << b } else if i.op == ir.Op.Sar && b >= 0 && b < 64 { n = a >> b } else { folded = false }

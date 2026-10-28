@@ -1,0 +1,162 @@
+// Division and remainder by constants that are not powers of two: x86-64
+// multiplies by a reciprocal instead of dividing. Each line hashes the
+// quotients and remainders of the dividends below, which include both
+// ends of Int; the expected values come from exact truncating division.
+// out: 3 -4312734094971672913
+// out: 5 6612451935016016243
+// out: 6 1317836834354936927
+// out: 7 -1141001746362184641
+// out: 9 -3917314567739871411
+// out: 10 1287011272414531508
+// out: 11 410022540982965429
+// out: 12 -2832876065832019963
+// out: 25 4978046136451338215
+// out: 60 -8979610898129836718
+// out: 100 -8641093507868179061
+// out: 641 -3161905899641990507
+// out: 1000 272731885260495250
+// out: 1000000 -4995043456311540545
+// out: 1000000007 -8792835335176334523
+// out: 123456789123 5042953488209884341
+// out: 4611686018427387905 -2754202117700486865
+// out: 6148914691236517205 8548531680975576775
+// out: 9223372036854775806 820507587430828497
+// out: 9223372036854775807 -49573915105011993
+// out: -2
+// out: -1
+// out: -922337203685477580
+// out: -8
+// out: 9223372036854775
+// out: 807
+import ints
+
+fn main() {
+    let xs = [-9223372036854775807 - 1, -9223372036854775807, -9223372036854775801, -1000000007, -123456789, -100, -99, -11, -10, -9, -7, -6, -5, -3, -2, -1, 0, 1, 2, 3, 5, 6, 7, 9, 10, 11, 99, 100, 101, 999, 1000, 123456789, 1000000007, 9223372036854775800, 9223372036854775806, 9223372036854775807]
+    let mut h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 3), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 3), 1099511628211)
+    }
+    print("3 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 5), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 5), 1099511628211)
+    }
+    print("5 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 6), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 6), 1099511628211)
+    }
+    print("6 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 7), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 7), 1099511628211)
+    }
+    print("7 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 9), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 9), 1099511628211)
+    }
+    print("9 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 10), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 10), 1099511628211)
+    }
+    print("10 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 11), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 11), 1099511628211)
+    }
+    print("11 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 12), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 12), 1099511628211)
+    }
+    print("12 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 25), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 25), 1099511628211)
+    }
+    print("25 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 60), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 60), 1099511628211)
+    }
+    print("60 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 100), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 100), 1099511628211)
+    }
+    print("100 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 641), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 641), 1099511628211)
+    }
+    print("641 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 1000), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 1000), 1099511628211)
+    }
+    print("1000 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 1000000), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 1000000), 1099511628211)
+    }
+    print("1000000 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 1000000007), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 1000000007), 1099511628211)
+    }
+    print("1000000007 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 123456789123), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 123456789123), 1099511628211)
+    }
+    print("123456789123 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 4611686018427387905), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 4611686018427387905), 1099511628211)
+    }
+    print("4611686018427387905 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 6148914691236517205), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 6148914691236517205), 1099511628211)
+    }
+    print("6148914691236517205 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 9223372036854775806), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 9223372036854775806), 1099511628211)
+    }
+    print("9223372036854775806 " + ints.to_str(h))
+    h = 0
+    for x in xs {
+        h = ints.wrapping_mul(h ^ (x / 9223372036854775807), 1099511628211)
+        h = ints.wrapping_mul(h ^ (x % 9223372036854775807), 1099511628211)
+    }
+    print("9223372036854775807 " + ints.to_str(h))
+    let n = xs[9 + 1]  // -7
+    print(n / 3)
+    print(n % 3)
+    print(xs[0] / 10)
+    print(xs[0] % 10)
+    print(xs[len(xs) - 1] / 1000)
+    print(xs[len(xs) - 1] % 1000)
+}
