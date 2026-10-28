@@ -2946,11 +2946,28 @@ the same entry. Close it with a commit or validation result; keep its history.
   native run fixtures 132/132 at `VELA_OPT=0`, under `--sanitize` and under
   `--tsan`; 2,000 differential programs agree; the native fixed point
   holds.
+- **Signs for bounds checks (follow-up):** `if r.pos < len(r.text) {
+  r.text[r.pos] }` kept its bounds check `pos <u len` even where an earlier
+  check made it certain, as a signed `<` does not rule out a negative index.
+  `opt.known_branches` now knows which registers are never negative:
+  constants, and the bound of a bounds check, which lowering makes only
+  with a length or width (`bounds_check` recognizes the test by its failing
+  way, a call to `vela_str_at`, `vela_array_at`, `vela_fixed_array_at` or
+  `vela_fixed_op`). A passed check `i <u n` then gives `i >= 0` and `i < n`,
+  a failed `i < n` gives `i >= 0`, and `i < n` with `i >= 0` decides
+  `i <u n`. A second `peek` after the first loses its check, as both ways
+  out of the first know `pos >= 0`. Loops over locals had none (the
+  frontend's range analysis removes them); in a loop over a field the first
+  check of each turn stays, as the field's starting value may be negative,
+  and removing it would need the loop peeled. Measured gains are small: the
+  JSON service runs 0.7% fewer instructions (422M to 419M), the compiler
+  translating itself 0.01% fewer, and the twelve benchmarks are unchanged.
+  `tests/run/bounds_signs.vl` checks that a negative index passing `i < n`
+  still panics and that a check after a `>=` test going the other way
+  stays. C and native suites 331/331; native run fixtures 133/133 at
+  `VELA_OPT=0` and under `--sanitize`; 2,000 differential programs agree.
 - **Remaining:** `number_value` still runs about 250 instructions per
-  number. Two peeks after the digit loop re-test `pos` against the length
-  signed, then unsigned (`ult` cannot follow from `lt` without knowing
-  `pos >= 0`); a nonnegative-index fact would address it. Loops whose
-  header does not read through the pointer
+  number. Loops whose header does not read through the pointer
   (`for x in xs { s.total = s.total + x }`) are not promoted.
 
 ### TL-104: x86-64 divided by constants with idiv
