@@ -1,0 +1,313 @@
+// The document tree: every node in one array, linked by index as
+// commonmark.js links its objects (parent, first and last child, previous
+// and next sibling; -1 for none), so blocks and inlines can be moved under
+// a new parent without copying them.
+import strings
+
+pub type Kind = enum {
+    Document
+    BlockQuote
+    List
+    Item
+    CodeBlock
+    HtmlBlock
+    Paragraph
+    Heading
+    ThematicBreak
+    Text
+    Softbreak
+    Linebreak
+    Code
+    HtmlInline
+    Emph
+    Strong
+    Link
+    Image
+}
+
+pub type ListData = struct {
+    ordered: Bool
+    bullet: Byte
+    start: Int
+    delimiter: Byte
+    padding: Int
+    marker_offset: Int
+    tight: Bool
+}
+
+pub type Node = struct {
+    kind: Kind
+    parent: Int
+    first: Int
+    last: Int
+    prev: Int
+    next: Int
+    literal: Str  // text, code, HTML
+    data: Int  // a block's, link's or image's entry in Doc.data; -1 for other inlines
+}
+
+// What only blocks, links and images have, kept apart so the many text
+// nodes stay small.
+pub type Data = struct {
+    open: Bool
+    start_line: Int
+    end_line: Int
+    content: Str  // a block's lines, before inline parsing
+    pending: [Str]  // lines not yet joined to `content`: a Str field copies on every append
+    level: Int
+    fenced: Bool
+    fence_char: Byte
+    fence_length: Int
+    fence_offset: Int
+    info: Str
+    html_type: Int
+    list: ListData
+    destination: Str
+    title: Str
+}
+
+pub type Doc = struct {
+    nodes: [Node]
+    data: [Data]
+}
+
+pub fn no_list() -> ListData {
+    return ListData { ordered: false, bullet: '-', start: 1, delimiter: '.', padding: 0, marker_offset: 0, tight: true }
+}
+
+pub fn new_doc() -> Doc {
+    let mut d = Doc { nodes: [], data: [] }
+    let _ = add(mut d, Kind.Document, 1)
+    return d
+}
+
+// A new node, not yet in the tree.
+pub fn add(d: mut Doc, kind: Kind, line: Int) -> Int {
+    let mut data = -1
+    if kind != Kind.Text && kind != Kind.Softbreak && kind != Kind.Linebreak && kind != Kind.Code && kind != Kind.HtmlInline &&
+        kind != Kind.Emph && kind != Kind.Strong {
+        push(mut d.data, Data {
+            open: true, start_line: line, end_line: line, content: "", pending: [], level: 0, fenced: false, fence_char: '`',
+            fence_length: 0, fence_offset: 0, info: "", html_type: 0, list: no_list(), destination: "", title: "",
+        })
+        data = len(d.data) - 1
+    }
+    push(mut d.nodes, Node { kind: kind, parent: -1, first: -1, last: -1, prev: -1, next: -1, literal: "", data: data })
+    return len(d.nodes) - 1
+}
+
+// A block's, link's or image's data.
+pub fn data(d: Doc, n: Int) -> Data {
+    return d.data[d.nodes[n].data]
+}
+
+pub fn text(d: mut Doc, s: Str) -> Int {
+    let n = add(mut d, Kind.Text, 0)
+    d.nodes[n].literal = s
+    return n
+}
+
+pub fn append(d: mut Doc, parent: Int, child: Int) {
+    unlink(mut d, child)
+    d.nodes[child].parent = parent
+    let last = d.nodes[parent].last
+    if last >= 0 {
+        d.nodes[last].next = child
+        d.nodes[child].prev = last
+    } else {
+        d.nodes[parent].first = child
+    }
+    d.nodes[parent].last = child
+}
+
+pub fn insert_after(d: mut Doc, node: Int, sibling: Int) {
+    unlink(mut d, sibling)
+    let next = d.nodes[node].next
+    let parent = d.nodes[node].parent
+    d.nodes[sibling].next = next
+    d.nodes[sibling].prev = node
+    d.nodes[sibling].parent = parent
+    d.nodes[node].next = sibling
+    if next >= 0 {
+        d.nodes[next].prev = sibling
+    } else if parent >= 0 {
+        d.nodes[parent].last = sibling
+    }
+}
+
+pub fn unlink(d: mut Doc, node: Int) {
+    let prev = d.nodes[node].prev
+    let next = d.nodes[node].next
+    let parent = d.nodes[node].parent
+    if prev >= 0 {
+        d.nodes[prev].next = next
+    } else if parent >= 0 {
+        d.nodes[parent].first = next
+    }
+    if next >= 0 {
+        d.nodes[next].prev = prev
+    } else if parent >= 0 {
+        d.nodes[parent].last = prev
+    }
+    d.nodes[node].parent = -1
+    d.nodes[node].prev = -1
+    d.nodes[node].next = -1
+}
+
+// ---- Characters ----
+
+pub fn is_space_or_tab(c: Byte) -> Bool {
+    return c == ' ' || c == '\t'
+}
+
+pub fn is_ascii_punctuation(c: Byte) -> Bool {
+    return c >= '!' && c <= '/' || c >= ':' && c <= '@' || c >= '[' && c <= '`' || c >= '{' && c <= '~'
+}
+
+pub fn is_digit(c: Byte) -> Bool {
+    return c >= '0' && c <= '9'
+}
+
+pub fn is_letter(c: Byte) -> Bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+}
+
+pub fn is_alnum(c: Byte) -> Bool {
+    return is_letter(c) || is_digit(c)
+}
+
+pub fn is_hex(c: Byte) -> Bool {
+    return is_digit(c) || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F'
+}
+
+pub fn lower(c: Byte) -> Byte {
+    if c >= 'A' && c <= 'Z' {
+        return c + 32
+    }
+    return c
+}
+
+// Whether `s` starts at `at` with `word`, ignoring ASCII case.
+pub fn starts_ci(s: Str, at: Int, word: Str) -> Bool {
+    if at + len(word) > len(s) {
+        return false
+    }
+    for i in 0..len(word) {
+        if lower(s[at + i]) != lower(word[i]) {
+            return false
+        }
+    }
+    return true
+}
+
+// Whether `part` occurs in `s` from `at`, ignoring ASCII case.
+pub fn contains_ci(s: Str, at: Int, part: Str) -> Bool {
+    let mut i = at
+    for i + len(part) <= len(s) {
+        if starts_ci(s, i, part) {
+            return true
+        }
+        i = i + 1
+    }
+    return false
+}
+
+pub fn is_blank(s: Str) -> Bool {
+    for c in s {
+        if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
+            return false
+        }
+    }
+    return true
+}
+
+// `s` without the spaces, tabs and line endings at either end.
+pub fn trim(s: Str) -> Str {
+    let mut a = 0
+    let mut b = len(s)
+    for a < b && (s[a] == ' ' || s[a] == '\t' || s[a] == '\n' || s[a] == '\r') {
+        a = a + 1
+    }
+    for b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\n' || s[b - 1] == '\r') {
+        b = b - 1
+    }
+    return s[a..b]
+}
+
+// The UTF-8 encoding of a code point; U+FFFD for one that cannot be encoded.
+pub fn encode(cp: Int) -> Str {
+    let mut c = cp
+    if c == 0 || c > 0x10FFFF || c >= 0xD800 && c <= 0xDFFF {
+        c = 0xFFFD
+    }
+    let mut b = strings.builder()
+    if c < 0x80 {
+        strings.add_byte(mut b, byte(c))
+    } else if c < 0x800 {
+        strings.add_byte(mut b, byte(0xC0 | c >> 6))
+        strings.add_byte(mut b, byte(0x80 | c & 0x3F))
+    } else if c < 0x10000 {
+        strings.add_byte(mut b, byte(0xE0 | c >> 12))
+        strings.add_byte(mut b, byte(0x80 | c >> 6 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | c & 0x3F))
+    } else {
+        strings.add_byte(mut b, byte(0xF0 | c >> 18))
+        strings.add_byte(mut b, byte(0x80 | c >> 12 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | c >> 6 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | c & 0x3F))
+    }
+    return strings.build(b)
+}
+
+pub type Decoded = struct {
+    cp: Int
+    size: Int
+}
+
+// The code point starting at byte `at` (U+FFFD for a malformed one).
+pub fn decode_at(s: Str, at: Int) -> Decoded {
+    let c = int(s[at])
+    let mut need = 0
+    let mut cp = 0
+    if c < 0x80 {
+        return Decoded { cp: c, size: 1 }
+    } else if c >= 0xC2 && c <= 0xDF {
+        need = 1
+        cp = c & 0x1F
+    } else if c >= 0xE0 && c <= 0xEF {
+        need = 2
+        cp = c & 0x0F
+    } else if c >= 0xF0 && c <= 0xF4 {
+        need = 3
+        cp = c & 0x07
+    } else {
+        return Decoded { cp: 0xFFFD, size: 1 }
+    }
+    if at + need >= len(s) {
+        return Decoded { cp: 0xFFFD, size: 1 }
+    }
+    for k in 1..need + 1 {
+        let x = int(s[at + k])
+        if x & 0xC0 != 0x80 {
+            return Decoded { cp: 0xFFFD, size: 1 }
+        }
+        cp = cp << 6 | x & 0x3F
+    }
+    return Decoded { cp: cp, size: need + 1 }
+}
+
+// The code point ending just before byte `at`; a line feed at the start.
+pub fn decode_before(s: Str, at: Int) -> Int {
+    if at <= 0 {
+        return 10
+    }
+    let mut start = at - 1
+    for start > 0 && at - start < 4 && int(s[start]) & 0xC0 == 0x80 {
+        start = start - 1
+    }
+    let d = decode_at(s, start)
+    if start + d.size != at {
+        return 0xFFFD
+    }
+    return d.cp
+}

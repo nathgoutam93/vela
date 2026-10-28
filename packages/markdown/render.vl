@@ -1,0 +1,273 @@
+// HTML output, as commonmark.js writes it: block tags on lines of their
+// own, text escaped, raw HTML as it was. A tight list's paragraphs have no
+// <p>. Inside an image, tags are left out so the alt text is plain.
+import nodes
+import strings
+
+type Out = struct {
+    b: strings.Builder
+    last: Byte
+    plain: Int  // images entered: tags are not written
+}
+
+pub fn html(d: nodes.Doc) -> Str {
+    let mut o = Out { b: strings.builder(), last: '\n', plain: 0 }
+    // Walk the tree without recursion: each container is entered, then its
+    // children, then left.
+    let mut n = 0
+    let mut entering = true
+    for {
+        let leaf = node(mut o, d, n, entering)
+        if entering && !leaf && d.nodes[n].first >= 0 {
+            n = d.nodes[n].first
+            continue
+        }
+        if entering && !leaf {
+            let _ = node(mut o, d, n, false)
+        }
+        if n == 0 {
+            break
+        }
+        if d.nodes[n].next >= 0 {
+            n = d.nodes[n].next
+            entering = true
+        } else {
+            n = d.nodes[n].parent
+            entering = false
+            let _ = node(mut o, d, n, false)
+            for n != 0 && d.nodes[n].next < 0 {
+                n = d.nodes[n].parent
+                let _ = node(mut o, d, n, false)
+            }
+            if n == 0 {
+                break
+            }
+            n = d.nodes[n].next
+            entering = true
+        }
+    }
+    return strings.build(o.b)
+}
+
+fn lit(o: mut Out, s: Str) {
+    if len(s) > 0 {
+        strings.add(mut o.b, s)
+        o.last = s[len(s) - 1]
+    }
+}
+
+fn cr(o: mut Out) {
+    if o.last != '\n' {
+        lit(mut o, "\n")
+    }
+}
+
+fn tag(o: mut Out, s: Str) {
+    if o.plain == 0 {
+        lit(mut o, s)
+    }
+}
+
+pub fn escape(s: Str) -> Str {
+    let mut special = false
+    for c in s {
+        if c == '&' || c == '<' || c == '>' || c == '"' {
+            special = true
+            break
+        }
+    }
+    if !special {
+        return s
+    }
+    let mut b = strings.builder()
+    for c in s {
+        if c == '&' {
+            strings.add(mut b, "&amp;")
+        } else if c == '<' {
+            strings.add(mut b, "&lt;")
+        } else if c == '>' {
+            strings.add(mut b, "&gt;")
+        } else if c == '"' {
+            strings.add(mut b, "&quot;")
+        } else {
+            strings.add_byte(mut b, c)
+        }
+    }
+    return strings.build(b)
+}
+
+fn level_text(n: Int) -> Str {
+    return strings.from_int(n)
+}
+
+// Writes the node, entering or leaving it; true for a leaf, which is only
+// entered.
+fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
+    let x = d.nodes[n]
+    let k = x.kind
+    let mut y = nodes.data(d, 0)  // the document's, when the node has none
+    if x.data >= 0 {
+        y = d.data[x.data]
+    }
+    if k == nodes.Kind.Text {
+        lit(mut o, escape(x.literal))
+        return true
+    }
+    if k == nodes.Kind.Softbreak {
+        lit(mut o, "\n")
+        return true
+    }
+    if k == nodes.Kind.Linebreak {
+        tag(mut o, "<br />")
+        cr(mut o)
+        return true
+    }
+    if k == nodes.Kind.Code {
+        tag(mut o, "<code>")
+        lit(mut o, escape(x.literal))
+        tag(mut o, "</code>")
+        return true
+    }
+    if k == nodes.Kind.HtmlInline {
+        lit(mut o, x.literal)
+        return true
+    }
+    if k == nodes.Kind.HtmlBlock {
+        cr(mut o)
+        lit(mut o, x.literal)
+        cr(mut o)
+        return true
+    }
+    if k == nodes.Kind.ThematicBreak {
+        cr(mut o)
+        tag(mut o, "<hr />")
+        cr(mut o)
+        return true
+    }
+    if k == nodes.Kind.CodeBlock {
+        cr(mut o)
+        let mut word = y.info
+        for i in 0..len(word) {
+            if word[i] == ' ' || word[i] == '\t' || word[i] == '\n' {
+                word = word[0..i]
+                break
+            }
+        }
+        if word == "" {
+            tag(mut o, "<pre><code>")
+        } else {
+            tag(mut o, "<pre><code class=\"language-" + escape(word) + "\">")
+        }
+        lit(mut o, escape(x.literal))
+        tag(mut o, "</code></pre>")
+        cr(mut o)
+        return true
+    }
+    if k == nodes.Kind.Emph {
+        if entering { tag(mut o, "<em>") } else { tag(mut o, "</em>") }
+        return false
+    }
+    if k == nodes.Kind.Strong {
+        if entering { tag(mut o, "<strong>") } else { tag(mut o, "</strong>") }
+        return false
+    }
+    if k == nodes.Kind.Link {
+        if entering {
+            let mut open = "<a href=\"" + escape(y.destination) + "\""
+            if y.title != "" {
+                open = open + " title=\"" + escape(y.title) + "\""
+            }
+            tag(mut o, open + ">")
+        } else {
+            tag(mut o, "</a>")
+        }
+        return false
+    }
+    if k == nodes.Kind.Image {
+        if entering {
+            if o.plain == 0 {
+                lit(mut o, "<img src=\"" + escape(y.destination) + "\" alt=\"")
+            }
+            o.plain = o.plain + 1
+        } else {
+            o.plain = o.plain - 1
+            if o.plain == 0 {
+                if y.title != "" {
+                    lit(mut o, "\" title=\"" + escape(y.title))
+                }
+                lit(mut o, "\" />")
+            }
+        }
+        return false
+    }
+    if k == nodes.Kind.Paragraph {
+        let parent = x.parent
+        if parent >= 0 {
+            let grandparent = d.nodes[parent].parent
+            if grandparent >= 0 && d.nodes[grandparent].kind == nodes.Kind.List && d.data[d.nodes[grandparent].data].list.tight {
+                return false
+            }
+        }
+        if entering {
+            cr(mut o)
+            tag(mut o, "<p>")
+        } else {
+            tag(mut o, "</p>")
+            cr(mut o)
+        }
+        return false
+    }
+    if k == nodes.Kind.Heading {
+        let h = "h" + level_text(y.level)
+        if entering {
+            cr(mut o)
+            tag(mut o, "<" + h + ">")
+        } else {
+            tag(mut o, "</" + h + ">")
+            cr(mut o)
+        }
+        return false
+    }
+    if k == nodes.Kind.BlockQuote {
+        if entering {
+            cr(mut o)
+            tag(mut o, "<blockquote>")
+            cr(mut o)
+        } else {
+            cr(mut o)
+            tag(mut o, "</blockquote>")
+            cr(mut o)
+        }
+        return false
+    }
+    if k == nodes.Kind.List {
+        let mut name = "ul"
+        if y.list.ordered {
+            name = "ol"
+        }
+        if entering {
+            cr(mut o)
+            if y.list.ordered && y.list.start != 1 {
+                tag(mut o, "<ol start=\"" + strings.from_int(y.list.start) + "\">")
+            } else {
+                tag(mut o, "<" + name + ">")
+            }
+            cr(mut o)
+        } else {
+            cr(mut o)
+            tag(mut o, "</" + name + ">")
+            cr(mut o)
+        }
+        return false
+    }
+    if k == nodes.Kind.Item {
+        if entering {
+            tag(mut o, "<li>")
+        } else {
+            tag(mut o, "</li>")
+            cr(mut o)
+        }
+        return false
+    }
+    return false  // the document
+}

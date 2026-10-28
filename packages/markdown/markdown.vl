@@ -1,0 +1,20 @@
+// CommonMark 0.31.2 to HTML: the markdown package. A program's vela.mod
+// says `use markdown ...` and then
+//
+//     print(markdown.to_html("# Hello\n\n*world*\n"))
+//
+// writes `<h1>Hello</h1>\n<p><em>world</em></p>\n`. It follows the
+// specification's algorithm as commonmark.js implements it: blocks
+// (blocks.vl), then inlines (inlines.vl), then HTML (render.vl). Raw HTML
+// passes through unchanged, as the specification's examples expect, so
+// untrusted input needs sanitizing after.
+import blocks
+import render
+
+pub fn to_html(text: Str) -> Str {
+    return render.html(blocks.parse(text).doc)
+}
+
+test "a heading and emphasis" {
+    assert(to_html("# Hello\n\n*world*\n") == "<h1>Hello</h1>\n<p><em>world</em></p>\n")
+}
