@@ -43,6 +43,19 @@ python3 run_tests.py --backend c --jobs 4 m30_test
 python3 run_tests.py --backend native --jobs 4
 ```
 
+Before changing an optimizer pass, the IR or a back end, also run the
+differential test over many more programs than the suite's fixed seeds. It
+generates integer, control-flow, struct, closure, Float and string programs,
+runs each with both back ends at both optimization settings, and checks
+integer results against values computed in Python:
+
+```sh
+python3 tests/differential_test.py --count 500
+```
+
+A failure prints the seed and a command reproducing it, and keeps the
+program in `build/differential-failures/`.
+
 Filters match substrings of test paths and are combined with OR. The
 [test guide](../tests/README.md) explains fixture types, integration suites,
 sanitizers and platform selection. The default runner enforces strict C

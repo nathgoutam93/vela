@@ -2721,6 +2721,56 @@ the same entry. Close it with a commit or validation result; keep its history.
   weighted short constant-count loops (`for j in 0..4`) below 8 changed one
   stack reference and was not kept.
 
+### TL-099: Back-end agreement was checked only by hand-written fixtures
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** the post-M30 review checked the optimizer and both back ends
+  with two throwaway generators: random programs run in every configuration,
+  and integer expressions whose values were computed independently in Python.
+  They found no disagreement, but they lived outside the repository, so later
+  optimizer and emitter changes (TL-097, TL-098, `rotate_loops`) had nothing
+  equivalent re-running them.
+- **Impact:** a miscompilation that the fixed fixtures do not happen to
+  exercise, such as a wrong register choice on one path or a folding rule
+  that differs from generated code, could reach `main` unseen.
+- **Workaround (before):** re-create the scratch generators by hand.
+- **Resolution:** [tests/differential_test.py](../tests/differential_test.py)
+  keeps both. Oracle programs print 40 integer expressions over every width
+  (wrapping, checked and saturating operations, shifts, conversions, range
+  matches), with leaves that are literals or array reads so constant folding
+  and generated code are both checked. Differential programs add loops,
+  `break`/`continue`, arrays, structs, enums, closures, `mut` parameters,
+  Float arithmetic on arrays of structs and string chains, and must exit,
+  print and report panics identically with C and native code generation at
+  `VELA_OPT=1` and `0`. `run_tests.py` runs seeds 1-12 of each kind; a
+  failure prints its seed and a reproducing command and keeps the program in
+  `build/differential-failures/`. The oracle generator no longer writes a
+  range pattern covering every value of its type, which correctly fails
+  with E3066.
+- **Found on first run:** under `run_tests.py`'s strict C flags, 6 of the 24
+  default programs failed to build with C (exit 70, E6002), because gcc's
+  `-Wtype-limits` rejects comparisons a type's range decides. The generated
+  C was faithful: the programs themselves wrote `15u16 > 65535u16`,
+  `z >= 0u8` and `match 0u64 { 0u64..=N => ... }`, all legal Vela. A range
+  pattern over a runtime value does not warn; the generator already omits a
+  bound the type implies. Like `x == x` (`-Wno-tautological-compare`, which
+  covers clang's form of this warning), it is a warning about the Vela
+  program, so `STRICT_CFLAGS` now has `-Wno-type-limits`. Builds without
+  `-Wextra`, the default, never saw it.
+- **Verification:**
+  - Seeds 1-12 of both kinds take 14 s; seeds 100-399 (600 programs) agree
+    in all four configurations, and seeds 1-150 (300 programs) agree under
+    the strict flags with gcc, and seeds 1000-1039 with clang.
+  - Replacing the oracle's truncating division by floor division fails 4 of
+    6 oracle programs; a compiler wrapper that changes one output line under
+    native `VELA_OPT=0` fails all 3 differential programs it runs.
+  - Of 60 differential programs, 49 run to completion and 11 end in the same
+    overflow panic in every configuration (median 11 lines of output); 46
+    use Floats and 4 print NaN.
+- **Proposed improvement:** generate Float expressions with an oracle too,
+  and programs using generics, traits and `Option`/`Result` chains, which
+  the generators do not yet write.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures

@@ -95,18 +95,20 @@ M28_TEST = TESTS / "m28_test.py"
 M29_TEST = TESTS / "m29_test.py"
 M30_TEST = TESTS / "m30_test.py"
 STACK_TEST = TESTS / "stack_overflow_test.py"
+DIFFERENTIAL_TEST = TESTS / "differential_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
 # Generated C must compile without a single warning; the test suite enforces it.
 # The exceptions are warnings about the Vela program rather than about the
 # code generator: Vela allows unused variables and parameters, `x == x` and
-# `x = x`, and recursion whose base case exits, so C must too.
+# `x = x`, comparisons a type's range decides (`b > 255u8`, `u >= 0u64`), and
+# recursion whose base case exits, so C must too.
 # (gcc ignores -Wno-self-assign, which is clang's.)
 STRICT_CFLAGS = (
     "-Wall -Wextra -Werror -pedantic"
     " -Wno-unused-variable -Wno-unused-parameter -Wno-unused-but-set-variable"
-    " -Wno-tautological-compare -Wno-self-assign -Wno-infinite-recursion"
+    " -Wno-tautological-compare -Wno-type-limits -Wno-self-assign -Wno-infinite-recursion"
 )
 # --sanitize: catch memory errors (use after free, out of bounds), undefined
 # behaviour, and, when the program exits, any memory it never freed.
@@ -211,6 +213,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(M30_TEST, compiler, env)
     if path == STACK_TEST:
         return run_script(STACK_TEST, compiler, env)
+    if path == DIFFERENTIAL_TEST:
+        return run_script(DIFFERENTIAL_TEST, compiler, env)
     if path == M27_TEST:
         return run_script(M27_TEST, compiler, env)
     if path == M26_TEST:
@@ -406,6 +410,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(M29_TEST)
     tests.append(M30_TEST)
     tests.append(STACK_TEST)
+    tests.append(DIFFERENTIAL_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:
