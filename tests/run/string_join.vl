@@ -11,6 +11,9 @@
 // out: 1:f,2:s,3:t
 // out: p0p1p2p3p4p5p6p7p8p9
 // out: 60
+// out: <0><1><2><3><4><5><6><7><8><9><10><11>|ok
+// out: stopped at 12
+// out: a-b-c-d-e-f-g-h-i-j-k-l
 import ints
 
 fn noted(log: mut [Str], s: Str) -> Str {
@@ -25,6 +28,22 @@ fn replace(s: mut Str) -> Str {
 
 fn tag(n: Int) -> Str {
     return "[" + ints.to_str(n) + "]"
+}
+
+fn part(n: Int, stop: Int) -> Result[Str, Str] {
+    if n == stop {
+        return Err("stopped at " + ints.to_str(n))
+    }
+    return Ok("|ok")
+}
+
+// More than eight computed parts are released together after the join; a
+// later part's `?` returning early must release the ones already made.
+fn many(stop: Int) -> Result[Str, Str] {
+    return Ok(tag(0)[0..0] + "<0>" + ints.to_str(1)[0..0] + "<1>" + ints.to_str(2)[0..0] + "<2>" + "<" + ints.to_str(3) + ">" +
+        "<" + ints.to_str(4) + ">" + "<" + ints.to_str(5) + ">" + "<" + ints.to_str(6) + ">" + "<" + ints.to_str(7) + ">" +
+            "<" + ints.to_str(8) + ">" + "<" + ints.to_str(9) + ">" + "<" + ints.to_str(10) + ">" + "<" + ints.to_str(11) + ">" +
+            part(12, stop)?)
 }
 
 fn main() {
@@ -48,4 +67,18 @@ fn main() {
     }
     print(chain)
     print(len(chain + chain + chain) / 1)
+    match many(0) {
+        Ok(s) => print(s)
+        Err(e) => print(e)
+    }
+    match many(12) {
+        Ok(s) => print(s)
+        Err(e) => print(e)
+    }
+    // Variables read without a copy share their slots, and are not released.
+    let a = "a" + ""
+    let b = ints.to_str(0)[0..0] + "b"
+    print(a + "-" + b + "-" + a[0..0] + "c" + "-" + "d" + "-" + "e" + "-" + "f" + "-" + "g" + "-" + "h" + "-" + "i" + "-" +
+        "j" + "-" + "k" + "-" + "l" + b[0..0] + a[0..0] + ints.to_str(1)[0..0] + ints.to_str(2)[0..0] + ints.to_str(3)[0..0] +
+            ints.to_str(4)[0..0] + ints.to_str(5)[0..0] + ints.to_str(6)[0..0] + ints.to_str(7)[0..0])
 }

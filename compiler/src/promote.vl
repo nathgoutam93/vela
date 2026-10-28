@@ -37,7 +37,7 @@ pub fn function(f: ir.Func) -> ir.Func {
     let mut out = f; out.insts = []; let mut words: [[Int]] = []; let mut any = false
     for s in 0..len(f.slot_sizes) {
         let mut registers: [Int] = []
-        if eligible[s] { any = true; for _ in 0..f.slot_sizes[s]/8 { push(mut registers, ir.reg(mut out, ir.INT())) } }
+        if eligible[s] { any = true; for _ in 0..f.slot_sizes[s] / 8 { push(mut registers, ir.reg(mut out, ir.INT())) } }
         push(mut words, registers)
     }
     if !any { return f }
@@ -46,21 +46,21 @@ pub fn function(f: ir.Func) -> ir.Func {
     for i in f.insts {
         if (i.op == ir.Op.SlotAddr || i.op == ir.Op.AddImm || i.op == ir.Op.Move) && maps.has(selected, i.dst) { continue }
         if i.op == ir.Op.Load && maps.has(selected, i.a) {
-            let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, i.dst, words[a.slot][(a.offset+i.imm)/8], -1, 0)); continue
+            let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, i.dst, words[a.slot][(a.offset + i.imm) / 8], -1, 0)); continue
         }
         if i.op == ir.Op.Store && maps.has(selected, i.a) {
-            let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, words[a.slot][(a.offset+i.imm)/8], i.b, -1, 0)); continue
+            let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, words[a.slot][(a.offset + i.imm) / 8], i.b, -1, 0)); continue
         }
         if i.op == ir.Op.Copy && (maps.has(selected, i.a) || maps.has(selected, i.b)) {
             let mut sources: [Int] = []
             // Freeze every source word before writing, including overlapping
             // copies within one promoted aggregate.
-            for offset in 0..i.imm/8 {
+            for offset in 0..i.imm / 8 {
                 let r = ir.reg(mut out, ir.INT()); push(mut sources, r)
-                if maps.has(selected, i.b) { let a = selected[i.b]; push(mut out.insts, ir.inst(ir.Op.Move, r, words[a.slot][a.offset/8+offset], -1, 0)) } else { let mut load = ir.inst(ir.Op.Load, r, i.b, -1, offset*8); load.imm2 = 8; push(mut out.insts, load) }
+                if maps.has(selected, i.b) { let a = selected[i.b]; push(mut out.insts, ir.inst(ir.Op.Move, r, words[a.slot][a.offset / 8 + offset], -1, 0)) } else { let mut load = ir.inst(ir.Op.Load, r, i.b, -1, offset * 8); load.imm2 = 8; push(mut out.insts, load) }
             }
-            for offset in 0..i.imm/8 {
-                if maps.has(selected, i.a) { let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, words[a.slot][a.offset/8+offset], sources[offset], -1, 0)) } else { let mut store = ir.inst(ir.Op.Store, -1, i.a, sources[offset], offset*8); store.imm2 = 8; push(mut out.insts, store) }
+            for offset in 0..i.imm / 8 {
+                if maps.has(selected, i.a) { let a = selected[i.a]; push(mut out.insts, ir.inst(ir.Op.Move, words[a.slot][a.offset / 8 + offset], sources[offset], -1, 0)) } else { let mut store = ir.inst(ir.Op.Store, -1, i.a, sources[offset], offset * 8); store.imm2 = 8; push(mut out.insts, store) }
             }; continue
         }
         push(mut out.insts, i)

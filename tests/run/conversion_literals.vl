@@ -1,0 +1,26 @@
+// A numeral takes a conversion's type only when it fits: otherwise the
+// numerals in the argument are Ints, and their value is converted, with the
+// usual check. A lone numeral that does not fit is an error (fail/).
+// out: 1500000000
+// out: -1500000000
+// out: -128
+// out: 200
+// out: -100
+// out: 50
+// out: 2047452635
+// out: 6148914691236517205
+// out: 255
+// err: conversion_literals.vl:25:11: panic: integer conversion out of range
+// exit: 101
+fn main() {
+    print(i32(3000000000 / 2))
+    print(i32(-3000000000 / 2))
+    print(i8(-(128)))
+    print(u8(300 - 100))
+    print(i8(-200 + 100))
+    print(i8(100 + 100 - 150))
+    print(i32(6270235947322418651 & 2147483647))
+    print(u64(18446744073709551615 / 3))
+    print(u8(255))
+    print(u8(1000 / 2))
+}

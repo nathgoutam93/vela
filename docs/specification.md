@@ -136,9 +136,12 @@ parameter mutable. A place is an assignable local or field/index projection
 rooted in an allowed mutable binding. Str indexes are never writable.
 
 `place = expression` assigns; there are no increment/decrement or compound
-assignment operators. Mutation uses checked indexes. Arguments granting
-overlapping mutable access, or a conflicting read while mutable access is
-being passed, are rejected; separate the operations with a temporary. Loop
+assignment operators. Mutation uses checked indexes. A call passing `mut`
+places rooted in the same binding, even disjoint fields, is rejected (E3144).
+An argument that is a copy of a place the call changes through a `mut`
+argument, or that a later argument's nested call changes, keeps the value
+from before the change; this is valid but warns (E3138, E3139). Separate
+the operations with a temporary or a preceding statement. Loop
 variables, match bindings and captured values are read-only. A binding is
 visible in its lexical scope; inner scopes may shadow outer names. Repeated
 immutable `let _ = call()` acknowledges intentional discard without creating

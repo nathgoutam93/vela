@@ -202,7 +202,6 @@ fn uses_stmt(u: mut Uses, st: ast.Stmt, in_closure: Bool) {
     }
 }
 
-
 pub fn analyze(k: checker.Checked, loop: ast.Stmt) -> Uses {
     let mut u = Uses { k: k, writes: [], grows: [], shared: [:] }; uses_stmt(mut u, loop, false); return u
 }

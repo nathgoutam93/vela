@@ -2500,8 +2500,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-093: Compile time grows faster than linearly on very long expressions
 
-- **Status:** resolved after the post-M30 review, except very long C-backend
-  chains of computed Str parts (below); found while resolving TL-092.
+- **Status:** resolved after the post-M30 review, including very long
+  C-backend chains of computed Str parts (below); found while resolving
+  TL-092.
 - **Evidence** (Linux x86-64, before the change):
   - Native `vela run` of `x = x + 1 + 1 + ...`: 3,000 terms 3.7 s, 20,000
     terms 118 s. Samples are in `ranges.limit`/`cannot_fail`, which compute
@@ -2550,10 +2551,22 @@ the same entry. Close it with a commit or validation result; keep its history.
   - `tests/stack_overflow_test.py` compiles 20,000-term sums and `&&` chains
     and builds a 20,000-term string chain with the C backend under a 120 s
     limit per step. The previous compiler times out on the C build.
-- **Remaining:** a C-backend chain of thousands of *computed* Str parts still
-  gives gcc one struct temporary per part: 4,000 parts of
-  `"<td>" + ints.to_str(x + i) + "</td>"` take 15 s on C, against 3.8 s
-  natively. Splitting very large generated C functions would address it.
+- **Computed parts (follow-up):** a C-backend chain of thousands of
+  *computed* Str parts still gave gcc one struct temporary per part, all
+  live until the join, then a release call per part: 4,000 repetitions of
+  `"<td>" + ints.to_str(x + i) + "</td>"` took 15 s on C, against 3.8 s
+  natively; gcc's time was in PRE, CSE and dead-store elimination. Now the
+  parts array is declared before the parts are evaluated, each computed part
+  is written into its slot as soon as it exists, and the slot takes over the
+  temporary's release (`hand_over`), so an early return (`?` in a later
+  part) still releases each part made so far, once. More than eight owned
+  parts are released after the join by one `vela_str_release_parts` call
+  over a static index table. The same chain builds and runs in 2.8 s (6.3 s
+  with the per-part releases). `tests/run/string_join.vl` adds a twelve-part
+  chain returning early through `?` and one sharing variables' slots; it
+  passes on both back ends, at both optimization settings and under
+  `--sanitize` with leak checking. The differential test's string chains now
+  have up to 14 parts.
 
 ### TL-094: LeakSanitizer failed every sandboxed program under --sanitize
 
@@ -2770,6 +2783,74 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Proposed improvement:** generate Float expressions with an oracle too,
   and programs using generics, traits and `Option`/`Result` chains, which
   the generators do not yet write.
+
+### TL-100: Numerals in a conversion took its type even when they did not fit
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** writing the oracle generator for TL-099 in the post-M30
+  review.
+- **Reproduce:** `fn main() { print(i32(3000000000 / 2)) }` reported
+  `integer literal does not fit in i32 [E3182]`, though 1500000000 fits;
+  `i8(-(128))`, `u8(300 - 100)` and `i32(6270235947322418651 & 2147483647)`
+  failed the same way. The same expressions through an Int variable worked.
+- **Cause (observed):** `integer_builtin` gave an argument made only of
+  numerals the conversion's type as its expected type, so every numeral in
+  it was typed as the target. The specification says an unsuffixed numeral
+  takes a *fitting* type from context, otherwise Int.
+- **Impact:** valid programs were rejected; the workaround changed the code's
+  shape for no reason.
+- **Workaround (before):** suffix the numerals (`3000000000i64`) or bind the
+  argument to a variable.
+- **Resolution:** the argument takes the target type only when every numeral
+  in it fits (`literals_fit`); otherwise its numerals are Ints and the value
+  is converted with the usual representability check. A lone numeral that
+  does not fit (`u8(300)`, `i32(3000000000)`) stays a compile-time error,
+  since converting it always fails.
+- **Verification:** `tests/run/conversion_literals.vl` (results on both back
+  ends and optimization settings, and a value out of range panicking) and
+  `tests/fail/conversion_literal_range.vl` (lone numerals stay errors).
+
+### TL-101: The specification called a warned argument copy "rejected"
+
+- **Status:** resolved after the post-M30 review (documentation).
+- **Discovery:** post-M30 review, comparing the specification's
+  bindings-and-mutation rules with `vela check`.
+- **Reproduce:** `one(mut p.a, p.a)` with `fn one(x: mut Int, y: Int)`
+  compiles with warning E3138; the specification said "a conflicting read
+  while mutable access is being passed" is rejected.
+- **Evidence:** M10b recorded the decision that this is a warning
+  ("Warnings exist: printed with errors, never fatal. The first: an argument
+  that is itself a copy of a variable changed through `mut` in the same
+  call"); `tests/cli/warning_stale_copy.vl` pins it. Meanwhile E3144
+  rejects two `mut` arguments rooted in the same binding even when they are
+  disjoint fields, which "overlapping" understated.
+- **Resolution:** the specification states both: `mut` places rooted in one
+  binding are rejected (E3144); an argument copying a place the call or a
+  later argument changes keeps the earlier value and warns (E3138, E3139).
+  No compiler change.
+
+### TL-102: Fourteen compiler files drifted from `vela fmt`
+
+- **Status:** resolved after the post-M30 review.
+- **Discovery:** post-M30 review.
+- **Reproduce:** `build/vela fmt -l compiler/src/*.vl` listed arm64,
+  capabilities, checker, codegen, incremental, live, loops, lower, main,
+  opt, promote, properties, regalloc and x64: operator spacing
+  (`at+1`, `let cache=...`), a mis-indented `match` in `checker.vl`, and
+  `;`-joined statements written without spaces in `main.vl`.
+- **Impact:** inconsistent source; nothing checked the repository's own
+  sources, so the drift went unnoticed.
+- **Resolution:** the files are formatted. The compiler's generated C is
+  identical before and after apart from 358 source locations.
+  `tests/format_test.py` runs `vela fmt -l` over the compiler, standard
+  library, packages, examples, benchmarks and evaluation tasks in the
+  default suite (162 files); test fixtures are left out, as some are
+  deliberately unformatted and the M26 and M30 corpora are pinned.
+- **Verification:** removing the spaces around one `=` in `loops.vl` fails
+  the test, naming the file.
+- **Not changed:** the formatter keeps `;`-joined statements on one line, so
+  `main.vl`'s dense incremental-build code remains dense; splitting them is
+  a formatter change to propose, not part of this fix.
 
 ## Outstanding validation
 

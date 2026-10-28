@@ -249,7 +249,7 @@ fn forward_destinations(f: ir.Func) -> ir.Func {
     for at < len(f.insts) {
         let mut i = f.insts[at]
         if i.dst >= 0 && defs[i.dst] == 1 && readers[i.dst] == 1 && at + 1 < len(f.insts) && (pure(i.op) || i.op == ir.Op.AddChk || i.op == ir.Op.SubChk || i.op == ir.Op.MulChk || i.op == ir.Op.DivChk || i.op == ir.Op.RemChk) {
-            let next = f.insts[at+1]
+            let next = f.insts[at + 1]
             if next.op == ir.Op.Move && next.a == i.dst && next.dst != i.dst && f.classes[next.dst] == f.classes[i.dst] {
                 i.dst = next.dst; push(mut out.insts, i); at = at + 2; continue
             }
@@ -282,11 +282,11 @@ fn scalar_copy(f: ir.Func) -> ir.Func {
             if after >= len(f.insts) { push(mut out.insts, i); at = at + 1; continue }
             let mut next = f.insts[after]; let mut size = next.imm2; if next.op == ir.Op.FLoad { size = 8 }
             if next.op == ir.Op.Copy && next.b == i.a && next.imm == i.imm {
-                for between in at+1..after { push(mut out.insts, f.insts[between]) }
+                for between in at + 1..after { push(mut out.insts, f.insts[between]) }
                 next.b = i.b; push(mut out.insts, next); at = after + 1; continue
             }
             if (next.op == ir.Op.Load || next.op == ir.Op.FLoad) && next.a == i.a && next.imm >= 0 && size > 0 && next.imm <= i.imm - size {
-                for between in at+1..after { push(mut out.insts, f.insts[between]) }
+                for between in at + 1..after { push(mut out.insts, f.insts[between]) }
                 next.a = i.b; push(mut out.insts, next); at = after + 1; continue
             }
         }
@@ -568,7 +568,7 @@ fn fold(f: ir.Func) -> ir.Func {
         if i.dst >= 0 && defs[i.dst] == 1 && maps.has(known, i.a) {
             let a = known[i.a]; let mut n = a; let mut folded = true
             if i.op == ir.Op.AddImm { n = ints.wrapping_add(a, i.imm) } else if i.op == ir.Op.MulImm { n = ints.wrapping_mul(a, i.imm) } else if i.op == ir.Op.Inv { n = ~a } else if i.op == ir.Op.Extend {
-                if i.imm < 64 { let mask = (1 << i.imm) - 1; n = a & mask; if i.imm2 != 0 { let sign = 1 << (i.imm-1); n = (n ^ sign) - sign } }
+                if i.imm < 64 { let mask = (1 << i.imm) - 1; n = a & mask; if i.imm2 != 0 { let sign = 1 << (i.imm - 1); n = (n ^ sign) - sign } }
             } else if maps.has(known, i.b) {
                 let b = known[i.b]
                 if i.op == ir.Op.Add { n = ints.wrapping_add(a, b) } else if i.op == ir.Op.Sub { n = ints.wrapping_sub(a, b) } else if i.op == ir.Op.Mul { n = ints.wrapping_mul(a, b) } else if i.op == ir.Op.And { n = a & b } else if i.op == ir.Op.Or { n = a | b } else if i.op == ir.Op.Xor { n = a ^ b } else if i.op == ir.Op.Shl && b >= 0 && b < 64 { n = a << b } else if i.op == ir.Op.Sar && b >= 0 && b < 64 { n = a >> b } else { folded = false }

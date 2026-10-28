@@ -156,7 +156,7 @@ fn main() {
         check_json(args[3], root)
         return
     }
-    if command == "verify" { verify_command(args[2..len(args)],root); return }
+    if command == "verify" { verify_command(args[2..len(args)], root); return }
     if command == "profile" { profile_command(args[2..len(args)], root); return }
     if command == "run" || command == "test" {
         let options = capabilities.parse(args[2..len(args)], command == "test")
@@ -566,7 +566,7 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
         Err(e) => driver_error(e)
     }
     let compiler = targets.compiler(target)
-    let cache=incremental.begin(cache_dir(),mode,"native",targets.selected(target),compiler)
+    let cache = incremental.begin(cache_dir(), mode, "native", targets.selected(target), compiler)
     let cc = compiler[0]
     let mut flags = targets.flags(target)
     match os.env("VELA_CFLAGS") {
@@ -591,7 +591,7 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
         push(mut rt, word)
     }
     // The runtime from the cache when it is there (M16b).
-    let mut cached = "";if cache.reason=="not requested"||mode>0{cached=cached_runtime(root, join_words(compiler), opt, flags, target)}
+    let mut cached = ""; if cache.reason == "not requested" || mode > 0 { cached = cached_runtime(root, join_words(compiler), opt, flags, target) }
     let have = cached != "" && exists(cached)
     let mut assembler = compiler
     for f in targets.assembly_flags(target) { push(mut assembler, f) }
@@ -599,16 +599,16 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
     for word in ["-c", source, "-o", program_o] { push(mut assembler, word) }
     let mut commands = [assembler, rt]
     if have { commands = [assembler] }
-    let mut probes:[incremental.Probe]=[]
-    let mut actual_program=program_o
-    if incremental.enabled(cache){
-        let mut as_base=compiler;for f in targets.assembly_flags(target){push(mut as_base,f)}
-        let a=incremental.assembly(cache,as_base,source,program_o,asm)
-        let mut rt_base=compiler;for f in ["-std=c11",opt]{push(mut rt_base,f)};for f in flags{push(mut rt_base,f)};push(mut rt_base,"-I");push(mut rt_base,runtime)
-        let r=incremental.c_unit(cache,rt_base,modules.join(runtime,"vela_rt.c"),runtime_o)
-        probes=[a,r];commands=[];for p in probes{if !p.hit{push(mut commands,p.command)}};actual_program=a.object;runtime_o=r.object
-    }else if cache.report!=""{
-        probes=[incremental.Probe{object:program_o,source:source,key:"",command:assembler,hit:false},incremental.Probe{object:runtime_o,source:modules.join(runtime,"vela_rt.c"),key:cached,command:rt,hit:have}]
+    let mut probes: [incremental.Probe] = []
+    let mut actual_program = program_o
+    if incremental.enabled(cache) {
+        let mut as_base = compiler; for f in targets.assembly_flags(target) { push(mut as_base, f) }
+        let a = incremental.assembly(cache, as_base, source, program_o, asm)
+        let mut rt_base = compiler; for f in ["-std=c11", opt] { push(mut rt_base, f) }; for f in flags { push(mut rt_base, f) }; push(mut rt_base, "-I"); push(mut rt_base, runtime)
+        let r = incremental.c_unit(cache, rt_base, modules.join(runtime, "vela_rt.c"), runtime_o)
+        probes = [a, r]; commands = []; for p in probes { if !p.hit { push(mut commands, p.command) } }; actual_program = a.object; runtime_o = r.object
+    } else if cache.report != "" {
+        probes = [incremental.Probe { object: program_o, source: source, key: "", command: assembler, hit: false }, incremental.Probe { object: runtime_o, source: modules.join(runtime, "vela_rt.c"), key: cached, command: rt, hit: have }]
     }
     let codes = tasks.map(commands, fn(command) {
         match os.run(command) {
@@ -653,10 +653,10 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
         }
     }
     if len(failed) == 0 { retain_debug(exe, target, mode) }
-    match incremental.finish(cache,probes,len(failed)==0){Ok(_)=>{},Err(e)=>driver_error(e)}
-    for p in probes{if p.source!=source&&modules.dirname(p.source)==tmp{cleanup(p.source)}}
+    match incremental.finish(cache, probes, len(failed) == 0) { Ok(_) => {}, Err(e) => driver_error(e) }
+    for p in probes { if p.source != source && modules.dirname(p.source) == tmp { cleanup(p.source) } }
     for f in [source, program_o, runtime_o] {
-        if f != cached && (cache.directory=="" || !text.starts_with(f,cache.directory+"/")) {
+        if f != cached && (cache.directory == "" || !text.starts_with(f, cache.directory + "/")) {
             cleanup(f)
         }
     }
@@ -694,7 +694,7 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
         Err(e) => driver_error(e)
     }
     let compiler = targets.compiler(target)
-    let cache=incremental.begin(cache_dir(),mode,"c",targets.selected(target),compiler)
+    let cache = incremental.begin(cache_dir(), mode, "c", targets.selected(target), compiler)
     let cc = compiler[0]
     let mut flags = targets.flags(target)
     match os.env("VELA_CFLAGS") {
@@ -715,16 +715,16 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
     let mut written: [Str] = []
     let mut objects: [Str] = []
     // The runtime once per set of flags, from the cache when it is there.
-    let mut cached="";if cache.reason=="not requested"||mode>0{cached=cached_runtime(root, join_words(compiler), opt, flags, target)}
+    let mut cached = ""; if cache.reason == "not requested" || mode > 0 { cached = cached_runtime(root, join_words(compiler), opt, flags, target) }
     let have = cached != "" && exists(cached)
     // About 400 KB of C per unit before another is worth starting.
     let mut units = c_parts(c_source, tasks.workers(), 400000)
-    if incremental.enabled(cache){units=incremental.parts(c_source,tasks.workers())}
-    let mut probes:[incremental.Probe]=[]
+    if incremental.enabled(cache) { units = incremental.parts(c_source, tasks.workers()) }
+    let mut probes: [incremental.Probe] = []
     for i in 0..len(units) + 1 {
         if i == len(units) && have {
             push(mut objects, cached)
-            if cache.report!=""{push(mut probes,incremental.Probe{object:cached,source:"",key:cached,command:[],hit:true})}
+            if cache.report != "" { push(mut probes, incremental.Probe { object: cached, source: "", key: cached, command: [], hit: true }) }
             continue
         }
         let mut source = modules.join(runtime, "vela_rt.c")
@@ -736,14 +736,14 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
             }
         }
         let object = modules.join(tmp, "part" + strings.from_int(i) + ".o")
-        if incremental.enabled(cache){let p=incremental.c_unit(cache,base,source,object);push(mut probes,p);push(mut written,p.source);push(mut objects,p.object);if !p.hit{push(mut commands,p.command)};continue}
+        if incremental.enabled(cache) { let p = incremental.c_unit(cache, base, source, object); push(mut probes, p); push(mut written, p.source); push(mut objects, p.object); if !p.hit { push(mut commands, p.command) }; continue }
         push(mut objects, object)
         let mut command = base
         for word in ["-c", source, "-o", object] {
             push(mut command, word)
         }
         push(mut commands, command)
-        if cache.report!=""{push(mut probes,incremental.Probe{object:object,source:source,key:"",command:command,hit:false})}
+        if cache.report != "" { push(mut probes, incremental.Probe { object: object, source: source, key: "", command: command, hit: false }) }
     }
     let codes = tasks.map(commands, fn(command) {
         match os.run(command) {
@@ -788,13 +788,13 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
         keep_runtime(objects[len(objects) - 1], cached, tmp)
     }
     if len(failed) == 0 { retain_debug(exe, target, mode) }
-    match incremental.finish(cache,probes,len(failed)==0){Ok(_)=>{},Err(e)=>driver_error(e)}
+    match incremental.finish(cache, probes, len(failed) == 0) { Ok(_) => {}, Err(e) => driver_error(e) }
     // The scratch directory goes either way.
     for f in written {
         cleanup(f)
     }
     for o in objects {
-        if o != cached && (cache.directory=="" || !text.starts_with(o,cache.directory+"/")) {
+        if o != cached && (cache.directory == "" || !text.starts_with(o, cache.directory + "/")) {
             cleanup(o)
         }
     }
@@ -1302,8 +1302,8 @@ fn coverage_program(k: checker.Checked) -> Result[ir.Program, [errors.CompileErr
 fn profile_command(words: [Str], root: Str) uses fs, os {
     let mut report = ""; let mut args: [Str] = []; let mut i = 0
     for i < len(words) {
-        if words[i] == "--json" { if report != "" || i+1 >= len(words) { usage() }; report = words[i+1]; i = i+2; continue }
-        if words[i] == "--allow" || words[i] == "--deny" { if i+1 >= len(words) { usage() }; push(mut args, words[i]); push(mut args, words[i+1]); i = i+2; continue }
+        if words[i] == "--json" { if report != "" || i + 1 >= len(words) { usage() }; report = words[i + 1]; i = i + 2; continue }
+        if words[i] == "--allow" || words[i] == "--deny" { if i + 1 >= len(words) { usage() }; push(mut args, words[i]); push(mut args, words[i + 1]); i = i + 2; continue }
         for word in words[i..len(words)] { push(mut args, word) }; break
     }
     let options = capabilities.parse(args, false)
@@ -1328,72 +1328,72 @@ fn profile_command(words: [Str], root: Str) uses fs, os {
 // Verification is opt-in, with hard solver/process/output budgets. Reused
 // reports establish freshness only; the current AST is always reverified.
 fn verify_command(words: [Str], root: Str) uses fs, os, clock {
-    let mut path="";let mut target="";let mut solver="";let mut report="";let mut reuse="";let mut output="";let mut as_json=false
-    let mut timeout=1000;let mut budget=5000;let mut i=0
-    for i<len(words){let word=words[i];i=i+1
-        if word=="--json"{as_json=true;continue}
-        if word=="--solver"||word=="--timeout"||word=="--budget"||word=="--report"||word=="--reuse"||word=="--build"||word=="--target"{
-            if i>=len(words){verification_error("missing value after "+word)};let value=words[i];i=i+1
-            if word=="--solver"{solver=value}else if word=="--report"{report=value}else if word=="--reuse"{reuse=value}else if word=="--build"{output=value}else if word=="--target"{target=targets.normalize(value)}else{
-                let mut n=0;match text.parse_int(value){Some(v)=>n=v,None=>verification_error("invalid verification budget")}
-                if n<1||n>60000{verification_error("verification budgets must be 1..60000 milliseconds")};if word=="--timeout"{timeout=n}else{budget=n}
+    let mut path = ""; let mut target = ""; let mut solver = ""; let mut report = ""; let mut reuse = ""; let mut output = ""; let mut as_json = false
+    let mut timeout = 1000; let mut budget = 5000; let mut i = 0
+    for i < len(words) { let word = words[i]; i = i + 1
+        if word == "--json" { as_json = true; continue }
+        if word == "--solver" || word == "--timeout" || word == "--budget" || word == "--report" || word == "--reuse" || word == "--build" || word == "--target" {
+            if i >= len(words) { verification_error("missing value after " + word) }; let value = words[i]; i = i + 1
+            if word == "--solver" { solver = value } else if word == "--report" { report = value } else if word == "--reuse" { reuse = value } else if word == "--build" { output = value } else if word == "--target" { target = targets.normalize(value) } else {
+                let mut n = 0; match text.parse_int(value) { Some(v) => n = v, None => verification_error("invalid verification budget") }
+                if n < 1 || n > 60000 { verification_error("verification budgets must be 1..60000 milliseconds") }; if word == "--timeout" { timeout = n } else { budget = n }
             }
-        }else{if path!=""||text.starts_with(word,"--"){verification_error("usage: vela verify [--json] [--solver z3] [--report FILE] [--reuse FILE] [--build EXE] SOURCE")};path=word}
+        } else { if path != "" || text.starts_with(word, "--") { verification_error("usage: vela verify [--json] [--solver z3] [--report FILE] [--reuse FILE] [--build EXE] SOURCE") }; path = word }
     }
-    if path==""{verification_error("missing source file")}
-    let k=checked_target(path,root,output=="",target)
-    if reuse!=""{
-        let old=json.parse(read(reuse));let mut prior=json.null();match old{Ok(v)=>prior=v,Err(e)=>verification_error(e)}
-        if json.str_or(json.get(prior,"format"),"")!="vela.verify"||json.int_or(json.get(prior,"version"),0)!=1{verification_error("unsupported proof report")}
-        let mut now=json.null();match evidence.context(k){Ok(v)=>now=v,Err(e)=>verification_error(e)}
-        match evidence.fresh(json.get(prior,"context"),now){Ok(_)=>{},Err(e)=>verification_error(e)}
+    if path == "" { verification_error("missing source file") }
+    let k = checked_target(path, root, output == "", target)
+    if reuse != "" {
+        let old = json.parse(read(reuse)); let mut prior = json.null(); match old { Ok(v) => prior = v, Err(e) => verification_error(e) }
+        if json.str_or(json.get(prior, "format"), "") != "vela.verify" || json.int_or(json.get(prior, "version"), 0) != 1 { verification_error("unsupported proof report") }
+        let mut now = json.null(); match evidence.context(k) { Ok(v) => now = v, Err(e) => verification_error(e) }
+        match evidence.fresh(json.get(prior, "context"), now) { Ok(_) => {}, Err(e) => verification_error(e) }
     }
-    let mut proof=verification.Outcome{checked:k,report:json.null()}
-    match verification.run(k,solver,timeout,budget){Ok(v)=>proof=v,Err(e)=>verification_error(e)}
-    let data=json.pretty(proof.report)
-    if report!=""{match files.write(report,data){Ok(_)=>{},Err(e)=>verification_error(e)}}
-    let mut refuted=false
-    for row in json.items(json.get(proof.report,"results")){
-        let state=json.str_or(json.get(row,"status"),"unknown");if state=="refuted"{refuted=true}
-        if !as_json{let f=json.get(row,"function");print(state+"  "+json.str_or(json.get(f,"file"),"")+":"+strings.from_int(json.int_or(json.get(f,"line"),0))+" "+json.str_or(json.get(f,"name"),"")+" — "+json.str_or(json.get(row,"reason"),""))}
+    let mut proof = verification.Outcome { checked: k, report: json.null() }
+    match verification.run(k, solver, timeout, budget) { Ok(v) => proof = v, Err(e) => verification_error(e) }
+    let data = json.pretty(proof.report)
+    if report != "" { match files.write(report, data) { Ok(_) => {}, Err(e) => verification_error(e) } }
+    let mut refuted = false
+    for row in json.items(json.get(proof.report, "results")) {
+        let state = json.str_or(json.get(row, "status"), "unknown"); if state == "refuted" { refuted = true }
+        if !as_json { let f = json.get(row, "function"); print(state + "  " + json.str_or(json.get(f, "file"), "") + ":" + strings.from_int(json.int_or(json.get(f, "line"), 0)) + " " + json.str_or(json.get(f, "name"), "") + " — " + json.str_or(json.get(row, "reason"), "")) }
     }
-    if as_json{print(data)}
-    if refuted{os.exit(1)}
-    if output!=""{build_from(path,output,root,false,proof.checked,link_flags(path),target)}
-    if json.str_or(json.get(proof.report,"status"),"unknown")=="unknown"{os.exit(3)}
+    if as_json { print(data) }
+    if refuted { os.exit(1) }
+    if output != "" { build_from(path, output, root, false, proof.checked, link_flags(path), target) }
+    if json.str_or(json.get(proof.report, "status"), "unknown") == "unknown" { os.exit(3) }
 }
-fn verification_error(message: Str) uses os { os.eprint("vela: "+message+" [E6012]");os.exit(1) }
+fn verification_error(message: Str) uses os { os.eprint("vela: " + message + " [E6012]"); os.exit(1) }
 
-fn property_child(args:[Str]) uses os {
-    if len(args)!=7 { verification_error("invalid property launch") }
-    let mut allow:[Str]=[];let mut deny:[Str]=[]
-    for side in 0..2 {let mut doc=json.null();match json.parse(args[side+2]){Ok(v)=>doc=v,Err(e)=>verification_error(e)}
-        match doc {json.Json.Array(values)=>{for value in values{match value{json.Json.Str(word)=>{if side==0{push(mut allow,word)}else{push(mut deny,word)}},_=>verification_error("invalid property policy")}}},_=>verification_error("invalid property policy")}
+fn property_child(args: [Str]) uses os {
+    if len(args) != 7 { verification_error("invalid property launch") }
+    let mut allow: [Str] = []; let mut deny: [Str] = []
+    for side in 0..2 { let mut doc = json.null(); match json.parse(args[side + 2]) { Ok(v) => doc = v, Err(e) => verification_error(e) }
+        match doc { json.Json.Array(values) => { for value in values { match value { json.Json.Str(word) => { if side == 0 { push(mut allow, word) } else { push(mut deny, word) } }, _ => verification_error("invalid property policy") } } }, _ => verification_error("invalid property policy") }
     }
-    match sysio.sandbox_run(args[4..7],allow,deny){Ok(code)=>os.exit(code),Err(e)=>capabilities.fail(e)}
+    match sysio.sandbox_run(args[4..7], allow, deny) { Ok(code) => os.exit(code), Err(e) => capabilities.fail(e) }
 }
-fn property_command(path:Str,words:[Str],root:Str,options:capabilities.Options) uses fs, os, clock {
-    let loaded=load(path,read(path),root)
-    if len(loaded.errors)>0{fail(path,loaded.errors)}
-    let original=checker.check_target(loaded,true,"",targets.host())
-    if len(original.errors)>0{fail(path,errors.merged(original.errors,original.warnings))};warn(path,original.warnings)
-    let libraries=link_flags(path);capabilities.admit(original,options,libraries,true)
-    if len(libraries)>0{verification_error("automatic properties do not execute foreign-library constructors; use manual tests")}
-    let mut context=json.null();match evidence.context(original){Ok(v)=>context=v,Err(e)=>verification_error(e)}
-    let plan=properties.prepare(loaded,original,options.cases,options.seed,options.size,options.shrinks,words)
-    let mut k=original
-    if len(plan.specs)>0{k=checker.check_target(plan.loaded,true,"",targets.host());if len(k.errors)>0{fail(path,k.errors)};k=properties.mark(k,plan.specs)}
-    let mut tmp="";match files.temp_dir(){Ok(dir)=>tmp=dir,Err(e)=>driver_error(e)};let exe=temporary_executable(tmp,"properties")
-    if len(plan.specs)>0{
-        if native(true){assemble_mode(targets.program(lowered(path,lower.lower_observed(k,true,false,3,"")),""),modules.stem(path)+"_properties",exe,root,"-O0",libraries,"",3)} else{compile_mode(c_code(path,codegen.generate_observed(k,true,false,3,"")),modules.stem(path)+"_properties",exe,root,"-O0",libraries,"",3)}
+fn property_command(path: Str, words: [Str], root: Str, options: capabilities.Options) uses fs, os, clock {
+    let loaded = load(path, read(path), root)
+    if len(loaded.errors) > 0 { fail(path, loaded.errors) }
+    let original = checker.check_target(loaded, true, "", targets.host())
+    if len(original.errors) > 0 { fail(path, errors.merged(original.errors, original.warnings)) }; warn(path, original.warnings)
+    let libraries = link_flags(path); capabilities.admit(original, options, libraries, true)
+    if len(libraries) > 0 { verification_error("automatic properties do not execute foreign-library constructors; use manual tests") }
+    let mut context = json.null(); match evidence.context(original) { Ok(v) => context = v, Err(e) => verification_error(e) }
+    let plan = properties.prepare(loaded, original, options.cases, options.seed, options.size, options.shrinks, words)
+    let mut k = original
+    if len(plan.specs) > 0 { k = checker.check_target(plan.loaded, true, "", targets.host()); if len(k.errors) > 0 { fail(path, k.errors) }; k = properties.mark(k, plan.specs) }
+    let mut tmp = ""; match files.temp_dir() { Ok(dir) => tmp = dir, Err(e) => driver_error(e) }; let exe = temporary_executable(tmp, "properties")
+    if len(plan.specs) > 0 {
+        if native(true) { assemble_mode(targets.program(lowered(path, lower.lower_observed(k, true, false, 3, "")), ""), modules.stem(path) + "_properties", exe, root, "-O0", libraries, "", 3) } else { compile_mode(c_code(path, codegen.generate_observed(k, true, false, 3, "")), modules.stem(path) + "_properties", exe, root, "-O0", libraries, "", 3) }
     }
-    let report=properties.run_cases(original,k,plan,exe,options,context)
-    remove_executable(exe,true);cleanup(tmp)
-    let data=json.pretty(report)
-    if options.report!=""{match files.write(options.report,data){Ok(_)=>{},Err(e)=>driver_error(e)}}
-    if options.as_json{print(data)}else{
-        for result in json.items(json.get(report,"results")){let f=json.get(result,"function");print(json.str_or(json.get(result,"status"),"unknown")+"  "+json.str_or(json.get(f,"file"),"")+":"+strings.from_int(json.int_or(json.get(f,"line"),0))+" "+json.str_or(json.get(f,"name"),"")+" — "+json.str_or(json.get(result,"reason"),""))}
-        print("properties: "+json.str_or(json.get(report,"status"),"unknown")+"; passing samples are not proof")
+    let report = properties.run_cases(original, k, plan, exe, options, context)
+    remove_executable(exe, true); cleanup(tmp)
+    let data = json.pretty(report)
+    if options.report != "" { match files.write(options.report, data) { Ok(_) => {}, Err(e) => driver_error(e) } }
+    if options.as_json { print(data) } else {
+        for result in json.items(json.get(report, "results")) { let f = json.get(result, "function"); print(json.str_or(json.get(result, "status"), "unknown") + "  " + json.str_or(json.get(f, "file"), "") + ":" + strings.from_int(json.int_or(json.get(f, "line"), 0)) + " " + json.str_or(json.get(f, "name"), "") + " — " + json.str_or(json.get(result, "reason"), "")) }
+        print("properties: " + json.str_or(json.get(report, "status"), "unknown") + "; passing samples are not proof")
     }
-    let status=json.str_or(json.get(report,"status"),"unknown");if status=="failed"{os.exit(1)};if status=="unknown"{os.exit(3)}
+    let status = json.str_or(json.get(report, "status"), "unknown"); if status == "failed" { os.exit(1) }; if status == "unknown" { os.exit(3) }
 }

@@ -33,9 +33,9 @@ pub fn begin(directory: Str, mode: Int, backend: Str, target: Str, compiler: [St
     if directory == "" { out.reason = "VELA_CACHE is disabled"; return out }
     // These options consume or produce compiler state outside plain textual
     // preprocessing. Preserve ordinary compilation rather than reuse objects.
-    let extra=setting("VELA_CFLAGS")
-    for option in ["-fmodule","-include-pch","-fpch","-fplugin","-fpass-plugin","-load","-specs","--specs","-fprofile","--coverage","-ftest-coverage","-ignorelist","-blacklist"]{
-        if text.contains(extra,option){out.reason="external compiler state is not cached";return out}
+    let extra = setting("VELA_CFLAGS")
+    for option in ["-fmodule", "-include-pch", "-fpch", "-fplugin", "-fpass-plugin", "-load", "-specs", "--specs", "-fprofile", "--coverage", "-ftest-coverage", "-ignorelist", "-blacklist"] {
+        if text.contains(extra, option) { out.reason = "external compiler state is not cached"; return out }
     }
     let mut version = compiler; push(mut version, "--version")
     match processes.communicate(version, "", 65536, 3000) {
@@ -44,7 +44,7 @@ pub fn begin(directory: Str, mode: Int, backend: Str, target: Str, compiler: [St
     }
     let image = binary(compiler[0]); if image == "" { out.reason = "toolchain image unavailable"; return out }
     out.identity = out.identity + "\n" + image + "\n" + backend + "\n" + target
-    match sysio.canonical("."){Ok(path)=>out.identity=out.identity+"\n"+path,Err(_)=>{out.reason="working directory unavailable";return out}}
+    match sysio.canonical(".") { Ok(path) => out.identity = out.identity + "\n" + path, Err(_) => { out.reason = "working directory unavailable"; return out } }
     for name in ["PATH", "SDKROOT", "MACOSX_DEPLOYMENT_TARGET", "IPHONEOS_DEPLOYMENT_TARGET", "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "GCC_EXEC_PREFIX", "COMPILER_PATH", "LIBRARY_PATH", "SOURCE_DATE_EPOCH", "CFLAGS", "CXXFLAGS", "ASFLAGS"] { out.identity = out.identity + "\n" + name + "=" + setting(name) }
     let dest = modules.join(directory, "objects-v1")
     match processes.communicate(["mkdir", "-p", dest], "", 65536, 3000) { Ok(v) => { if v.status != 0 { out.reason = "cache is not writable"; return out } }, Err(_) => { out.reason = "cache is not writable"; return out } }

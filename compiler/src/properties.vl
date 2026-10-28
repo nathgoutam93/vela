@@ -144,8 +144,8 @@ fn collect_hints(g: mut Gen, e: ast.Expr, id: Int, t: Int, out: mut [Str], fuel:
 
 pub fn prepare(loaded: modules.Loaded, checked: checker.Checked, cases: Int, seed: Int, size: Int, shrinks: Int, words: [Str]) -> Plan {
     let mut plan = Plan { loaded: loaded, specs: [], skipped: [] }; let graph = call_graph.build(checked); let mut total = 0; let mut raw_program = false; for raw in graph.unsafe { raw_program = raw_program || raw }
-    for id in 0..len(checked.fns) { let f = checked.fns[id];let module=checked.modules[f.module]
-        let standard=module.is_std||(module.name!=""&&len(module.path)>4&&module.path[0..4]=="std/")
+    for id in 0..len(checked.fns) { let f = checked.fns[id]; let module = checked.modules[f.module]
+        let standard = module.is_std || (module.name != "" && len(module.path) > 4 && module.path[0..4] == "std/")
         if f.is_test || standard || len(f.decl.requires) + len(f.decl.ensures) == 0 { continue }
         let mut selected = len(words) == 0; for word in words { if text.contains(f.decl.name, word) { selected = true } }; if !selected { continue }
         let mut reason = ""; if raw_program { reason = "automatic properties do not execute a program containing unsafe code" }; if f.decl.foreign != "" || len(f.params) > 8 { reason = "foreign function or too many parameters" }
@@ -227,8 +227,8 @@ pub fn run_cases(original: checker.Checked, compiled: checker.Checked, plan: Pla
     let mut seed = integers.unsigned_text(options.seed)
     for spec in plan.specs {
         let actual = original.fns[spec.original]; let module = original.modules[actual.module].name; let mut target = actual.decl.name; if module != "" { target = module + "." + target }
-        let mut id = -1; let mut which = -1;let entries=codegen.test_ids(compiled)
-        for index in 0..len(entries) {let i=entries[index];let f=compiled.fns[i];if f.module==spec.module&&f.decl.name==spec.helper{id=i;which=index}}
+        let mut id = -1; let mut which = -1; let entries = codegen.test_ids(compiled)
+        for index in 0..len(entries) { let i = entries[index]; let f = compiled.fns[i]; if f.module == spec.module && f.decl.name == spec.helper { id = i; which = index } }
         let mut success = 0; let mut discarded = 0; let mut failure = -1; let mut tries = 0; let mut reason = "no admitted cases"; let mut event = Event { kind: "unknown", diagnostic: json.null(), stdout: "", stderr: "", reason: reason }
         if id >= 0 {
             for index in 0..spec.initial {
