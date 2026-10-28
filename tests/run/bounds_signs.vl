@@ -1,0 +1,42 @@
+// A bounds check `i <u n` follows from `i < n` once i is known not to be
+// negative (opt.known_branches): a check passed before, or `i >= n` with n a
+// length. Each check that can still fail must stay: here a negative index
+// that passed `i < n` panics.
+// out: 98
+// out: 0
+// out: 97
+// out: 195
+// err: bounds_signs.vl:33:22: panic: index out of range
+// exit: 101
+type Reader = struct {
+    text: Str
+    pos: Int
+}
+
+fn peek(r: Reader) -> Byte {
+    if r.pos < len(r.text) {
+        return r.text[r.pos]
+    }
+    return byte(0)
+}
+
+// The second peek's check follows from the first's (or from pos >= len).
+fn two(r: Reader) -> Int {
+    return int(peek(r)) + int(peek(r))
+}
+
+// Only `pos < len` is known here: pos may be negative.
+fn below(r: Reader) -> Int {
+    if r.pos >= len(r.text) {
+        return 0
+    }
+    return int(r.text[r.pos])
+}
+
+fn main() {
+    print(below(Reader { text: "abc", pos: 1 }))
+    print(two(Reader { text: "ab", pos: 2 }))
+    print(peek(Reader { text: "ab", pos: 0 }))
+    print(two(Reader { text: "xa", pos: 1 }) + 1)
+    print(below(Reader { text: "abc", pos: -1 }))
+}

@@ -751,6 +751,16 @@ fn known_branches(f: ir.Func) -> ir.Func {
         for t in targets(i) { ways[t] = ways_to(ways, t) + 1 }
         if i.op == ir.Op.Label && k > 0 && !ir.ends_block(f.insts[k - 1].op) { ways[i.imm] = ways_to(ways, i.imm) + 1 }
     }
+    // Registers never negative: constants, and the bound a bounds check
+    // compares an index with. Lowering compares only lengths and widths so
+    // (`bounds_check`), and these registers are set once, so they hold the
+    // same value wherever they are read.
+    let mut bounds: Map[Int, Bool] = [:]
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        if i.op == ir.Op.Const && defs[i.dst] == 1 && i.imm >= 0 { bounds[i.dst] = true }
+        if i.op == ir.Op.BranchCmp && i.sym == "ult" && i.b >= 0 && defs[i.b] == 1 && bounds_check(f, k) { bounds[i.b] = true }
+    }
     let mut facts: Map[Str, Bool] = [:]
     let mut saved: Map[Int, Map[Str, Bool]] = [:]
     let mut arrivals: Map[Int, Int] = [:]
@@ -766,9 +776,8 @@ fn known_branches(f: ir.Func) -> ir.Func {
         }
         if i.op == ir.Op.BranchCmp && i.a >= 0 && i.b >= 0 && defs[i.a] == 1 && defs[i.b] == 1 && inverse(i.sym) != "" &&
             f.classes[i.a] != ir.FLOAT() && f.classes[i.b] != ir.FLOAT() {
-            let holds = fact(i.sym, i.a, i.b)
-            let fails = fact(inverse(i.sym), i.a, i.b)
-            if maps.has(facts, holds) {
+            let known = decided(facts, bounds, i.sym, i.a, i.b)
+            if known == 1 {
                 changed = true
                 let jump = ir.inst(ir.Op.Jump, -1, -1, -1, i.imm)
                 meet(mut saved, mut arrivals, i.imm, facts)
@@ -776,14 +785,14 @@ fn known_branches(f: ir.Func) -> ir.Func {
                 falls = false
                 continue
             }
-            if maps.has(facts, fails) {
+            if known == 0 {
                 changed = true
                 continue  // never taken
             }
             let mut taken = facts
-            learn(mut taken, i.sym, i.a, i.b)
+            learn(mut taken, bounds, i.sym, i.a, i.b)
             meet(mut saved, mut arrivals, i.imm, taken)
-            learn(mut facts, inverse(i.sym), i.a, i.b)
+            learn(mut facts, bounds, inverse(i.sym), i.a, i.b)
             push(mut out.insts, i)
             falls = true
             continue
@@ -814,13 +823,76 @@ fn fact(cond: Str, a: Int, b: Int) -> Str {
     return c + ":" + strings.from_int(x) + ":" + strings.from_int(y)
 }
 
-// Know that `a cond b`, and what follows from it directly.
-fn learn(facts: mut Map[Str, Bool], cond: Str, a: Int, b: Int) {
+// Know that `a cond b`, and what follows from it directly, signs included:
+// x <= y with x >= 0 makes y >= 0, and x <u y with y >= 0 makes x >= 0 and
+// x < y, as no negative number is below y unsigned.
+fn learn(facts: mut Map[Str, Bool], bounds: Map[Int, Bool], cond: Str, a: Int, b: Int) {
     facts[fact(cond, a, b)] = true
     let also = match cond {
         "lt" => ["le", "ne"], "gt" => ["ge", "ne"], "ult" => ["ule", "ne"], "ugt" => ["uge", "ne"], "eq" => ["le", "ge", "ule", "uge"], _ => [],
     }
     for c in also { facts[fact(c, a, b)] = true }
+    let mut small = a
+    let mut big = b
+    if cond == "gt" || cond == "ge" || cond == "ugt" || cond == "uge" {
+        small = b
+        big = a
+    }
+    if cond == "lt" || cond == "le" || cond == "gt" || cond == "ge" {
+        if nonneg(facts, bounds, small) { facts[sign(big)] = true }
+    } else if cond == "eq" {
+        if nonneg(facts, bounds, a) || nonneg(facts, bounds, b) {
+            facts[sign(a)] = true
+            facts[sign(b)] = true
+        }
+    } else if cond != "ne" && nonneg(facts, bounds, big) {
+        facts[sign(small)] = true
+        if cond == "ult" || cond == "ugt" { learn(mut facts, bounds, "lt", small, big) } else { learn(mut facts, bounds, "le", small, big) }
+    }
+}
+
+fn sign(r: Int) -> Str {
+    return "nn:" + strings.from_int(r)
+}
+
+fn nonneg(facts: Map[Str, Bool], bounds: Map[Int, Bool], r: Int) -> Bool {
+    return maps.has(bounds, r) || maps.has(facts, sign(r))
+}
+
+// Whether `a cond b` is known: 1 true, 0 false, -1 not known. An unsigned
+// test of numbers known not negative is the signed one.
+fn decided(facts: Map[Str, Bool], bounds: Map[Int, Bool], cond: Str, a: Int, b: Int) -> Int {
+    if maps.has(facts, fact(cond, a, b)) { return 1 }
+    if maps.has(facts, fact(inverse(cond), a, b)) { return 0 }
+    let unsigned = cond == "ult" || cond == "ule" || cond == "ugt" || cond == "uge"
+    if !unsigned || !nonneg(facts, bounds, a) || !nonneg(facts, bounds, b) {
+        // x < y with x >= 0 makes x <u y even when y's sign is not known.
+        if cond == "ult" && maps.has(facts, fact("lt", a, b)) && nonneg(facts, bounds, a) { return 1 }
+        if cond == "uge" && maps.has(facts, fact("lt", a, b)) && nonneg(facts, bounds, a) { return 0 }
+        if cond == "ugt" && maps.has(facts, fact("lt", b, a)) && nonneg(facts, bounds, b) { return 1 }
+        if cond == "ule" && maps.has(facts, fact("lt", b, a)) && nonneg(facts, bounds, b) { return 0 }
+        return -1
+    }
+    let signed = match cond { "ult" => "lt", "ule" => "le", "ugt" => "gt", _ => "ge" }
+    if maps.has(facts, fact(signed, a, b)) { return 1 }
+    if maps.has(facts, fact(inverse(signed), a, b)) { return 0 }
+    return -1
+}
+
+// Whether the test at `k` is a bounds check: `branch.cmp ult i, n` whose
+// failing way goes straight to a runtime call reporting the index, which
+// lowering makes only with n a length or width (element_at, index,
+// fixed_at, a shift's count).
+fn bounds_check(f: ir.Func, k: Int) -> Bool {
+    let mut j = k + 1
+    for j < len(f.insts) && (f.insts[j].op == ir.Op.SymAddr || f.insts[j].op == ir.Op.Const) {
+        j = j + 1
+    }
+    if j + 1 >= len(f.insts) || f.insts[j].op != ir.Op.CCall || f.insts[j + 1].op != ir.Op.Unreachable {
+        return false
+    }
+    let name = f.insts[j].sym
+    return name == "vela_str_at" || name == "vela_array_at" || name == "vela_fixed_array_at" || name == "vela_fixed_op"
 }
 
 // One more way into `label`, with `facts` known on it: keep what every way so
