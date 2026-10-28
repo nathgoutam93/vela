@@ -1523,6 +1523,7 @@ fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
     if rt != types.NOTHING() {
         if in_memory(g, rt) {
             g.fs.sret = ir.param(mut g.fs.f, ir.INT())
+            g.fs.f.sret = g.fs.sret
         } else {
             g.fs.f.result = class_of(rt)
         }
@@ -2719,6 +2720,7 @@ fn closure_value(g: mut Low, e: ast.Expr, body: ast.Block) -> Val {
     if rt != types.NOTHING() {
         if in_memory(g, rt) {
             g.fs.sret = ir.param(mut g.fs.f, ir.INT())
+            g.fs.f.sret = g.fs.sret
         } else {
             g.fs.f.result = class_of(rt)
         }
