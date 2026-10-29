@@ -169,6 +169,68 @@ still hold 2 to 3 times cmark's memory. The native build is now 1.39× the C
 build (geometric mean): the package changes removed work both builds shared,
 and what is left is mostly byte loops that clang compiles better (TL-112).
 
+## Linux x86-64 (2026-10-29)
+
+The same programs on the Linux x86-64 host of the earlier reports, before
+(`b2ebbb4`, built with that commit's compiler) and after (`87c0fa1`). cmark
+could not be built there, so this compares Vela with itself: the follow-up's
+gains, and the native build against the C build. The method is
+`bench/markdown_compare.py`'s without cmark: the same repository input and
+cmark's 25 samples repeated to 10 MB, outputs of all four programs checked
+equal first, best of seven fresh processes in an order rotating every round,
+minus each program's best time on an empty file (1.1 to 1.3 ms). The
+[raw report](2026-10-29-markdown-linux.json) keeps every sample.
+
+- Intel Xeon at 2.10 GHz, 4 cores, Linux 6.18, gcc 13.3 (`cc -O2` for the
+  C build).
+- This host is noisy (TL-085): the median spread between a program's fastest
+  and slowest of seven runs is 24%. Read single rows as approximate.
+
+| | C: after / before | native: after / before | native / C before | native / C after |
+| --- | ---: | ---: | ---: | ---: |
+| repository | 0.81× | 0.90× | 0.97× | 1.08× |
+| 25 samples, geometric mean | 0.67× | 0.72× | 0.95× | 1.01× |
+
+On the repository's Markdown the C build went from 35.2 to 43.4 MB/s and
+the native build from 36.2 to 40.0 MB/s.
+
+| Input | Before C | Before native | After C | After native | native / C | Peak RSS before / after (C) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| repository (10.5 MB) | 0.299 s | 0.291 s | 0.243 s | 0.263 s | 1.08 | 125 / 125 MiB |
+| `block-bq-flat` | 0.351 s | 0.287 s | 0.218 s | 0.222 s | 1.02 | 151 / 128 MiB |
+| `block-bq-nested` | 0.387 s | 0.391 s | 0.299 s | 0.279 s | 0.93 | 213 / 167 MiB |
+| `block-code` | 0.300 s | 0.328 s | 0.128 s | 0.137 s | 1.07 | 140 / 125 MiB |
+| `block-fences` | 0.325 s | 0.316 s | 0.199 s | 0.211 s | 1.06 | 125 / 125 MiB |
+| `block-heading` | 0.681 s | 0.697 s | 0.389 s | 0.417 s | 1.07 | 316 / 238 MiB |
+| `block-hr` | 0.440 s | 0.438 s | 0.309 s | 0.327 s | 1.06 | 260 / 185 MiB |
+| `block-html` | 0.510 s | 0.422 s | 0.318 s | 0.268 s | 0.84 | 182 / 133 MiB |
+| `block-lheading` | 0.384 s | 0.454 s | 0.266 s | 0.280 s | 1.05 | 202 / 153 MiB |
+| `block-list-flat` | 1.133 s | 1.195 s | 0.787 s | 0.783 s | 0.99 | 606 / 413 MiB |
+| `block-list-nested` | 1.508 s | 1.330 s | 0.884 s | 0.828 s | 0.94 | 703 / 474 MiB |
+| `block-ref-flat` | 0.524 s | 0.588 s | 0.472 s | 0.388 s | 0.82 | 257 / 215 MiB |
+| `block-ref-nested` | 1.238 s | 1.237 s | 1.082 s | 1.059 s | 0.98 | 652 / 636 MiB |
+| `inline-autolink` | 0.420 s | 0.377 s | 0.257 s | 0.298 s | 1.16 | 149 / 126 MiB |
+| `inline-backticks` | 0.520 s | 0.465 s | 0.414 s | 0.436 s | 1.05 | 283 / 261 MiB |
+| `inline-em-flat` | 1.025 s | 0.985 s | 0.861 s | 0.884 s | 1.03 | 549 / 531 MiB |
+| `inline-em-nested` | 0.883 s | 0.856 s | 0.699 s | 0.769 s | 1.10 | 419 / 401 MiB |
+| `inline-em-worst` | 0.581 s | 0.595 s | 0.502 s | 0.518 s | 1.03 | 300 / 284 MiB |
+| `inline-entity` | 1.631 s | 0.624 s | 0.290 s | 0.296 s | 1.02 | 180 / 159 MiB |
+| `inline-escape` | 1.145 s | 1.069 s | 0.938 s | 0.891 s | 0.95 | 613 / 575 MiB |
+| `inline-html` | 0.829 s | 0.840 s | 0.458 s | 0.458 s | 1.00 | 281 / 231 MiB |
+| `inline-links-flat` | 0.454 s | 0.454 s | 0.362 s | 0.375 s | 1.04 | 192 / 152 MiB |
+| `inline-links-nested` | 1.013 s | 1.084 s | 0.934 s | 0.904 s | 0.97 | 599 / 558 MiB |
+| `inline-newlines` | 0.741 s | 0.695 s | 0.519 s | 0.556 s | 1.07 | 343 / 314 MiB |
+| `lorem1` | 0.084 s | 0.085 s | 0.076 s | 0.082 s | 1.08 | 125 / 125 MiB |
+| `rawtabs` | 0.316 s | 0.303 s | 0.197 s | 0.209 s | 1.06 | 129 / 125 MiB |
+
+- **The native gap is arm64's.** Here the native build runs at the C
+  build's speed (1.01× over the samples, 1.08× on the repository input),
+  where the M2 measured 1.39× and 1.31×. The shared optimizer passes are the
+  same on both, so what remains of TL-112 points at the arm64 emitter.
+- **The follow-up's gains hold on x86-64**, smaller than on the M2 for the
+  C build (0.67× of the earlier time over the samples here). Entities went
+  from 1.63 s to 0.29 s through C, code blocks from 0.30 s to 0.13 s.
+
 ## Reproduce
 
 Build cmark 0.31.2 from its tag. Its CMake build generates two headers; in
