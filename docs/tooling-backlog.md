@@ -3197,6 +3197,17 @@ the same entry. Close it with a commit or validation result; keep its history.
   shared. Sampling `block-code` shows native byte loops (`escape`,
   `finalize_code`, `add_line`) taking about twice the C build's samples.
   Suspected cause, not verified: clang vectorizes or unrolls these scans.
+- **x86-64 (2026-10-29):** the same comparison on Linux x86-64 (Intel Xeon
+  at 2.10 GHz, gcc 13.3), by `bench/markdown_compare.py`'s method without
+  cmark, measures the native build at 1.01x the C build over cmark's 25
+  samples (geometric mean) and 1.08x on the repository's Markdown at
+  `87c0fa1`, against 1.39x and 1.31x on the M2
+  ([section](../bench/results/2026-10-28-markdown-cmark-macos.md#linux-x86-64-2026-10-29),
+  [raw](../bench/results/2026-10-29-markdown-linux.json)). The optimizer
+  passes are shared, so the remaining gap is in the arm64 emitter or its
+  interaction with the M2, not the native pipeline as a whole. Next step:
+  compare the arm64 and x86-64 code of `render.escape` and
+  `blocks.add_line`.
 
 ### TL-113: The C backend retains each element a for loop reads
 

@@ -22,7 +22,7 @@ Run tools from [bench/](../README.md) and put fresh scratch reports in `build/`.
 | `2026-10-27-x64-*.json` | Paired native comparisons for TL-097 (nbody) and TL-098 (rcx/rdx allocation), and a 21-round recheck |
 | `2026-10-28-native-loop-fields-ab.json` | Paired native comparison for TL-103 to TL-105 (loop fields, load reuse, known branches, constant division) |
 | [`2026-10-28-markdown-port.md`](2026-10-28-markdown-port.md) | The CommonMark port: conformance, pathological inputs, throughput, memory, compile time and friction |
-| [`2026-10-28-markdown-cmark-macos.md`](2026-10-28-markdown-cmark-macos.md), its JSON report and `2026-10-29-markdown-cmark-macos-after.json` | The markdown package against cmark 0.31.2 on the repository's Markdown and cmark's 25 feature samples, both Vela backends, before and after the follow-up |
+| [`2026-10-28-markdown-cmark-macos.md`](2026-10-28-markdown-cmark-macos.md), its JSON report, `2026-10-29-markdown-cmark-macos-after.json` and `2026-10-29-markdown-linux.json` | The markdown package against cmark 0.31.2 on the repository's Markdown and cmark's 25 feature samples, both Vela backends, before and after the follow-up; the same programs on Linux x86-64 without cmark |
 | `*-validation.json` | Commands, environments, outcomes and validation limits |
 
 Reports retain their original bytes. Paths, commands, source digests and
