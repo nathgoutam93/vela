@@ -994,16 +994,37 @@ void vela_eprint_float(double x) {
     print_line(stderr, buf, (size_t)len);
 }
 
+// x in decimal at buf, as printf's "%" PRId64 writes it, without its cost
+// (integers become text in every key the compiler builds): the length,
+// with a 0 after it. buf holds at least 21 bytes.
+static int format_digits(char *buf, uint64_t u, bool negative) {
+    char digits[20];
+    int n = 0;
+    do {
+        digits[n++] = (char)('0' + u % 10);
+        u /= 10;
+    } while (u);
+    int len = 0;
+    if (negative) buf[len++] = '-';
+    while (n) buf[len++] = digits[--n];
+    buf[len] = 0;
+    return len;
+}
+
+static int format_int(char *buf, int64_t x) {
+    return x < 0 ? format_digits(buf, 0 - (uint64_t)x, true) : format_digits(buf, (uint64_t)x, false);
+}
+
 void vela_print_int(int64_t x) {
     VELA_PROFILE_SCOPE("output");
     if (fake_stdout) {
         char buf[32];
-        int len = snprintf(buf, sizeof buf, "%" PRId64, x);
+        int len = format_int(buf, x);
         captured((vela_str){NULL, (const uint8_t *)buf, len});
         return;
     }
     char buf[32];
-    int len = snprintf(buf, sizeof buf, "%" PRId64, x);
+    int len = format_int(buf, x);
     print_line(stdout, buf, (size_t)len);
 }
 
@@ -1027,7 +1048,7 @@ void vela_print_str(vela_str x) {
 
 void vela_eprint_int(int64_t x) {
     char buf[32];
-    int len = snprintf(buf, sizeof buf, "%" PRId64, x);
+    int len = format_int(buf, x);
     print_line(stderr, buf, (size_t)len);
 }
 
@@ -1403,7 +1424,7 @@ void vela_builder_add(vela_array *b, vela_str s) {
 void vela_builder_add_int(vela_array *b, int64_t n) {
     VELA_PROFILE_SCOPE("strings");
     char buf[24];  // INT64_MIN is 20 characters
-    int len = snprintf(buf, sizeof buf, "%" PRId64, n);
+    int len = format_int(buf, n);
     vela_builder_add(b, (vela_str){NULL, (const uint8_t *)buf, len});
 }
 
@@ -1414,7 +1435,7 @@ vela_str vela_builder_build(vela_array *b) {
 
 vela_str vela_from_int(int64_t n) {
     char buf[24];
-    int len = snprintf(buf, sizeof buf, "%" PRId64, n);
+    int len = format_int(buf, n);
     return str_from(buf, (size_t)len);
 }
 
@@ -2036,19 +2057,19 @@ int64_t vela_fixed_compare(uint64_t a, uint64_t b, int64_t condition) {
 double vela_uint_to_float(uint64_t n) { return (double)n; }
 vela_str vela_from_uint(uint64_t n) {
     char buf[32];
-    int len = snprintf(buf, sizeof buf, "%" PRIu64, n);
+    int len = format_digits(buf, n, false);
     return str_from(buf, (size_t)len);
 }
 void vela_print_uint(uint64_t n) {
     VELA_PROFILE_SCOPE("output");
     if (fake_stdout) { vela_str s = vela_from_uint(n); captured(s); vela_str_release(s); return; }
     char buf[32];
-    int len = snprintf(buf, sizeof buf, "%" PRIu64, n);
+    int len = format_digits(buf, n, false);
     print_line(stdout, buf, (size_t)len);
 }
 void vela_eprint_uint(uint64_t n) {
     char buf[32];
-    int len = snprintf(buf, sizeof buf, "%" PRIu64, n);
+    int len = format_digits(buf, n, false);
     print_line(stderr, buf, (size_t)len);
 }
 
