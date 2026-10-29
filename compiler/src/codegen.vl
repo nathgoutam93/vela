@@ -8,6 +8,7 @@ import contract_checks
 import errors
 import integers
 import layout
+import lists
 import maps
 import loops
 import mono
@@ -1487,6 +1488,14 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
     let v = expr(mut g, scrutinee).c
     let t = ty(g, scrutinee)
     let borrowed = unchanging(g, scrutinee)
+    // Many Str literals: the arm is chosen first, then tested by number.
+    let texts = switch_texts(arms)
+    let mut chosen = ""
+    if len(texts) > 0 {
+        chosen = new_temp(mut g)
+        emit(mut g, "int64_t " + chosen + " = " + strings.from_int(len(texts)) + ";")
+        text_switch(mut g, v, texts, chosen)
+    }
     let mut all_end = true  // every arm returns, breaks or continues
     // Each arm starts from the lookups made before the match; after it,
     // those no arm forgot remain.
@@ -1504,7 +1513,8 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
                 open(mut g, "{")
             }
         } else {
-            let tests = tests(mut g, a.pattern, v, t)
+            let mut tests = tests(mut g, a.pattern, v, t)
+            if chosen != "" { tests = [chosen + " == " + strings.from_int(i)] }
             let mut cond = strings.builder()
             for j in 0..len(tests) {
                 if j > 0 {
@@ -1583,6 +1593,151 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
     // runs, and no code is written for it: no releases after a match whose
     // arms all return.
     g.dead = all_end
+}
+
+// ---- Matches of many Str literals (TL-107) ----
+
+// A match whose arms before the last are at least this many Str literals
+// chooses its arm by the Str's length, then by its bytes, instead of
+// comparing it with each literal in turn.
+fn many_texts() -> Int {
+    return 8
+}
+
+// The texts of the arms before the last when each is a Str literal and there
+// are enough of them, else none. The last arm takes every other value.
+pub fn switch_texts(arms: [ast.Arm]) -> [Str] {
+    let none: [Str] = []
+    if len(arms) - 1 < many_texts() {
+        return none
+    }
+    let mut out: [Str] = []
+    for i in 0..len(arms) - 1 {
+        match arms[i].pattern.kind {
+            ast.PatternKind.Lit(e) => {
+                match e.kind {
+                    ast.ExprKind.StrLit(text) => push(mut out, text)
+                    _ => return none
+                }
+            }
+            _ => return none
+        }
+    }
+    return out
+}
+
+// The arms to choose among, by length, shortest first: [length, arm, arm,
+// ...]. Of arms with the same text, only the first can be chosen.
+pub fn by_length(texts: [Str]) -> [[Int]] {
+    let mut seen: Map[Str, Bool] = [:]
+    let mut groups: Map[Int, [Int]] = [:]
+    for i in 0..len(texts) {
+        if maps.has(seen, texts[i]) {
+            continue
+        }
+        seen[texts[i]] = true
+        let n = len(texts[i])
+        let mut ids: [Int] = []
+        match maps.get(groups, n) {
+            Some(x) => ids = x
+            None => {}
+        }
+        push(mut ids, i)
+        groups[n] = ids
+    }
+    let mut out: [[Int]] = []
+    for n in lists.sort(maps.keys(groups)) {
+        let mut group = [n]
+        for i in groups[n] { push(mut group, i) }
+        push(mut out, group)
+    }
+    return out
+}
+
+pub type Split = struct {
+    at: Int  // the byte position; -1 when the texts are all the same
+    bytes: [Int]  // the bytes found there, lowest first
+    groups: [[Int]]  // the arms with each
+}
+
+// For the different texts of one length in `ids`, the position whose bytes
+// divide them into the most groups.
+pub fn split(texts: [Str], ids: [Int]) -> Split {
+    let n = len(texts[ids[0]])
+    let mut best = -1
+    let mut most = 1
+    for at in 0..n {
+        let mut found: [Bool] = []
+        for _ in 0..256 { push(mut found, false) }
+        let mut count = 0
+        for id in ids {
+            let b = int(texts[id][at])
+            if !found[b] {
+                found[b] = true
+                count = count + 1
+            }
+        }
+        if count > most {
+            best = at
+            most = count
+        }
+    }
+    let mut out = Split { at: best, bytes: [], groups: [] }
+    if best < 0 {
+        return out
+    }
+    let mut bins: [[Int]] = []
+    for _ in 0..256 { push(mut bins, []) }
+    for id in ids { push(mut bins[int(texts[id][best])], id) }
+    for b in 0..256 {
+        if len(bins[b]) > 0 {
+            push(mut out.bytes, b)
+            push(mut out.groups, bins[b])
+        }
+    }
+    return out
+}
+
+// Sets `chosen` to the arm whose text the Str `v` is, if any, with C
+// switches on its length and on bytes, then one comparison.
+fn text_switch(g: mut Gen, v: Str, texts: [Str], chosen: Str) {
+    emit(mut g, "switch ((" + v + ").len) {")
+    for group in by_length(texts) {
+        let mut ids: [Int] = []
+        for k in 1..len(group) { push(mut ids, group[k]) }
+        emit(mut g, "case " + strings.from_int(group[0]) + ":")
+        g.depth = g.depth + 1
+        text_tree(mut g, v, texts, ids, chosen)
+        emit(mut g, "break;")
+        g.depth = g.depth - 1
+    }
+    emit(mut g, "}")
+}
+
+fn text_tree(g: mut Gen, v: Str, texts: [Str], ids: [Int], chosen: Str) {
+    let s = split(texts, ids)
+    if len(ids) <= 2 || s.at < 0 {
+        for k in 0..len(ids) {
+            let text = texts[ids[k]]
+            let mut cond = "1"
+            if len(text) > 0 {
+                cond = "memcmp((" + v + ").data, " + string_bytes(mut g, text) + ", " + strings.from_int(len(text)) + ") == 0"
+            }
+            let mut keyword = "if"
+            if k > 0 { keyword = "else if" }
+            emit(mut g, keyword + " (" + cond + ") " + chosen + " = " + strings.from_int(ids[k]) + ";")
+        }
+        return
+    }
+    emit(mut g, "switch ((" + v + ").data[" + strings.from_int(s.at) + "]) {")
+    for k in 0..len(s.bytes) {
+        emit(mut g, "case " + strings.from_int(s.bytes[k]) + ":")
+        g.depth = g.depth + 1
+        text_tree(mut g, v, texts, s.groups[k], chosen)
+        emit(mut g, "break;")
+        g.depth = g.depth - 1
+    }
+    emit(mut g, "}")
 }
 
 fn payload(g: Gen, path: Str, enum: Int, vi: Int, i: Int) -> Str {

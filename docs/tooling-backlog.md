@@ -3055,7 +3055,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-107: Large match tables compile slowly and match strings one by one
 
-- **Status:** open (proposal).
+- **Status:** resolved for literal arms (below); range arms open.
 - **Discovery:** post-M30 CommonMark port.
 - **Evidence (observed):** `packages/markdown/tables.vl` (four functions,
   about 4,000 arms) takes 3.9 s to build natively and 13.4 s through C on its
@@ -3081,6 +3081,32 @@ the same entry. Close it with a commit or validation result; keep its history.
   heavily, so its compile time would benefit too.
 - **Verify:** the same build times and lookup timings, and the IR of
   `tables.entity`.
+- **Status update:** resolved for literal arms. A `match` whose arms
+  before the last are eight or more Str literals now chooses its arm first.
+  It switches on the length, then on the byte at the position that best
+  tells that length's texts apart, recursing until one or two texts are
+  left, and then compares once. The shared helpers are
+  `codegen.switch_texts`, `by_length` and `split`. Natively the switches
+  are binary searches (`lower.int_switch`), and so is a match with eight or
+  more integer or Byte literal arms. Through C, the dispatch is nested C
+  `switch`es that set the arm's number, and then `memcmp`. Range arms are
+  still tested in turn.
+- **Validation:** a flat 2,125-arm `entity` match (the original shape,
+  generated from `tables.vl`), 110,000 lookups: C 0.94 s to 0.008 s and
+  native 0.135 s to 0.008 s (about 70 ns each), with a C build of 10.8 s
+  to 4.0 s. Its native build went from 0.56 s to 0.85 s, because the
+  dispatch adds compares and labels that `known_branches` and `reuse` walk.
+  The markdown program as it is (entities grouped, many-arm Int tables)
+  builds natively in 2.1 s instead of 3.9 s, and through C in 3.4 s instead
+  of 3.5 s. `tests/run/match_tables.vl` covers Str (empty, multibyte, over
+  16 bytes), Int (both ends of Int), Byte and u64 tables. It gives the same
+  output from the old and new compilers on both back ends. A native build of
+  the compiler took 18.5 s and 19.5 s before, 17.0 s and 18.6 s after, a C
+  build 25.2 s before and 24.6 s after (one noisy host,
+  [report](../bench/results/2026-10-29-friction-fixes.md)). Suites,
+  fixed points, differential seeds 20000-20999 and the markdown test pass.
+- **Remaining:** natively, the binary searches make a very large table's
+  function slower to optimize (above). Range arms are still tested in turn.
 
 ### TL-108: Tables cannot be module-level constants
 
@@ -3114,7 +3140,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-110: Appending to a Str field copies the whole Str
 
-- **Status:** open (proposal).
+- **Status:** resolved.
 - **Discovery:** post-M30 CommonMark port.
 - **Evidence (observed):** a paragraph collecting its lines as
   `content = content + line` (or through a builder seeded with `content`)
@@ -3134,6 +3160,23 @@ the same entry. Close it with a commit or validation result; keep its history.
   quadratic.
 - **Verify:** the 2 MB paragraph with `content = content + line` in
   linear time.
+- **Resolution:** a Str object records its capacity (`vela_strobj.cap`).
+  `vela_str_concat` and `vela_str_join` (`str_extend`) write after the left
+  operand's bytes, in its own object, when that operand holds the object's
+  only reference (rc 1, so no other view can see the bytes past its end)
+  and the object has room. The result then shares the object. Otherwise,
+  when the operand held the only reference, the copy gets half again as
+  much room, so a string grown by repeated `+` is copied a logarithmic
+  number of times. Strings stay immutable: every existing view keeps its
+  bytes.
+- **Validation:** 32,000 appends of a 61-byte line (2 MB) to a local, to an
+  array element's field and to a struct field (through a join) take
+  0.016 s against 15.2 s with the old runtime, on both back ends.
+  `tests/run/str_append.vl` checks that copies, slices and array elements
+  keep their bytes while the original grows. It passes under
+  `--sanitize`. Callgrind counts of twelve benchmarks and the markdown CLI
+  change by at most +0.5% (markdown through C), and peak memory by at most
+  1 MiB ([report](../bench/results/2026-10-29-friction-fixes.md)).
 
 ### TL-111: A short-circuit Bool used only by a branch is materialized
 

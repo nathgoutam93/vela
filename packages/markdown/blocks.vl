@@ -560,7 +560,7 @@ fn html_block(p: mut Parser, container: Int) -> Int {
 }
 
 // Whether `name`, in lowercase, starts an HTML block of type 6. Matched by
-// length first: a match on Str compares arm by arm (TL-107).
+// length first, from when a match on Str compared arm by arm (TL-107).
 fn block_name(name: Str) -> Bool {
     return match len(name) {
         1 => name == "p"
