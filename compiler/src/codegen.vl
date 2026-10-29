@@ -1490,11 +1490,13 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
     let borrowed = unchanging(g, scrutinee)
     // Many Str literals: the arm is chosen first, then tested by number.
     let texts = switch_texts(arms)
+    let mut spans: [Span] = []
+    if len(texts) == 0 { spans = switch_spans(arms, t) }
     let mut chosen = ""
-    if len(texts) > 0 {
+    if len(texts) > 0 || len(spans) > 0 {
         chosen = new_temp(mut g)
-        emit(mut g, "int64_t " + chosen + " = " + strings.from_int(len(texts)) + ";")
-        text_switch(mut g, v, texts, chosen)
+        emit(mut g, "int64_t " + chosen + " = " + strings.from_int(len(arms) - 1) + ";")
+        if len(texts) > 0 { text_switch(mut g, v, texts, chosen) } else { span_switch(mut g, v, t, spans, 0, len(spans), chosen) }
     }
     let mut all_end = true  // every arm returns, breaks or continues
     // Each arm starts from the lookups made before the match; after it,
@@ -1696,6 +1698,132 @@ pub fn split(texts: [Str], ids: [Int]) -> Split {
         }
     }
     return out
+}
+
+// ---- Matches of many integer literals and ranges ----
+
+pub type Span = struct {
+    lo: Int  // inclusive, both: values, compared unsigned for u64
+    hi: Int
+    arm: Int
+}
+
+// For a match whose arms before the last are at least many_texts() integer
+// or Byte literals and ranges, the values each arm is the first to take, as
+// spans in ascending order (unsigned for u64), with no two overlapping;
+// else none. Values in no span go to the last arm.
+pub fn switch_spans(arms: [ast.Arm], t: Int) -> [Span] {
+    let none: [Span] = []
+    if len(arms) - 1 < many_texts() {
+        return none
+    }
+    // Keys order the values: a u64's are its bits with the top one flipped,
+    // so that Int order is unsigned order.
+    let mut flip = 0
+    if t == 13 { flip = integers.min(types.INT()) }
+    let mut taken: [Span] = []  // keys, ascending
+    for i in 0..len(arms) - 1 {
+        let mut lo = 0
+        let mut hi = 0
+        match arms[i].pattern.kind {
+            ast.PatternKind.Lit(e) => {
+                match e.kind {
+                    ast.ExprKind.IntLit(n) => { lo = n; hi = n }
+                    ast.ExprKind.FixedIntLit(n, _, _) => { lo = n; hi = n }
+                    ast.ExprKind.ByteLit(n) => { lo = n; hi = n }
+                    _ => return none
+                }
+            }
+            ast.PatternKind.Range(a, b) => {
+                lo = literal(a)
+                hi = literal(b)
+            }
+            _ => return none
+        }
+        lo = lo ^ flip
+        hi = hi ^ flip
+        if lo > hi {
+            continue
+        }
+        // The parts of lo..=hi no earlier arm takes.
+        let mut out: [Span] = []
+        let mut at = lo
+        let mut done = false
+        for x in taken {
+            if !done && x.lo > hi {
+                push(mut out, Span { lo: at, hi: hi, arm: i })
+                done = true
+            } else if !done && x.hi >= at {
+                if x.lo > at { push(mut out, Span { lo: at, hi: x.lo - 1, arm: i }) }
+                if x.hi >= hi { done = true } else { at = x.hi + 1 }
+            }
+            push(mut out, x)
+        }
+        if !done { push(mut out, Span { lo: at, hi: hi, arm: i }) }
+        taken = out
+    }
+    // Neighbours going to the same arm become one span.
+    let mut spans: [Span] = []
+    for x in taken {
+        let n = len(spans)
+        if n > 0 && spans[n - 1].arm == x.arm && spans[n - 1].hi + 1 == x.lo {
+            spans[n - 1].hi = x.hi
+        } else {
+            push(mut spans, x)
+        }
+    }
+    for k in 0..len(spans) {
+        spans[k].lo = spans[k].lo ^ flip
+        spans[k].hi = spans[k].hi ^ flip
+    }
+    return spans
+}
+
+// Sets `chosen` to the arm whose span holds the integer `v`: a binary search
+// down to a few spans, then each in turn.
+fn span_switch(g: mut Gen, v: Str, t: Int, spans: [Span], lo: Int, hi: Int, chosen: Str) {
+    if hi - lo > 4 {
+        let half = lo + (hi - lo) / 2
+        open(mut g, "if (" + v + " >= " + integer_literal(spans[half].lo, t) + ") {")
+        span_switch(mut g, v, t, spans, half, hi, chosen)
+        g.depth = g.depth - 1
+        open(mut g, "} else {")
+        span_switch(mut g, v, t, spans, lo, half, chosen)
+        g.depth = g.depth - 1
+        emit(mut g, "}")
+        return
+    }
+    // Ascending: once v is past a span, it is below the next one or in it.
+    let mut first = true
+    for k in lo..hi {
+        let x = spans[k]
+        let mut keyword = "} else if ("
+        if first { keyword = "if (" }
+        first = false
+        if x.lo == x.hi {
+            emit(mut g, keyword + v + " == " + integer_literal(x.lo, t) + ") {")
+        } else {
+            if !lowest(x.lo, t) {
+                emit(mut g, keyword + v + " < " + integer_literal(x.lo, t) + ") {")
+                keyword = "} else if ("
+            }
+            if highest(x.hi, t) { emit(mut g, keyword + "1) {") } else { emit(mut g, keyword + v + " <= " + integer_literal(x.hi, t) + ") {") }
+        }
+        emit(mut g, "    " + chosen + " = " + strings.from_int(x.arm) + ";")
+    }
+    if !first { emit(mut g, "}") }
+}
+
+// Whether `bits` is the least or greatest value of integer type `t`: a C
+// comparison with it could never fail, and draw a warning.
+fn lowest(bits: Int, t: Int) -> Bool {
+    if t == 13 || types.is_integer(t) && !types.integer_signed(t) { return bits == 0 }
+    return types.is_integer(t) && bits == integers.min(t)
+}
+
+fn highest(bits: Int, t: Int) -> Bool {
+    if t == 13 { return bits == -1 }
+    return types.is_integer(t) && bits == integers.max(t)
 }
 
 // Sets `chosen` to the arm whose text the Str `v` is, if any, with C

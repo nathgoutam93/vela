@@ -2118,11 +2118,16 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
     let mut all_end = true  // every arm returns, breaks or continues
     // Many literals: the arm is chosen first, and each arm starts at a label.
     let texts = codegen.switch_texts(arms)
-    let numbers = switch_numbers(arms)
+    let mut spans: [codegen.Span] = []
+    if len(texts) == 0 { spans = codegen.switch_spans(arms, t) }
     let mut arm_at: [Int] = []
-    if len(texts) > 0 || len(numbers) > 0 {
+    if len(texts) > 0 || len(spans) > 0 {
         for _ in arms { push(mut arm_at, label(mut g)) }
-        if len(texts) > 0 { text_switch(mut g, v, texts, arm_at) } else { number_switch(mut g, scalar(mut g, v), numbers, arm_at) }
+        if len(texts) > 0 {
+            text_switch(mut g, v, texts, arm_at)
+        } else {
+            span_switch(mut g, scalar(mut g, v), t == 13, spans, 0, len(spans), arm_at)
+        }
     }
     for i in 0..len(arms) {
         let a = arms[i]
@@ -2346,42 +2351,35 @@ fn text_tree(g: mut Low, path: Val, texts: [Str], ids: [Int], arm_at: [Int], oth
     }
 }
 
-// The values of the arms before the last when each is an integer or Byte
-// literal and there are enough of them, as [value, arm] pairs by value (of
-// arms with the same value, the first), else none.
-fn switch_numbers(arms: [ast.Arm]) -> [[Int]] {
-    let none: [[Int]] = []
-    if len(arms) - 1 < 8 {
-        return none
+// Goes to the arm whose span holds the register `v` (spans ascending,
+// unsigned for a u64), else to the last arm: halves of the spans, then a
+// few in turn.
+fn span_switch(g: mut Low, v: Int, unsigned: Bool, spans: [codegen.Span], lo: Int, hi: Int, arm_at: [Int]) {
+    let other = arm_at[len(arm_at) - 1]
+    let mut below = "lt"
+    let mut within = "le"
+    let mut above = "ge"
+    if unsigned { below = "ult"; within = "ule"; above = "uge" }
+    if hi - lo > 4 {
+        let half = lo + (hi - lo) / 2
+        let upper = label(mut g)
+        branch_cmp(mut g, above, v, konst(mut g, spans[half].lo), upper)
+        span_switch(mut g, v, unsigned, spans, lo, half, arm_at)
+        place_label(mut g, upper)
+        span_switch(mut g, v, unsigned, spans, half, hi, arm_at)
+        return
     }
-    let mut first: Map[Int, Int] = [:]
-    for i in 0..len(arms) - 1 {
-        match arms[i].pattern.kind {
-            ast.PatternKind.Lit(e) => {
-                match e.kind {
-                    ast.ExprKind.IntLit(_) => {}
-                    ast.ExprKind.FixedIntLit(_, _, _) => {}
-                    ast.ExprKind.ByteLit(_) => {}
-                    _ => return none
-                }
-                if !maps.has(first, literal(e)) { first[literal(e)] = i }
-            }
-            _ => return none
+    // Ascending: once v is past a span, it is below the next one or in it.
+    for k in lo..hi {
+        let x = spans[k]
+        if x.lo == x.hi {
+            branch_cmp(mut g, "eq", v, konst(mut g, x.lo), arm_at[x.arm])
+        } else {
+            branch_cmp(mut g, below, v, konst(mut g, x.lo), other)
+            branch_cmp(mut g, within, v, konst(mut g, x.hi), arm_at[x.arm])
         }
     }
-    let mut out: [[Int]] = []
-    for n in lists.sort(maps.keys(first)) { push(mut out, [n, first[n]]) }
-    return out
-}
-
-fn number_switch(g: mut Low, v: Int, numbers: [[Int]], arm_at: [Int]) {
-    let mut values: [Int] = []
-    let mut to: [Int] = []
-    for pair in numbers {
-        push(mut values, pair[0])
-        push(mut to, arm_at[pair[1]])
-    }
-    int_switch(mut g, v, values, to, 0, len(values), arm_at[len(arm_at) - 1])
+    jump(mut g, other)
 }
 
 // Goes to to[k] when the register `v` is keys[k], for k from `lo` to before
