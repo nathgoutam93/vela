@@ -24,7 +24,11 @@ pub type Parser = struct {
     all_closed: Bool
     last_matched: Int
     last_line_length: Int
-    block_names: [Str]  // made once: Vela has no module-level constants
+    // The lines of the open leaf block `lines_of` (-1 for none), not yet in
+    // its content: only the tip takes lines, so one builder serves, as one
+    // buffer does in cmark, and a Str field would copy on every append.
+    lines: strings.Builder
+    lines_of: Int
 }
 
 fn code_indent() -> Int {
@@ -36,7 +40,7 @@ pub fn parse(text: Str) -> Parser {
     let mut p = Parser {
         doc: nodes.new_doc(), refs: [:], tip: 0, oldtip: 0, line: "", line_number: 0, offset: 0, column: 0, next_nonspace: 0,
         next_nonspace_column: 0, indent: 0, indented: false, blank: false, partial_tab: false, all_closed: true, last_matched: 0,
-        last_line_length: 0, block_names: block_names(),
+        last_line_length: 0, lines: strings.builder(), lines_of: -1,
     }
     let lines = split_lines(text, has_nul(text))
     for line in lines {
@@ -191,31 +195,35 @@ fn advance(p: mut Parser, count: Int, columns: Bool) {
 }
 
 fn add_line(p: mut Parser) {
-    let mut b = strings.builder()
+    if p.lines_of != p.tip {
+        flush(mut p, p.lines_of)
+        p.lines_of = p.tip
+    }
     if p.partial_tab {
         p.offset = p.offset + 1
         let to_tab = 4 - p.column % 4
         for _ in 0..to_tab {
-            strings.add_byte(mut b, ' ')
+            strings.add_byte(mut p.lines, ' ')
         }
     }
-    strings.add(mut b, p.line[p.offset..len(p.line)])
-    strings.add_byte(mut b, '\n')
-    push(mut p.doc.data[p.doc.nodes[p.tip].data].pending, strings.build(b))
+    strings.add(mut p.lines, p.line[p.offset..len(p.line)])
+    strings.add_byte(mut p.lines, '\n')
 }
 
-// Joins a block's pending lines to its content.
+// Joins the lines collected for block `n`, if any, to its content.
 fn flush(p: mut Parser, n: Int) {
-    if len(p.doc.data[p.doc.nodes[n].data].pending) == 0 {
+    if n < 0 || p.lines_of != n {
         return
     }
-    let mut b = strings.builder()
-    strings.add(mut b, p.doc.data[p.doc.nodes[n].data].content)
-    for line in p.doc.data[p.doc.nodes[n].data].pending {
-        strings.add(mut b, line)
+    let i = p.doc.nodes[n].data
+    let lines = strings.build(p.lines)
+    if len(p.doc.data[i].content) == 0 {
+        p.doc.data[i].content = lines
+    } else {
+        p.doc.data[i].content = p.doc.data[i].content + lines
     }
-    p.doc.data[p.doc.nodes[n].data].content = strings.build(b)
-    p.doc.data[p.doc.nodes[n].data].pending = []
+    p.lines = strings.builder()
+    p.lines_of = -1
 }
 
 fn add_child(p: mut Parser, k: nodes.Kind) -> Int {
@@ -359,18 +367,18 @@ fn continue_block(p: mut Parser, container: Int) -> Int {
         return 1
     }
     if k == nodes.Kind.CodeBlock {
-        let n = nodes.data(p.doc, container)
-        if n.fenced {
-            let closing = closing_fence(p.line, p.next_nonspace, n.fence_char)
-            if p.indent <= 3 && closing >= n.fence_length {
+        let i = p.doc.nodes[container].data
+        if p.doc.data[i].fenced {
+            let closing = closing_fence(p.line, p.next_nonspace, p.doc.data[i].fence_char)
+            if p.indent <= 3 && closing >= p.doc.data[i].fence_length {
                 p.last_line_length = p.offset + p.indent + closing
                 finalize(mut p, container, p.line_number)
                 return 2
             }
-            let mut i = n.fence_offset
-            for i > 0 && p.offset < len(p.line) && nodes.is_space_or_tab(p.line[p.offset]) {
+            let mut left = p.doc.data[i].fence_offset
+            for left > 0 && p.offset < len(p.line) && nodes.is_space_or_tab(p.line[p.offset]) {
                 advance(mut p, 1, true)
-                i = i - 1
+                left = left - 1
             }
             return 0
         }
@@ -541,7 +549,7 @@ fn html_block(p: mut Parser, container: Int) -> Int {
     let s = p.line[p.next_nonspace..len(p.line)]
     let lazy = !p.all_closed && !p.blank && kind(p, p.tip) == nodes.Kind.Paragraph
     for t in 1..8 {
-        if html_block_starts(t, s, p.block_names) && (t < 7 || kind(p, container) != nodes.Kind.Paragraph && !lazy) {
+        if html_block_starts(t, s) && (t < 7 || kind(p, container) != nodes.Kind.Paragraph && !lazy) {
             close_unmatched(mut p)
             let b = add_child(mut p, nodes.Kind.HtmlBlock)
             p.doc.data[p.doc.nodes[b].data].html_type = t
@@ -551,12 +559,107 @@ fn html_block(p: mut Parser, container: Int) -> Int {
     return 0
 }
 
-fn block_names() -> [Str] {
-    return ["address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center", "col", "colgroup", "dd",
-        "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer", "form", "frame", "frameset", "h1",
-        "h2", "h3", "h4", "h5", "h6", "head", "header", "hr", "html", "iframe", "legend", "li", "link", "main", "menu",
-        "menuitem", "nav", "noframes", "ol", "optgroup", "option", "p", "param", "search", "section", "summary", "table",
-        "tbody", "td", "tfoot", "th", "thead", "title", "tr", "track", "ul"]
+// Whether `name`, in lowercase, starts an HTML block of type 6. Matched by
+// length first: a match on Str compares arm by arm (TL-107).
+fn block_name(name: Str) -> Bool {
+    return match len(name) {
+        1 => name == "p"
+        2 => match name {
+            "dd" => true
+            "dl" => true
+            "dt" => true
+            "h1" => true
+            "h2" => true
+            "h3" => true
+            "h4" => true
+            "h5" => true
+            "h6" => true
+            "hr" => true
+            "li" => true
+            "ol" => true
+            "td" => true
+            "th" => true
+            "tr" => true
+            "ul" => true
+            _ => false
+        }
+        3 => name == "col" || name == "dir" || name == "div" || name == "nav"
+        4 => match name {
+            "base" => true
+            "body" => true
+            "form" => true
+            "head" => true
+            "html" => true
+            "link" => true
+            "main" => true
+            "menu" => true
+            _ => false
+        }
+        5 => match name {
+            "aside" => true
+            "frame" => true
+            "param" => true
+            "table" => true
+            "tbody" => true
+            "tfoot" => true
+            "thead" => true
+            "title" => true
+            "track" => true
+            _ => false
+        }
+        6 => match name {
+            "center" => true
+            "dialog" => true
+            "figure" => true
+            "footer" => true
+            "header" => true
+            "iframe" => true
+            "legend" => true
+            "option" => true
+            "search" => true
+            _ => false
+        }
+        7 => match name {
+            "address" => true
+            "article" => true
+            "caption" => true
+            "details" => true
+            "section" => true
+            "summary" => true
+            _ => false
+        }
+        8 => match name {
+            "basefont" => true
+            "colgroup" => true
+            "fieldset" => true
+            "frameset" => true
+            "menuitem" => true
+            "noframes" => true
+            "optgroup" => true
+            _ => false
+        }
+        10 => name == "blockquote" || name == "figcaption"
+        _ => false
+    }
+}
+
+// `s` in ASCII lowercase, copied only when it has a capital.
+fn ascii_lower(s: Str) -> Str {
+    let mut upper = false
+    for c in s {
+        if c >= 'A' && c <= 'Z' {
+            upper = true
+            break
+        }
+    }
+    if !upper {
+        return s
+    }
+    let mut b = strings.builder()
+    for c in s {
+        strings.add_byte(mut b, nodes.lower(c))
+    }
+    return strings.build(b)
 }
 
 // Whether `name` ends at `at` in `s`: followed by a space, a tab, the end,
@@ -569,38 +672,34 @@ fn name_ends(s: Str, at: Int, slash: Bool) -> Bool {
     return c == ' ' || c == '\t' || c == '>' || slash && c == '/' && at + 1 < len(s) && s[at + 1] == '>'
 }
 
-fn html_block_starts(t: Int, s: Str, names: [Str]) -> Bool {
+fn html_block_starts(t: Int, s: Str) -> Bool {
     if t == 1 {
-        for name in ["script", "pre", "textarea", "style"] {
-            if nodes.starts_ci(s, 1, name) && name_ends(s, 1 + len(name), false) {
-                return true
-            }
-        }
-        return false
+        return starts_name(s, "script") || starts_name(s, "pre") || starts_name(s, "textarea") || starts_name(s, "style")
     }
     if t == 2 {
-        return text_at(s, 0, "<!--")
+        return nodes.text_at(s, 0, "<!--")
     }
     if t == 3 {
-        return text_at(s, 0, "<?")
+        return nodes.text_at(s, 0, "<?")
     }
     if t == 4 {
         return len(s) > 2 && s[1] == '!' && nodes.is_letter(s[2])
     }
     if t == 5 {
-        return text_at(s, 0, "<![CDATA[")
+        return nodes.text_at(s, 0, "<![CDATA[")
     }
     if t == 6 {
         let mut at = 1
         if len(s) > 1 && s[1] == '/' {
             at = 2
         }
-        for name in names {
-            if nodes.starts_ci(s, at, name) && name_ends(s, at + len(name), true) {
-                return true
-            }
+        // The names are letters and digits, so only the whole run of them
+        // can be one.
+        let mut end = at
+        for end < len(s) && nodes.is_alnum(s[end]) && end - at <= 10 {
+            end = end + 1
         }
-        return false
+        return end > at && name_ends(s, end, true) && block_name(ascii_lower(s[at..end]))
     }
     // 7: a whole open or closing tag, then only spaces and tabs.
     if len(s) < 2 || !(nodes.is_letter(s[1]) || s[1] == '/') {
@@ -618,8 +717,9 @@ fn html_block_starts(t: Int, s: Str, names: [Str]) -> Bool {
     return true
 }
 
-fn text_at(s: Str, at: Int, part: Str) -> Bool {
-    return at + len(part) <= len(s) && s[at..at + len(part)] == part
+// Whether `s` starts with `<name`, ignoring case, and the name ends there.
+fn starts_name(s: Str, name: Str) -> Bool {
+    return nodes.starts_ci(s, 1, name) && name_ends(s, 1 + len(name), false)
 }
 
 fn html_block_ends(t: Int, s: Str) -> Bool {
@@ -881,38 +981,29 @@ fn finalize_code(p: mut Parser, block: Int) {
         }
         p.doc.nodes[block].literal = rest
     } else {
-        // Without trailing blank lines, which do not belong to it.
-        let mut lines: [Str] = []
-        let mut start = 0
-        for i in 0..len(content) {
-            if content[i] == '\n' {
-                push(mut lines, content[start..i])
-                start = i + 1
+        // Without trailing blank lines, which do not belong to it: up to
+        // the line ending after the last other character. Every line has
+        // its ending.
+        let mut end = len(content)
+        for end > 0 && (content[end - 1] == ' ' || content[end - 1] == '\t' || content[end - 1] == '\n') {
+            end = end - 1
+        }
+        let mut n = 0
+        if end > 0 {
+            for content[end] != '\n' {
+                end = end + 1
+            }
+            end = end + 1
+            for c in content[0..end] {
+                if c == '\n' {
+                    n = n + 1
+                }
             }
         }
-        push(mut lines, content[start..len(content)])
-        let mut n = len(lines)
-        for n > 0 && is_space_line(lines[n - 1]) {
-            n = n - 1
-        }
-        let mut b = strings.builder()
-        for i in 0..n {
-            strings.add(mut b, lines[i])
-            strings.add_byte(mut b, '\n')
-        }
-        p.doc.nodes[block].literal = strings.build(b)
+        p.doc.nodes[block].literal = content[0..end]
         p.doc.data[p.doc.nodes[block].data].end_line = p.doc.data[p.doc.nodes[block].data].start_line + n - 1
     }
     p.doc.data[p.doc.nodes[block].data].content = ""
-}
-
-fn is_space_line(s: Str) -> Bool {
-    for c in s {
-        if !nodes.is_space_or_tab(c) {
-            return false
-        }
-    }
-    return true
 }
 
 // A list is loose when blank lines separate its items, or two blocks
@@ -972,7 +1063,8 @@ fn process_inlines(p: mut Parser) {
             child = p.doc.nodes[child].next
         }
     }
+    let mut ip = inlines.parser("")
     for b in blocks {
-        inlines.parse(mut p.doc, b, p.refs)
+        inlines.parse(mut ip, mut p.doc, b, p.refs)
     }
 }

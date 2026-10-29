@@ -3068,6 +3068,13 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Impact:** keyword, entity and character tables, the natural shape of
   such data in Vela (TL-108), are slow to build and to search.
 - **Workaround:** none taken; entities are rare in real text.
+- **Workaround taken (follow-up with cmark):** `tools/tables.py` now writes
+  `tables.entity` as a match on the first letter, then on length, then on
+  the name. On cmark's `inline-entity` sample (10 MB) the C build went from
+  3.16× cmark's time to 0.84×, and the C build of the whole program from
+  2.7 s to 1.3 s on an Apple M2
+  ([report](../bench/results/2026-10-28-markdown-cmark-macos.md)). The
+  compiler still lowers a Str `match` arm by arm, so the proposal stands.
 - **Proposed improvement:** lower a large Str `match` to a switch on length
   and then on bytes (or a perfect hash), and Int range arms to a binary
   search or jump table. The compiler's own sources match on strings
@@ -3116,6 +3123,11 @@ the same entry. Close it with a commit or validation result; keep its history.
   0.05 s (`nodes.Data.pending`, `blocks.flush`). JavaScript engines make
   repeated `+=` cheap, so a port of JavaScript meets this at once.
 - **Workaround:** collect parts in an array and join once.
+- **Workaround taken (follow-up with cmark):** the array of lines still
+  copied each line twice more (built, then joined). The parser now holds
+  one `strings.Builder` for the open leaf block's lines, as cmark holds one
+  buffer: cmark's `block-code` sample went from 3.39× cmark's time to 1.39×
+  through C, and its peak memory from 167 to 69 MiB.
 - **Proposed improvement:** when the left operand of `s + t` is a uniquely
   owned Str with spare capacity (refcount 1), append in place, as arrays
   already grow; or at least say in the guide that repeated `+` is
@@ -3141,6 +3153,70 @@ the same entry. Close it with a commit or validation result; keep its history.
   only branched on, thread the branches through it; let known facts follow
   moves.
 - **Verify:** the loop in `inlines.plain` and the markdown throughput.
+
+### TL-112: The native markdown program trails its C build on arm64
+
+- **Status:** open; one cause fixed, the rest observed.
+- **Discovery:** post-M30 comparison of the markdown package with cmark
+  ([report](../bench/results/2026-10-28-markdown-cmark-macos.md)).
+- **Evidence (observed):** on an Apple M2, `python3 bench/markdown_compare.py
+  --cmark PATH --samples DIR` times the native build at 1.23× the C build
+  (`cc -O2`) on the repository's Markdown (0.275 s against 0.224 s). Over
+  cmark's 25 feature samples it is 1.19× (geometric mean), and slower on all
+  of them except `inline-entity`, where the C build is slower (TL-107). The
+  port measured 1.08× on Linux x86-64. No performance gate runs this
+  program.
+- **Impact:** the native backend, which is the default, adds about 20% to
+  cmark's lead on this parser-shaped workload.
+- **Workaround:** build with `VELA_BACKEND=c`.
+- **Proposed improvement:** profile both builds on the repository input
+  (`bench/profile.py`). Find which functions account for the difference
+  before choosing a change. TL-111 (materialized short-circuit Bools) is
+  one suspected contributor.
+- **Verify:** the native/C ratio from `bench/markdown_compare.py` on arm64
+  and x86-64.
+- **Found (follow-up):** reading an enum field of an array element,
+  `p.doc.nodes[n].kind`, copied the whole 80-byte element to a stack slot
+  and then the 4-byte field out of it (`build/vela ir` of `nodes[n].kind ==
+  Kind.B`). `scalar_copy` forwarded a load past such a copy only when
+  nothing but address and constant instructions came between; comparing
+  with an enum constant stores that constant to a fresh slot first, and an
+  inlined `kind()` copies the field rather than loading it.
+- **Resolution (partial):** `scalar_copy` (`compiler/src/opt.vl`) now also
+  allows stores to slots first addressed between the copy and its reader,
+  which nothing else can reach, and forwards a reading copy of any prefix
+  of the slot. The element copy is gone from that IR; the C and native
+  bootstrap fixed points hold (the compiler's own native assembly is 7,768
+  lines shorter), and `run_tests.py` passes with both backends (two native
+  integration tests that timed out while the host slept passed on rerun).
+  The markdown program gained 1 to 8% natively (`block-code` 8%,
+  repository input 1%), output unchanged.
+- **Remaining (observed):** after the package changes the native build is
+  1.31× the C build on the repository's Markdown and 1.39× over cmark's
+  samples (geometric mean): the package changes removed work both builds
+  shared. Sampling `block-code` shows native byte loops (`escape`,
+  `finalize_code`, `add_line`) taking about twice the C build's samples.
+  Suspected cause, not verified: clang vectorizes or unrolls these scans.
+
+### TL-113: The C backend retains each element a for loop reads
+
+- **Status:** open (observed).
+- **Discovery:** post-M30 follow-up on the markdown package and cmark.
+- **Evidence (observed):** for `for name in names { if len(name) == n {
+  ... } }` over a `[Str]`, `build/vela c` emits `vela_str_retain(v_name)`
+  and `vela_str_release(v_name)` around every iteration, both out-of-line
+  calls. `build/vela ir` of the same function shows the native backend
+  borrowing the elements (one `rc.inc` of the array, none per element).
+  In the markdown package, testing each line that starts with `<` against
+  the 62 HTML block names this way made `vela_str_release` one of the C
+  build's hottest functions on cmark's `block-html` sample.
+- **Impact:** loops that only read reference-counted elements pay two calls
+  per element through C.
+- **Workaround:** avoid looping over a table of Strs on a hot path (the
+  package now matches the name by length, then by text).
+- **Proposed improvement:** borrow loop elements in the C backend as the
+  native one does when the body neither stores nor moves the element.
+- **Verify:** the C of the loop above has no per-element retain or release.
 
 ## Outstanding validation
 

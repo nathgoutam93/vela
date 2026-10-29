@@ -69,35 +69,66 @@ fn tag(o: mut Out, s: Str) {
 }
 
 pub fn escape(s: Str) -> Str {
-    let mut special = false
     for c in s {
         if c == '&' || c == '<' || c == '>' || c == '"' {
-            special = true
-            break
+            let mut b = strings.builder()
+            escape_to(mut b, s)
+            return strings.build(b)
         }
     }
-    if !special {
-        return s
-    }
-    let mut b = strings.builder()
-    for c in s {
-        if c == '&' {
-            strings.add(mut b, "&amp;")
-        } else if c == '<' {
-            strings.add(mut b, "&lt;")
-        } else if c == '>' {
-            strings.add(mut b, "&gt;")
-        } else if c == '"' {
-            strings.add(mut b, "&quot;")
-        } else {
-            strings.add_byte(mut b, c)
-        }
-    }
-    return strings.build(b)
+    return s
 }
 
-fn level_text(n: Int) -> Str {
-    return strings.from_int(n)
+// Text written escaped, without making it a Str first. Its last byte stands
+// for the output's: an escaped one ends in ';', and only '\n' matters.
+fn escaped(o: mut Out, s: Str) {
+    if len(s) > 0 {
+        escape_to(mut o.b, s)
+        o.last = s[len(s) - 1]
+    }
+}
+
+// Adds `s` to `b` with &, <, > and " escaped, in runs between them.
+fn escape_to(b: mut strings.Builder, s: Str) {
+    let mut start = 0
+    for i in 0..len(s) {
+        let c = s[i]
+        if c == '&' || c == '<' || c == '>' || c == '"' {
+            strings.add(mut b, s[start..i])
+            if c == '&' {
+                strings.add(mut b, "&amp;")
+            } else if c == '<' {
+                strings.add(mut b, "&lt;")
+            } else if c == '>' {
+                strings.add(mut b, "&gt;")
+            } else {
+                strings.add(mut b, "&quot;")
+            }
+            start = i + 1
+        }
+    }
+    strings.add(mut b, s[start..len(s)])
+}
+
+fn heading_tag(level: Int, entering: Bool) -> Str {
+    if entering {
+        return match level {
+            1 => "<h1>"
+            2 => "<h2>"
+            3 => "<h3>"
+            4 => "<h4>"
+            5 => "<h5>"
+            _ => "<h6>"
+        }
+    }
+    return match level {
+        1 => "</h1>"
+        2 => "</h2>"
+        3 => "</h3>"
+        4 => "</h4>"
+        5 => "</h5>"
+        _ => "</h6>"
+    }
 }
 
 // Writes the node, entering or leaving it; true for a leaf, which is only
@@ -105,12 +136,8 @@ fn level_text(n: Int) -> Str {
 fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
     let x = d.nodes[n]
     let k = x.kind
-    let mut y = nodes.data(d, 0)  // the document's, when the node has none
-    if x.data >= 0 {
-        y = d.data[x.data]
-    }
     if k == nodes.Kind.Text {
-        lit(mut o, escape(x.literal))
+        escaped(mut o, x.literal)
         return true
     }
     if k == nodes.Kind.Softbreak {
@@ -124,7 +151,7 @@ fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
     }
     if k == nodes.Kind.Code {
         tag(mut o, "<code>")
-        lit(mut o, escape(x.literal))
+        escaped(mut o, x.literal)
         tag(mut o, "</code>")
         return true
     }
@@ -146,7 +173,7 @@ fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
     }
     if k == nodes.Kind.CodeBlock {
         cr(mut o)
-        let mut word = y.info
+        let mut word = d.data[x.data].info
         for i in 0..len(word) {
             if word[i] == ' ' || word[i] == '\t' || word[i] == '\n' {
                 word = word[0..i]
@@ -158,7 +185,7 @@ fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
         } else {
             tag(mut o, "<pre><code class=\"language-" + escape(word) + "\">")
         }
-        lit(mut o, escape(x.literal))
+        escaped(mut o, x.literal)
         tag(mut o, "</code></pre>")
         cr(mut o)
         return true
@@ -173,6 +200,7 @@ fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
     }
     if k == nodes.Kind.Link {
         if entering {
+            let y = d.links[x.data]
             let mut open = "<a href=\"" + escape(y.destination) + "\""
             if y.title != "" {
                 open = open + " title=\"" + escape(y.title) + "\""
@@ -186,14 +214,15 @@ fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
     if k == nodes.Kind.Image {
         if entering {
             if o.plain == 0 {
-                lit(mut o, "<img src=\"" + escape(y.destination) + "\" alt=\"")
+                lit(mut o, "<img src=\"" + escape(d.links[x.data].destination) + "\" alt=\"")
             }
             o.plain = o.plain + 1
         } else {
             o.plain = o.plain - 1
             if o.plain == 0 {
-                if y.title != "" {
-                    lit(mut o, "\" title=\"" + escape(y.title))
+                let title = d.links[x.data].title
+                if title != "" {
+                    lit(mut o, "\" title=\"" + escape(title))
                 }
                 lit(mut o, "\" />")
             }
@@ -218,12 +247,11 @@ fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
         return false
     }
     if k == nodes.Kind.Heading {
-        let h = "h" + level_text(y.level)
         if entering {
             cr(mut o)
-            tag(mut o, "<" + h + ">")
+            tag(mut o, heading_tag(d.data[x.data].level, true))
         } else {
-            tag(mut o, "</" + h + ">")
+            tag(mut o, heading_tag(d.data[x.data].level, false))
             cr(mut o)
         }
         return false
@@ -241,21 +269,24 @@ fn node(o: mut Out, d: nodes.Doc, n: Int, entering: Bool) -> Bool {
         return false
     }
     if k == nodes.Kind.List {
-        let mut name = "ul"
-        if y.list.ordered {
-            name = "ol"
-        }
+        let list = d.data[x.data].list
         if entering {
             cr(mut o)
-            if y.list.ordered && y.list.start != 1 {
-                tag(mut o, "<ol start=\"" + strings.from_int(y.list.start) + "\">")
+            if !list.ordered {
+                tag(mut o, "<ul>")
+            } else if list.start != 1 {
+                tag(mut o, "<ol start=\"" + strings.from_int(list.start) + "\">")
             } else {
-                tag(mut o, "<" + name + ">")
+                tag(mut o, "<ol>")
             }
             cr(mut o)
         } else {
             cr(mut o)
-            tag(mut o, "</" + name + ">")
+            if list.ordered {
+                tag(mut o, "</ol>")
+            } else {
+                tag(mut o, "</ul>")
+            }
             cr(mut o)
         }
         return false

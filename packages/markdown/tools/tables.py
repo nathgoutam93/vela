@@ -72,11 +72,27 @@ for cp in range(0x110000):
     if f != c:
         out.append(f'        {cp} => {vela_str(f)}')
 out += ['        _ => ""', '    }', '}', '']
-out.append('// The text a named character reference such as "amp" stands for, or "".')
-out.append('pub fn entity(name: Str) -> Str {')
-out.append('    return match name {')
+# A match on Str compares arm by arm (TL-107), so the names are matched
+# by first letter, then by length, and only then by text.
+entities = {}
 for name in sorted(html.entities.html5):
     if name.endswith(';'):
-        out.append(f'        {vela_str(name[:-1])} => {vela_str(html.entities.html5[name])}')
+        entities.setdefault(name[0], {}).setdefault(len(name) - 1, []).append(name[:-1])
+out.append('// The text a named character reference such as "amp" stands for, or "".')
+out.append('pub fn entity(name: Str) -> Str {')
+out.append('    if len(name) == 0 {')
+out.append('        return ""')
+out.append('    }')
+out.append('    return match name[0] {')
+for first in sorted(entities):
+    out.append(f"        '{first}' => entity_{first}(name)")
 out += ['        _ => ""', '    }', '}']
+for first, by_length in sorted(entities.items()):
+    out += ['', f'fn entity_{first}(name: Str) -> Str {{', '    return match len(name) {']
+    for length, names in sorted(by_length.items()):
+        out.append(f'        {length} => match name {{')
+        for name in names:
+            out.append(f'            {vela_str(name)} => {vela_str(html.entities.html5[name + ";"])}')
+        out += ['            _ => ""', '        }']
+    out += ['        _ => ""', '    }', '}']
 print('\n'.join(out))

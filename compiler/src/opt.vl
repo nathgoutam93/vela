@@ -304,13 +304,23 @@ fn scalar_copy(f: ir.Func) -> ir.Func {
     for at < len(f.insts) {
         let i = f.insts[at]
         if i.op == ir.Op.Copy && maps.has(slots, i.a) && defs[i.a] == 1 && counts[i.a] == 2 && addresses[slots[i.a]] == 1 && at + 1 < len(f.insts) {
+            // Between the copy and its one reader may also come stores to
+            // slots first addressed there, which nothing else can reach,
+            // such as an enum constant compared with a field.
+            let mut fresh: Map[Int, Bool] = [:]
             let mut after = at + 1
-            for after < len(f.insts) && (f.insts[after].op == ir.Op.SlotAddr || f.insts[after].op == ir.Op.SymAddr || f.insts[after].op == ir.Op.Const || f.insts[after].op == ir.Op.FConst) {
-                if f.insts[after].dst == i.b { break }; after = after + 1
+            for after < len(f.insts) {
+                let w = f.insts[after]
+                if w.dst == i.b { break }
+                if w.op == ir.Op.SlotAddr && addresses[w.imm] == 1 { fresh[w.dst] = true }
+                let stores_fresh = (w.op == ir.Op.Store || w.op == ir.Op.FStore) && maps.has(fresh, w.a)
+                if !(w.op == ir.Op.SlotAddr || w.op == ir.Op.SymAddr || w.op == ir.Op.Const || w.op == ir.Op.FConst || stores_fresh) { break }
+                after = after + 1
             }
             if after >= len(f.insts) { push(mut out.insts, i); at = at + 1; continue }
             let mut next = f.insts[after]; let mut size = next.imm2; if next.op == ir.Op.FLoad { size = 8 }
-            if next.op == ir.Op.Copy && next.b == i.a && next.imm == i.imm {
+            // A copy of all or the start of it, such as one field of an element.
+            if next.op == ir.Op.Copy && next.b == i.a && next.imm <= i.imm {
                 for between in at + 1..after { push(mut out.insts, f.insts[between]) }
                 next.b = i.b; push(mut out.insts, next); at = after + 1; continue
             }

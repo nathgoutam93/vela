@@ -143623,266 +143623,315 @@ t_2ir_Func f_3opt_scalar_copy(t_2ir_Func v_f) {
             _t60 = _t65;
         }
         if (_t60) {
-            // line 307
-            int64_t _t66 = v_at;
-            int64_t _t67 = (_t66 + 1);
-            int64_t v_after = _t67;
-            // line 308
+            // line 310
+            vela_map * _t66 = vela_map_new(&vela_type_int, &vela_type_bool);
+            vela_map * v_fresh = _t66;
+            // line 311
+            int64_t _t67 = v_at;
+            int64_t _t68 = (_t67 + 1);
+            int64_t v_after = _t68;
+            // line 312
+            vela_unique_map(&v_fresh);
             for (;;) {
-                int64_t _t68 = v_after;
-                int64_t _t69 = v_f.m_insts->len;
-                bool _t70 = _t68 < _t69;
-                bool _t71 = _t70;
-                if (_t71) {
-                    t_2ir_Inst _t72 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_after, sizeof(t_2ir_Inst), "compiler/src/opt.vl:308:49");
-                    t_2ir_Op _t73 = (t_2ir_Op){ .tag = t_2ir_Op_SlotAddr };
-                    bool _t74 = _t72.m_op.tag == _t73.tag;
-                    bool _t75 = _t74;
-                    if (!_t75) {
-                        t_2ir_Inst _t76 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_after, sizeof(t_2ir_Inst), "compiler/src/opt.vl:308:88");
-                        t_2ir_Op _t77 = (t_2ir_Op){ .tag = t_2ir_Op_SymAddr };
-                        bool _t78 = _t76.m_op.tag == _t77.tag;
-                        _t75 = _t78;
-                    }
-                    bool _t79 = _t75;
-                    if (!_t79) {
-                        t_2ir_Inst _t80 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_after, sizeof(t_2ir_Inst), "compiler/src/opt.vl:308:126");
-                        t_2ir_Op _t81 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
-                        bool _t82 = _t80.m_op.tag == _t81.tag;
-                        _t79 = _t82;
-                    }
-                    bool _t83 = _t79;
-                    if (!_t83) {
-                        t_2ir_Inst _t84 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_after, sizeof(t_2ir_Inst), "compiler/src/opt.vl:308:162");
-                        t_2ir_Op _t85 = (t_2ir_Op){ .tag = t_2ir_Op_FConst };
-                        bool _t86 = _t84.m_op.tag == _t85.tag;
-                        _t83 = _t86;
-                    }
-                    _t71 = _t83;
-                }
-                bool _t87 = _t71;
-                if (!_t87) break;
-                // line 309
-                t_2ir_Inst _t88 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_after, sizeof(t_2ir_Inst), "compiler/src/opt.vl:309:27");
-                int64_t _t89 = _t88.m_dst;
-                bool _t90 = _t89 == v_i_2.m_b;
-                if (_t90) {
-                    // line 309
+                int64_t _t69 = v_after;
+                int64_t _t70 = v_f.m_insts->len;
+                bool _t71 = _t69 < _t70;
+                bool _t72 = _t71;
+                if (!_t72) break;
+                // line 313
+                t_2ir_Inst _t73 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_after, sizeof(t_2ir_Inst), "compiler/src/opt.vl:313:32");
+                rc_retain_t_2ir_Inst(_t73);
+                t_2ir_Inst v_w = _t73;
+                // line 314
+                int64_t _t74 = v_w.m_dst;
+                bool _t75 = _t74 == v_i_2.m_b;
+                if (_t75) {
+                    // line 314
+                    rc_release_t_2ir_Inst(v_w);
                     break;
                 }
-                // line 309
-                int64_t _t91 = v_after;
-                int64_t _t92 = (_t91 + 1);
-                v_after = _t92;
+                // line 315
+                t_2ir_Op _t76 = (t_2ir_Op){ .tag = t_2ir_Op_SlotAddr };
+                bool _t77 = v_w.m_op.tag == _t76.tag;
+                bool _t78 = _t77;
+                if (_t78) {
+                    int64_t _t79 = *(int64_t *)vela_at(v_addresses, v_w.m_imm, sizeof(int64_t), "compiler/src/opt.vl:315:55");
+                    int64_t _t80 = _t79;
+                    bool _t81 = _t80 == 1;
+                    _t78 = _t81;
+                }
+                if (_t78) {
+                    // line 315
+                    int64_t _t82 = v_w.m_dst;
+                    bool _t83 = true;
+                    vela_map_set(v_fresh, &_t82, &_t83);
+                }
+                // line 316
+                t_2ir_Op _t84 = (t_2ir_Op){ .tag = t_2ir_Op_Store };
+                bool _t85 = v_w.m_op.tag == _t84.tag;
+                bool _t86 = _t85;
+                if (!_t86) {
+                    t_2ir_Op _t87 = (t_2ir_Op){ .tag = t_2ir_Op_FStore };
+                    bool _t88 = v_w.m_op.tag == _t87.tag;
+                    _t86 = _t88;
+                }
+                bool _t89 = _t86;
+                if (_t89) {
+                    int64_t _t91 = v_w.m_a;
+                    bool *_t90 = vela_map_find(v_fresh, &_t91);
+                    bool _t92 = _t90 != NULL;
+                    _t89 = _t92;
+                }
+                bool v_stores_fresh = _t89;
+                // line 317
+                t_2ir_Op _t93 = (t_2ir_Op){ .tag = t_2ir_Op_SlotAddr };
+                bool _t94 = v_w.m_op.tag == _t93.tag;
+                bool _t95 = _t94;
+                if (!_t95) {
+                    t_2ir_Op _t96 = (t_2ir_Op){ .tag = t_2ir_Op_SymAddr };
+                    bool _t97 = v_w.m_op.tag == _t96.tag;
+                    _t95 = _t97;
+                }
+                bool _t98 = _t95;
+                if (!_t98) {
+                    t_2ir_Op _t99 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
+                    bool _t100 = v_w.m_op.tag == _t99.tag;
+                    _t98 = _t100;
+                }
+                bool _t101 = _t98;
+                if (!_t101) {
+                    t_2ir_Op _t102 = (t_2ir_Op){ .tag = t_2ir_Op_FConst };
+                    bool _t103 = v_w.m_op.tag == _t102.tag;
+                    _t101 = _t103;
+                }
+                bool _t104 = _t101;
+                if (!_t104) {
+                    _t104 = v_stores_fresh;
+                }
+                bool _t105 = !_t104;
+                if (_t105) {
+                    // line 317
+                    rc_release_t_2ir_Inst(v_w);
+                    break;
+                }
+                // line 318
+                int64_t _t106 = v_after;
+                int64_t _t107 = (_t106 + 1);
+                v_after = _t107;
+                rc_release_t_2ir_Inst(v_w);
             }
-            // line 311
-            int64_t _t93 = v_after;
-            int64_t _t94 = v_f.m_insts->len;
-            bool _t95 = _t93 >= _t94;
-            if (_t95) {
-                // line 311
-                t_2ir_Inst _t96 = v_i_2;
-                rc_retain_t_2ir_Inst(_t96);
+            // line 320
+            int64_t _t108 = v_after;
+            int64_t _t109 = v_f.m_insts->len;
+            bool _t110 = _t108 >= _t109;
+            if (_t110) {
+                // line 320
+                t_2ir_Inst _t111 = v_i_2;
+                rc_retain_t_2ir_Inst(_t111);
                 vela_unique(&v_out.m_insts);
-                t_2ir_Inst _t97 = _t96;
-                vela_push(v_out.m_insts, &_t97, sizeof(t_2ir_Inst));
-                // line 311
-                int64_t _t98 = v_at;
-                int64_t _t99 = (_t98 + 1);
-                v_at = _t99;
-                // line 311
+                t_2ir_Inst _t112 = _t111;
+                vela_push(v_out.m_insts, &_t112, sizeof(t_2ir_Inst));
+                // line 320
+                int64_t _t113 = v_at;
+                int64_t _t114 = (_t113 + 1);
+                v_at = _t114;
+                // line 320
+                vela_map_release(v_fresh);
                 rc_release_t_2ir_Inst(v_i_2);
                 continue;
             }
-            // line 312
-            t_2ir_Inst _t100 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_after, sizeof(t_2ir_Inst), "compiler/src/opt.vl:312:35");
-            rc_retain_t_2ir_Inst(_t100);
-            t_2ir_Inst v_next = _t100;
-            // line 312
+            // line 321
+            t_2ir_Inst _t115 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_after, sizeof(t_2ir_Inst), "compiler/src/opt.vl:321:35");
+            rc_retain_t_2ir_Inst(_t115);
+            t_2ir_Inst v_next = _t115;
+            // line 321
             int64_t v_size = v_next.m_imm2;
-            // line 312
-            t_2ir_Op _t101 = (t_2ir_Op){ .tag = t_2ir_Op_FLoad };
-            bool _t102 = v_next.m_op.tag == _t101.tag;
-            if (_t102) {
-                // line 312
+            // line 321
+            t_2ir_Op _t116 = (t_2ir_Op){ .tag = t_2ir_Op_FLoad };
+            bool _t117 = v_next.m_op.tag == _t116.tag;
+            if (_t117) {
+                // line 321
                 v_size = 8;
             }
-            // line 313
-            t_2ir_Op _t103 = (t_2ir_Op){ .tag = t_2ir_Op_Copy };
-            bool _t104 = v_next.m_op.tag == _t103.tag;
-            bool _t105 = _t104;
-            if (_t105) {
-                int64_t _t106 = v_next.m_b;
-                bool _t107 = _t106 == v_i_2.m_a;
-                _t105 = _t107;
+            // line 323
+            t_2ir_Op _t118 = (t_2ir_Op){ .tag = t_2ir_Op_Copy };
+            bool _t119 = v_next.m_op.tag == _t118.tag;
+            bool _t120 = _t119;
+            if (_t120) {
+                int64_t _t121 = v_next.m_b;
+                bool _t122 = _t121 == v_i_2.m_a;
+                _t120 = _t122;
             }
-            bool _t108 = _t105;
-            if (_t108) {
-                int64_t _t109 = v_next.m_imm;
-                bool _t110 = _t109 == v_i_2.m_imm;
-                _t108 = _t110;
+            bool _t123 = _t120;
+            if (_t123) {
+                int64_t _t124 = v_next.m_imm;
+                bool _t125 = _t124 <= v_i_2.m_imm;
+                _t123 = _t125;
             }
-            if (_t108) {
-                // line 314
-                int64_t _t111 = v_at;
-                int64_t _t112 = (_t111 + 1);
-                int64_t _t113 = v_after;
-                for (int64_t _t114 = _t112; _t114 < _t113; _t114++) {
-                    int64_t v_between = _t114;
-                    // line 314
-                    t_2ir_Inst _t115 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_between, sizeof(t_2ir_Inst), "compiler/src/opt.vl:314:75");
-                    rc_retain_t_2ir_Inst(_t115);
+            if (_t123) {
+                // line 324
+                int64_t _t126 = v_at;
+                int64_t _t127 = (_t126 + 1);
+                int64_t _t128 = v_after;
+                for (int64_t _t129 = _t127; _t129 < _t128; _t129++) {
+                    int64_t v_between = _t129;
+                    // line 324
+                    t_2ir_Inst _t130 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_between, sizeof(t_2ir_Inst), "compiler/src/opt.vl:324:75");
+                    rc_retain_t_2ir_Inst(_t130);
                     vela_unique(&v_out.m_insts);
-                    t_2ir_Inst _t116 = _t115;
-                    vela_push(v_out.m_insts, &_t116, sizeof(t_2ir_Inst));
+                    t_2ir_Inst _t131 = _t130;
+                    vela_push(v_out.m_insts, &_t131, sizeof(t_2ir_Inst));
                 }
-                // line 315
+                // line 325
                 v_next.m_b = v_i_2.m_b;
-                // line 315
-                t_2ir_Inst _t117 = v_next;
-                rc_retain_t_2ir_Inst(_t117);
+                // line 325
+                t_2ir_Inst _t132 = v_next;
+                rc_retain_t_2ir_Inst(_t132);
                 vela_unique(&v_out.m_insts);
-                t_2ir_Inst _t118 = _t117;
-                vela_push(v_out.m_insts, &_t118, sizeof(t_2ir_Inst));
-                // line 315
-                int64_t _t119 = v_after;
-                int64_t _t120 = (_t119 + 1);
-                v_at = _t120;
-                // line 315
+                t_2ir_Inst _t133 = _t132;
+                vela_push(v_out.m_insts, &_t133, sizeof(t_2ir_Inst));
+                // line 325
+                int64_t _t134 = v_after;
+                int64_t _t135 = (_t134 + 1);
+                v_at = _t135;
+                // line 325
                 rc_release_t_2ir_Inst(v_next);
+                vela_map_release(v_fresh);
                 rc_release_t_2ir_Inst(v_i_2);
                 continue;
             }
-            // line 317
-            t_2ir_Op _t121 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
-            bool _t122 = v_next.m_op.tag == _t121.tag;
-            bool _t123 = _t122;
-            if (!_t123) {
-                t_2ir_Op _t124 = (t_2ir_Op){ .tag = t_2ir_Op_FLoad };
-                bool _t125 = v_next.m_op.tag == _t124.tag;
-                _t123 = _t125;
+            // line 327
+            t_2ir_Op _t136 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
+            bool _t137 = v_next.m_op.tag == _t136.tag;
+            bool _t138 = _t137;
+            if (!_t138) {
+                t_2ir_Op _t139 = (t_2ir_Op){ .tag = t_2ir_Op_FLoad };
+                bool _t140 = v_next.m_op.tag == _t139.tag;
+                _t138 = _t140;
             }
-            bool _t126 = _t123;
-            if (_t126) {
-                int64_t _t127 = v_next.m_a;
-                bool _t128 = _t127 == v_i_2.m_a;
-                _t126 = _t128;
+            bool _t141 = _t138;
+            if (_t141) {
+                int64_t _t142 = v_next.m_a;
+                bool _t143 = _t142 == v_i_2.m_a;
+                _t141 = _t143;
             }
-            bool _t129 = _t126;
-            if (_t129) {
-                int64_t _t130 = v_next.m_imm;
-                bool _t131 = _t130 >= 0;
-                _t129 = _t131;
+            bool _t144 = _t141;
+            if (_t144) {
+                int64_t _t145 = v_next.m_imm;
+                bool _t146 = _t145 >= 0;
+                _t144 = _t146;
             }
-            bool _t132 = _t129;
-            if (_t132) {
-                int64_t _t133 = v_size;
-                bool _t134 = _t133 > 0;
-                _t132 = _t134;
+            bool _t147 = _t144;
+            if (_t147) {
+                int64_t _t148 = v_size;
+                bool _t149 = _t148 > 0;
+                _t147 = _t149;
             }
-            bool _t135 = _t132;
-            if (_t135) {
-                int64_t _t136 = v_next.m_imm;
-                int64_t _t137 = v_i_2.m_imm;
-                int64_t _t138 = vela_sub(_t137, v_size, "compiler/src/opt.vl:317:133");
-                bool _t139 = _t136 <= _t138;
-                _t135 = _t139;
+            bool _t150 = _t147;
+            if (_t150) {
+                int64_t _t151 = v_next.m_imm;
+                int64_t _t152 = v_i_2.m_imm;
+                int64_t _t153 = vela_sub(_t152, v_size, "compiler/src/opt.vl:327:133");
+                bool _t154 = _t151 <= _t153;
+                _t150 = _t154;
             }
-            if (_t135) {
-                // line 318
-                int64_t _t140 = v_at;
-                int64_t _t141 = (_t140 + 1);
-                int64_t _t142 = v_after;
-                for (int64_t _t143 = _t141; _t143 < _t142; _t143++) {
-                    int64_t v_between_2 = _t143;
-                    // line 318
-                    t_2ir_Inst _t144 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_between_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:318:75");
-                    rc_retain_t_2ir_Inst(_t144);
+            if (_t150) {
+                // line 328
+                int64_t _t155 = v_at;
+                int64_t _t156 = (_t155 + 1);
+                int64_t _t157 = v_after;
+                for (int64_t _t158 = _t156; _t158 < _t157; _t158++) {
+                    int64_t v_between_2 = _t158;
+                    // line 328
+                    t_2ir_Inst _t159 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_between_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:328:75");
+                    rc_retain_t_2ir_Inst(_t159);
                     vela_unique(&v_out.m_insts);
-                    t_2ir_Inst _t145 = _t144;
-                    vela_push(v_out.m_insts, &_t145, sizeof(t_2ir_Inst));
+                    t_2ir_Inst _t160 = _t159;
+                    vela_push(v_out.m_insts, &_t160, sizeof(t_2ir_Inst));
                 }
-                // line 319
+                // line 329
                 v_next.m_a = v_i_2.m_b;
-                // line 319
-                t_2ir_Inst _t146 = v_next;
-                rc_retain_t_2ir_Inst(_t146);
+                // line 329
+                t_2ir_Inst _t161 = v_next;
+                rc_retain_t_2ir_Inst(_t161);
                 vela_unique(&v_out.m_insts);
-                t_2ir_Inst _t147 = _t146;
-                vela_push(v_out.m_insts, &_t147, sizeof(t_2ir_Inst));
-                // line 319
-                int64_t _t148 = v_after;
-                int64_t _t149 = (_t148 + 1);
-                v_at = _t149;
-                // line 319
+                t_2ir_Inst _t162 = _t161;
+                vela_push(v_out.m_insts, &_t162, sizeof(t_2ir_Inst));
+                // line 329
+                int64_t _t163 = v_after;
+                int64_t _t164 = (_t163 + 1);
+                v_at = _t164;
+                // line 329
                 rc_release_t_2ir_Inst(v_next);
+                vela_map_release(v_fresh);
                 rc_release_t_2ir_Inst(v_i_2);
                 continue;
             }
             rc_release_t_2ir_Inst(v_next);
+            vela_map_release(v_fresh);
         }
-        // line 322
-        t_2ir_Inst _t150 = v_i_2;
-        rc_retain_t_2ir_Inst(_t150);
+        // line 332
+        t_2ir_Inst _t165 = v_i_2;
+        rc_retain_t_2ir_Inst(_t165);
         vela_unique(&v_out.m_insts);
-        t_2ir_Inst _t151 = _t150;
-        vela_push(v_out.m_insts, &_t151, sizeof(t_2ir_Inst));
-        // line 322
-        int64_t _t152 = v_at;
-        int64_t _t153 = (_t152 + 1);
-        v_at = _t153;
+        t_2ir_Inst _t166 = _t165;
+        vela_push(v_out.m_insts, &_t166, sizeof(t_2ir_Inst));
+        // line 332
+        int64_t _t167 = v_at;
+        int64_t _t168 = (_t167 + 1);
+        v_at = _t168;
         rc_release_t_2ir_Inst(v_i_2);
     }
-    // line 324
-    t_2ir_Func _t154 = v_out;
-    rc_retain_t_2ir_Func(_t154);
-    t_2ir_Func _t155 = _t154;
+    // line 334
+    t_2ir_Func _t169 = v_out;
+    rc_retain_t_2ir_Func(_t169);
+    t_2ir_Func _t170 = _t169;
     rc_release_t_2ir_Func(v_out);
     vela_map_release(v_slots);
     vela_array_release(v_addresses);
     vela_array_release(v_counts);
     vela_array_release(v_defs);
-    return _t155;
+    return _t170;
 }
 /* vela: part */
 
 t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
-    // line 333
+    // line 343
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     vela_array * v_rep = _t1;
-    // line 333
+    // line 343
     int64_t _t2 = v_f.m_classes->len;
     int64_t _t3 = _t2;
     vela_unique(&v_rep);
     for (int64_t _t4 = 0; _t4 < _t3; _t4++) {
         int64_t v_r = _t4;
-        // line 333
+        // line 343
         int64_t _t5 = v_r;
         vela_push(v_rep, &_t5, sizeof(int64_t));
     }
-    // line 334
+    // line 344
     vela_array * _t6 = vela_array_new(&vela_type_int, 0);
     vela_array * v_active = _t6;
-    // line 334
+    // line 344
     t_2ir_Func _t7 = v_f;
     rc_retain_t_2ir_Func(_t7);
     t_2ir_Func v_out = _t7;
-    // line 334
+    // line 344
     vela_array * _t8 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t8;
-    // line 335
+    // line 345
     vela_array * _t10 = v_f.m_insts;
     vela_array_retain(_t10);
     vela_array * _t9 = _t10;
     for (int64_t _t11 = 0; _t11 < _t9->len; _t11++) {
         t_2ir_Inst v_original = ((t_2ir_Inst *)_t9->data)[_t11];
         rc_retain_t_2ir_Inst(v_original);
-        // line 336
+        // line 346
         t_2ir_Op _t12 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t13 = v_original.m_op.tag == _t12.tag;
         if (_t13) {
-            // line 336
+            // line 346
             vela_array * _t15 = v_active;
             vela_array_retain(_t15);
             vela_array * _t14 = _t15;
@@ -143891,20 +143940,20 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
             int64_t _t17n = v_rep->len;
             for (int64_t _t16 = 0; _t16 < _t14->len; _t16++) {
                 int64_t v_r_2 = ((int64_t *)_t14->data)[_t16];
-                // line 336
-                int64_t *_t18 = (int64_t *)vela_at_in(_t17, _t17n, v_r_2, sizeof(int64_t), "compiler/src/opt.vl:336:62");
+                // line 346
+                int64_t *_t18 = (int64_t *)vela_at_in(_t17, _t17n, v_r_2, sizeof(int64_t), "compiler/src/opt.vl:346:62");
                 *_t18 = v_r_2;
             }
             vela_array_release(_t14);
-            // line 336
+            // line 346
             vela_array * _t19 = vela_array_new(&vela_type_int, 0);
             vela_array_release(v_active);
             v_active = _t19;
         }
-        // line 337
+        // line 347
         t_2ir_Inst _t20 = f_3opt_renamed(v_original, v_rep);
         t_2ir_Inst v_i = _t20;
-        // line 338
+        // line 348
         t_2ir_Op _t21 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
         bool _t22 = v_i.m_op.tag == _t21.tag;
         bool _t23 = _t22;
@@ -143914,21 +143963,21 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
             _t23 = _t25;
         }
         if (_t23) {
-            // line 338
+            // line 348
             rc_release_t_2ir_Inst(v_i);
             rc_release_t_2ir_Inst(v_original);
             continue;
         }
-        // line 339
+        // line 349
         int64_t _t26 = v_i.m_dst;
         bool _t27 = _t26 >= 0;
         if (_t27) {
-            // line 340
+            // line 350
             int64_t v_d = v_i.m_dst;
-            // line 340
+            // line 350
             vela_array * _t28 = vela_array_new(&vela_type_int, 0);
             vela_array * v_kept = _t28;
-            // line 341
+            // line 351
             vela_array * _t30 = v_active;
             vela_array_retain(_t30);
             vela_array * _t29 = _t30;
@@ -143938,8 +143987,8 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
             int64_t _t32n = v_rep->len;
             for (int64_t _t31 = 0; _t31 < _t29->len; _t31++) {
                 int64_t v_r_3 = ((int64_t *)_t29->data)[_t31];
-                // line 342
-                int64_t _t33 = *(int64_t *)vela_at_in(_t32, _t32n, v_r_3, sizeof(int64_t), "compiler/src/opt.vl:342:23");
+                // line 352
+                int64_t _t33 = *(int64_t *)vela_at_in(_t32, _t32n, v_r_3, sizeof(int64_t), "compiler/src/opt.vl:352:23");
                 int64_t _t34 = _t33;
                 bool _t35 = _t34 == v_d;
                 bool _t36 = _t35;
@@ -143949,26 +143998,26 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
                     _t36 = _t38;
                 }
                 if (_t36) {
-                    // line 342
+                    // line 352
                     int64_t *_t39 = ((int64_t *)_t32 + v_r_3);
                     *_t39 = v_r_3;
                 } else {
-                    // line 342
+                    // line 352
                     int64_t _t40 = v_r_3;
                     vela_push(v_kept, &_t40, sizeof(int64_t));
                 }
             }
             vela_array_release(_t29);
-            // line 343
+            // line 353
             vela_array * _t41 = v_kept;
             vela_array_retain(_t41);
             vela_array_release(v_active);
             v_active = _t41;
-            // line 343
+            // line 353
             vela_unique(&v_rep);
-            int64_t *_t42 = (int64_t *)vela_at(v_rep, v_d, sizeof(int64_t), "compiler/src/opt.vl:343:34");
+            int64_t *_t42 = (int64_t *)vela_at(v_rep, v_d, sizeof(int64_t), "compiler/src/opt.vl:353:34");
             *_t42 = v_d;
-            // line 344
+            // line 354
             t_2ir_Op _t43 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
             bool _t44 = v_i.m_op.tag == _t43.tag;
             bool _t45 = _t44;
@@ -143978,24 +144027,24 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
                 _t45 = _t47;
             }
             if (_t45) {
-                // line 344
+                // line 354
                 vela_unique(&v_rep);
                 int64_t *_t48 = ((int64_t *)v_rep->data + v_d);
                 *_t48 = v_i.m_a;
-                // line 344
+                // line 354
                 vela_unique(&v_active);
                 int64_t _t49 = v_d;
                 vela_push(v_active, &_t49, sizeof(int64_t));
             }
             vela_array_release(v_kept);
         }
-        // line 346
+        // line 356
         t_2ir_Inst _t50 = v_i;
         rc_retain_t_2ir_Inst(_t50);
         vela_unique(&v_out.m_insts);
         t_2ir_Inst _t51 = _t50;
         vela_push(v_out.m_insts, &_t51, sizeof(t_2ir_Inst));
-        // line 347
+        // line 357
         bool _t52 = f_2ir_ends_block(v_i.m_op);
         bool _t53 = _t52;
         if (!_t53) {
@@ -144004,7 +144053,7 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
             _t53 = _t55;
         }
         if (_t53) {
-            // line 347
+            // line 357
             vela_array * _t57 = v_active;
             vela_array_retain(_t57);
             vela_array * _t56 = _t57;
@@ -144013,12 +144062,12 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
             int64_t _t59n = v_rep->len;
             for (int64_t _t58 = 0; _t58 < _t56->len; _t58++) {
                 int64_t v_r_4 = ((int64_t *)_t56->data)[_t58];
-                // line 347
-                int64_t *_t60 = (int64_t *)vela_at_in(_t59, _t59n, v_r_4, sizeof(int64_t), "compiler/src/opt.vl:347:82");
+                // line 357
+                int64_t *_t60 = (int64_t *)vela_at_in(_t59, _t59n, v_r_4, sizeof(int64_t), "compiler/src/opt.vl:357:82");
                 *_t60 = v_r_4;
             }
             vela_array_release(_t56);
-            // line 347
+            // line 357
             vela_array * _t61 = vela_array_new(&vela_type_int, 0);
             vela_array_release(v_active);
             v_active = _t61;
@@ -144027,7 +144076,7 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_original);
     }
     vela_array_release(_t9);
-    // line 349
+    // line 359
     t_2ir_Func _t62 = v_out;
     rc_retain_t_2ir_Func(_t62);
     t_2ir_Func _t63 = _t62;
@@ -144039,7 +144088,7 @@ t_2ir_Func f_3opt_local_copies(t_2ir_Func v_f) {
 /* vela: part */
 
 int64_t f_3opt_ways_to(vela_map * v_ways, int64_t v_label) {
-    // line 361
+    // line 371
     int64_t _t1;
     int64_t _t3 = v_label;
     uint64_t _t4;
@@ -144063,59 +144112,59 @@ int64_t f_3opt_ways_to(vela_map * v_ways, int64_t v_label) {
 /* vela: part */
 
 t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
-    // line 377
+    // line 387
     vela_array * _t1 = f_3opt_def_counts(v_f);
     vela_array * v_defs = _t1;
-    // line 377
+    // line 387
     vela_map * _t2 = vela_map_new(&vela_type_str, &vela_type_int);
     vela_map * v_values = _t2;
-    // line 377
+    // line 387
     vela_map * _t3 = vela_map_new(&vela_type_str, &vela_type_int);
     vela_map * v_loads = _t3;
-    // line 378
+    // line 388
     vela_map * _t4 = vela_map_new(&vela_type_int, &vela_type_array);
     vela_map * v_readers = _t4;
-    // line 379
+    // line 389
     vela_array * _t5 = vela_array_new(&vela_type_int, 0);
     vela_array * v_rep = _t5;
-    // line 379
+    // line 389
     int64_t _t6 = v_f.m_classes->len;
     int64_t _t7 = _t6;
     vela_unique(&v_rep);
     for (int64_t _t8 = 0; _t8 < _t7; _t8++) {
         int64_t v_r = _t8;
-        // line 379
+        // line 389
         int64_t _t9 = v_r;
         vela_push(v_rep, &_t9, sizeof(int64_t));
     }
-    // line 380
+    // line 390
     vela_map * _t10 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_ways = _t10;
-    // line 381
+    // line 391
     int64_t _t11 = v_f.m_insts->len;
     int64_t _t12 = _t11;
     for (int64_t _t13 = 0; _t13 < _t12; _t13++) {
         int64_t v_k = _t13;
-        // line 382
-        t_2ir_Inst _t14 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:382:24");
+        // line 392
+        t_2ir_Inst _t14 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:392:24");
         rc_retain_t_2ir_Inst(_t14);
         t_2ir_Inst v_i = _t14;
-        // line 383
+        // line 393
         vela_array * _t16 = f_3opt_targets(v_i);
         vela_array * _t15 = _t16;
         for (int64_t _t17 = 0; _t17 < _t15->len; _t17++) {
             int64_t v_t = ((int64_t *)_t15->data)[_t17];
-            // line 383
+            // line 393
             int64_t _t18 = f_3opt_ways_to(v_ways, v_t);
             int64_t _t19 = _t18;
-            int64_t _t20 = vela_add(_t19, 1, "compiler/src/opt.vl:383:58");
+            int64_t _t20 = vela_add(_t19, 1, "compiler/src/opt.vl:393:58");
             vela_unique_map(&v_ways);
             int64_t _t21 = v_t;
             int64_t _t22 = _t20;
             vela_map_set(v_ways, &_t21, &_t22);
         }
         vela_array_release(_t15);
-        // line 384
+        // line 394
         t_2ir_Op _t23 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t24 = v_i.m_op.tag == _t23.tag;
         bool _t25 = _t24;
@@ -144128,16 +144177,16 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
         if (_t28) {
             int64_t _t30 = v_k;
             int64_t _t31 = (_t30 - 1);
-            t_2ir_Inst _t29 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t31, sizeof(t_2ir_Inst), "compiler/src/opt.vl:384:66");
+            t_2ir_Inst _t29 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t31, sizeof(t_2ir_Inst), "compiler/src/opt.vl:394:66");
             bool _t32 = f_2ir_ends_block(_t29.m_op);
             bool _t33 = !_t32;
             _t28 = _t33;
         }
         if (_t28) {
-            // line 384
+            // line 394
             int64_t _t34 = f_3opt_ways_to(v_ways, v_i.m_imm);
             int64_t _t35 = _t34;
-            int64_t _t36 = vela_add(_t35, 1, "compiler/src/opt.vl:384:115");
+            int64_t _t36 = vela_add(_t35, 1, "compiler/src/opt.vl:394:115");
             vela_unique_map(&v_ways);
             int64_t _t37 = v_i.m_imm;
             int64_t _t38 = _t36;
@@ -144145,29 +144194,29 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
         }
         rc_release_t_2ir_Inst(v_i);
     }
-    // line 386
+    // line 396
     vela_map * _t39 = vela_map_new(&vela_type_int, &vela_type_map);
     vela_map * v_saved_loads = _t39;
-    // line 386
+    // line 396
     vela_map * _t40 = vela_map_new(&vela_type_int, &vela_type_map);
     vela_map * v_saved_readers = _t40;
-    // line 387
+    // line 397
     vela_map * _t41 = vela_map_new(&vela_type_str, &vela_type_array);
     vela_map * v_spans = _t41;
-    // line 388
+    // line 398
     vela_map * _t42 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_arrivals = _t42;
-    // line 389
+    // line 399
     bool v_falls = false;
-    // line 390
+    // line 400
     t_2ir_Func _t43 = v_f;
     rc_retain_t_2ir_Func(_t43);
     t_2ir_Func v_out = _t43;
-    // line 390
+    // line 400
     vela_array * _t44 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t44;
-    // line 391
+    // line 401
     vela_array * _t46 = v_f.m_insts;
     vela_array_retain(_t46);
     vela_array * _t45 = _t46;
@@ -144175,17 +144224,17 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
     for (int64_t _t47 = 0; _t47 < _t45->len; _t47++) {
         t_2ir_Inst v_original = ((t_2ir_Inst *)_t45->data)[_t47];
         rc_retain_t_2ir_Inst(v_original);
-        // line 392
+        // line 402
         t_2ir_Inst _t48 = f_3opt_renamed(v_original, v_rep);
         t_2ir_Inst v_i_2 = _t48;
-        // line 393
+        // line 403
         t_2ir_Op _t49 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t50 = v_i_2.m_op.tag == _t49.tag;
         if (_t50) {
-            // line 394
+            // line 404
             int64_t _t51 = f_3opt_ways_to(v_ways, v_i_2.m_imm);
             int64_t v_n = _t51;
-            // line 395
+            // line 405
             int64_t _t52 = v_n;
             bool _t53 = _t52 == 1;
             bool _t54 = _t53;
@@ -144201,15 +144250,15 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 _t56 = _t59;
             }
             if (_t56) {
-                // line 396
+                // line 406
                 int64_t _t61 = v_i_2.m_imm;
-                vela_map * _t60 = *(vela_map * *)vela_map_at(v_saved_loads, &_t61, "compiler/src/opt.vl:396:36");
+                vela_map * _t60 = *(vela_map * *)vela_map_at(v_saved_loads, &_t61, "compiler/src/opt.vl:406:36");
                 vela_map_retain(_t60);
                 vela_map_release(v_loads);
                 v_loads = _t60;
-                // line 396
+                // line 406
                 int64_t _t63 = v_i_2.m_imm;
-                vela_map * _t62 = *(vela_map * *)vela_map_at(v_saved_readers, &_t63, "compiler/src/opt.vl:396:68");
+                vela_map * _t62 = *(vela_map * *)vela_map_at(v_saved_readers, &_t63, "compiler/src/opt.vl:406:68");
                 vela_map_retain(_t62);
                 vela_map_release(v_readers);
                 v_readers = _t62;
@@ -144217,9 +144266,9 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 int64_t _t64 = v_n;
                 bool _t65 = _t64 > 1;
                 if (_t65) {
-                    // line 400
+                    // line 410
                     if (v_falls) {
-                        // line 400
+                        // line 410
                         vela_map * _t66 = v_loads;
                         vela_map_retain(_t66);
                         vela_map * _t67 = v_spans;
@@ -144231,35 +144280,35 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                         vela_map_release(_t67);
                         vela_map_release(_t66);
                     }
-                    // line 401
+                    // line 411
                     int64_t _t69 = f_3opt_ways_to(v_arrivals, v_i_2.m_imm);
                     int64_t _t70 = _t69;
                     bool _t71 = _t70 == v_n;
                     if (_t71) {
-                        // line 401
+                        // line 411
                         int64_t _t73 = v_i_2.m_imm;
-                        vela_map * _t72 = *(vela_map * *)vela_map_at(v_saved_loads, &_t73, "compiler/src/opt.vl:401:71");
+                        vela_map * _t72 = *(vela_map * *)vela_map_at(v_saved_loads, &_t73, "compiler/src/opt.vl:411:71");
                         vela_map_retain(_t72);
                         vela_map_release(v_loads);
                         v_loads = _t72;
                     } else {
-                        // line 401
+                        // line 411
                         vela_map * _t74 = vela_map_new(&vela_type_str, &vela_type_int);
                         vela_map_release(v_loads);
                         v_loads = _t74;
                     }
-                    // line 402
+                    // line 412
                     vela_map * _t75 = vela_map_new(&vela_type_int, &vela_type_array);
                     vela_map_release(v_readers);
                     v_readers = _t75;
                 } else {
                     bool _t76 = !v_falls;
                     if (_t76) {
-                        // line 404
+                        // line 414
                         vela_map * _t77 = vela_map_new(&vela_type_str, &vela_type_int);
                         vela_map_release(v_loads);
                         v_loads = _t77;
-                        // line 404
+                        // line 414
                         vela_map * _t78 = vela_map_new(&vela_type_int, &vela_type_array);
                         vela_map_release(v_readers);
                         v_readers = _t78;
@@ -144267,7 +144316,7 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 }
             }
         }
-        // line 407
+        // line 417
         t_2ir_Op _t79 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t80 = v_i_2.m_op.tag == _t79.tag;
         bool _t81 = _t80;
@@ -144277,36 +144326,36 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             _t81 = _t83;
         }
         if (_t81) {
-            // line 408
+            // line 418
             vela_map * _t84 = vela_map_new(&vela_type_str, &vela_type_int);
             vela_map_release(v_values);
             v_values = _t84;
         }
-        // line 410
+        // line 420
         vela_array * _t86 = f_3opt_targets(v_i_2);
         vela_array * _t85 = _t86;
         for (int64_t _t87 = 0; _t87 < _t85->len; _t87++) {
             int64_t v_t_2 = ((int64_t *)_t85->data)[_t87];
-            // line 411
+            // line 421
             int64_t _t88 = f_3opt_ways_to(v_ways, v_t_2);
             int64_t _t89 = _t88;
             bool _t90 = _t89 == 1;
             if (_t90) {
-                // line 411
+                // line 421
                 vela_map * _t91 = v_loads;
                 vela_map_retain(_t91);
                 vela_unique_map(&v_saved_loads);
                 int64_t _t92 = v_t_2;
                 vela_map * _t93 = _t91;
                 vela_map_set(v_saved_loads, &_t92, &_t93);
-                // line 411
+                // line 421
                 vela_map * _t94 = v_readers;
                 vela_map_retain(_t94);
                 int64_t _t95 = v_t_2;
                 vela_map * _t96 = _t94;
                 vela_map_set(v_saved_readers, &_t95, &_t96);
             } else {
-                // line 411
+                // line 421
                 vela_map * _t97 = v_loads;
                 vela_map_retain(_t97);
                 vela_map * _t98 = v_spans;
@@ -144320,27 +144369,27 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             }
         }
         vela_array_release(_t85);
-        // line 413
+        // line 423
         bool _t100 = f_2ir_ends_block(v_i_2.m_op);
         bool _t101 = !_t100;
         v_falls = _t101;
-        // line 414
+        // line 424
         bool _t102 = f_2ir_ends_block(v_i_2.m_op);
         if (_t102) {
-            // line 414
+            // line 424
             vela_map * _t103 = vela_map_new(&vela_type_str, &vela_type_int);
             vela_map_release(v_values);
             v_values = _t103;
-            // line 414
+            // line 424
             vela_map * _t104 = vela_map_new(&vela_type_str, &vela_type_int);
             vela_map_release(v_loads);
             v_loads = _t104;
-            // line 414
+            // line 424
             vela_map * _t105 = vela_map_new(&vela_type_int, &vela_type_array);
             vela_map_release(v_readers);
             v_readers = _t105;
         }
-        // line 415
+        // line 425
         t_2ir_Op _t106 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
         bool _t107 = v_i_2.m_op.tag == _t106.tag;
         bool _t108 = _t107;
@@ -144350,7 +144399,7 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             _t108 = _t110;
         }
         bool v_reading = _t108;
-        // line 416
+        // line 426
         t_2ir_Op _t111 = (t_2ir_Op){ .tag = t_2ir_Op_Call };
         bool _t112 = v_i_2.m_op.tag == _t111.tag;
         bool _t113 = _t112;
@@ -144384,12 +144433,12 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             _t125 = _t127;
         }
         if (_t125) {
-            // line 416
+            // line 426
             vela_map * _t128 = vela_map_new(&vela_type_str, &vela_type_int);
             vela_map_release(v_loads);
             v_loads = _t128;
         }
-        // line 417
+        // line 427
         t_2ir_Op _t129 = (t_2ir_Op){ .tag = t_2ir_Op_Store };
         bool _t130 = v_i_2.m_op.tag == _t129.tag;
         bool _t131 = _t130;
@@ -144399,57 +144448,57 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             _t131 = _t133;
         }
         if (_t131) {
-            // line 418
+            // line 428
             int64_t v_width = 8;
-            // line 419
+            // line 429
             t_2ir_Op _t134 = (t_2ir_Op){ .tag = t_2ir_Op_Store };
             bool _t135 = v_i_2.m_op.tag == _t134.tag;
             if (_t135) {
-                // line 419
+                // line 429
                 v_width = v_i_2.m_imm2;
             }
-            // line 420
+            // line 430
             vela_map * _t136 = vela_map_new(&vela_type_str, &vela_type_int);
             vela_map * v_kept = _t136;
-            // line 421
+            // line 431
             vela_array * _t138 = vela_map_keys(v_loads);
             vela_array * _t137 = _t138;
             vela_unique_map(&v_kept);
             for (int64_t _t139 = 0; _t139 < _t137->len; _t139++) {
                 vela_str v_key = ((vela_str *)_t137->data)[_t139];
                 vela_str_retain(v_key);
-                // line 422
+                // line 432
                 vela_str _t141 = v_key;
-                vela_array * _t140 = *(vela_array * *)vela_map_at(v_spans, &_t141, "compiler/src/opt.vl:422:31");
+                vela_array * _t140 = *(vela_array * *)vela_map_at(v_spans, &_t141, "compiler/src/opt.vl:432:31");
                 vela_array_retain(_t140);
                 vela_array * v_at = _t140;
-                // line 423
-                int64_t _t142 = *(int64_t *)vela_at(v_at, 0, sizeof(int64_t), "compiler/src/opt.vl:423:22");
+                // line 433
+                int64_t _t142 = *(int64_t *)vela_at(v_at, 0, sizeof(int64_t), "compiler/src/opt.vl:433:22");
                 int64_t _t143 = _t142;
                 bool _t144 = _t143 == v_i_2.m_a;
                 bool _t145 = _t144;
                 if (_t145) {
-                    int64_t _t146 = *(int64_t *)vela_at(v_at, 1, sizeof(int64_t), "compiler/src/opt.vl:423:39");
+                    int64_t _t146 = *(int64_t *)vela_at(v_at, 1, sizeof(int64_t), "compiler/src/opt.vl:433:39");
                     int64_t _t147 = _t146;
-                    int64_t _t148 = *(int64_t *)vela_at(v_at, 2, sizeof(int64_t), "compiler/src/opt.vl:423:47");
-                    int64_t _t149 = vela_add(_t147, _t148, "compiler/src/opt.vl:423:43");
+                    int64_t _t148 = *(int64_t *)vela_at(v_at, 2, sizeof(int64_t), "compiler/src/opt.vl:433:47");
+                    int64_t _t149 = vela_add(_t147, _t148, "compiler/src/opt.vl:433:43");
                     int64_t _t150 = _t149;
                     bool _t151 = _t150 <= v_i_2.m_imm;
                     bool _t152 = _t151;
                     if (!_t152) {
                         int64_t _t153 = v_i_2.m_imm;
-                        int64_t _t154 = vela_add(_t153, v_width, "compiler/src/opt.vl:423:69");
+                        int64_t _t154 = vela_add(_t153, v_width, "compiler/src/opt.vl:433:69");
                         int64_t _t155 = _t154;
-                        int64_t _t156 = *(int64_t *)vela_at(v_at, 1, sizeof(int64_t), "compiler/src/opt.vl:423:82");
+                        int64_t _t156 = *(int64_t *)vela_at(v_at, 1, sizeof(int64_t), "compiler/src/opt.vl:433:82");
                         bool _t157 = _t155 <= _t156;
                         _t152 = _t157;
                     }
                     _t145 = _t152;
                 }
                 if (_t145) {
-                    // line 423
+                    // line 433
                     vela_str _t159 = v_key;
-                    int64_t _t158 = *(int64_t *)vela_map_at(v_loads, &_t159, "compiler/src/opt.vl:423:106");
+                    int64_t _t158 = *(int64_t *)vela_map_at(v_loads, &_t159, "compiler/src/opt.vl:433:106");
                     vela_str _t160 = v_key;
                     vela_str_retain(_t160);
                     vela_str _t161 = _t160;
@@ -144460,12 +144509,12 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 vela_str_release(v_key);
             }
             vela_array_release(_t137);
-            // line 425
+            // line 435
             vela_map * _t163 = v_kept;
             vela_map_retain(_t163);
             vela_map_release(v_loads);
             v_loads = _t163;
-            // line 426
+            // line 436
             t_2ir_Op _t164 = (t_2ir_Op){ .tag = t_2ir_Op_Store };
             bool _t165 = v_i_2.m_op.tag == _t164.tag;
             bool _t166 = _t165;
@@ -144476,20 +144525,20 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             }
             bool _t169 = _t166;
             if (_t169) {
-                int64_t _t170 = *(int64_t *)vela_at(v_defs, v_i_2.m_a, sizeof(int64_t), "compiler/src/opt.vl:426:57");
+                int64_t _t170 = *(int64_t *)vela_at(v_defs, v_i_2.m_a, sizeof(int64_t), "compiler/src/opt.vl:436:57");
                 int64_t _t171 = _t170;
                 bool _t172 = _t171 == 1;
                 _t169 = _t172;
             }
             bool _t173 = _t169;
             if (_t173) {
-                int64_t _t174 = *(int64_t *)vela_at(v_defs, v_i_2.m_b, sizeof(int64_t), "compiler/src/opt.vl:426:75");
+                int64_t _t174 = *(int64_t *)vela_at(v_defs, v_i_2.m_b, sizeof(int64_t), "compiler/src/opt.vl:436:75");
                 int64_t _t175 = _t174;
                 bool _t176 = _t175 == 1;
                 _t173 = _t176;
             }
             if (_t173) {
-                // line 427
+                // line 437
                 static const vela_str _t177[] = {VELA_STR_INIT("load:", 5), {NULL, NULL, 0}, VELA_STR_INIT(":-1:", 4), {NULL, NULL, 0}, VELA_STR_INIT(":8:", 3)};
                 vela_str _t178[5];
                 memcpy(_t178, _t177, sizeof _t178);
@@ -144501,14 +144550,14 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 vela_str_release(_t178[1]);
                 vela_str_release(_t178[3]);
                 vela_str v_key_2 = _t181;
-                // line 428
+                // line 438
                 vela_unique_map(&v_loads);
                 vela_str _t182 = v_key_2;
                 vela_str_retain(_t182);
                 vela_str _t183 = _t182;
                 int64_t _t184 = v_i_2.m_b;
                 vela_map_set(v_loads, &_t183, &_t184);
-                // line 429
+                // line 439
                 vela_array * _t185 = vela_array_new(&vela_type_int, 3);
                 int64_t _t186 = v_i_2.m_a;
                 vela_push(_t185, &_t186, sizeof(int64_t));
@@ -144526,7 +144575,7 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             }
             vela_map_release(v_kept);
         }
-        // line 432
+        // line 442
         int64_t _t192 = v_i_2.m_dst;
         bool _t193 = _t192 >= 0;
         bool _t194 = _t193;
@@ -144536,15 +144585,15 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
         }
         bool _t196 = _t194;
         if (_t196) {
-            int64_t _t197 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:432:57");
+            int64_t _t197 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:442:57");
             int64_t _t198 = _t197;
             bool _t199 = _t198 == 1;
             _t196 = _t199;
         }
         bool v_candidate = _t196;
-        // line 433
+        // line 443
         if (v_candidate) {
-            // line 434
+            // line 444
             static const vela_str _t200[] = {{NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}};
             vela_str _t201[11];
             memcpy(_t201, _t200, sizeof _t201);
@@ -144566,11 +144615,11 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             vela_str_release(_t201[6]);
             vela_str_release(_t201[8]);
             vela_str v_key_3 = _t207;
-            // line 435
+            // line 445
             int64_t v_previous = -1;
-            // line 436
+            // line 446
             if (v_reading) {
-                // line 436
+                // line 446
                 vela_str _t209 = v_key_3;
                 uint64_t _t210;
                 int64_t *_t208 = vela_map_find_hashed(v_loads, &_t209, &_t210);
@@ -144583,12 +144632,12 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 }
                 if (_t212.tag == Option_Int_Some) {
                     int64_t v_v = _t212.as.m_Some._0;
-                    // line 436
+                    // line 446
                     v_previous = v_v;
                 } else {
                 }
             } else {
-                // line 436
+                // line 446
                 vela_str _t214 = v_key_3;
                 uint64_t _t215;
                 int64_t *_t213 = vela_map_find_hashed(v_values, &_t214, &_t215);
@@ -144601,44 +144650,44 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 }
                 if (_t217.tag == Option_Int_Some) {
                     int64_t v_v_2 = _t217.as.m_Some._0;
-                    // line 436
+                    // line 446
                     v_previous = v_v_2;
                 } else {
                 }
             }
-            // line 437
+            // line 447
             int64_t _t218 = v_previous;
             bool _t219 = _t218 >= 0;
             if (_t219) {
-                // line 437
+                // line 447
                 vela_unique(&v_rep);
-                int64_t *_t220 = (int64_t *)vela_at(v_rep, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:437:35");
+                int64_t *_t220 = (int64_t *)vela_at(v_rep, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:447:35");
                 *_t220 = v_previous;
-                // line 437
+                // line 447
                 vela_str_release(v_key_3);
                 rc_release_t_2ir_Inst(v_i_2);
                 rc_release_t_2ir_Inst(v_original);
                 continue;
             }
-            // line 438
+            // line 448
             if (v_reading) {
-                // line 439
+                // line 449
                 vela_unique_map(&v_loads);
                 vela_str _t221 = v_key_3;
                 vela_str_retain(_t221);
                 vela_str _t222 = _t221;
                 int64_t _t223 = v_i_2.m_dst;
                 vela_map_set(v_loads, &_t222, &_t223);
-                // line 440
+                // line 450
                 int64_t v_size = 8;
-                // line 441
+                // line 451
                 t_2ir_Op _t224 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
                 bool _t225 = v_i_2.m_op.tag == _t224.tag;
                 if (_t225) {
-                    // line 441
+                    // line 451
                     v_size = v_i_2.m_imm2;
                 }
-                // line 442
+                // line 452
                 vela_array * _t226 = vela_array_new(&vela_type_int, 3);
                 int64_t _t227 = v_i_2.m_a;
                 vela_push(_t226, &_t227, sizeof(int64_t));
@@ -144653,7 +144702,7 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 vela_array * _t232 = _t226;
                 vela_map_set(v_spans, &_t231, &_t232);
             } else {
-                // line 443
+                // line 453
                 vela_unique_map(&v_values);
                 vela_str _t233 = v_key_3;
                 vela_str_retain(_t233);
@@ -144661,21 +144710,21 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 int64_t _t235 = v_i_2.m_dst;
                 vela_map_set(v_values, &_t234, &_t235);
             }
-            // line 444
+            // line 454
             vela_array * _t237 = f_2ir_reads(v_i_2);
             vela_array * _t236 = _t237;
             vela_unique_map(&v_readers);
             for (int64_t _t238 = 0; _t238 < _t236->len; _t238++) {
                 int64_t v_r_2 = ((int64_t *)_t236->data)[_t238];
-                // line 445
-                int64_t _t239 = *(int64_t *)vela_at(v_defs, v_r_2, sizeof(int64_t), "compiler/src/opt.vl:445:24");
+                // line 455
+                int64_t _t239 = *(int64_t *)vela_at(v_defs, v_r_2, sizeof(int64_t), "compiler/src/opt.vl:455:24");
                 int64_t _t240 = _t239;
                 bool _t241 = _t240 != 1;
                 if (_t241) {
-                    // line 446
+                    // line 456
                     vela_array * _t242 = vela_array_new(&vela_type_str, 0);
                     vela_array * v_keys = _t242;
-                    // line 447
+                    // line 457
                     int64_t _t244 = v_r_2;
                     uint64_t _t245;
                     vela_array * *_t243 = vela_map_find_hashed(v_readers, &_t244, &_t245);
@@ -144690,7 +144739,7 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                     if (_t247.tag == Option_Array_Str_Some) {
                         vela_array * v_ks = _t247.as.m_Some._0;
                         vela_array_retain(v_ks);
-                        // line 447
+                        // line 457
                         vela_array * _t248 = v_ks;
                         vela_array_retain(_t248);
                         vela_array_release(v_keys);
@@ -144699,13 +144748,13 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                     } else {
                     }
                     rc_release_Option_Array_Str(_t247);
-                    // line 448
+                    // line 458
                     vela_str _t249 = v_key_3;
                     vela_str_retain(_t249);
                     vela_unique(&v_keys);
                     vela_str _t250 = _t249;
                     vela_push(v_keys, &_t250, sizeof(vela_str));
-                    // line 449
+                    // line 459
                     vela_array * _t251 = v_keys;
                     vela_array_retain(_t251);
                     int64_t _t252 = v_r_2;
@@ -144717,18 +144766,18 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             vela_array_release(_t236);
             vela_str_release(v_key_3);
         }
-        // line 454
+        // line 464
         int64_t _t254 = v_i_2.m_dst;
         bool _t255 = _t254 >= 0;
         bool _t256 = _t255;
         if (_t256) {
-            int64_t _t257 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:454:30");
+            int64_t _t257 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:464:30");
             int64_t _t258 = _t257;
             bool _t259 = _t258 != 1;
             _t256 = _t259;
         }
         if (_t256) {
-            // line 455
+            // line 465
             int64_t _t261 = v_i_2.m_dst;
             vela_array * *_t260 = vela_map_find(v_readers, &_t261);
             Option_Array_Str _t262;
@@ -144741,7 +144790,7 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             if (_t262.tag == Option_Array_Str_Some) {
                 vela_array * v_keys_2 = _t262.as.m_Some._0;
                 vela_array_retain(v_keys_2);
-                // line 457
+                // line 467
                 vela_array * _t264 = v_keys_2;
                 vela_array_retain(_t264);
                 vela_array * _t263 = _t264;
@@ -144750,32 +144799,32 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
                 for (int64_t _t265 = 0; _t265 < _t263->len; _t265++) {
                     vela_str v_key_4 = ((vela_str *)_t263->data)[_t265];
                     vela_str_retain(v_key_4);
-                    // line 458
+                    // line 468
                     vela_str _t267 = v_key_4;
                     uint64_t _t268;
                     int64_t *_t266 = vela_map_find_hashed(v_values, &_t267, &_t268);
                     vela_map *_t269 = v_values;
                     bool _t270 = _t266 != NULL;
                     if (_t270) {
-                        // line 458
+                        // line 468
                         vela_str _t271 = v_key_4;
                         (void)vela_map_remove(v_values, &_t271);
                     }
-                    // line 459
+                    // line 469
                     vela_str _t273 = v_key_4;
                     uint64_t _t274;
                     int64_t *_t272 = vela_map_find_hashed(v_loads, &_t273, &_t274);
                     vela_map *_t275 = v_loads;
                     bool _t276 = _t272 != NULL;
                     if (_t276) {
-                        // line 459
+                        // line 469
                         vela_str _t277 = v_key_4;
                         (void)vela_map_remove(v_loads, &_t277);
                     }
                     vela_str_release(v_key_4);
                 }
                 vela_array_release(_t263);
-                // line 461
+                // line 471
                 vela_unique_map(&v_readers);
                 int64_t _t278 = v_i_2.m_dst;
                 (void)vela_map_remove(v_readers, &_t278);
@@ -144784,7 +144833,7 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
             }
             rc_release_Option_Array_Str(_t262);
         }
-        // line 466
+        // line 476
         t_2ir_Inst _t279 = v_i_2;
         rc_retain_t_2ir_Inst(_t279);
         vela_unique(&v_out.m_insts);
@@ -144794,7 +144843,7 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_original);
     }
     vela_array_release(_t45);
-    // line 468
+    // line 478
     t_2ir_Func _t281 = v_out;
     rc_retain_t_2ir_Func(_t281);
     t_2ir_Func _t282 = _t281;
@@ -144814,47 +144863,47 @@ t_2ir_Func f_3opt_reuse(t_2ir_Func v_f) {
 /* vela: part */
 
 void f_3opt_arrive(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_label, vela_map * v_loads, vela_map * v_spans, vela_array * v_defs) {
-    // line 475
+    // line 485
     int64_t _t1 = f_3opt_ways_to((*v_arrivals), v_label);
     int64_t _t2 = _t1;
     bool _t3 = _t2 == 0;
     bool v_first = _t3;
-    // line 476
+    // line 486
     vela_map * _t4 = vela_map_new(&vela_type_str, &vela_type_int);
     vela_map * v_have = _t4;
-    // line 477
+    // line 487
     bool _t5 = !v_first;
     if (_t5) {
-        // line 477
+        // line 487
         int64_t _t7 = v_label;
-        vela_map * _t6 = *(vela_map * *)vela_map_at((*v_saved), &_t7, "compiler/src/opt.vl:477:29");
+        vela_map * _t6 = *(vela_map * *)vela_map_at((*v_saved), &_t7, "compiler/src/opt.vl:487:29");
         vela_map_retain(_t6);
         vela_map_release(v_have);
         v_have = _t6;
     }
-    // line 478
+    // line 488
     vela_map * _t8 = vela_map_new(&vela_type_str, &vela_type_int);
     vela_map * v_out = _t8;
-    // line 479
+    // line 489
     vela_array * _t10 = vela_map_keys(v_loads);
     vela_array * _t9 = _t10;
     vela_unique_map(&v_out);
     for (int64_t _t11 = 0; _t11 < _t9->len; _t11++) {
         vela_str v_key = ((vela_str *)_t9->data)[_t11];
         vela_str_retain(v_key);
-        // line 480
+        // line 490
         vela_str _t14 = v_key;
-        vela_array * _t13 = *(vela_array * *)vela_map_at(v_spans, &_t14, "compiler/src/opt.vl:480:22");
-        int64_t _t15 = *(int64_t *)vela_at(_t13, 0, sizeof(int64_t), "compiler/src/opt.vl:480:27");
-        int64_t _t12 = *(int64_t *)vela_at(v_defs, _t15, sizeof(int64_t), "compiler/src/opt.vl:480:16");
+        vela_array * _t13 = *(vela_array * *)vela_map_at(v_spans, &_t14, "compiler/src/opt.vl:490:22");
+        int64_t _t15 = *(int64_t *)vela_at(_t13, 0, sizeof(int64_t), "compiler/src/opt.vl:490:27");
+        int64_t _t12 = *(int64_t *)vela_at(v_defs, _t15, sizeof(int64_t), "compiler/src/opt.vl:490:16");
         int64_t _t16 = _t12;
         bool _t17 = _t16 != 1;
         if (_t17) {
-            // line 480
+            // line 490
             vela_str_release(v_key);
             continue;
         }
-        // line 481
+        // line 491
         bool _t18 = v_first;
         if (!_t18) {
             vela_str _t20 = v_key;
@@ -144865,19 +144914,19 @@ void f_3opt_arrive(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_labe
             bool _t24 = _t23;
             if (_t24) {
                 vela_str _t26 = v_key;
-                int64_t _t25 = *(int64_t *)vela_map_at(v_have, &_t26, "compiler/src/opt.vl:481:48");
+                int64_t _t25 = *(int64_t *)vela_map_at(v_have, &_t26, "compiler/src/opt.vl:491:48");
                 int64_t _t27 = _t25;
                 vela_str _t29 = v_key;
-                int64_t _t28 = *(int64_t *)vela_map_at(v_loads, &_t29, "compiler/src/opt.vl:481:62");
+                int64_t _t28 = *(int64_t *)vela_map_at(v_loads, &_t29, "compiler/src/opt.vl:491:62");
                 bool _t30 = _t27 == _t28;
                 _t24 = _t30;
             }
             _t18 = _t24;
         }
         if (_t18) {
-            // line 481
+            // line 491
             vela_str _t32 = v_key;
-            int64_t _t31 = *(int64_t *)vela_map_at(v_loads, &_t32, "compiler/src/opt.vl:481:86");
+            int64_t _t31 = *(int64_t *)vela_map_at(v_loads, &_t32, "compiler/src/opt.vl:491:86");
             vela_str _t33 = v_key;
             vela_str_retain(_t33);
             vela_str _t34 = _t33;
@@ -144887,17 +144936,17 @@ void f_3opt_arrive(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_labe
         vela_str_release(v_key);
     }
     vela_array_release(_t9);
-    // line 483
+    // line 493
     vela_map * _t36 = v_out;
     vela_map_retain(_t36);
     vela_unique_map(&(*v_saved));
     int64_t _t37 = v_label;
     vela_map * _t38 = _t36;
     vela_map_set((*v_saved), &_t37, &_t38);
-    // line 484
+    // line 494
     int64_t _t39 = f_3opt_ways_to((*v_arrivals), v_label);
     int64_t _t40 = _t39;
-    int64_t _t41 = vela_add(_t40, 1, "compiler/src/opt.vl:484:48");
+    int64_t _t41 = vela_add(_t40, 1, "compiler/src/opt.vl:494:48");
     vela_unique_map(&(*v_arrivals));
     int64_t _t42 = v_label;
     int64_t _t43 = _t41;
@@ -144908,7 +144957,7 @@ void f_3opt_arrive(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_labe
 /* vela: part */
 
 t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
-    // line 497
+    // line 507
     int64_t _t1 = v_f.m_sret;
     bool _t2 = _t1 < 0;
     bool _t3 = _t2;
@@ -144919,31 +144968,31 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
         _t3 = _t6;
     }
     if (_t3) {
-        // line 498
+        // line 508
         t_2ir_Func _t7 = v_f;
         rc_retain_t_2ir_Func(_t7);
         t_2ir_Func _t8 = _t7;
         return _t8;
     }
-    // line 500
+    // line 510
     vela_array * _t9 = f_3opt_def_counts(v_f);
     vela_array * v_defs = _t9;
-    // line 501
+    // line 511
     vela_array * _t10 = vela_array_new(&vela_type_int, 0);
     vela_array * v_readers = _t10;
-    // line 502
+    // line 512
     vela_array * _t12 = v_f.m_classes;
     vela_array_retain(_t12);
     vela_array * _t11 = _t12;
     vela_unique(&v_readers);
     for (int64_t _t13 = 0; _t13 < _t11->len; _t13++) {
         int64_t v__ = ((int64_t *)_t11->data)[_t13];
-        // line 502
+        // line 512
         int64_t _t14 = 0;
         vela_push(v_readers, &_t14, sizeof(int64_t));
     }
     vela_array_release(_t11);
-    // line 503
+    // line 513
     vela_array * _t16 = v_f.m_insts;
     vela_array_retain(_t16);
     vela_array * _t15 = _t16;
@@ -144953,15 +145002,15 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
     for (int64_t _t17 = 0; _t17 < _t15->len; _t17++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t15->data)[_t17];
         rc_retain_t_2ir_Inst(v_i);
-        // line 504
+        // line 514
         vela_array * _t20 = f_2ir_reads(v_i);
         vela_array * _t19 = _t20;
         for (int64_t _t21 = 0; _t21 < _t19->len; _t21++) {
             int64_t v_r = ((int64_t *)_t19->data)[_t21];
-            // line 504
-            int64_t _t22 = *(int64_t *)vela_at_in(_t18, _t18n, v_r, sizeof(int64_t), "compiler/src/opt.vl:504:52");
+            // line 514
+            int64_t _t22 = *(int64_t *)vela_at_in(_t18, _t18n, v_r, sizeof(int64_t), "compiler/src/opt.vl:514:52");
             int64_t _t23 = _t22;
-            int64_t _t24 = vela_add(_t23, 1, "compiler/src/opt.vl:504:56");
+            int64_t _t24 = vela_add(_t23, 1, "compiler/src/opt.vl:514:56");
             int64_t *_t25 = ((int64_t *)_t18 + v_r);
             *_t25 = _t24;
         }
@@ -144969,32 +145018,32 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t15);
-    // line 506
+    // line 516
     t_2ir_Func _t26 = v_f;
     rc_retain_t_2ir_Func(_t26);
     t_2ir_Func v_out = _t26;
-    // line 507
+    // line 517
     vela_map * _t27 = vela_map_new(&vela_type_int, &vela_type_bool);
     vela_map * v_moved = _t27;
-    // line 508
+    // line 518
     int64_t _t28 = v_f.m_insts->len;
     int64_t _t29 = _t28;
     int64_t _t30 = (_t29 - 1);
     int64_t v_k = _t30;
-    // line 509
+    // line 519
     vela_unique_map(&v_moved);
     for (;;) {
         int64_t _t31 = v_k;
         bool _t32 = _t31 >= 0;
         bool _t33 = _t32;
         if (!_t33) break;
-        // line 510
-        t_2ir_Inst _t34 = *(t_2ir_Inst *)vela_at(v_out.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:510:26");
+        // line 520
+        t_2ir_Inst _t34 = *(t_2ir_Inst *)vela_at(v_out.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:520:26");
         rc_retain_t_2ir_Inst(_t34);
         t_2ir_Inst v_c = _t34;
-        // line 511
+        // line 521
         int64_t v_s = v_c.m_b;
-        // line 512
+        // line 522
         t_2ir_Op _t35 = (t_2ir_Op){ .tag = t_2ir_Op_Copy };
         bool _t36 = v_c.m_op.tag == _t35.tag;
         bool _t37 = _t36;
@@ -145011,7 +145060,7 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
         }
         bool _t43 = _t40;
         if (_t43) {
-            int64_t _t44 = *(int64_t *)vela_at(v_defs, v_s, sizeof(int64_t), "compiler/src/opt.vl:512:65");
+            int64_t _t44 = *(int64_t *)vela_at(v_defs, v_s, sizeof(int64_t), "compiler/src/opt.vl:522:65");
             int64_t _t45 = _t44;
             bool _t46 = _t45 == 1;
             _t43 = _t46;
@@ -145027,14 +145076,14 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
         if (_t51) {
             int64_t _t52 = v_c.m_imm;
             int64_t _t54 = f_3opt_slot_of(v_out, v_s);
-            int64_t _t53 = *(int64_t *)vela_at(v_out.m_slot_sizes, _t54, sizeof(int64_t), "compiler/src/opt.vl:512:124");
+            int64_t _t53 = *(int64_t *)vela_at(v_out.m_slot_sizes, _t54, sizeof(int64_t), "compiler/src/opt.vl:522:124");
             bool _t55 = _t52 == _t53;
             _t51 = _t55;
         }
         if (_t51) {
-            // line 513
+            // line 523
             int64_t v_start = v_k;
-            // line 514
+            // line 524
             for (;;) {
                 int64_t _t56 = v_start;
                 bool _t57 = _t56 > 0;
@@ -145042,51 +145091,51 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                 if (_t58) {
                     int64_t _t60 = v_start;
                     int64_t _t61 = (_t60 - 1);
-                    t_2ir_Inst _t59 = *(t_2ir_Inst *)vela_at(v_out.m_insts, _t61, sizeof(t_2ir_Inst), "compiler/src/opt.vl:514:49");
+                    t_2ir_Inst _t59 = *(t_2ir_Inst *)vela_at(v_out.m_insts, _t61, sizeof(t_2ir_Inst), "compiler/src/opt.vl:524:49");
                     bool _t62 = f_3opt_boundary(_t59);
                     bool _t63 = !_t62;
                     _t58 = _t63;
                 }
                 bool _t64 = _t58;
                 if (!_t64) break;
-                // line 515
+                // line 525
                 int64_t _t65 = v_start;
                 int64_t _t66 = (_t65 - 1);
                 v_start = _t66;
             }
-            // line 518
+            // line 528
             vela_map * _t67 = vela_map_new(&vela_type_int, &vela_type_bool);
             vela_map * v_derived = _t67;
-            // line 519
+            // line 529
             vela_unique_map(&v_derived);
             int64_t _t68 = v_s;
             bool _t69 = true;
             vela_map_set(v_derived, &_t68, &_t69);
-            // line 520
+            // line 530
             int64_t v_seen = 1;
-            // line 521
+            // line 531
             bool v_ok = true;
-            // line 522
+            // line 532
             int64_t _t70 = v_k;
             for (int64_t _t71 = v_start; _t71 < _t70; _t71++) {
                 int64_t v_x = _t71;
-                // line 523
-                t_2ir_Inst _t72 = *(t_2ir_Inst *)vela_at(v_out.m_insts, v_x, sizeof(t_2ir_Inst), "compiler/src/opt.vl:523:34");
+                // line 533
+                t_2ir_Inst _t72 = *(t_2ir_Inst *)vela_at(v_out.m_insts, v_x, sizeof(t_2ir_Inst), "compiler/src/opt.vl:533:34");
                 rc_retain_t_2ir_Inst(_t72);
                 t_2ir_Inst v_i_2 = _t72;
-                // line 524
+                // line 534
                 vela_array * _t74 = f_2ir_reads(v_i_2);
                 vela_array * _t73 = _t74;
                 for (int64_t _t75 = 0; _t75 < _t73->len; _t75++) {
                     int64_t v_r_2 = ((int64_t *)_t73->data)[_t75];
-                    // line 525
+                    // line 535
                     int64_t _t76 = v_r_2;
                     bool _t77 = _t76 == v_f.m_sret;
                     if (_t77) {
-                        // line 526
+                        // line 536
                         v_ok = false;
                     }
-                    // line 528
+                    // line 538
                     int64_t _t79 = v_r_2;
                     uint64_t _t80;
                     bool *_t78 = vela_map_find_hashed(v_derived, &_t79, &_t80);
@@ -145094,14 +145143,14 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                     bool _t82 = _t78 != NULL;
                     bool _t83 = !_t82;
                     if (_t83) {
-                        // line 529
+                        // line 539
                         continue;
                     }
-                    // line 531
+                    // line 541
                     int64_t _t84 = v_seen;
-                    int64_t _t85 = vela_add(_t84, 1, "compiler/src/opt.vl:531:33");
+                    int64_t _t85 = vela_add(_t84, 1, "compiler/src/opt.vl:541:33");
                     v_seen = _t85;
-                    // line 532
+                    // line 542
                     t_2ir_Op _t86 = (t_2ir_Op){ .tag = t_2ir_Op_Store };
                     bool _t87 = v_i_2.m_op.tag == _t86.tag;
                     bool _t88 = _t87;
@@ -145131,7 +145180,7 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                         _t97 = _t101;
                     }
                     bool v_write = _t97;
-                    // line 533
+                    // line 543
                     t_2ir_Op _t102 = (t_2ir_Op){ .tag = t_2ir_Op_AddImm };
                     bool _t103 = v_i_2.m_op.tag == _t102.tag;
                     bool _t104 = _t103;
@@ -145142,13 +145191,13 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                     }
                     bool _t107 = _t104;
                     if (_t107) {
-                        int64_t _t108 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:533:74");
+                        int64_t _t108 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:543:74");
                         int64_t _t109 = _t108;
                         bool _t110 = _t109 == 1;
                         _t107 = _t110;
                     }
                     bool v_offset = _t107;
-                    // line 534
+                    // line 544
                     t_2ir_Op _t111 = (t_2ir_Op){ .tag = t_2ir_Op_CCall };
                     bool _t112 = v_i_2.m_op.tag == _t111.tag;
                     bool _t113 = _t112;
@@ -145164,7 +145213,7 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                         _t116 = _t118;
                     }
                     bool v_runtime = _t116;
-                    // line 535
+                    // line 545
                     t_2ir_Op _t119 = (t_2ir_Op){ .tag = t_2ir_Op_Call };
                     bool _t120 = v_i_2.m_op.tag == _t119.tag;
                     bool _t121 = _t120;
@@ -145176,7 +145225,7 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                     }
                     bool _t125 = _t121;
                     if (_t125) {
-                        int64_t _t126 = *(int64_t *)vela_at(v_i_2.m_args, 0, sizeof(int64_t), "compiler/src/opt.vl:535:81");
+                        int64_t _t126 = *(int64_t *)vela_at(v_i_2.m_args, 0, sizeof(int64_t), "compiler/src/opt.vl:545:81");
                         int64_t _t127 = _t126;
                         bool _t128 = _t127 == v_r_2;
                         _t125 = _t128;
@@ -145184,22 +145233,22 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                     bool _t129 = _t125;
                     if (_t129) {
                         int64_t _t130 = v_i_2.m_args->len;
-                        vela_array * _t131 = vela_array_slice(v_i_2.m_args, 1, _t130, "compiler/src/opt.vl:535:110");
+                        vela_array * _t131 = vela_array_slice(v_i_2.m_args, 1, _t130, "compiler/src/opt.vl:545:110");
                         bool _t132 = f_3opt_reads_any(_t131, v_derived);
                         bool _t133 = !_t132;
                         _t129 = _t133;
                         vela_array_release(_t131);
                     }
                     bool v_result = _t129;
-                    // line 536
+                    // line 546
                     if (v_offset) {
-                        // line 537
+                        // line 547
                         vela_unique_map(&v_derived);
                         int64_t _t134 = v_i_2.m_dst;
                         bool _t135 = true;
                         vela_map_set(v_derived, &_t134, &_t135);
                     }
-                    // line 539
+                    // line 549
                     bool _t136 = v_write;
                     if (!_t136) {
                         _t136 = v_offset;
@@ -145214,28 +145263,28 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                     }
                     bool _t139 = !_t138;
                     if (_t139) {
-                        // line 540
+                        // line 550
                         v_ok = false;
                     }
                 }
                 vela_array_release(_t73);
                 rc_release_t_2ir_Inst(v_i_2);
             }
-            // line 544
+            // line 554
             int64_t v_total = 0;
-            // line 545
+            // line 555
             vela_array * _t141 = vela_map_keys(v_derived);
             vela_array * _t140 = _t141;
             for (int64_t _t142 = 0; _t142 < _t140->len; _t142++) {
                 int64_t v_d = ((int64_t *)_t140->data)[_t142];
-                // line 546
+                // line 556
                 int64_t _t143 = v_total;
-                int64_t _t144 = *(int64_t *)vela_at(v_readers, v_d, sizeof(int64_t), "compiler/src/opt.vl:546:40");
-                int64_t _t145 = vela_add(_t143, _t144, "compiler/src/opt.vl:546:31");
+                int64_t _t144 = *(int64_t *)vela_at(v_readers, v_d, sizeof(int64_t), "compiler/src/opt.vl:556:40");
+                int64_t _t145 = vela_add(_t143, _t144, "compiler/src/opt.vl:556:31");
                 v_total = _t145;
             }
             vela_array_release(_t140);
-            // line 548
+            // line 558
             bool _t146 = v_ok;
             if (_t146) {
                 int64_t _t147 = v_total;
@@ -145243,15 +145292,15 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                 _t146 = _t148;
             }
             if (_t146) {
-                // line 549
+                // line 559
                 int64_t _t149 = v_k;
                 for (int64_t _t150 = v_start; _t150 < _t149; _t150++) {
                     int64_t v_x_2 = _t150;
-                    // line 550
-                    t_2ir_Inst _t151 = *(t_2ir_Inst *)vela_at(v_out.m_insts, v_x_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:550:38");
+                    // line 560
+                    t_2ir_Inst _t151 = *(t_2ir_Inst *)vela_at(v_out.m_insts, v_x_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:560:38");
                     rc_retain_t_2ir_Inst(_t151);
                     t_2ir_Inst v_i_3 = _t151;
-                    // line 551
+                    // line 561
                     t_2ir_Op _t152 = (t_2ir_Op){ .tag = t_2ir_Op_Call };
                     bool _t153 = v_i_3.m_op.tag != _t152.tag;
                     bool _t154 = _t153;
@@ -145267,9 +145316,9 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                         _t157 = _t159;
                     }
                     if (_t157) {
-                        // line 552
+                        // line 562
                         vela_unique(&v_out.m_insts);
-                        (*(t_2ir_Inst *)vela_at(v_out.m_insts, v_x_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:552:34")).m_a = v_f.m_sret;
+                        (*(t_2ir_Inst *)vela_at(v_out.m_insts, v_x_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:562:34")).m_a = v_f.m_sret;
                     } else {
                         t_2ir_Op _t160 = (t_2ir_Op){ .tag = t_2ir_Op_Call };
                         bool _t161 = v_i_3.m_op.tag == _t160.tag;
@@ -145282,47 +145331,47 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
                         }
                         bool _t166 = _t162;
                         if (_t166) {
-                            int64_t _t167 = *(int64_t *)vela_at(v_i_3.m_args, 0, sizeof(int64_t), "compiler/src/opt.vl:553:78");
+                            int64_t _t167 = *(int64_t *)vela_at(v_i_3.m_args, 0, sizeof(int64_t), "compiler/src/opt.vl:563:78");
                             int64_t _t168 = _t167;
                             bool _t169 = _t168 == v_s;
                             _t166 = _t169;
                         }
                         if (_t166) {
-                            // line 554
+                            // line 564
                             vela_unique(&v_out.m_insts);
-                            vela_unique(&(*(t_2ir_Inst *)vela_at(v_out.m_insts, v_x_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:554:34")).m_args);
-                            int64_t *_t170 = (int64_t *)vela_at((*(t_2ir_Inst *)vela_at(v_out.m_insts, v_x_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:554:34")).m_args, 0, sizeof(int64_t), "compiler/src/opt.vl:554:42");
+                            vela_unique(&(*(t_2ir_Inst *)vela_at(v_out.m_insts, v_x_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:564:34")).m_args);
+                            int64_t *_t170 = (int64_t *)vela_at((*(t_2ir_Inst *)vela_at(v_out.m_insts, v_x_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:564:34")).m_args, 0, sizeof(int64_t), "compiler/src/opt.vl:564:42");
                             *_t170 = v_f.m_sret;
                         }
                     }
                     rc_release_t_2ir_Inst(v_i_3);
                 }
-                // line 557
+                // line 567
                 t_2ir_Op _t171 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
                 t_2ir_Inst _t172 = f_2ir_inst(_t171, -1, -1, -1, -1);
                 vela_unique(&v_out.m_insts);
-                t_2ir_Inst *_t173 = (t_2ir_Inst *)vela_at(v_out.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:557:26");
+                t_2ir_Inst *_t173 = (t_2ir_Inst *)vela_at(v_out.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:567:26");
                 rc_release_t_2ir_Inst(*_t173);
                 *_t173 = _t172;
-                // line 558
+                // line 568
                 int64_t _t174 = v_s;
                 bool _t175 = true;
                 vela_map_set(v_moved, &_t174, &_t175);
             }
             vela_map_release(v_derived);
         }
-        // line 561
+        // line 571
         int64_t _t176 = v_k;
         int64_t _t177 = (_t176 - 1);
         v_k = _t177;
         rc_release_t_2ir_Inst(v_c);
     }
-    // line 563
+    // line 573
     int64_t _t178 = v_moved->len;
     int64_t _t179 = _t178;
     bool _t180 = _t179 == 0;
     if (_t180) {
-        // line 564
+        // line 574
         t_2ir_Func _t181 = v_f;
         rc_retain_t_2ir_Func(_t181);
         t_2ir_Func _t182 = _t181;
@@ -145332,10 +145381,10 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
         vela_array_release(v_defs);
         return _t182;
     }
-    // line 566
+    // line 576
     vela_array * _t183 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array * v_insts = _t183;
-    // line 567
+    // line 577
     vela_array * _t185 = v_out.m_insts;
     vela_array_retain(_t185);
     vela_array * _t184 = _t185;
@@ -145343,7 +145392,7 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
     for (int64_t _t186 = 0; _t186 < _t184->len; _t186++) {
         t_2ir_Inst v_i_4 = ((t_2ir_Inst *)_t184->data)[_t186];
         rc_retain_t_2ir_Inst(v_i_4);
-        // line 568
+        // line 578
         t_2ir_Op _t187 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t188 = v_i_4.m_op.tag == _t187.tag;
         bool _t189 = _t188;
@@ -145366,10 +145415,10 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
             _t192 = _t195;
         }
         bool v_gone = _t192;
-        // line 569
+        // line 579
         bool _t199 = !v_gone;
         if (_t199) {
-            // line 569
+            // line 579
             t_2ir_Inst _t200 = v_i_4;
             rc_retain_t_2ir_Inst(_t200);
             t_2ir_Inst _t201 = _t200;
@@ -145378,12 +145427,12 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i_4);
     }
     vela_array_release(_t184);
-    // line 571
+    // line 581
     vela_array * _t202 = v_insts;
     vela_array_retain(_t202);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t202;
-    // line 572
+    // line 582
     t_2ir_Func _t203 = v_out;
     rc_retain_t_2ir_Func(_t203);
     t_2ir_Func _t204 = _t203;
@@ -145397,7 +145446,7 @@ t_2ir_Func f_3opt_build_in_place(t_2ir_Func v_f) {
 /* vela: part */
 
 bool f_3opt_boundary(t_2ir_Inst v_i) {
-    // line 576
+    // line 586
     t_2ir_Op _t1 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
     bool _t2 = v_i.m_op.tag == _t1.tag;
     bool _t3 = _t2;
@@ -145417,41 +145466,41 @@ bool f_3opt_boundary(t_2ir_Inst v_i) {
 /* vela: part */
 
 bool f_3opt_reads_any(vela_array * v_regs, vela_map * v_set) {
-    // line 580
+    // line 590
     vela_array * _t2 = v_regs;
     vela_array_retain(_t2);
     vela_array * _t1 = _t2;
     for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
         int64_t v_r = ((int64_t *)_t1->data)[_t3];
-        // line 581
+        // line 591
         int64_t _t5 = v_r;
         uint64_t _t6;
         bool *_t4 = vela_map_find_hashed(v_set, &_t5, &_t6);
         vela_map *_t7 = v_set;
         bool _t8 = _t4 != NULL;
         if (_t8) {
-            // line 581
+            // line 591
             bool _t9 = true;
             vela_array_release(_t1);
             return _t9;
         }
     }
     vela_array_release(_t1);
-    // line 583
+    // line 593
     bool _t10 = false;
     return _t10;
 }
 /* vela: part */
 
 int64_t f_3opt_slot_of(t_2ir_Func v_f, int64_t v_r) {
-    // line 588
+    // line 598
     vela_array * _t2 = v_f.m_insts;
     vela_array_retain(_t2);
     vela_array * _t1 = _t2;
     for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t1->data)[_t3];
         rc_retain_t_2ir_Inst(v_i);
-        // line 589
+        // line 599
         int64_t _t4 = v_i.m_dst;
         bool _t5 = _t4 == v_r;
         bool _t6 = _t5;
@@ -145461,7 +145510,7 @@ int64_t f_3opt_slot_of(t_2ir_Func v_f, int64_t v_r) {
             _t6 = _t8;
         }
         if (_t6) {
-            // line 589
+            // line 599
             int64_t _t9 = v_i.m_imm;
             rc_release_t_2ir_Inst(v_i);
             vela_array_release(_t1);
@@ -145470,14 +145519,14 @@ int64_t f_3opt_slot_of(t_2ir_Func v_f, int64_t v_r) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t1);
-    // line 591
+    // line 601
     int64_t _t10 = -1;
     return _t10;
 }
 /* vela: part */
 
 vela_array * f_3opt_targets(t_2ir_Inst v_i) {
-    // line 596
+    // line 606
     t_2ir_Op _t1 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
     bool _t2 = v_i.m_op.tag == _t1.tag;
     bool _t3 = _t2;
@@ -145487,18 +145536,18 @@ vela_array * f_3opt_targets(t_2ir_Inst v_i) {
         _t3 = _t5;
     }
     if (_t3) {
-        // line 596
+        // line 606
         vela_array * _t6 = vela_array_new(&vela_type_int, 1);
         int64_t _t7 = v_i.m_imm;
         vela_push(_t6, &_t7, sizeof(int64_t));
         vela_array * _t8 = _t6;
         return _t8;
     }
-    // line 597
+    // line 607
     t_2ir_Op _t9 = (t_2ir_Op){ .tag = t_2ir_Op_Branch };
     bool _t10 = v_i.m_op.tag == _t9.tag;
     if (_t10) {
-        // line 597
+        // line 607
         vela_array * _t11 = vela_array_new(&vela_type_int, 2);
         int64_t _t12 = v_i.m_imm;
         vela_push(_t11, &_t12, sizeof(int64_t));
@@ -145507,7 +145556,7 @@ vela_array * f_3opt_targets(t_2ir_Inst v_i) {
         vela_array * _t14 = _t11;
         return _t14;
     }
-    // line 598
+    // line 608
     vela_array * _t15 = vela_array_new(&vela_type_int, 0);
     vela_array * _t16 = _t15;
     return _t16;
@@ -145515,65 +145564,65 @@ vela_array * f_3opt_targets(t_2ir_Inst v_i) {
 /* vela: part */
 
 t_2ir_Func f_3opt_loop_fields(t_2ir_Func v_f) {
-    // line 615
+    // line 625
     t_2ir_Func _t1 = v_f;
     rc_retain_t_2ir_Func(_t1);
     t_2ir_Func v_out = _t1;
-    // line 616
+    // line 626
     bool v_changed = true;
-    // line 617
+    // line 627
     for (;;) {
         bool _t2 = v_changed;
         if (!_t2) break;
-        // line 618
+        // line 628
         v_changed = false;
-        // line 619
+        // line 629
         t_2ir_Func _t3 = v_out;
         rc_retain_t_2ir_Func(_t3);
         t_2ir_Func v_g = _t3;
-        // line 620
+        // line 630
         vela_map * _t4 = vela_map_new(&vela_type_int, &vela_type_int);
         vela_map * v_label_at = _t4;
-        // line 621
+        // line 631
         int64_t _t5 = v_g.m_insts->len;
         int64_t _t6 = _t5;
         vela_unique_map(&v_label_at);
         for (int64_t _t7 = 0; _t7 < _t6; _t7++) {
             int64_t v_k = _t7;
-            // line 622
-            t_2ir_Inst _t8 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:622:23");
+            // line 632
+            t_2ir_Inst _t8 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:632:23");
             t_2ir_Op _t9 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
             bool _t10 = _t8.m_op.tag == _t9.tag;
             if (_t10) {
-                // line 622
-                t_2ir_Inst _t11 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:622:63");
+                // line 632
+                t_2ir_Inst _t11 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:632:63");
                 int64_t _t12 = _t11.m_imm;
                 int64_t _t13 = v_k;
                 vela_map_set(v_label_at, &_t12, &_t13);
             }
         }
-        // line 624
+        // line 634
         vela_array * _t14 = f_3opt_def_counts(v_g);
         vela_array * v_defs = _t14;
-        // line 625
+        // line 635
         vela_map * _t15 = f_3opt_readable_pointers(v_g, v_defs);
         vela_map * v_readable = _t15;
-        // line 626
+        // line 636
         vela_array * _t16 = vela_array_new(&vela_type_int, 0);
         vela_array * v_defined = _t16;
-        // line 627
+        // line 637
         vela_array * _t18 = v_g.m_classes;
         vela_array_retain(_t18);
         vela_array * _t17 = _t18;
         vela_unique(&v_defined);
         for (int64_t _t19 = 0; _t19 < _t17->len; _t19++) {
             int64_t v__ = ((int64_t *)_t17->data)[_t19];
-            // line 627
+            // line 637
             int64_t _t20 = -1;
             vela_push(v_defined, &_t20, sizeof(int64_t));
         }
         vela_array_release(_t17);
-        // line 628
+        // line 638
         int64_t _t21 = v_g.m_insts->len;
         int64_t _t22 = _t21;
         vela_unique(&v_defined);
@@ -145581,23 +145630,23 @@ t_2ir_Func f_3opt_loop_fields(t_2ir_Func v_f) {
         int64_t _t24n = v_defined->len;
         for (int64_t _t23 = 0; _t23 < _t22; _t23++) {
             int64_t v_k_2 = _t23;
-            // line 629
-            t_2ir_Inst _t25 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:629:23");
+            // line 639
+            t_2ir_Inst _t25 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:639:23");
             int64_t _t26 = _t25.m_dst;
             bool _t27 = _t26 >= 0;
             if (_t27) {
-                // line 629
-                t_2ir_Inst _t28 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:629:53");
-                int64_t *_t29 = (int64_t *)vela_at_in(_t24, _t24n, _t28.m_dst, sizeof(int64_t), "compiler/src/opt.vl:629:45");
+                // line 639
+                t_2ir_Inst _t28 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:639:53");
+                int64_t *_t29 = (int64_t *)vela_at_in(_t24, _t24n, _t28.m_dst, sizeof(int64_t), "compiler/src/opt.vl:639:45");
                 *_t29 = v_k_2;
             }
         }
-        // line 631
+        // line 641
         int64_t _t30 = v_g.m_insts->len;
         int64_t _t31 = _t30;
         int64_t _t32 = (_t31 - 1);
         int64_t v_k_3 = _t32;
-        // line 632
+        // line 642
         for (;;) {
             int64_t _t33 = v_k_3;
             bool _t34 = _t33 >= 0;
@@ -145608,15 +145657,15 @@ t_2ir_Func f_3opt_loop_fields(t_2ir_Func v_f) {
             }
             bool _t37 = _t35;
             if (!_t37) break;
-            // line 633
+            // line 643
             int64_t v_header = -1;
-            // line 634
-            t_2ir_Inst _t39 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:634:37");
+            // line 644
+            t_2ir_Inst _t39 = *(t_2ir_Inst *)vela_at(v_g.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:644:37");
             vela_array * _t40 = f_3opt_targets(_t39);
             vela_array * _t38 = _t40;
             for (int64_t _t41 = 0; _t41 < _t38->len; _t41++) {
                 int64_t v_t = ((int64_t *)_t38->data)[_t41];
-                // line 635
+                // line 645
                 int64_t _t43 = v_t;
                 uint64_t _t44;
                 int64_t *_t42 = vela_map_find_hashed(v_label_at, &_t43, &_t44);
@@ -145625,24 +145674,24 @@ t_2ir_Func f_3opt_loop_fields(t_2ir_Func v_f) {
                 bool _t47 = _t46;
                 if (_t47) {
                     int64_t _t49 = v_t;
-                    int64_t _t48 = *(int64_t *)vela_map_at(v_label_at, &_t49, "compiler/src/opt.vl:635:53");
+                    int64_t _t48 = *(int64_t *)vela_map_at(v_label_at, &_t49, "compiler/src/opt.vl:645:53");
                     int64_t _t50 = _t48;
                     bool _t51 = _t50 <= v_k_3;
                     _t47 = _t51;
                 }
                 if (_t47) {
-                    // line 635
+                    // line 645
                     int64_t _t53 = v_t;
-                    int64_t _t52 = *(int64_t *)vela_map_at(v_label_at, &_t53, "compiler/src/opt.vl:635:81");
+                    int64_t _t52 = *(int64_t *)vela_map_at(v_label_at, &_t53, "compiler/src/opt.vl:645:81");
                     v_header = _t52;
                 }
             }
             vela_array_release(_t38);
-            // line 637
+            // line 647
             int64_t _t54 = v_header;
             bool _t55 = _t54 >= 0;
             if (_t55) {
-                // line 637
+                // line 647
                 t_2ir_Func _t56 = v_g;
                 rc_retain_t_2ir_Func(_t56);
                 vela_map * _t57 = v_label_at;
@@ -145661,7 +145710,7 @@ t_2ir_Func f_3opt_loop_fields(t_2ir_Func v_f) {
                 vela_map_release(_t57);
                 rc_release_t_2ir_Func(_t56);
             }
-            // line 638
+            // line 648
             int64_t _t62 = v_k_3;
             int64_t _t63 = (_t62 - 1);
             v_k_3 = _t63;
@@ -145672,7 +145721,7 @@ t_2ir_Func f_3opt_loop_fields(t_2ir_Func v_f) {
         vela_map_release(v_label_at);
         rc_release_t_2ir_Func(v_g);
     }
-    // line 641
+    // line 651
     t_2ir_Func _t64 = v_out;
     rc_retain_t_2ir_Func(_t64);
     t_2ir_Func _t65 = _t64;
@@ -145682,37 +145731,37 @@ t_2ir_Func f_3opt_loop_fields(t_2ir_Func v_f) {
 /* vela: part */
 
 bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_at, vela_array * v_defs, vela_array * v_defined, vela_map * v_readable, int64_t v_h, int64_t v_e) {
-    // line 647
+    // line 657
     int64_t _t1 = v_h;
     bool _t2 = _t1 > 0;
     bool _t3 = _t2;
     if (_t3) {
         int64_t _t5 = v_h;
         int64_t _t6 = (_t5 - 1);
-        t_2ir_Inst _t4 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t6, sizeof(t_2ir_Inst), "compiler/src/opt.vl:647:38");
+        t_2ir_Inst _t4 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t6, sizeof(t_2ir_Inst), "compiler/src/opt.vl:657:38");
         bool _t7 = f_2ir_ends_block(_t4.m_op);
         _t3 = _t7;
     }
     if (_t3) {
-        // line 647
+        // line 657
         bool _t8 = false;
         return _t8;
     }
-    // line 648
-    t_2ir_Inst _t9 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_h, sizeof(t_2ir_Inst), "compiler/src/opt.vl:648:23");
+    // line 658
+    t_2ir_Inst _t9 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_h, sizeof(t_2ir_Inst), "compiler/src/opt.vl:658:23");
     int64_t v_head = _t9.m_imm;
-    // line 649
+    // line 659
     int64_t _t10 = v_f.m_insts->len;
     int64_t _t11 = _t10;
     for (int64_t _t12 = 0; _t12 < _t11; _t12++) {
         int64_t v_k = _t12;
-        // line 650
-        t_2ir_Inst _t14 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:650:33");
+        // line 660
+        t_2ir_Inst _t14 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:660:33");
         vela_array * _t15 = f_3opt_targets(_t14);
         vela_array * _t13 = _t15;
         for (int64_t _t16 = 0; _t16 < _t13->len; _t16++) {
             int64_t v_t = ((int64_t *)_t13->data)[_t16];
-            // line 651
+            // line 661
             int64_t _t18 = v_t;
             uint64_t _t19;
             int64_t *_t17 = vela_map_find_hashed(v_label_at, &_t18, &_t19);
@@ -145720,14 +145769,14 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             bool _t21 = _t17 != NULL;
             bool _t22 = !_t21;
             if (_t22) {
-                // line 651
+                // line 661
                 continue;
             }
-            // line 652
+            // line 662
             int64_t _t24 = v_t;
-            int64_t _t23 = *(int64_t *)vela_map_at(v_label_at, &_t24, "compiler/src/opt.vl:652:30");
+            int64_t _t23 = *(int64_t *)vela_map_at(v_label_at, &_t24, "compiler/src/opt.vl:662:30");
             int64_t v_at = _t23;
-            // line 653
+            // line 663
             int64_t _t25 = v_at;
             bool _t26 = _t25 >= v_h;
             bool _t27 = _t26;
@@ -145749,12 +145798,12 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
                 _t30 = _t33;
             }
             if (_t30) {
-                // line 653
+                // line 663
                 bool _t36 = false;
                 vela_array_release(_t13);
                 return _t36;
             }
-            // line 654
+            // line 664
             int64_t _t37 = v_k;
             bool _t38 = _t37 >= v_h;
             bool _t39 = _t38;
@@ -145776,7 +145825,7 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
                 _t45 = _t47;
             }
             if (_t45) {
-                // line 654
+                // line 664
                 bool _t48 = false;
                 vela_array_release(_t13);
                 return _t48;
@@ -145784,19 +145833,19 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
         }
         vela_array_release(_t13);
     }
-    // line 657
+    // line 667
     int64_t v_writer = -1;
-    // line 658
+    // line 668
     int64_t _t49 = v_e;
-    int64_t _t50 = vela_add(_t49, 1, "compiler/src/opt.vl:658:19");
+    int64_t _t50 = vela_add(_t49, 1, "compiler/src/opt.vl:668:19");
     int64_t _t51 = _t50;
     for (int64_t _t52 = v_h; _t52 < _t51; _t52++) {
         int64_t v_k_2 = _t52;
-        // line 659
-        t_2ir_Inst _t53 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:659:24");
+        // line 669
+        t_2ir_Inst _t53 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:669:24");
         rc_retain_t_2ir_Inst(_t53);
         t_2ir_Inst v_i = _t53;
-        // line 660
+        // line 670
         t_2ir_Op _t54 = (t_2ir_Op){ .tag = t_2ir_Op_Call };
         bool _t55 = v_i.m_op.tag == _t54.tag;
         bool _t56 = _t55;
@@ -145824,12 +145873,12 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t65 = _t67;
         }
         if (_t65) {
-            // line 660
+            // line 670
             bool _t68 = false;
             rc_release_t_2ir_Inst(v_i);
             return _t68;
         }
-        // line 661
+        // line 671
         t_2ir_Op _t69 = (t_2ir_Op){ .tag = t_2ir_Op_CCall };
         bool _t70 = v_i.m_op.tag == _t69.tag;
         bool _t71 = _t70;
@@ -145842,7 +145891,7 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             if (!_t76) {
                 int64_t _t78 = v_k_2;
                 int64_t _t79 = (_t78 + 1);
-                t_2ir_Inst _t77 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t79, sizeof(t_2ir_Inst), "compiler/src/opt.vl:661:56");
+                t_2ir_Inst _t77 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t79, sizeof(t_2ir_Inst), "compiler/src/opt.vl:671:56");
                 t_2ir_Op _t80 = (t_2ir_Op){ .tag = t_2ir_Op_Unreachable };
                 bool _t81 = _t77.m_op.tag != _t80.tag;
                 _t76 = _t81;
@@ -145850,12 +145899,12 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t71 = _t76;
         }
         if (_t71) {
-            // line 661
+            // line 671
             bool _t82 = false;
             rc_release_t_2ir_Inst(v_i);
             return _t82;
         }
-        // line 662
+        // line 672
         t_2ir_Op _t83 = (t_2ir_Op){ .tag = t_2ir_Op_Store };
         bool _t84 = v_i.m_op.tag == _t83.tag;
         bool _t85 = _t84;
@@ -145865,7 +145914,7 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t85 = _t87;
         }
         if (_t85) {
-            // line 663
+            // line 673
             int64_t _t88 = v_writer;
             bool _t89 = _t88 >= 0;
             bool _t90 = _t89;
@@ -145875,56 +145924,56 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
                 _t90 = _t92;
             }
             if (_t90) {
-                // line 663
+                // line 673
                 bool _t93 = false;
                 rc_release_t_2ir_Inst(v_i);
                 return _t93;
             }
-            // line 664
+            // line 674
             v_writer = v_i.m_a;
         }
         rc_release_t_2ir_Inst(v_i);
     }
-    // line 668
+    // line 678
     vela_map * _t94 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_reach = _t94;
-    // line 669
+    // line 679
     int64_t _t95 = v_h;
     int64_t _t96 = (_t95 + 1);
     int64_t v_k_3 = _t96;
-    // line 670
+    // line 680
     vela_unique_map(&v_reach);
     for (;;) {
         int64_t _t97 = v_k_3;
         bool _t98 = _t97 <= v_e;
         bool _t99 = _t98;
         if (_t99) {
-            t_2ir_Inst _t100 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:670:41");
+            t_2ir_Inst _t100 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:680:41");
             bool _t101 = f_2ir_ends_block(_t100.m_op);
             bool _t102 = !_t101;
             _t99 = _t102;
         }
         bool _t103 = _t99;
         if (_t103) {
-            t_2ir_Inst _t104 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:670:59");
+            t_2ir_Inst _t104 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:680:59");
             t_2ir_Op _t105 = (t_2ir_Op){ .tag = t_2ir_Op_BranchCmp };
             bool _t106 = _t104.m_op.tag != _t105.tag;
             _t103 = _t106;
         }
         bool _t107 = _t103;
         if (_t107) {
-            t_2ir_Inst _t108 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:670:95");
+            t_2ir_Inst _t108 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:680:95");
             t_2ir_Op _t109 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
             bool _t110 = _t108.m_op.tag != _t109.tag;
             _t107 = _t110;
         }
         bool _t111 = _t107;
         if (!_t111) break;
-        // line 671
-        t_2ir_Inst _t112 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:671:24");
+        // line 681
+        t_2ir_Inst _t112 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_3, sizeof(t_2ir_Inst), "compiler/src/opt.vl:681:24");
         rc_retain_t_2ir_Inst(_t112);
         t_2ir_Inst v_i_2 = _t112;
-        // line 672
+        // line 682
         t_2ir_Op _t113 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
         bool _t114 = v_i_2.m_op.tag == _t113.tag;
         bool _t115 = _t114;
@@ -145940,7 +145989,7 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t118 = _t120;
         }
         if (_t118) {
-            // line 673
+            // line 683
             int64_t _t122 = v_i_2.m_a;
             int64_t *_t121 = vela_map_find(v_reach, &_t122);
             bool _t123 = _t121 != NULL;
@@ -145948,47 +145997,47 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             bool _t125 = _t124;
             if (!_t125) {
                 int64_t _t127 = v_i_2.m_a;
-                int64_t _t126 = *(int64_t *)vela_map_at(v_reach, &_t127, "compiler/src/opt.vl:673:46");
+                int64_t _t126 = *(int64_t *)vela_map_at(v_reach, &_t127, "compiler/src/opt.vl:683:46");
                 int64_t _t128 = _t126;
                 bool _t129 = _t128 < v_i_2.m_imm;
                 _t125 = _t129;
             }
             if (_t125) {
-                // line 673
+                // line 683
                 int64_t _t130 = v_i_2.m_a;
                 int64_t _t131 = v_i_2.m_imm;
                 vela_map_set(v_reach, &_t130, &_t131);
             }
         }
-        // line 675
+        // line 685
         int64_t _t132 = v_k_3;
         int64_t _t133 = (_t132 + 1);
         v_k_3 = _t133;
         rc_release_t_2ir_Inst(v_i_2);
     }
-    // line 678
+    // line 688
     vela_map * _t134 = vela_map_new(&vela_type_str, &vela_type_int);
     vela_map * v_kept = _t134;
-    // line 679
+    // line 689
     vela_map * _t135 = vela_map_new(&vela_type_str, &vela_type_bool);
     vela_map * v_written = _t135;
-    // line 680
+    // line 690
     vela_array * _t136 = vela_array_new(&vela_type_str, 0);
     vela_array * v_order = _t136;
-    // line 681
+    // line 691
     int64_t _t137 = v_e;
-    int64_t _t138 = vela_add(_t137, 1, "compiler/src/opt.vl:681:19");
+    int64_t _t138 = vela_add(_t137, 1, "compiler/src/opt.vl:691:19");
     int64_t _t139 = _t138;
     vela_unique_map(&v_kept);
     vela_unique_map(&v_written);
     vela_unique(&v_order);
     for (int64_t _t140 = v_h; _t140 < _t139; _t140++) {
         int64_t v_k_4 = _t140;
-        // line 682
-        t_2ir_Inst _t141 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_4, sizeof(t_2ir_Inst), "compiler/src/opt.vl:682:24");
+        // line 692
+        t_2ir_Inst _t141 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_4, sizeof(t_2ir_Inst), "compiler/src/opt.vl:692:24");
         rc_retain_t_2ir_Inst(_t141);
         t_2ir_Inst v_i_3 = _t141;
-        // line 683
+        // line 693
         t_2ir_Op _t142 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
         bool _t143 = v_i_3.m_op.tag != _t142.tag;
         bool _t144 = _t143;
@@ -145998,19 +146047,19 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t144 = _t146;
         }
         if (_t144) {
-            // line 683
+            // line 693
             rc_release_t_2ir_Inst(v_i_3);
             continue;
         }
-        // line 684
+        // line 694
         int64_t v_p = v_i_3.m_a;
-        // line 685
-        int64_t _t147 = *(int64_t *)vela_at(v_defs, v_p, sizeof(int64_t), "compiler/src/opt.vl:685:16");
+        // line 695
+        int64_t _t147 = *(int64_t *)vela_at(v_defs, v_p, sizeof(int64_t), "compiler/src/opt.vl:695:16");
         int64_t _t148 = _t147;
         bool _t149 = _t148 != 1;
         bool _t150 = _t149;
         if (!_t150) {
-            int64_t _t151 = *(int64_t *)vela_at(v_defined, v_p, sizeof(int64_t), "compiler/src/opt.vl:685:36");
+            int64_t _t151 = *(int64_t *)vela_at(v_defined, v_p, sizeof(int64_t), "compiler/src/opt.vl:695:36");
             int64_t _t152 = _t151;
             bool _t153 = _t152 >= v_h;
             bool _t154 = _t153;
@@ -146029,11 +146078,11 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t158 = _t160;
         }
         if (_t158) {
-            // line 685
+            // line 695
             rc_release_t_2ir_Inst(v_i_3);
             continue;
         }
-        // line 686
+        // line 696
         int64_t _t161 = v_writer;
         bool _t162 = _t161 >= 0;
         bool _t163 = _t162;
@@ -146043,11 +146092,11 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t163 = _t165;
         }
         if (_t163) {
-            // line 686
+            // line 696
             rc_release_t_2ir_Inst(v_i_3);
             continue;
         }
-        // line 687
+        // line 697
         int64_t _t167 = v_p;
         uint64_t _t168;
         bool *_t166 = vela_map_find_hashed(v_readable, &_t167, &_t168);
@@ -146066,57 +146115,57 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             if (!_t179) {
                 int64_t _t180 = v_i_3.m_imm;
                 int64_t _t182 = v_p;
-                int64_t _t181 = *(int64_t *)vela_map_at(v_reach, &_t182, "compiler/src/opt.vl:687:75");
+                int64_t _t181 = *(int64_t *)vela_map_at(v_reach, &_t182, "compiler/src/opt.vl:697:75");
                 bool _t183 = _t180 > _t181;
                 _t179 = _t183;
             }
             _t172 = _t179;
         }
         if (_t172) {
-            // line 687
+            // line 697
             rc_release_t_2ir_Inst(v_i_3);
             continue;
         }
-        // line 688
+        // line 698
         t_2ir_Op _t184 = (t_2ir_Op){ .tag = t_2ir_Op_FLoad };
         bool _t185 = v_i_3.m_op.tag == _t184.tag;
         bool v_float = _t185;
-        // line 689
+        // line 699
         int64_t v_size = 8;
-        // line 690
+        // line 700
         bool _t186 = !v_float;
         if (_t186) {
-            // line 690
+            // line 700
             v_size = v_i_3.m_imm2;
         }
-        // line 691
+        // line 701
         vela_str _t187 = f_3opt_field_key(v_p, v_i_3.m_imm, v_size, v_float);
         vela_str v_key = _t187;
-        // line 692
+        // line 702
         vela_str _t189 = v_key;
         uint64_t _t190;
         int64_t *_t188 = vela_map_find_hashed(v_kept, &_t189, &_t190);
         vela_map *_t191 = v_kept;
         bool _t192 = _t188 != NULL;
         if (_t192) {
-            // line 692
+            // line 702
             vela_str_release(v_key);
             rc_release_t_2ir_Inst(v_i_3);
             continue;
         }
-        // line 695
+        // line 705
         bool v_ok = true;
-        // line 696
+        // line 706
         bool v_stored = false;
-        // line 697
+        // line 707
         int64_t _t194 = v_e;
-        int64_t _t195 = vela_add(_t194, 1, "compiler/src/opt.vl:697:31");
-        vela_array * _t196 = vela_array_slice(v_f.m_insts, v_h, _t195, "compiler/src/opt.vl:697:25");
+        int64_t _t195 = vela_add(_t194, 1, "compiler/src/opt.vl:707:31");
+        vela_array * _t196 = vela_array_slice(v_f.m_insts, v_h, _t195, "compiler/src/opt.vl:707:25");
         vela_array * _t193 = _t196;
         for (int64_t _t197 = 0; _t197 < _t193->len; _t197++) {
             t_2ir_Inst v_x = ((t_2ir_Inst *)_t193->data)[_t197];
             rc_retain_t_2ir_Inst(v_x);
-            // line 698
+            // line 708
             t_2ir_Op _t198 = (t_2ir_Op){ .tag = t_2ir_Op_Store };
             bool _t199 = v_x.m_op.tag != _t198.tag;
             bool _t200 = _t199;
@@ -146132,38 +146181,38 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
                 _t203 = _t205;
             }
             if (_t203) {
-                // line 698
+                // line 708
                 rc_release_t_2ir_Inst(v_x);
                 continue;
             }
-            // line 699
+            // line 709
             int64_t v_width = 8;
-            // line 700
+            // line 710
             t_2ir_Op _t206 = (t_2ir_Op){ .tag = t_2ir_Op_Store };
             bool _t207 = v_x.m_op.tag == _t206.tag;
             if (_t207) {
-                // line 700
+                // line 710
                 v_width = v_x.m_imm2;
             }
-            // line 701
+            // line 711
             int64_t _t208 = v_x.m_imm;
-            int64_t _t209 = vela_add(_t208, v_width, "compiler/src/opt.vl:701:22");
+            int64_t _t209 = vela_add(_t208, v_width, "compiler/src/opt.vl:711:22");
             int64_t _t210 = _t209;
             bool _t211 = _t210 <= v_i_3.m_imm;
             bool _t212 = _t211;
             if (!_t212) {
                 int64_t _t213 = v_i_3.m_imm;
-                int64_t _t214 = vela_add(_t213, v_size, "compiler/src/opt.vl:701:48");
+                int64_t _t214 = vela_add(_t213, v_size, "compiler/src/opt.vl:711:48");
                 int64_t _t215 = _t214;
                 bool _t216 = _t215 <= v_x.m_imm;
                 _t212 = _t216;
             }
             if (_t212) {
-                // line 701
+                // line 711
                 rc_release_t_2ir_Inst(v_x);
                 continue;
             }
-            // line 702
+            // line 712
             int64_t _t217 = v_x.m_imm;
             bool _t218 = _t217 == v_i_3.m_imm;
             bool _t219 = _t218;
@@ -146187,46 +146236,46 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
                 _t225 = _t229;
             }
             if (_t225) {
-                // line 702
+                // line 712
                 v_stored = true;
             } else {
-                // line 702
+                // line 712
                 v_ok = false;
             }
             rc_release_t_2ir_Inst(v_x);
         }
         vela_array_release(_t193);
-        // line 704
+        // line 714
         bool _t230 = !v_ok;
         if (_t230) {
-            // line 704
+            // line 714
             vela_str_release(v_key);
             rc_release_t_2ir_Inst(v_i_3);
             continue;
         }
-        // line 705
+        // line 715
         int64_t _t231 = f_2ir_INT();
         int64_t v_class = _t231;
-        // line 706
+        // line 716
         if (v_float) {
-            // line 706
+            // line 716
             int64_t _t232 = f_2ir_FLOAT();
             v_class = _t232;
         }
-        // line 707
+        // line 717
         int64_t _t233 = f_2ir_reg(&(*v_out), v_class);
         vela_str _t234 = v_key;
         vela_str_retain(_t234);
         vela_str _t235 = _t234;
         int64_t _t236 = _t233;
         vela_map_set(v_kept, &_t235, &_t236);
-        // line 708
+        // line 718
         vela_str _t237 = v_key;
         vela_str_retain(_t237);
         vela_str _t238 = _t237;
         bool _t239 = v_stored;
         vela_map_set(v_written, &_t238, &_t239);
-        // line 709
+        // line 719
         vela_str _t240 = v_key;
         vela_str_retain(_t240);
         vela_str _t241 = _t240;
@@ -146234,12 +146283,12 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
         vela_str_release(v_key);
         rc_release_t_2ir_Inst(v_i_3);
     }
-    // line 711
+    // line 721
     int64_t _t242 = v_order->len;
     int64_t _t243 = _t242;
     bool _t244 = _t243 == 0;
     if (_t244) {
-        // line 711
+        // line 721
         bool _t245 = false;
         vela_array_release(v_order);
         vela_map_release(v_written);
@@ -146247,23 +146296,23 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
         vela_map_release(v_reach);
         return _t245;
     }
-    // line 713
+    // line 723
     vela_array * _t246 = vela_array_new(&vela_type_int, 0);
     vela_array * v_rep = _t246;
-    // line 714
+    // line 724
     int64_t _t247 = (*v_out).m_classes->len;
     int64_t _t248 = _t247;
     vela_unique(&v_rep);
     for (int64_t _t249 = 0; _t249 < _t248; _t249++) {
         int64_t v_r = _t249;
-        // line 714
+        // line 724
         int64_t _t250 = v_r;
         vela_push(v_rep, &_t250, sizeof(int64_t));
     }
-    // line 715
+    // line 725
     vela_array * _t251 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array * v_insts = _t251;
-    // line 716
+    // line 726
     int64_t _t252 = v_f.m_insts->len;
     int64_t _t253 = _t252;
     vela_unique(&v_insts);
@@ -146272,29 +146321,29 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
     int64_t _t255n = v_rep->len;
     for (int64_t _t254 = 0; _t254 < _t253; _t254++) {
         int64_t v_k_5 = _t254;
-        // line 717
-        t_2ir_Inst _t256 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_5, sizeof(t_2ir_Inst), "compiler/src/opt.vl:717:24");
+        // line 727
+        t_2ir_Inst _t256 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_5, sizeof(t_2ir_Inst), "compiler/src/opt.vl:727:24");
         rc_retain_t_2ir_Inst(_t256);
         t_2ir_Inst v_i_4 = _t256;
-        // line 718
+        // line 728
         int64_t _t257 = v_k_5;
         bool _t258 = _t257 == v_h;
         if (_t258) {
-            // line 719
+            // line 729
             vela_array * _t260 = v_order;
             vela_array_retain(_t260);
             vela_array * _t259 = _t260;
             for (int64_t _t261 = 0; _t261 < _t259->len; _t261++) {
                 vela_str v_key_2 = ((vela_str *)_t259->data)[_t261];
                 vela_str_retain(v_key_2);
-                // line 720
+                // line 730
                 t_2ir_Inst _t262 = f_3opt_first_load(v_f, v_h, v_e, v_key_2);
                 t_2ir_Inst v_load = _t262;
-                // line 721
+                // line 731
                 vela_str _t264 = v_key_2;
-                int64_t _t263 = *(int64_t *)vela_map_at(v_kept, &_t264, "compiler/src/opt.vl:721:32");
+                int64_t _t263 = *(int64_t *)vela_map_at(v_kept, &_t264, "compiler/src/opt.vl:731:32");
                 v_load.m_dst = _t263;
-                // line 722
+                // line 732
                 t_2ir_Inst _t265 = v_load;
                 rc_retain_t_2ir_Inst(_t265);
                 t_2ir_Inst _t266 = _t265;
@@ -146304,7 +146353,7 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             }
             vela_array_release(_t259);
         }
-        // line 725
+        // line 735
         int64_t _t267 = v_k_5;
         bool _t268 = _t267 >= v_h;
         bool _t269 = _t268;
@@ -146326,60 +146375,60 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t272 = _t275;
         }
         if (_t272) {
-            // line 726
+            // line 736
             int64_t v_size_2 = 8;
-            // line 727
+            // line 737
             t_2ir_Op _t278 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
             bool _t279 = v_i_4.m_op.tag == _t278.tag;
             if (_t279) {
-                // line 727
+                // line 737
                 v_size_2 = v_i_4.m_imm2;
             }
-            // line 728
+            // line 738
             t_2ir_Op _t280 = (t_2ir_Op){ .tag = t_2ir_Op_FLoad };
             bool _t281 = v_i_4.m_op.tag == _t280.tag;
             vela_str _t282 = f_3opt_field_key(v_i_4.m_a, v_i_4.m_imm, v_size_2, _t281);
             vela_str v_key_3 = _t282;
-            // line 729
+            // line 739
             vela_str _t284 = v_key_3;
             uint64_t _t285;
             int64_t *_t283 = vela_map_find_hashed(v_kept, &_t284, &_t285);
             vela_map *_t286 = v_kept;
             bool _t287 = _t283 != NULL;
             if (_t287) {
-                // line 730
+                // line 740
                 vela_str _t289 = v_key_3;
-                bool _t288 = *(bool *)vela_map_at(v_written, &_t289, "compiler/src/opt.vl:730:27");
+                bool _t288 = *(bool *)vela_map_at(v_written, &_t289, "compiler/src/opt.vl:740:27");
                 bool _t290 = _t288;
                 if (!_t290) {
-                    int64_t _t291 = *(int64_t *)vela_at(v_defs, v_i_4.m_dst, sizeof(int64_t), "compiler/src/opt.vl:730:40");
+                    int64_t _t291 = *(int64_t *)vela_at(v_defs, v_i_4.m_dst, sizeof(int64_t), "compiler/src/opt.vl:740:40");
                     int64_t _t292 = _t291;
                     bool _t293 = _t292 != 1;
                     _t290 = _t293;
                 }
                 if (_t290) {
-                    // line 730
+                    // line 740
                     t_2ir_Op _t294 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
                     vela_str _t296 = v_key_3;
-                    int64_t _t295 = *(int64_t *)vela_map_at(v_kept, &_t296, "compiler/src/opt.vl:730:102");
+                    int64_t _t295 = *(int64_t *)vela_map_at(v_kept, &_t296, "compiler/src/opt.vl:740:102");
                     t_2ir_Inst _t297 = f_2ir_inst(_t294, v_i_4.m_dst, _t295, -1, 0);
                     t_2ir_Inst _t298 = _t297;
                     vela_push(v_insts, &_t298, sizeof(t_2ir_Inst));
                 } else {
-                    // line 730
+                    // line 740
                     vela_str _t300 = v_key_3;
-                    int64_t _t299 = *(int64_t *)vela_map_at(v_kept, &_t300, "compiler/src/opt.vl:730:143");
-                    int64_t *_t301 = (int64_t *)vela_at_in(_t255, _t255n, v_i_4.m_dst, sizeof(int64_t), "compiler/src/opt.vl:730:129");
+                    int64_t _t299 = *(int64_t *)vela_map_at(v_kept, &_t300, "compiler/src/opt.vl:740:143");
+                    int64_t *_t301 = (int64_t *)vela_at_in(_t255, _t255n, v_i_4.m_dst, sizeof(int64_t), "compiler/src/opt.vl:740:129");
                     *_t301 = _t299;
                 }
-                // line 731
+                // line 741
                 vela_str_release(v_key_3);
                 rc_release_t_2ir_Inst(v_i_4);
                 continue;
             }
             vela_str_release(v_key_3);
         }
-        // line 734
+        // line 744
         int64_t _t302 = v_k_5;
         bool _t303 = _t302 >= v_h;
         bool _t304 = _t303;
@@ -146401,12 +146450,12 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             _t307 = _t310;
         }
         if (_t307) {
-            // line 735
+            // line 745
             t_2ir_Op _t313 = (t_2ir_Op){ .tag = t_2ir_Op_FStore };
             bool _t314 = v_i_4.m_op.tag == _t313.tag;
             vela_str _t315 = f_3opt_field_key(v_i_4.m_a, v_i_4.m_imm, 8, _t314);
             vela_str v_key_4 = _t315;
-            // line 736
+            // line 746
             vela_str _t317 = v_key_4;
             uint64_t _t318;
             int64_t *_t316 = vela_map_find_hashed(v_kept, &_t317, &_t318);
@@ -146425,27 +146474,27 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
                 _t321 = _t324;
             }
             if (_t321) {
-                // line 740
+                // line 750
                 t_2ir_Op _t327 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
                 vela_str _t329 = v_key_4;
-                int64_t _t328 = *(int64_t *)vela_map_at(v_kept, &_t329, "compiler/src/opt.vl:740:57");
+                int64_t _t328 = *(int64_t *)vela_map_at(v_kept, &_t329, "compiler/src/opt.vl:750:57");
                 t_2ir_Inst _t330 = f_2ir_inst(_t327, _t328, v_i_4.m_b, -1, 0);
                 t_2ir_Inst _t331 = _t330;
                 vela_push(v_insts, &_t331, sizeof(t_2ir_Inst));
-                // line 741
+                // line 751
                 t_2ir_Inst _t332 = v_i_4;
                 rc_retain_t_2ir_Inst(_t332);
                 t_2ir_Inst v_stored_2 = _t332;
-                // line 742
+                // line 752
                 vela_str _t334 = v_key_4;
-                int64_t _t333 = *(int64_t *)vela_map_at(v_kept, &_t334, "compiler/src/opt.vl:742:32");
+                int64_t _t333 = *(int64_t *)vela_map_at(v_kept, &_t334, "compiler/src/opt.vl:752:32");
                 v_stored_2.m_b = _t333;
-                // line 743
+                // line 753
                 t_2ir_Inst _t335 = v_stored_2;
                 rc_retain_t_2ir_Inst(_t335);
                 t_2ir_Inst _t336 = _t335;
                 vela_push(v_insts, &_t336, sizeof(t_2ir_Inst));
-                // line 744
+                // line 754
                 rc_release_t_2ir_Inst(v_stored_2);
                 vela_str_release(v_key_4);
                 rc_release_t_2ir_Inst(v_i_4);
@@ -146453,25 +146502,25 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
             }
             vela_str_release(v_key_4);
         }
-        // line 747
+        // line 757
         t_2ir_Inst _t337 = v_i_4;
         rc_retain_t_2ir_Inst(_t337);
         t_2ir_Inst _t338 = _t337;
         vela_push(v_insts, &_t338, sizeof(t_2ir_Inst));
         rc_release_t_2ir_Inst(v_i_4);
     }
-    // line 749
+    // line 759
     vela_array * _t339 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release((*v_out).m_insts);
     (*v_out).m_insts = _t339;
-    // line 750
+    // line 760
     vela_array * _t341 = v_insts;
     vela_array_retain(_t341);
     vela_array * _t340 = _t341;
     for (int64_t _t342 = 0; _t342 < _t340->len; _t342++) {
         t_2ir_Inst v_i_5 = ((t_2ir_Inst *)_t340->data)[_t342];
         rc_retain_t_2ir_Inst(v_i_5);
-        // line 750
+        // line 760
         t_2ir_Inst _t343 = f_3opt_renamed(v_i_5, v_rep);
         vela_unique(&(*v_out).m_insts);
         t_2ir_Inst _t344 = _t343;
@@ -146479,7 +146528,7 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
         rc_release_t_2ir_Inst(v_i_5);
     }
     vela_array_release(_t340);
-    // line 751
+    // line 761
     bool _t345 = true;
     vela_array_release(v_insts);
     vela_array_release(v_rep);
@@ -146492,29 +146541,29 @@ bool f_3opt_promote_loop(t_2ir_Func v_f, t_2ir_Func * v_out, vela_map * v_label_
 /* vela: part */
 
 vela_map * f_3opt_readable_pointers(t_2ir_Func v_f, vela_array * v_defs) {
-    // line 760
+    // line 770
     vela_map * _t1 = vela_map_new(&vela_type_int, &vela_type_bool);
     vela_map * v_out = _t1;
-    // line 761
+    // line 771
     vela_array * _t3 = v_f.m_refs;
     vela_array_retain(_t3);
     vela_array * _t2 = _t3;
     vela_unique_map(&v_out);
     for (int64_t _t4 = 0; _t4 < _t2->len; _t4++) {
         int64_t v_p = ((int64_t *)_t2->data)[_t4];
-        // line 762
-        int64_t _t5 = *(int64_t *)vela_at(v_defs, v_p, sizeof(int64_t), "compiler/src/opt.vl:762:16");
+        // line 772
+        int64_t _t5 = *(int64_t *)vela_at(v_defs, v_p, sizeof(int64_t), "compiler/src/opt.vl:772:16");
         int64_t _t6 = _t5;
         bool _t7 = _t6 == 1;
         if (_t7) {
-            // line 762
+            // line 772
             int64_t _t8 = v_p;
             bool _t9 = true;
             vela_map_set(v_out, &_t8, &_t9);
         }
     }
     vela_array_release(_t2);
-    // line 764
+    // line 774
     vela_array * _t11 = v_f.m_insts;
     vela_array_retain(_t11);
     vela_array * _t10 = _t11;
@@ -146522,18 +146571,18 @@ vela_map * f_3opt_readable_pointers(t_2ir_Func v_f, vela_array * v_defs) {
     for (int64_t _t12 = 0; _t12 < _t10->len; _t12++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t10->data)[_t12];
         rc_retain_t_2ir_Inst(v_i);
-        // line 765
+        // line 775
         int64_t _t13 = v_i.m_dst;
         bool _t14 = _t13 >= 0;
         bool _t15 = _t14;
         if (_t15) {
-            int64_t _t16 = *(int64_t *)vela_at(v_defs, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:765:30");
+            int64_t _t16 = *(int64_t *)vela_at(v_defs, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:775:30");
             int64_t _t17 = _t16;
             bool _t18 = _t17 == 1;
             _t15 = _t18;
         }
         if (_t15) {
-            // line 766
+            // line 776
             t_2ir_Op _t19 = (t_2ir_Op){ .tag = t_2ir_Op_SlotAddr };
             bool _t20 = v_i.m_op.tag == _t19.tag;
             bool _t21 = _t20;
@@ -146556,7 +146605,7 @@ vela_map * f_3opt_readable_pointers(t_2ir_Func v_f, vela_array * v_defs) {
                 _t21 = _t27;
             }
             if (_t21) {
-                // line 766
+                // line 776
                 int64_t _t31 = v_i.m_dst;
                 bool _t32 = true;
                 vela_map_set(v_out, &_t31, &_t32);
@@ -146565,7 +146614,7 @@ vela_map * f_3opt_readable_pointers(t_2ir_Func v_f, vela_array * v_defs) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t10);
-    // line 769
+    // line 779
     vela_map * _t33 = v_out;
     vela_map_retain(_t33);
     vela_map * _t34 = _t33;
@@ -146575,15 +146624,15 @@ vela_map * f_3opt_readable_pointers(t_2ir_Func v_f, vela_array * v_defs) {
 /* vela: part */
 
 vela_str f_3opt_field_key(int64_t v_p, int64_t v_offset, int64_t v_size, bool v_float) {
-    // line 773
+    // line 783
     vela_str v_kind = VELA_STR("i", 1);
-    // line 774
+    // line 784
     if (v_float) {
-        // line 774
+        // line 784
         vela_str_release(v_kind);
         v_kind = VELA_STR("f", 1);
     }
-    // line 775
+    // line 785
     static const vela_str _t1[] = {{NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}};
     vela_str _t2[7];
     memcpy(_t2, _t1, sizeof _t2);
@@ -146605,15 +146654,15 @@ vela_str f_3opt_field_key(int64_t v_p, int64_t v_offset, int64_t v_size, bool v_
 /* vela: part */
 
 t_2ir_Inst f_3opt_first_load(t_2ir_Func v_f, int64_t v_h, int64_t v_e, vela_str v_key) {
-    // line 780
+    // line 790
     int64_t _t2 = v_e;
-    int64_t _t3 = vela_add(_t2, 1, "compiler/src/opt.vl:780:27");
-    vela_array * _t4 = vela_array_slice(v_f.m_insts, v_h, _t3, "compiler/src/opt.vl:780:21");
+    int64_t _t3 = vela_add(_t2, 1, "compiler/src/opt.vl:790:27");
+    vela_array * _t4 = vela_array_slice(v_f.m_insts, v_h, _t3, "compiler/src/opt.vl:790:21");
     vela_array * _t1 = _t4;
     for (int64_t _t5 = 0; _t5 < _t1->len; _t5++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t1->data)[_t5];
         rc_retain_t_2ir_Inst(v_i);
-        // line 781
+        // line 791
         t_2ir_Op _t6 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
         bool _t7 = v_i.m_op.tag != _t6.tag;
         bool _t8 = _t7;
@@ -146623,26 +146672,26 @@ t_2ir_Inst f_3opt_first_load(t_2ir_Func v_f, int64_t v_h, int64_t v_e, vela_str 
             _t8 = _t10;
         }
         if (_t8) {
-            // line 781
+            // line 791
             rc_release_t_2ir_Inst(v_i);
             continue;
         }
-        // line 782
+        // line 792
         int64_t v_size = 8;
-        // line 783
+        // line 793
         t_2ir_Op _t11 = (t_2ir_Op){ .tag = t_2ir_Op_Load };
         bool _t12 = v_i.m_op.tag == _t11.tag;
         if (_t12) {
-            // line 783
+            // line 793
             v_size = v_i.m_imm2;
         }
-        // line 784
+        // line 794
         t_2ir_Op _t13 = (t_2ir_Op){ .tag = t_2ir_Op_FLoad };
         bool _t14 = v_i.m_op.tag == _t13.tag;
         vela_str _t15 = f_3opt_field_key(v_i.m_a, v_i.m_imm, v_size, _t14);
         bool _t16 = vela_str_eq(_t15, v_key);
         if (_t16) {
-            // line 784
+            // line 794
             t_2ir_Inst _t17 = v_i;
             rc_retain_t_2ir_Inst(_t17);
             t_2ir_Inst _t18 = _t17;
@@ -146655,8 +146704,8 @@ t_2ir_Inst f_3opt_first_load(t_2ir_Func v_f, int64_t v_h, int64_t v_e, vela_str 
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t1);
-    // line 786
-    t_2ir_Inst _t19 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_h, sizeof(t_2ir_Inst), "compiler/src/opt.vl:786:19");
+    // line 796
+    t_2ir_Inst _t19 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_h, sizeof(t_2ir_Inst), "compiler/src/opt.vl:796:19");
     rc_retain_t_2ir_Inst(_t19);
     t_2ir_Inst _t20 = _t19;
     return _t20;
@@ -146664,37 +146713,37 @@ t_2ir_Inst f_3opt_first_load(t_2ir_Func v_f, int64_t v_h, int64_t v_e, vela_str 
 /* vela: part */
 
 t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
-    // line 798
+    // line 808
     vela_array * _t1 = f_3opt_def_counts(v_f);
     vela_array * v_defs = _t1;
-    // line 799
+    // line 809
     vela_map * _t2 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_ways = _t2;
-    // line 800
+    // line 810
     int64_t _t3 = v_f.m_insts->len;
     int64_t _t4 = _t3;
     for (int64_t _t5 = 0; _t5 < _t4; _t5++) {
         int64_t v_k = _t5;
-        // line 801
-        t_2ir_Inst _t6 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:801:24");
+        // line 811
+        t_2ir_Inst _t6 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:811:24");
         rc_retain_t_2ir_Inst(_t6);
         t_2ir_Inst v_i = _t6;
-        // line 802
+        // line 812
         vela_array * _t8 = f_3opt_targets(v_i);
         vela_array * _t7 = _t8;
         for (int64_t _t9 = 0; _t9 < _t7->len; _t9++) {
             int64_t v_t = ((int64_t *)_t7->data)[_t9];
-            // line 802
+            // line 812
             int64_t _t10 = f_3opt_ways_to(v_ways, v_t);
             int64_t _t11 = _t10;
-            int64_t _t12 = vela_add(_t11, 1, "compiler/src/opt.vl:802:58");
+            int64_t _t12 = vela_add(_t11, 1, "compiler/src/opt.vl:812:58");
             vela_unique_map(&v_ways);
             int64_t _t13 = v_t;
             int64_t _t14 = _t12;
             vela_map_set(v_ways, &_t13, &_t14);
         }
         vela_array_release(_t7);
-        // line 803
+        // line 813
         t_2ir_Op _t15 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t16 = v_i.m_op.tag == _t15.tag;
         bool _t17 = _t16;
@@ -146707,16 +146756,16 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
         if (_t20) {
             int64_t _t22 = v_k;
             int64_t _t23 = (_t22 - 1);
-            t_2ir_Inst _t21 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t23, sizeof(t_2ir_Inst), "compiler/src/opt.vl:803:66");
+            t_2ir_Inst _t21 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t23, sizeof(t_2ir_Inst), "compiler/src/opt.vl:813:66");
             bool _t24 = f_2ir_ends_block(_t21.m_op);
             bool _t25 = !_t24;
             _t20 = _t25;
         }
         if (_t20) {
-            // line 803
+            // line 813
             int64_t _t26 = f_3opt_ways_to(v_ways, v_i.m_imm);
             int64_t _t27 = _t26;
-            int64_t _t28 = vela_add(_t27, 1, "compiler/src/opt.vl:803:115");
+            int64_t _t28 = vela_add(_t27, 1, "compiler/src/opt.vl:813:115");
             vela_unique_map(&v_ways);
             int64_t _t29 = v_i.m_imm;
             int64_t _t30 = _t28;
@@ -146724,25 +146773,25 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
         }
         rc_release_t_2ir_Inst(v_i);
     }
-    // line 809
+    // line 819
     vela_map * _t31 = vela_map_new(&vela_type_int, &vela_type_bool);
     vela_map * v_bounds = _t31;
-    // line 810
+    // line 820
     int64_t _t32 = v_f.m_insts->len;
     int64_t _t33 = _t32;
     vela_unique_map(&v_bounds);
     for (int64_t _t34 = 0; _t34 < _t33; _t34++) {
         int64_t v_k_2 = _t34;
-        // line 811
-        t_2ir_Inst _t35 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:811:24");
+        // line 821
+        t_2ir_Inst _t35 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:821:24");
         rc_retain_t_2ir_Inst(_t35);
         t_2ir_Inst v_i_2 = _t35;
-        // line 812
+        // line 822
         t_2ir_Op _t36 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
         bool _t37 = v_i_2.m_op.tag == _t36.tag;
         bool _t38 = _t37;
         if (_t38) {
-            int64_t _t39 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:812:39");
+            int64_t _t39 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:822:39");
             int64_t _t40 = _t39;
             bool _t41 = _t40 == 1;
             _t38 = _t41;
@@ -146754,12 +146803,12 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
             _t42 = _t44;
         }
         if (_t42) {
-            // line 812
+            // line 822
             int64_t _t45 = v_i_2.m_dst;
             bool _t46 = true;
             vela_map_set(v_bounds, &_t45, &_t46);
         }
-        // line 813
+        // line 823
         t_2ir_Op _t47 = (t_2ir_Op){ .tag = t_2ir_Op_BranchCmp };
         bool _t48 = v_i_2.m_op.tag == _t47.tag;
         bool _t49 = _t48;
@@ -146775,7 +146824,7 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
         }
         bool _t54 = _t51;
         if (_t54) {
-            int64_t _t55 = *(int64_t *)vela_at(v_defs, v_i_2.m_b, sizeof(int64_t), "compiler/src/opt.vl:813:73");
+            int64_t _t55 = *(int64_t *)vela_at(v_defs, v_i_2.m_b, sizeof(int64_t), "compiler/src/opt.vl:823:73");
             int64_t _t56 = _t55;
             bool _t57 = _t56 == 1;
             _t54 = _t57;
@@ -146786,57 +146835,57 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
             _t58 = _t59;
         }
         if (_t58) {
-            // line 813
+            // line 823
             int64_t _t60 = v_i_2.m_b;
             bool _t61 = true;
             vela_map_set(v_bounds, &_t60, &_t61);
         }
         rc_release_t_2ir_Inst(v_i_2);
     }
-    // line 815
+    // line 825
     vela_map * _t62 = vela_map_new(&vela_type_str, &vela_type_bool);
     vela_map * v_facts = _t62;
-    // line 816
+    // line 826
     vela_map * _t63 = vela_map_new(&vela_type_int, &vela_type_map);
     vela_map * v_saved = _t63;
-    // line 817
+    // line 827
     vela_map * _t64 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_arrivals = _t64;
-    // line 818
+    // line 828
     bool v_falls = false;
-    // line 819
+    // line 829
     bool v_changed = false;
-    // line 820
+    // line 830
     t_2ir_Func _t65 = v_f;
     rc_retain_t_2ir_Func(_t65);
     t_2ir_Func v_out = _t65;
-    // line 821
+    // line 831
     vela_array * _t66 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t66;
-    // line 822
+    // line 832
     vela_array * _t68 = v_f.m_insts;
     vela_array_retain(_t68);
     vela_array * _t67 = _t68;
     for (int64_t _t69 = 0; _t69 < _t67->len; _t69++) {
         t_2ir_Inst v_i_3 = ((t_2ir_Inst *)_t67->data)[_t69];
         rc_retain_t_2ir_Inst(v_i_3);
-        // line 823
+        // line 833
         t_2ir_Op _t70 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t71 = v_i_3.m_op.tag == _t70.tag;
         if (_t71) {
-            // line 824
+            // line 834
             int64_t _t72 = f_3opt_ways_to(v_ways, v_i_3.m_imm);
             int64_t v_n = _t72;
-            // line 825
+            // line 835
             if (v_falls) {
-                // line 825
+                // line 835
                 vela_map * _t73 = v_facts;
                 vela_map_retain(_t73);
                 f_3opt_meet(&v_saved, &v_arrivals, v_i_3.m_imm, _t73);
                 vela_map_release(_t73);
             }
-            // line 826
+            // line 836
             int64_t _t74 = f_3opt_ways_to(v_arrivals, v_i_3.m_imm);
             int64_t _t75 = _t74;
             bool _t76 = _t75 == v_n;
@@ -146847,20 +146896,20 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
                 _t77 = _t79;
             }
             if (_t77) {
-                // line 826
+                // line 836
                 int64_t _t81 = v_i_3.m_imm;
-                vela_map * _t80 = *(vela_map * *)vela_map_at(v_saved, &_t81, "compiler/src/opt.vl:826:70");
+                vela_map * _t80 = *(vela_map * *)vela_map_at(v_saved, &_t81, "compiler/src/opt.vl:836:70");
                 vela_map_retain(_t80);
                 vela_map_release(v_facts);
                 v_facts = _t80;
             } else {
-                // line 826
+                // line 836
                 vela_map * _t82 = vela_map_new(&vela_type_str, &vela_type_bool);
                 vela_map_release(v_facts);
                 v_facts = _t82;
             }
         }
-        // line 828
+        // line 838
         t_2ir_Op _t83 = (t_2ir_Op){ .tag = t_2ir_Op_BranchCmp };
         bool _t84 = v_i_3.m_op.tag == _t83.tag;
         bool _t85 = _t84;
@@ -146877,14 +146926,14 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
         }
         bool _t91 = _t88;
         if (_t91) {
-            int64_t _t92 = *(int64_t *)vela_at(v_defs, v_i_3.m_a, sizeof(int64_t), "compiler/src/opt.vl:828:67");
+            int64_t _t92 = *(int64_t *)vela_at(v_defs, v_i_3.m_a, sizeof(int64_t), "compiler/src/opt.vl:838:67");
             int64_t _t93 = _t92;
             bool _t94 = _t93 == 1;
             _t91 = _t94;
         }
         bool _t95 = _t91;
         if (_t95) {
-            int64_t _t96 = *(int64_t *)vela_at(v_defs, v_i_3.m_b, sizeof(int64_t), "compiler/src/opt.vl:828:85");
+            int64_t _t96 = *(int64_t *)vela_at(v_defs, v_i_3.m_b, sizeof(int64_t), "compiler/src/opt.vl:838:85");
             int64_t _t97 = _t96;
             bool _t98 = _t97 == 1;
             _t95 = _t98;
@@ -146898,7 +146947,7 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
         }
         bool _t102 = _t99;
         if (_t102) {
-            int64_t _t103 = *(int64_t *)vela_at(v_f.m_classes, v_i_3.m_a, sizeof(int64_t), "compiler/src/opt.vl:829:22");
+            int64_t _t103 = *(int64_t *)vela_at(v_f.m_classes, v_i_3.m_a, sizeof(int64_t), "compiler/src/opt.vl:839:22");
             int64_t _t104 = _t103;
             int64_t _t105 = f_2ir_FLOAT();
             bool _t106 = _t104 != _t105;
@@ -146906,59 +146955,59 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
         }
         bool _t107 = _t102;
         if (_t107) {
-            int64_t _t108 = *(int64_t *)vela_at(v_f.m_classes, v_i_3.m_b, sizeof(int64_t), "compiler/src/opt.vl:829:54");
+            int64_t _t108 = *(int64_t *)vela_at(v_f.m_classes, v_i_3.m_b, sizeof(int64_t), "compiler/src/opt.vl:839:54");
             int64_t _t109 = _t108;
             int64_t _t110 = f_2ir_FLOAT();
             bool _t111 = _t109 != _t110;
             _t107 = _t111;
         }
         if (_t107) {
-            // line 830
+            // line 840
             int64_t _t112 = f_3opt_decided(v_facts, v_bounds, v_i_3.m_sym, v_i_3.m_a, v_i_3.m_b);
             int64_t v_known = _t112;
-            // line 831
+            // line 841
             int64_t _t113 = v_known;
             bool _t114 = _t113 == 1;
             if (_t114) {
-                // line 832
+                // line 842
                 v_changed = true;
-                // line 833
+                // line 843
                 t_2ir_Op _t115 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
                 t_2ir_Inst _t116 = f_2ir_inst(_t115, -1, -1, -1, v_i_3.m_imm);
                 t_2ir_Inst v_jump = _t116;
-                // line 834
+                // line 844
                 vela_map * _t117 = v_facts;
                 vela_map_retain(_t117);
                 f_3opt_meet(&v_saved, &v_arrivals, v_i_3.m_imm, _t117);
                 vela_map_release(_t117);
-                // line 835
+                // line 845
                 t_2ir_Inst _t118 = v_jump;
                 rc_retain_t_2ir_Inst(_t118);
                 vela_unique(&v_out.m_insts);
                 t_2ir_Inst _t119 = _t118;
                 vela_push(v_out.m_insts, &_t119, sizeof(t_2ir_Inst));
-                // line 836
+                // line 846
                 v_falls = false;
-                // line 837
+                // line 847
                 rc_release_t_2ir_Inst(v_jump);
                 rc_release_t_2ir_Inst(v_i_3);
                 continue;
             }
-            // line 839
+            // line 849
             int64_t _t120 = v_known;
             bool _t121 = _t120 == 0;
             if (_t121) {
-                // line 840
+                // line 850
                 v_changed = true;
-                // line 841
+                // line 851
                 rc_release_t_2ir_Inst(v_i_3);
                 continue;
             }
-            // line 843
+            // line 853
             vela_map * _t122 = v_facts;
             vela_map_retain(_t122);
             vela_map * v_taken = _t122;
-            // line 844
+            // line 854
             vela_map * _t123 = v_bounds;
             vela_map_retain(_t123);
             vela_str _t124 = v_i_3.m_sym;
@@ -146966,48 +147015,48 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
             f_3opt_learn(&v_taken, _t123, _t124, v_i_3.m_a, v_i_3.m_b);
             vela_str_release(_t124);
             vela_map_release(_t123);
-            // line 845
+            // line 855
             vela_map * _t125 = v_taken;
             vela_map_retain(_t125);
             f_3opt_meet(&v_saved, &v_arrivals, v_i_3.m_imm, _t125);
             vela_map_release(_t125);
-            // line 846
+            // line 856
             vela_map * _t126 = v_bounds;
             vela_map_retain(_t126);
             vela_str _t127 = f_3opt_inverse(v_i_3.m_sym);
             f_3opt_learn(&v_facts, _t126, _t127, v_i_3.m_a, v_i_3.m_b);
             vela_str_release(_t127);
             vela_map_release(_t126);
-            // line 847
+            // line 857
             t_2ir_Inst _t128 = v_i_3;
             rc_retain_t_2ir_Inst(_t128);
             vela_unique(&v_out.m_insts);
             t_2ir_Inst _t129 = _t128;
             vela_push(v_out.m_insts, &_t129, sizeof(t_2ir_Inst));
-            // line 848
+            // line 858
             v_falls = true;
-            // line 849
+            // line 859
             vela_map_release(v_taken);
             rc_release_t_2ir_Inst(v_i_3);
             continue;
         }
-        // line 851
+        // line 861
         vela_array * _t131 = f_3opt_targets(v_i_3);
         vela_array * _t130 = _t131;
         for (int64_t _t132 = 0; _t132 < _t130->len; _t132++) {
             int64_t v_t_2 = ((int64_t *)_t130->data)[_t132];
-            // line 851
+            // line 861
             vela_map * _t133 = v_facts;
             vela_map_retain(_t133);
             f_3opt_meet(&v_saved, &v_arrivals, v_t_2, _t133);
             vela_map_release(_t133);
         }
         vela_array_release(_t130);
-        // line 852
+        // line 862
         bool _t134 = f_2ir_ends_block(v_i_3.m_op);
         bool _t135 = !_t134;
         v_falls = _t135;
-        // line 853
+        // line 863
         t_2ir_Inst _t136 = v_i_3;
         rc_retain_t_2ir_Inst(_t136);
         vela_unique(&v_out.m_insts);
@@ -147016,10 +147065,10 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i_3);
     }
     vela_array_release(_t67);
-    // line 855
+    // line 865
     bool _t138 = !v_changed;
     if (_t138) {
-        // line 855
+        // line 865
         t_2ir_Func _t139 = v_f;
         rc_retain_t_2ir_Func(_t139);
         t_2ir_Func _t140 = _t139;
@@ -147032,7 +147081,7 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
         vela_array_release(v_defs);
         return _t140;
     }
-    // line 856
+    // line 866
     t_2ir_Func _t141 = v_out;
     rc_retain_t_2ir_Func(_t141);
     t_2ir_Func _t142 = _t141;
@@ -147048,15 +147097,15 @@ t_2ir_Func f_3opt_known_branches(t_2ir_Func v_f) {
 /* vela: part */
 
 vela_str f_3opt_fact(vela_str v_cond, int64_t v_a, int64_t v_b) {
-    // line 862
+    // line 872
     vela_str _t1 = v_cond;
     vela_str_retain(_t1);
     vela_str v_c = _t1;
-    // line 863
+    // line 873
     int64_t v_x = v_a;
-    // line 864
+    // line 874
     int64_t v_y = v_b;
-    // line 865
+    // line 875
     bool _t2 = vela_str_eq(v_c, VELA_STR("gt", 2));
     bool _t3 = _t2;
     if (!_t3) {
@@ -147074,7 +147123,7 @@ vela_str f_3opt_fact(vela_str v_cond, int64_t v_a, int64_t v_b) {
         _t7 = _t8;
     }
     if (_t7) {
-        // line 866
+        // line 876
         vela_str _t9;
         if (vela_str_eq(v_c, VELA_STR("gt", 2))) {
             _t9 = VELA_STR("lt", 2);
@@ -147087,12 +147136,12 @@ vela_str f_3opt_fact(vela_str v_cond, int64_t v_a, int64_t v_b) {
         }
         vela_str_release(v_c);
         v_c = _t9;
-        // line 867
+        // line 877
         v_x = v_b;
-        // line 868
+        // line 878
         v_y = v_a;
     }
-    // line 870
+    // line 880
     bool _t10 = vela_str_eq(v_c, VELA_STR("eq", 2));
     bool _t11 = _t10;
     if (!_t11) {
@@ -147106,12 +147155,12 @@ vela_str f_3opt_fact(vela_str v_cond, int64_t v_a, int64_t v_b) {
         _t13 = _t15;
     }
     if (_t13) {
-        // line 871
+        // line 881
         v_x = v_b;
-        // line 872
+        // line 882
         v_y = v_a;
     }
-    // line 874
+    // line 884
     static const vela_str _t16[] = {{NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}, VELA_STR_INIT(":", 1), {NULL, NULL, 0}};
     vela_str _t17[5];
     memcpy(_t17, _t16, sizeof _t17);
@@ -147130,13 +147179,13 @@ vela_str f_3opt_fact(vela_str v_cond, int64_t v_a, int64_t v_b) {
 /* vela: part */
 
 void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, int64_t v_a, int64_t v_b) {
-    // line 881
+    // line 891
     vela_unique_map(&(*v_facts));
     vela_str _t1 = f_3opt_fact(v_cond, v_a, v_b);
     vela_str _t2 = _t1;
     bool _t3 = true;
     vela_map_set((*v_facts), &_t2, &_t3);
-    // line 882
+    // line 892
     vela_array * _t4;
     if (vela_str_eq(v_cond, VELA_STR("lt", 2))) {
         vela_array * _t5 = vela_array_new(&vela_type_str, 2);
@@ -147182,7 +147231,7 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
         _t4 = _t22;
     }
     vela_array * v_also = _t4;
-    // line 885
+    // line 895
     vela_array * _t24 = v_also;
     vela_array_retain(_t24);
     vela_array * _t23 = _t24;
@@ -147190,7 +147239,7 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
     for (int64_t _t25 = 0; _t25 < _t23->len; _t25++) {
         vela_str v_c = ((vela_str *)_t23->data)[_t25];
         vela_str_retain(v_c);
-        // line 885
+        // line 895
         vela_str _t26 = f_3opt_fact(v_c, v_a, v_b);
         vela_str _t27 = _t26;
         bool _t28 = true;
@@ -147198,11 +147247,11 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
         vela_str_release(v_c);
     }
     vela_array_release(_t23);
-    // line 886
+    // line 896
     int64_t v_small = v_a;
-    // line 887
+    // line 897
     int64_t v_big = v_b;
-    // line 888
+    // line 898
     bool _t29 = vela_str_eq(v_cond, VELA_STR("gt", 2));
     bool _t30 = _t29;
     if (!_t30) {
@@ -147220,12 +147269,12 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
         _t34 = _t35;
     }
     if (_t34) {
-        // line 889
+        // line 899
         v_small = v_b;
-        // line 890
+        // line 900
         v_big = v_a;
     }
-    // line 892
+    // line 902
     bool _t36 = vela_str_eq(v_cond, VELA_STR("lt", 2));
     bool _t37 = _t36;
     if (!_t37) {
@@ -147243,10 +147292,10 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
         _t41 = _t42;
     }
     if (_t41) {
-        // line 893
+        // line 903
         bool _t43 = f_3opt_nonneg((*v_facts), v_bounds, v_small);
         if (_t43) {
-            // line 893
+            // line 903
             vela_unique_map(&(*v_facts));
             vela_str _t44 = f_3opt_sign(v_big);
             vela_str _t45 = _t44;
@@ -147256,7 +147305,7 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
     } else {
         bool _t47 = vela_str_eq(v_cond, VELA_STR("eq", 2));
         if (_t47) {
-            // line 895
+            // line 905
             bool _t48 = f_3opt_nonneg((*v_facts), v_bounds, v_a);
             bool _t49 = _t48;
             if (!_t49) {
@@ -147264,13 +147313,13 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
                 _t49 = _t50;
             }
             if (_t49) {
-                // line 896
+                // line 906
                 vela_unique_map(&(*v_facts));
                 vela_str _t51 = f_3opt_sign(v_a);
                 vela_str _t52 = _t51;
                 bool _t53 = true;
                 vela_map_set((*v_facts), &_t52, &_t53);
-                // line 897
+                // line 907
                 vela_unique_map(&(*v_facts));
                 vela_str _t54 = f_3opt_sign(v_b);
                 vela_str _t55 = _t54;
@@ -147285,13 +147334,13 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
                 _t58 = _t59;
             }
             if (_t58) {
-                // line 900
+                // line 910
                 vela_unique_map(&(*v_facts));
                 vela_str _t60 = f_3opt_sign(v_small);
                 vela_str _t61 = _t60;
                 bool _t62 = true;
                 vela_map_set((*v_facts), &_t61, &_t62);
-                // line 901
+                // line 911
                 bool _t63 = vela_str_eq(v_cond, VELA_STR("ult", 3));
                 bool _t64 = _t63;
                 if (!_t64) {
@@ -147299,14 +147348,14 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
                     _t64 = _t65;
                 }
                 if (_t64) {
-                    // line 901
+                    // line 911
                     vela_map * _t66 = v_bounds;
                     vela_map_retain(_t66);
                     f_3opt_learn(&(*v_facts), _t66, VELA_STR("lt", 2), v_small, v_big);
                     vela_str_release(VELA_STR("lt", 2));
                     vela_map_release(_t66);
                 } else {
-                    // line 901
+                    // line 911
                     vela_map * _t67 = v_bounds;
                     vela_map_retain(_t67);
                     f_3opt_learn(&(*v_facts), _t67, VELA_STR("le", 2), v_small, v_big);
@@ -147321,7 +147370,7 @@ void f_3opt_learn(vela_map * * v_facts, vela_map * v_bounds, vela_str v_cond, in
 /* vela: part */
 
 vela_str f_3opt_sign(int64_t v_r) {
-    // line 906
+    // line 916
     vela_str _t1 = vela_from_int(v_r);
     vela_str _t2 = vela_str_concat(VELA_STR("nn:", 3), _t1);
     vela_str_release(_t1);
@@ -147331,7 +147380,7 @@ vela_str f_3opt_sign(int64_t v_r) {
 /* vela: part */
 
 bool f_3opt_nonneg(vela_map * v_facts, vela_map * v_bounds, int64_t v_r) {
-    // line 910
+    // line 920
     int64_t _t2 = v_r;
     uint64_t _t3;
     bool *_t1 = vela_map_find_hashed(v_bounds, &_t2, &_t3);
@@ -147352,26 +147401,26 @@ bool f_3opt_nonneg(vela_map * v_facts, vela_map * v_bounds, int64_t v_r) {
 /* vela: part */
 
 int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond, int64_t v_a, int64_t v_b) {
-    // line 916
+    // line 926
     vela_str _t1 = f_3opt_fact(v_cond, v_a, v_b);
     vela_str _t3 = _t1;
     bool *_t2 = vela_map_find(v_facts, &_t3);
     bool _t4 = _t2 != NULL;
     if (_t4) {
-        // line 916
+        // line 926
         int64_t _t5 = 1;
         vela_str_release(_t1);
         return _t5;
     }
     vela_str_release(_t1);
-    // line 917
+    // line 927
     vela_str _t6 = f_3opt_inverse(v_cond);
     vela_str _t7 = f_3opt_fact(_t6, v_a, v_b);
     vela_str _t9 = _t7;
     bool *_t8 = vela_map_find(v_facts, &_t9);
     bool _t10 = _t8 != NULL;
     if (_t10) {
-        // line 917
+        // line 927
         int64_t _t11 = 0;
         vela_str_release(_t7);
         vela_str_release(_t6);
@@ -147379,7 +147428,7 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
     }
     vela_str_release(_t7);
     vela_str_release(_t6);
-    // line 918
+    // line 928
     bool _t12 = vela_str_eq(v_cond, VELA_STR("ult", 3));
     bool _t13 = _t12;
     if (!_t13) {
@@ -147397,7 +147446,7 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
         _t17 = _t18;
     }
     bool v_unsigned = _t17;
-    // line 919
+    // line 929
     bool _t19 = !v_unsigned;
     bool _t20 = _t19;
     if (!_t20) {
@@ -147412,7 +147461,7 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
         _t23 = _t25;
     }
     if (_t23) {
-        // line 921
+        // line 931
         bool _t26 = vela_str_eq(v_cond, VELA_STR("ult", 3));
         bool _t27 = _t26;
         if (_t27) {
@@ -147429,11 +147478,11 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
             _t32 = _t33;
         }
         if (_t32) {
-            // line 921
+            // line 931
             int64_t _t34 = 1;
             return _t34;
         }
-        // line 922
+        // line 932
         bool _t35 = vela_str_eq(v_cond, VELA_STR("uge", 3));
         bool _t36 = _t35;
         if (_t36) {
@@ -147450,11 +147499,11 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
             _t41 = _t42;
         }
         if (_t41) {
-            // line 922
+            // line 932
             int64_t _t43 = 0;
             return _t43;
         }
-        // line 923
+        // line 933
         bool _t44 = vela_str_eq(v_cond, VELA_STR("ugt", 3));
         bool _t45 = _t44;
         if (_t45) {
@@ -147471,11 +147520,11 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
             _t50 = _t51;
         }
         if (_t50) {
-            // line 923
+            // line 933
             int64_t _t52 = 1;
             return _t52;
         }
-        // line 924
+        // line 934
         bool _t53 = vela_str_eq(v_cond, VELA_STR("ule", 3));
         bool _t54 = _t53;
         if (_t54) {
@@ -147492,15 +147541,15 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
             _t59 = _t60;
         }
         if (_t59) {
-            // line 924
+            // line 934
             int64_t _t61 = 0;
             return _t61;
         }
-        // line 925
+        // line 935
         int64_t _t62 = -1;
         return _t62;
     }
-    // line 927
+    // line 937
     vela_str _t63;
     if (vela_str_eq(v_cond, VELA_STR("ult", 3))) {
         _t63 = VELA_STR("lt", 2);
@@ -147512,27 +147561,27 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
         _t63 = VELA_STR("ge", 2);
     }
     vela_str v_signed = _t63;
-    // line 928
+    // line 938
     vela_str _t64 = f_3opt_fact(v_signed, v_a, v_b);
     vela_str _t66 = _t64;
     bool *_t65 = vela_map_find(v_facts, &_t66);
     bool _t67 = _t65 != NULL;
     if (_t67) {
-        // line 928
+        // line 938
         int64_t _t68 = 1;
         vela_str_release(_t64);
         vela_str_release(v_signed);
         return _t68;
     }
     vela_str_release(_t64);
-    // line 929
+    // line 939
     vela_str _t69 = f_3opt_inverse(v_signed);
     vela_str _t70 = f_3opt_fact(_t69, v_a, v_b);
     vela_str _t72 = _t70;
     bool *_t71 = vela_map_find(v_facts, &_t72);
     bool _t73 = _t71 != NULL;
     if (_t73) {
-        // line 929
+        // line 939
         int64_t _t74 = 0;
         vela_str_release(_t70);
         vela_str_release(_t69);
@@ -147541,7 +147590,7 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
     }
     vela_str_release(_t70);
     vela_str_release(_t69);
-    // line 930
+    // line 940
     int64_t _t75 = -1;
     vela_str_release(v_signed);
     return _t75;
@@ -147549,23 +147598,23 @@ int64_t f_3opt_decided(vela_map * v_facts, vela_map * v_bounds, vela_str v_cond,
 /* vela: part */
 
 bool f_3opt_bounds_check(t_2ir_Func v_f, int64_t v_k) {
-    // line 938
+    // line 948
     int64_t _t1 = v_k;
     int64_t _t2 = (_t1 + 1);
     int64_t v_j = _t2;
-    // line 939
+    // line 949
     for (;;) {
         int64_t _t3 = v_j;
         int64_t _t4 = v_f.m_insts->len;
         bool _t5 = _t3 < _t4;
         bool _t6 = _t5;
         if (_t6) {
-            t_2ir_Inst _t7 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_j, sizeof(t_2ir_Inst), "compiler/src/opt.vl:939:37");
+            t_2ir_Inst _t7 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_j, sizeof(t_2ir_Inst), "compiler/src/opt.vl:949:37");
             t_2ir_Op _t8 = (t_2ir_Op){ .tag = t_2ir_Op_SymAddr };
             bool _t9 = _t7.m_op.tag == _t8.tag;
             bool _t10 = _t9;
             if (!_t10) {
-                t_2ir_Inst _t11 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_j, sizeof(t_2ir_Inst), "compiler/src/opt.vl:939:71");
+                t_2ir_Inst _t11 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_j, sizeof(t_2ir_Inst), "compiler/src/opt.vl:949:71");
                 t_2ir_Op _t12 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
                 bool _t13 = _t11.m_op.tag == _t12.tag;
                 _t10 = _t13;
@@ -147574,12 +147623,12 @@ bool f_3opt_bounds_check(t_2ir_Func v_f, int64_t v_k) {
         }
         bool _t14 = _t6;
         if (!_t14) break;
-        // line 940
+        // line 950
         int64_t _t15 = v_j;
         int64_t _t16 = (_t15 + 1);
         v_j = _t16;
     }
-    // line 942
+    // line 952
     int64_t _t17 = v_j;
     int64_t _t18 = (_t17 + 1);
     int64_t _t19 = _t18;
@@ -147587,7 +147636,7 @@ bool f_3opt_bounds_check(t_2ir_Func v_f, int64_t v_k) {
     bool _t21 = _t19 >= _t20;
     bool _t22 = _t21;
     if (!_t22) {
-        t_2ir_Inst _t23 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_j, sizeof(t_2ir_Inst), "compiler/src/opt.vl:942:40");
+        t_2ir_Inst _t23 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_j, sizeof(t_2ir_Inst), "compiler/src/opt.vl:952:40");
         t_2ir_Op _t24 = (t_2ir_Op){ .tag = t_2ir_Op_CCall };
         bool _t25 = _t23.m_op.tag != _t24.tag;
         _t22 = _t25;
@@ -147596,22 +147645,22 @@ bool f_3opt_bounds_check(t_2ir_Func v_f, int64_t v_k) {
     if (!_t26) {
         int64_t _t28 = v_j;
         int64_t _t29 = (_t28 + 1);
-        t_2ir_Inst _t27 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t29, sizeof(t_2ir_Inst), "compiler/src/opt.vl:942:72");
+        t_2ir_Inst _t27 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t29, sizeof(t_2ir_Inst), "compiler/src/opt.vl:952:72");
         t_2ir_Op _t30 = (t_2ir_Op){ .tag = t_2ir_Op_Unreachable };
         bool _t31 = _t27.m_op.tag != _t30.tag;
         _t26 = _t31;
     }
     if (_t26) {
-        // line 943
+        // line 953
         bool _t32 = false;
         return _t32;
     }
-    // line 945
-    t_2ir_Inst _t33 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_j, sizeof(t_2ir_Inst), "compiler/src/opt.vl:945:23");
+    // line 955
+    t_2ir_Inst _t33 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_j, sizeof(t_2ir_Inst), "compiler/src/opt.vl:955:23");
     vela_str _t34 = _t33.m_sym;
     vela_str_retain(_t34);
     vela_str v_name = _t34;
-    // line 946
+    // line 956
     bool _t35 = vela_str_eq(v_name, VELA_STR("vela_str_at", 11));
     bool _t36 = _t35;
     if (!_t36) {
@@ -147635,12 +147684,12 @@ bool f_3opt_bounds_check(t_2ir_Func v_f, int64_t v_k) {
 /* vela: part */
 
 void f_3opt_meet(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_label, vela_map * v_facts) {
-    // line 952
+    // line 962
     int64_t _t1 = f_3opt_ways_to((*v_arrivals), v_label);
     int64_t _t2 = _t1;
     bool _t3 = _t2 == 0;
     if (_t3) {
-        // line 953
+        // line 963
         vela_map * _t4 = v_facts;
         vela_map_retain(_t4);
         vela_unique_map(&(*v_saved));
@@ -147648,29 +147697,29 @@ void f_3opt_meet(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_label,
         vela_map * _t6 = _t4;
         vela_map_set((*v_saved), &_t5, &_t6);
     } else {
-        // line 955
+        // line 965
         int64_t _t8 = v_label;
-        vela_map * _t7 = *(vela_map * *)vela_map_at((*v_saved), &_t8, "compiler/src/opt.vl:955:25");
+        vela_map * _t7 = *(vela_map * *)vela_map_at((*v_saved), &_t8, "compiler/src/opt.vl:965:25");
         vela_map_retain(_t7);
         vela_map * v_have = _t7;
-        // line 956
+        // line 966
         vela_map * _t9 = vela_map_new(&vela_type_str, &vela_type_bool);
         vela_map * v_both = _t9;
-        // line 957
+        // line 967
         vela_array * _t11 = vela_map_keys(v_facts);
         vela_array * _t10 = _t11;
         vela_unique_map(&v_both);
         for (int64_t _t12 = 0; _t12 < _t10->len; _t12++) {
             vela_str v_key = ((vela_str *)_t10->data)[_t12];
             vela_str_retain(v_key);
-            // line 958
+            // line 968
             vela_str _t14 = v_key;
             uint64_t _t15;
             bool *_t13 = vela_map_find_hashed(v_have, &_t14, &_t15);
             vela_map *_t16 = v_have;
             bool _t17 = _t13 != NULL;
             if (_t17) {
-                // line 958
+                // line 968
                 vela_str _t18 = v_key;
                 vela_str_retain(_t18);
                 vela_str _t19 = _t18;
@@ -147680,7 +147729,7 @@ void f_3opt_meet(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_label,
             vela_str_release(v_key);
         }
         vela_array_release(_t10);
-        // line 960
+        // line 970
         vela_map * _t21 = v_both;
         vela_map_retain(_t21);
         vela_unique_map(&(*v_saved));
@@ -147690,10 +147739,10 @@ void f_3opt_meet(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_label,
         vela_map_release(v_both);
         vela_map_release(v_have);
     }
-    // line 962
+    // line 972
     int64_t _t24 = f_3opt_ways_to((*v_arrivals), v_label);
     int64_t _t25 = _t24;
-    int64_t _t26 = vela_add(_t25, 1, "compiler/src/opt.vl:962:48");
+    int64_t _t26 = vela_add(_t25, 1, "compiler/src/opt.vl:972:48");
     vela_unique_map(&(*v_arrivals));
     int64_t _t27 = v_label;
     int64_t _t28 = _t26;
@@ -147702,51 +147751,51 @@ void f_3opt_meet(vela_map * * v_saved, vela_map * * v_arrivals, int64_t v_label,
 /* vela: part */
 
 t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
-    // line 973
+    // line 983
     vela_map * _t1 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_label_at = _t1;
-    // line 974
+    // line 984
     int64_t _t2 = v_f.m_insts->len;
     int64_t _t3 = _t2;
     vela_unique_map(&v_label_at);
     for (int64_t _t4 = 0; _t4 < _t3; _t4++) {
         int64_t v_k = _t4;
-        // line 975
-        t_2ir_Inst _t5 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:975:19");
+        // line 985
+        t_2ir_Inst _t5 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:985:19");
         t_2ir_Op _t6 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t7 = _t5.m_op.tag == _t6.tag;
         if (_t7) {
-            // line 975
-            t_2ir_Inst _t8 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:975:59");
+            // line 985
+            t_2ir_Inst _t8 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:985:59");
             int64_t _t9 = _t8.m_imm;
             int64_t _t10 = v_k;
             vela_map_set(v_label_at, &_t9, &_t10);
         }
     }
-    // line 977
+    // line 987
     t_2ir_Func _t11 = v_f;
     rc_retain_t_2ir_Func(_t11);
     t_2ir_Func v_out = _t11;
-    // line 978
+    // line 988
     vela_map * _t12 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_body = _t12;
-    // line 979
+    // line 989
     vela_array * _t13 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array * v_insts = _t13;
-    // line 980
+    // line 990
     int64_t _t14 = v_f.m_insts->len;
     int64_t _t15 = _t14;
     vela_unique_map(&v_body);
     vela_unique(&v_insts);
     for (int64_t _t16 = 0; _t16 < _t15; _t16++) {
         int64_t v_k_2 = _t16;
-        // line 981
-        t_2ir_Inst _t17 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:981:24");
+        // line 991
+        t_2ir_Inst _t17 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k_2, sizeof(t_2ir_Inst), "compiler/src/opt.vl:991:24");
         rc_retain_t_2ir_Inst(_t17);
         t_2ir_Inst v_i = _t17;
-        // line 982
+        // line 992
         bool v_rotated = false;
-        // line 983
+        // line 993
         t_2ir_Op _t18 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
         bool _t19 = v_i.m_op.tag == _t18.tag;
         bool _t20 = _t19;
@@ -147759,7 +147808,7 @@ t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
         bool _t24 = _t20;
         if (_t24) {
             int64_t _t26 = v_i.m_imm;
-            int64_t _t25 = *(int64_t *)vela_map_at(v_label_at, &_t26, "compiler/src/opt.vl:983:71");
+            int64_t _t25 = *(int64_t *)vela_map_at(v_label_at, &_t26, "compiler/src/opt.vl:993:71");
             int64_t _t27 = _t25;
             bool _t28 = _t27 < v_k_2;
             _t24 = _t28;
@@ -147767,27 +147816,27 @@ t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
         bool _t29 = _t24;
         if (_t29) {
             int64_t _t31 = v_i.m_imm;
-            int64_t _t30 = *(int64_t *)vela_map_at(v_label_at, &_t31, "compiler/src/opt.vl:983:94");
+            int64_t _t30 = *(int64_t *)vela_map_at(v_label_at, &_t31, "compiler/src/opt.vl:993:94");
             int64_t _t32 = _t30;
-            int64_t _t33 = vela_add(_t32, 1, "compiler/src/opt.vl:983:102");
+            int64_t _t33 = vela_add(_t32, 1, "compiler/src/opt.vl:993:102");
             int64_t _t34 = _t33;
             int64_t _t35 = v_f.m_insts->len;
             bool _t36 = _t34 < _t35;
             _t29 = _t36;
         }
         if (_t29) {
-            // line 984
+            // line 994
             int64_t _t39 = v_i.m_imm;
-            int64_t _t38 = *(int64_t *)vela_map_at(v_label_at, &_t39, "compiler/src/opt.vl:984:41");
+            int64_t _t38 = *(int64_t *)vela_map_at(v_label_at, &_t39, "compiler/src/opt.vl:994:41");
             int64_t _t40 = _t38;
-            int64_t _t41 = vela_add(_t40, 1, "compiler/src/opt.vl:984:49");
-            t_2ir_Inst _t37 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t41, sizeof(t_2ir_Inst), "compiler/src/opt.vl:984:32");
+            int64_t _t41 = vela_add(_t40, 1, "compiler/src/opt.vl:994:49");
+            t_2ir_Inst _t37 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t41, sizeof(t_2ir_Inst), "compiler/src/opt.vl:994:32");
             rc_retain_t_2ir_Inst(_t37);
             t_2ir_Inst v_check = _t37;
-            // line 985
+            // line 995
             vela_str _t42 = f_3opt_inverse(v_check.m_sym);
             vela_str v_opposite = _t42;
-            // line 986
+            // line 996
             t_2ir_Op _t43 = (t_2ir_Op){ .tag = t_2ir_Op_BranchCmp };
             bool _t44 = v_check.m_op.tag == _t43.tag;
             bool _t45 = _t44;
@@ -147809,7 +147858,7 @@ t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
             }
             bool _t53 = _t50;
             if (_t53) {
-                int64_t _t54 = *(int64_t *)vela_at(v_f.m_classes, v_check.m_a, sizeof(int64_t), "compiler/src/opt.vl:987:26");
+                int64_t _t54 = *(int64_t *)vela_at(v_f.m_classes, v_check.m_a, sizeof(int64_t), "compiler/src/opt.vl:997:26");
                 int64_t _t55 = _t54;
                 int64_t _t56 = f_2ir_FLOAT();
                 bool _t57 = _t55 != _t56;
@@ -147817,59 +147866,59 @@ t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
             }
             bool _t58 = _t53;
             if (_t58) {
-                int64_t _t59 = *(int64_t *)vela_at(v_f.m_classes, v_check.m_b, sizeof(int64_t), "compiler/src/opt.vl:987:62");
+                int64_t _t59 = *(int64_t *)vela_at(v_f.m_classes, v_check.m_b, sizeof(int64_t), "compiler/src/opt.vl:997:62");
                 int64_t _t60 = _t59;
                 int64_t _t61 = f_2ir_FLOAT();
                 bool _t62 = _t60 != _t61;
                 _t58 = _t62;
             }
             if (_t58) {
-                // line 988
+                // line 998
                 int64_t _t64 = v_i.m_imm;
                 int64_t *_t63 = vela_map_find(v_body, &_t64);
                 bool _t65 = _t63 != NULL;
                 bool _t66 = !_t65;
                 if (_t66) {
-                    // line 988
+                    // line 998
                     int64_t _t67 = f_2ir_label(&v_out);
                     int64_t _t68 = v_i.m_imm;
                     int64_t _t69 = _t67;
                     vela_map_set(v_body, &_t68, &_t69);
                 }
-                // line 989
+                // line 999
                 t_2ir_Inst _t70 = v_check;
                 rc_retain_t_2ir_Inst(_t70);
                 t_2ir_Inst v_back = _t70;
-                // line 990
+                // line 1000
                 vela_str _t71 = v_opposite;
                 vela_str_retain(_t71);
                 vela_str_release(v_back.m_sym);
                 v_back.m_sym = _t71;
-                // line 991
+                // line 1001
                 int64_t _t73 = v_i.m_imm;
-                int64_t _t72 = *(int64_t *)vela_map_at(v_body, &_t73, "compiler/src/opt.vl:991:32");
+                int64_t _t72 = *(int64_t *)vela_map_at(v_body, &_t73, "compiler/src/opt.vl:1001:32");
                 v_back.m_imm = _t72;
-                // line 992
+                // line 1002
                 t_2ir_Inst _t74 = v_back;
                 rc_retain_t_2ir_Inst(_t74);
                 t_2ir_Inst _t75 = _t74;
                 vela_push(v_insts, &_t75, sizeof(t_2ir_Inst));
-                // line 993
+                // line 1003
                 t_2ir_Op _t76 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
                 t_2ir_Inst _t77 = f_2ir_inst(_t76, -1, -1, -1, v_check.m_imm);
                 t_2ir_Inst _t78 = _t77;
                 vela_push(v_insts, &_t78, sizeof(t_2ir_Inst));
-                // line 994
+                // line 1004
                 v_rotated = true;
                 rc_release_t_2ir_Inst(v_back);
             }
             vela_str_release(v_opposite);
             rc_release_t_2ir_Inst(v_check);
         }
-        // line 997
+        // line 1007
         bool _t79 = !v_rotated;
         if (_t79) {
-            // line 997
+            // line 1007
             t_2ir_Inst _t80 = v_i;
             rc_retain_t_2ir_Inst(_t80);
             t_2ir_Inst _t81 = _t80;
@@ -147877,12 +147926,12 @@ t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
         }
         rc_release_t_2ir_Inst(v_i);
     }
-    // line 999
+    // line 1009
     int64_t _t82 = v_body->len;
     int64_t _t83 = _t82;
     bool _t84 = _t83 == 0;
     if (_t84) {
-        // line 999
+        // line 1009
         t_2ir_Func _t85 = v_f;
         rc_retain_t_2ir_Func(_t85);
         t_2ir_Func _t86 = _t85;
@@ -147892,22 +147941,22 @@ t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
         vela_map_release(v_label_at);
         return _t86;
     }
-    // line 1001
+    // line 1011
     vela_array * _t87 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t87;
-    // line 1002
+    // line 1012
     int64_t _t88 = v_insts->len;
     int64_t _t89 = _t88;
     for (int64_t _t90 = 0; _t90 < _t89; _t90++) {
         int64_t v_k_3 = _t90;
-        // line 1003
+        // line 1013
         t_2ir_Inst _t91 = *((t_2ir_Inst *)v_insts->data + v_k_3);
         rc_retain_t_2ir_Inst(_t91);
         vela_unique(&v_out.m_insts);
         t_2ir_Inst _t92 = _t91;
         vela_push(v_out.m_insts, &_t92, sizeof(t_2ir_Inst));
-        // line 1004
+        // line 1014
         int64_t _t93 = v_k_3;
         bool _t94 = _t93 > 0;
         bool _t95 = _t94;
@@ -147937,20 +147986,20 @@ t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
             _t108 = _t111;
         }
         if (_t108) {
-            // line 1005
+            // line 1015
             t_2ir_Op _t112 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
             int64_t _t115 = v_k_3;
             int64_t _t116 = (_t115 - 1);
             t_2ir_Inst _t114 = *((t_2ir_Inst *)v_insts->data + _t116);
             int64_t _t117 = _t114.m_imm;
-            int64_t _t113 = *(int64_t *)vela_map_at(v_body, &_t117, "compiler/src/opt.vl:1005:70");
+            int64_t _t113 = *(int64_t *)vela_map_at(v_body, &_t117, "compiler/src/opt.vl:1015:70");
             t_2ir_Inst _t118 = f_2ir_inst(_t112, -1, -1, -1, _t113);
             vela_unique(&v_out.m_insts);
             t_2ir_Inst _t119 = _t118;
             vela_push(v_out.m_insts, &_t119, sizeof(t_2ir_Inst));
         }
     }
-    // line 1008
+    // line 1018
     t_2ir_Func _t120 = v_out;
     rc_retain_t_2ir_Func(_t120);
     t_2ir_Func _t121 = _t120;
@@ -147963,7 +148012,7 @@ t_2ir_Func f_3opt_rotate_loops(t_2ir_Func v_f) {
 /* vela: part */
 
 vela_str f_3opt_inverse(vela_str v_cond) {
-    // line 1013
+    // line 1023
     vela_str _t1;
     if (vela_str_eq(v_cond, VELA_STR("eq", 2))) {
         _t1 = VELA_STR("ne", 2);
@@ -147994,10 +148043,10 @@ vela_str f_3opt_inverse(vela_str v_cond) {
 /* vela: part */
 
 t_2ir_Func f_3opt_compact_slots(t_2ir_Func v_f) {
-    // line 1020
+    // line 1030
     vela_map * _t1 = vela_map_new(&vela_type_int, &vela_type_bool);
     vela_map * v_used = _t1;
-    // line 1020
+    // line 1030
     vela_array * _t3 = v_f.m_insts;
     vela_array_retain(_t3);
     vela_array * _t2 = _t3;
@@ -148005,11 +148054,11 @@ t_2ir_Func f_3opt_compact_slots(t_2ir_Func v_f) {
     for (int64_t _t4 = 0; _t4 < _t2->len; _t4++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t2->data)[_t4];
         rc_retain_t_2ir_Inst(v_i);
-        // line 1020
+        // line 1030
         t_2ir_Op _t5 = (t_2ir_Op){ .tag = t_2ir_Op_SlotAddr };
         bool _t6 = v_i.m_op.tag == _t5.tag;
         if (_t6) {
-            // line 1020
+            // line 1030
             int64_t _t7 = v_i.m_imm;
             bool _t8 = true;
             vela_map_set(v_used, &_t7, &_t8);
@@ -148017,76 +148066,76 @@ t_2ir_Func f_3opt_compact_slots(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t2);
-    // line 1021
+    // line 1031
     vela_map * _t9 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_slots = _t9;
-    // line 1021
+    // line 1031
     t_2ir_Func _t10 = v_f;
     rc_retain_t_2ir_Func(_t10);
     t_2ir_Func v_out = _t10;
-    // line 1021
+    // line 1031
     vela_array * _t11 = vela_array_new(&vela_type_int, 0);
     vela_array_release(v_out.m_slot_sizes);
     v_out.m_slot_sizes = _t11;
-    // line 1021
+    // line 1031
     vela_array * _t12 = vela_array_new(&vela_type_int, 0);
     vela_array_release(v_out.m_slot_aligns);
     v_out.m_slot_aligns = _t12;
-    // line 1022
+    // line 1032
     int64_t _t13 = v_f.m_slot_sizes->len;
     int64_t _t14 = _t13;
     vela_unique_map(&v_slots);
     for (int64_t _t15 = 0; _t15 < _t14; _t15++) {
         int64_t v_s = _t15;
-        // line 1022
+        // line 1032
         int64_t _t17 = v_s;
         uint64_t _t18;
         bool *_t16 = vela_map_find_hashed(v_used, &_t17, &_t18);
         vela_map *_t19 = v_used;
         bool _t20 = _t16 != NULL;
         if (_t20) {
-            // line 1022
+            // line 1032
             int64_t _t21 = v_out.m_slot_sizes->len;
             int64_t _t22 = v_s;
             int64_t _t23 = _t21;
             vela_map_set(v_slots, &_t22, &_t23);
-            // line 1022
-            int64_t _t24 = *(int64_t *)vela_at(v_f.m_slot_sizes, v_s, sizeof(int64_t), "compiler/src/opt.vl:1022:129");
+            // line 1032
+            int64_t _t24 = *(int64_t *)vela_at(v_f.m_slot_sizes, v_s, sizeof(int64_t), "compiler/src/opt.vl:1032:129");
             vela_unique(&v_out.m_slot_sizes);
             int64_t _t25 = _t24;
             vela_push(v_out.m_slot_sizes, &_t25, sizeof(int64_t));
-            // line 1022
-            int64_t _t26 = *(int64_t *)vela_at(v_f.m_slot_aligns, v_s, sizeof(int64_t), "compiler/src/opt.vl:1022:174");
+            // line 1032
+            int64_t _t26 = *(int64_t *)vela_at(v_f.m_slot_aligns, v_s, sizeof(int64_t), "compiler/src/opt.vl:1032:174");
             vela_unique(&v_out.m_slot_aligns);
             int64_t _t27 = _t26;
             vela_push(v_out.m_slot_aligns, &_t27, sizeof(int64_t));
         }
     }
-    // line 1023
+    // line 1033
     vela_array * _t28 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t28;
-    // line 1023
+    // line 1033
     vela_array * _t30 = v_f.m_insts;
     vela_array_retain(_t30);
     vela_array * _t29 = _t30;
     for (int64_t _t31 = 0; _t31 < _t29->len; _t31++) {
         t_2ir_Inst v_original = ((t_2ir_Inst *)_t29->data)[_t31];
         rc_retain_t_2ir_Inst(v_original);
-        // line 1023
+        // line 1033
         t_2ir_Inst _t32 = v_original;
         rc_retain_t_2ir_Inst(_t32);
         t_2ir_Inst v_i_2 = _t32;
-        // line 1023
+        // line 1033
         t_2ir_Op _t33 = (t_2ir_Op){ .tag = t_2ir_Op_SlotAddr };
         bool _t34 = v_i_2.m_op.tag == _t33.tag;
         if (_t34) {
-            // line 1023
+            // line 1033
             int64_t _t36 = v_i_2.m_imm;
-            int64_t _t35 = *(int64_t *)vela_map_at(v_slots, &_t36, "compiler/src/opt.vl:1023:110");
+            int64_t _t35 = *(int64_t *)vela_map_at(v_slots, &_t36, "compiler/src/opt.vl:1033:110");
             v_i_2.m_imm = _t35;
         }
-        // line 1023
+        // line 1033
         t_2ir_Inst _t37 = v_i_2;
         rc_retain_t_2ir_Inst(_t37);
         vela_unique(&v_out.m_insts);
@@ -148096,7 +148145,7 @@ t_2ir_Func f_3opt_compact_slots(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_original);
     }
     vela_array_release(_t29);
-    // line 1024
+    // line 1034
     t_2ir_Func _t39 = v_out;
     rc_retain_t_2ir_Func(_t39);
     t_2ir_Func _t40 = _t39;
@@ -148108,34 +148157,34 @@ t_2ir_Func f_3opt_compact_slots(t_2ir_Func v_f) {
 /* vela: part */
 
 t_2ir_Func f_3opt_hoist_floats(t_2ir_Func v_f) {
-    // line 1028
+    // line 1038
     vela_array * _t1 = f_3opt_def_counts(v_f);
     vela_array * v_defs = _t1;
-    // line 1028
+    // line 1038
     vela_map * _t2 = vela_map_new(&vela_type_str, &vela_type_int);
     vela_map * v_constants = _t2;
-    // line 1028
+    // line 1038
     vela_array * _t3 = vela_array_new(&vela_type_int, 0);
     vela_array * v_rep = _t3;
-    // line 1029
+    // line 1039
     int64_t _t4 = v_f.m_classes->len;
     int64_t _t5 = _t4;
     vela_unique(&v_rep);
     for (int64_t _t6 = 0; _t6 < _t5; _t6++) {
         int64_t v_r = _t6;
-        // line 1029
+        // line 1039
         int64_t _t7 = v_r;
         vela_push(v_rep, &_t7, sizeof(int64_t));
     }
-    // line 1030
+    // line 1040
     t_2ir_Func _t8 = v_f;
     rc_retain_t_2ir_Func(_t8);
     t_2ir_Func v_out = _t8;
-    // line 1030
+    // line 1040
     vela_array * _t9 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t9;
-    // line 1031
+    // line 1041
     vela_array * _t11 = v_f.m_insts;
     vela_array_retain(_t11);
     vela_array * _t10 = _t11;
@@ -148146,18 +148195,18 @@ t_2ir_Func f_3opt_hoist_floats(t_2ir_Func v_f) {
     for (int64_t _t12 = 0; _t12 < _t10->len; _t12++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t10->data)[_t12];
         rc_retain_t_2ir_Inst(v_i);
-        // line 1031
+        // line 1041
         t_2ir_Op _t14 = (t_2ir_Op){ .tag = t_2ir_Op_FConst };
         bool _t15 = v_i.m_op.tag == _t14.tag;
         bool _t16 = _t15;
         if (_t16) {
-            int64_t _t17 = *(int64_t *)vela_at(v_defs, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1031:55");
+            int64_t _t17 = *(int64_t *)vela_at(v_defs, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1041:55");
             int64_t _t18 = _t17;
             bool _t19 = _t18 == 1;
             _t16 = _t19;
         }
         if (_t16) {
-            // line 1032
+            // line 1042
             vela_str _t21 = v_i.m_sym;
             int64_t *_t20 = vela_map_find(v_constants, &_t21);
             Option_Int _t22;
@@ -148168,17 +148217,17 @@ t_2ir_Func f_3opt_hoist_floats(t_2ir_Func v_f) {
             }
             if (_t22.tag == Option_Int_Some) {
                 int64_t v_v = _t22.as.m_Some._0;
-                // line 1032
-                int64_t *_t23 = (int64_t *)vela_at_in(_t13, _t13n, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1032:58");
+                // line 1042
+                int64_t *_t23 = (int64_t *)vela_at_in(_t13, _t13n, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1042:58");
                 *_t23 = v_v;
             } else {
-                // line 1032
+                // line 1042
                 vela_str _t24 = v_i.m_sym;
                 vela_str_retain(_t24);
                 vela_str _t25 = _t24;
                 int64_t _t26 = v_i.m_dst;
                 vela_map_set(v_constants, &_t25, &_t26);
-                // line 1032
+                // line 1042
                 t_2ir_Inst _t27 = v_i;
                 rc_retain_t_2ir_Inst(_t27);
                 vela_unique(&v_out.m_insts);
@@ -148189,25 +148238,25 @@ t_2ir_Func f_3opt_hoist_floats(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t10);
-    // line 1034
+    // line 1044
     vela_array * _t30 = v_f.m_insts;
     vela_array_retain(_t30);
     vela_array * _t29 = _t30;
     for (int64_t _t31 = 0; _t31 < _t29->len; _t31++) {
         t_2ir_Inst v_i_2 = ((t_2ir_Inst *)_t29->data)[_t31];
         rc_retain_t_2ir_Inst(v_i_2);
-        // line 1034
+        // line 1044
         t_2ir_Op _t32 = (t_2ir_Op){ .tag = t_2ir_Op_FConst };
         bool _t33 = v_i_2.m_op.tag != _t32.tag;
         bool _t34 = _t33;
         if (!_t34) {
-            int64_t _t35 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1034:55");
+            int64_t _t35 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1044:55");
             int64_t _t36 = _t35;
             bool _t37 = _t36 != 1;
             _t34 = _t37;
         }
         if (_t34) {
-            // line 1034
+            // line 1044
             t_2ir_Inst _t38 = f_3opt_renamed(v_i_2, v_rep);
             vela_unique(&v_out.m_insts);
             t_2ir_Inst _t39 = _t38;
@@ -148216,7 +148265,7 @@ t_2ir_Func f_3opt_hoist_floats(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i_2);
     }
     vela_array_release(_t29);
-    // line 1035
+    // line 1045
     t_2ir_Func _t40 = v_out;
     rc_retain_t_2ir_Func(_t40);
     t_2ir_Func _t41 = _t40;
@@ -148229,22 +148278,22 @@ t_2ir_Func f_3opt_hoist_floats(t_2ir_Func v_f) {
 /* vela: part */
 
 t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
-    // line 1039
+    // line 1049
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     vela_array * v_counts = _t1;
-    // line 1039
+    // line 1049
     vela_array * _t3 = v_f.m_classes;
     vela_array_retain(_t3);
     vela_array * _t2 = _t3;
     vela_unique(&v_counts);
     for (int64_t _t4 = 0; _t4 < _t2->len; _t4++) {
         int64_t v__ = ((int64_t *)_t2->data)[_t4];
-        // line 1039
+        // line 1049
         int64_t _t5 = 0;
         vela_push(v_counts, &_t5, sizeof(int64_t));
     }
     vela_array_release(_t2);
-    // line 1040
+    // line 1050
     vela_array * _t7 = v_f.m_insts;
     vela_array_retain(_t7);
     vela_array * _t6 = _t7;
@@ -148254,15 +148303,15 @@ t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
     for (int64_t _t8 = 0; _t8 < _t6->len; _t8++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t6->data)[_t8];
         rc_retain_t_2ir_Inst(v_i);
-        // line 1040
+        // line 1050
         vela_array * _t11 = f_2ir_reads(v_i);
         vela_array * _t10 = _t11;
         for (int64_t _t12 = 0; _t12 < _t10->len; _t12++) {
             int64_t v_r = ((int64_t *)_t10->data)[_t12];
-            // line 1040
-            int64_t _t13 = *(int64_t *)vela_at_in(_t9, _t9n, v_r, sizeof(int64_t), "compiler/src/opt.vl:1040:65");
+            // line 1050
+            int64_t _t13 = *(int64_t *)vela_at_in(_t9, _t9n, v_r, sizeof(int64_t), "compiler/src/opt.vl:1050:65");
             int64_t _t14 = _t13;
-            int64_t _t15 = vela_add(_t14, 1, "compiler/src/opt.vl:1040:69");
+            int64_t _t15 = vela_add(_t14, 1, "compiler/src/opt.vl:1050:69");
             int64_t *_t16 = ((int64_t *)_t9 + v_r);
             *_t16 = _t15;
         }
@@ -148270,28 +148319,28 @@ t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t6);
-    // line 1041
+    // line 1051
     t_2ir_Func _t17 = v_f;
     rc_retain_t_2ir_Func(_t17);
     t_2ir_Func v_out = _t17;
-    // line 1041
+    // line 1051
     vela_array * _t18 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t18;
-    // line 1041
+    // line 1051
     int64_t v_at = 0;
-    // line 1042
+    // line 1052
     for (;;) {
         int64_t _t19 = v_at;
         int64_t _t20 = v_f.m_insts->len;
         bool _t21 = _t19 < _t20;
         bool _t22 = _t21;
         if (!_t22) break;
-        // line 1043
-        t_2ir_Inst _t23 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_at, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1043:24");
+        // line 1053
+        t_2ir_Inst _t23 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_at, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1053:24");
         rc_retain_t_2ir_Inst(_t23);
         t_2ir_Inst v_i_2 = _t23;
-        // line 1044
+        // line 1054
         t_2ir_Op _t24 = (t_2ir_Op){ .tag = t_2ir_Op_Cmp };
         bool _t25 = v_i_2.m_op.tag == _t24.tag;
         bool _t26 = _t25;
@@ -148302,7 +148351,7 @@ t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
         }
         bool _t29 = _t26;
         if (_t29) {
-            int64_t _t30 = *(int64_t *)vela_at(v_counts, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1044:65");
+            int64_t _t30 = *(int64_t *)vela_at(v_counts, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1054:65");
             int64_t _t31 = _t30;
             bool _t32 = _t31 == 1;
             _t29 = _t32;
@@ -148317,13 +148366,13 @@ t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
             _t33 = _t38;
         }
         if (_t33) {
-            // line 1045
+            // line 1055
             int64_t _t40 = v_at;
             int64_t _t41 = (_t40 + 1);
-            t_2ir_Inst _t39 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t41, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1045:31");
+            t_2ir_Inst _t39 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t41, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1055:31");
             rc_retain_t_2ir_Inst(_t39);
             t_2ir_Inst v_next = _t39;
-            // line 1046
+            // line 1056
             t_2ir_Op _t42 = (t_2ir_Op){ .tag = t_2ir_Op_Branch };
             bool _t43 = v_next.m_op.tag == _t42.tag;
             bool _t44 = _t43;
@@ -148333,28 +148382,28 @@ t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
                 _t44 = _t46;
             }
             if (_t44) {
-                // line 1047
+                // line 1057
                 int64_t v_b = v_i_2.m_b;
-                // line 1048
+                // line 1058
                 t_2ir_Op _t47 = (t_2ir_Op){ .tag = t_2ir_Op_CmpImm };
                 bool _t48 = v_i_2.m_op.tag == _t47.tag;
                 if (_t48) {
-                    // line 1048
+                    // line 1058
                     int64_t _t49 = f_2ir_INT();
                     int64_t _t50 = f_2ir_reg(&v_out, _t49);
                     v_b = _t50;
-                    // line 1048
+                    // line 1058
                     t_2ir_Op _t51 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
                     t_2ir_Inst _t52 = f_2ir_inst(_t51, v_b, -1, -1, v_i_2.m_imm2);
                     vela_unique(&v_out.m_insts);
                     t_2ir_Inst _t53 = _t52;
                     vela_push(v_out.m_insts, &_t53, sizeof(t_2ir_Inst));
                 }
-                // line 1049
+                // line 1059
                 t_2ir_Op _t54 = (t_2ir_Op){ .tag = t_2ir_Op_BranchCmp };
                 t_2ir_Inst _t55 = f_2ir_inst(_t54, -1, v_i_2.m_a, v_b, v_next.m_imm);
                 t_2ir_Inst v_branch = _t55;
-                // line 1050
+                // line 1060
                 vela_str _t56;
                 if (v_i_2.m_imm == 0) {
                     _t56 = VELA_STR("eq", 2);
@@ -148371,23 +148420,23 @@ t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
                 }
                 vela_str_release(v_branch.m_sym);
                 v_branch.m_sym = _t56;
-                // line 1051
+                // line 1061
                 t_2ir_Inst _t57 = v_branch;
                 rc_retain_t_2ir_Inst(_t57);
                 vela_unique(&v_out.m_insts);
                 t_2ir_Inst _t58 = _t57;
                 vela_push(v_out.m_insts, &_t58, sizeof(t_2ir_Inst));
-                // line 1051
+                // line 1061
                 t_2ir_Op _t59 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
                 t_2ir_Inst _t60 = f_2ir_inst(_t59, -1, -1, -1, v_next.m_imm2);
                 vela_unique(&v_out.m_insts);
                 t_2ir_Inst _t61 = _t60;
                 vela_push(v_out.m_insts, &_t61, sizeof(t_2ir_Inst));
-                // line 1051
+                // line 1061
                 int64_t _t62 = v_at;
                 int64_t _t63 = (_t62 + 2);
                 v_at = _t63;
-                // line 1051
+                // line 1061
                 rc_release_t_2ir_Inst(v_branch);
                 rc_release_t_2ir_Inst(v_next);
                 rc_release_t_2ir_Inst(v_i_2);
@@ -148395,19 +148444,19 @@ t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
             }
             rc_release_t_2ir_Inst(v_next);
         }
-        // line 1054
+        // line 1064
         t_2ir_Inst _t64 = v_i_2;
         rc_retain_t_2ir_Inst(_t64);
         vela_unique(&v_out.m_insts);
         t_2ir_Inst _t65 = _t64;
         vela_push(v_out.m_insts, &_t65, sizeof(t_2ir_Inst));
-        // line 1054
+        // line 1064
         int64_t _t66 = v_at;
         int64_t _t67 = (_t66 + 1);
         v_at = _t67;
         rc_release_t_2ir_Inst(v_i_2);
     }
-    // line 1056
+    // line 1066
     t_2ir_Func _t68 = v_out;
     rc_retain_t_2ir_Func(_t68);
     t_2ir_Func _t69 = _t68;
@@ -148418,20 +148467,20 @@ t_2ir_Func f_3opt_fuse_branches(t_2ir_Func v_f) {
 /* vela: part */
 
 vela_array * f_3opt_def_counts(t_2ir_Func v_f) {
-    // line 1061
+    // line 1071
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     vela_array * v_defs = _t1;
-    // line 1062
+    // line 1072
     int64_t _t2 = v_f.m_classes->len;
     int64_t _t3 = _t2;
     vela_unique(&v_defs);
     for (int64_t _t4 = 0; _t4 < _t3; _t4++) {
         int64_t v__ = _t4;
-        // line 1063
+        // line 1073
         int64_t _t5 = 0;
         vela_push(v_defs, &_t5, sizeof(int64_t));
     }
-    // line 1065
+    // line 1075
     vela_array * _t7 = v_f.m_params;
     vela_array_retain(_t7);
     vela_array * _t6 = _t7;
@@ -148440,15 +148489,15 @@ vela_array * f_3opt_def_counts(t_2ir_Func v_f) {
     int64_t _t9n = v_defs->len;
     for (int64_t _t8 = 0; _t8 < _t6->len; _t8++) {
         int64_t v_p = ((int64_t *)_t6->data)[_t8];
-        // line 1066
-        int64_t _t10 = *(int64_t *)vela_at_in(_t9, _t9n, v_p, sizeof(int64_t), "compiler/src/opt.vl:1066:23");
+        // line 1076
+        int64_t _t10 = *(int64_t *)vela_at_in(_t9, _t9n, v_p, sizeof(int64_t), "compiler/src/opt.vl:1076:23");
         int64_t _t11 = _t10;
-        int64_t _t12 = vela_add(_t11, 1, "compiler/src/opt.vl:1066:27");
+        int64_t _t12 = vela_add(_t11, 1, "compiler/src/opt.vl:1076:27");
         int64_t *_t13 = ((int64_t *)_t9 + v_p);
         *_t13 = _t12;
     }
     vela_array_release(_t6);
-    // line 1068
+    // line 1078
     vela_array * _t15 = v_f.m_insts;
     vela_array_retain(_t15);
     vela_array * _t14 = _t15;
@@ -148458,21 +148507,21 @@ vela_array * f_3opt_def_counts(t_2ir_Func v_f) {
     for (int64_t _t16 = 0; _t16 < _t14->len; _t16++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t14->data)[_t16];
         rc_retain_t_2ir_Inst(v_i);
-        // line 1069
+        // line 1079
         int64_t _t18 = v_i.m_dst;
         bool _t19 = _t18 >= 0;
         if (_t19) {
-            // line 1070
-            int64_t _t20 = *(int64_t *)vela_at_in(_t17, _t17n, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1070:31");
+            // line 1080
+            int64_t _t20 = *(int64_t *)vela_at_in(_t17, _t17n, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1080:31");
             int64_t _t21 = _t20;
-            int64_t _t22 = vela_add(_t21, 1, "compiler/src/opt.vl:1070:39");
-            int64_t *_t23 = (int64_t *)vela_at_in(_t17, _t17n, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1070:17");
+            int64_t _t22 = vela_add(_t21, 1, "compiler/src/opt.vl:1080:39");
+            int64_t *_t23 = (int64_t *)vela_at_in(_t17, _t17n, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1080:17");
             *_t23 = _t22;
         }
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t14);
-    // line 1073
+    // line 1083
     vela_array * _t24 = v_defs;
     vela_array_retain(_t24);
     vela_array * _t25 = _t24;
@@ -148482,25 +148531,25 @@ vela_array * f_3opt_def_counts(t_2ir_Func v_f) {
 /* vela: part */
 
 t_2ir_Func f_3opt_propagate(t_2ir_Func v_f) {
-    // line 1077
+    // line 1087
     vela_array * _t1 = f_3opt_def_counts(v_f);
     vela_array * v_defs = _t1;
-    // line 1078
+    // line 1088
     vela_array * _t2 = vela_array_new(&vela_type_int, 0);
     vela_array * v_rep = _t2;
-    // line 1079
+    // line 1089
     int64_t _t3 = v_f.m_classes->len;
     int64_t _t4 = _t3;
     vela_unique(&v_rep);
     for (int64_t _t5 = 0; _t5 < _t4; _t5++) {
         int64_t v_r = _t5;
-        // line 1080
+        // line 1090
         int64_t _t6 = v_r;
         vela_push(v_rep, &_t6, sizeof(int64_t));
     }
-    // line 1082
+    // line 1092
     bool v_any = false;
-    // line 1083
+    // line 1093
     vela_array * _t8 = v_f.m_insts;
     vela_array_retain(_t8);
     vela_array * _t7 = _t8;
@@ -148510,45 +148559,45 @@ t_2ir_Func f_3opt_propagate(t_2ir_Func v_f) {
     for (int64_t _t9 = 0; _t9 < _t7->len; _t9++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t7->data)[_t9];
         rc_retain_t_2ir_Inst(v_i);
-        // line 1084
+        // line 1094
         t_2ir_Op _t11 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
         bool _t12 = v_i.m_op.tag == _t11.tag;
         bool _t13 = _t12;
         if (_t13) {
-            int64_t _t14 = *(int64_t *)vela_at(v_defs, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1084:38");
+            int64_t _t14 = *(int64_t *)vela_at(v_defs, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1094:38");
             int64_t _t15 = _t14;
             bool _t16 = _t15 == 1;
             _t13 = _t16;
         }
         bool _t17 = _t13;
         if (_t17) {
-            int64_t _t18 = *(int64_t *)vela_at(v_defs, v_i.m_a, sizeof(int64_t), "compiler/src/opt.vl:1084:58");
+            int64_t _t18 = *(int64_t *)vela_at(v_defs, v_i.m_a, sizeof(int64_t), "compiler/src/opt.vl:1094:58");
             int64_t _t19 = _t18;
             bool _t20 = _t19 == 1;
             _t17 = _t20;
         }
         bool _t21 = _t17;
         if (_t21) {
-            int64_t _t22 = *(int64_t *)vela_at(v_f.m_classes, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1084:81");
+            int64_t _t22 = *(int64_t *)vela_at(v_f.m_classes, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1094:81");
             int64_t _t23 = _t22;
-            int64_t _t24 = *(int64_t *)vela_at(v_f.m_classes, v_i.m_a, sizeof(int64_t), "compiler/src/opt.vl:1084:101");
+            int64_t _t24 = *(int64_t *)vela_at(v_f.m_classes, v_i.m_a, sizeof(int64_t), "compiler/src/opt.vl:1094:101");
             bool _t25 = _t23 == _t24;
             _t21 = _t25;
         }
         if (_t21) {
-            // line 1085
-            int64_t *_t26 = (int64_t *)vela_at_in(_t10, _t10n, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1085:16");
+            // line 1095
+            int64_t *_t26 = (int64_t *)vela_at_in(_t10, _t10n, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1095:16");
             *_t26 = v_i.m_a;
-            // line 1086
+            // line 1096
             v_any = true;
         }
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t7);
-    // line 1089
+    // line 1099
     bool _t27 = !v_any;
     if (_t27) {
-        // line 1090
+        // line 1100
         t_2ir_Func _t28 = v_f;
         rc_retain_t_2ir_Func(_t28);
         t_2ir_Func _t29 = _t28;
@@ -148556,7 +148605,7 @@ t_2ir_Func f_3opt_propagate(t_2ir_Func v_f) {
         vela_array_release(v_defs);
         return _t29;
     }
-    // line 1093
+    // line 1103
     int64_t _t30 = v_rep->len;
     int64_t _t31 = _t30;
     vela_unique(&v_rep);
@@ -148564,55 +148613,55 @@ t_2ir_Func f_3opt_propagate(t_2ir_Func v_f) {
     int64_t _t33n = v_rep->len;
     for (int64_t _t32 = 0; _t32 < _t31; _t32++) {
         int64_t v_r_2 = _t32;
-        // line 1094
+        // line 1104
         int64_t _t34 = *((int64_t *)_t33 + v_r_2);
         int64_t v_x = _t34;
-        // line 1095
+        // line 1105
         for (;;) {
-            int64_t _t35 = *(int64_t *)vela_at_in(_t33, _t33n, v_x, sizeof(int64_t), "compiler/src/opt.vl:1095:16");
+            int64_t _t35 = *(int64_t *)vela_at_in(_t33, _t33n, v_x, sizeof(int64_t), "compiler/src/opt.vl:1105:16");
             int64_t _t36 = _t35;
             bool _t37 = _t36 != v_x;
             bool _t38 = _t37;
             if (!_t38) break;
-            // line 1096
+            // line 1106
             int64_t _t39 = *((int64_t *)_t33 + v_x);
             v_x = _t39;
         }
-        // line 1098
+        // line 1108
         int64_t *_t40 = ((int64_t *)_t33 + v_r_2);
         *_t40 = v_x;
     }
-    // line 1100
+    // line 1110
     t_2ir_Func _t41 = v_f;
     rc_retain_t_2ir_Func(_t41);
     t_2ir_Func v_out = _t41;
-    // line 1101
+    // line 1111
     vela_array * _t42 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t42;
-    // line 1102
+    // line 1112
     vela_array * _t44 = v_f.m_insts;
     vela_array_retain(_t44);
     vela_array * _t43 = _t44;
     for (int64_t _t45 = 0; _t45 < _t43->len; _t45++) {
         t_2ir_Inst v_i_2 = ((t_2ir_Inst *)_t43->data)[_t45];
         rc_retain_t_2ir_Inst(v_i_2);
-        // line 1103
+        // line 1113
         t_2ir_Op _t46 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
         bool _t47 = v_i_2.m_op.tag == _t46.tag;
         bool _t48 = _t47;
         if (_t48) {
-            int64_t _t49 = *(int64_t *)vela_at(v_rep, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1103:37");
+            int64_t _t49 = *(int64_t *)vela_at(v_rep, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1113:37");
             int64_t _t50 = _t49;
             bool _t51 = _t50 != v_i_2.m_dst;
             _t48 = _t51;
         }
         if (_t48) {
-            // line 1104
+            // line 1114
             rc_release_t_2ir_Inst(v_i_2);
             continue;
         }
-        // line 1106
+        // line 1116
         t_2ir_Inst _t52 = f_3opt_renamed(v_i_2, v_rep);
         vela_unique(&v_out.m_insts);
         t_2ir_Inst _t53 = _t52;
@@ -148620,7 +148669,7 @@ t_2ir_Func f_3opt_propagate(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i_2);
     }
     vela_array_release(_t43);
-    // line 1108
+    // line 1118
     t_2ir_Func _t54 = v_out;
     rc_retain_t_2ir_Func(_t54);
     t_2ir_Func _t55 = _t54;
@@ -148632,11 +148681,11 @@ t_2ir_Func f_3opt_propagate(t_2ir_Func v_f) {
 /* vela: part */
 
 t_2ir_Inst f_3opt_renamed_one(t_2ir_Inst v_i, int64_t v_from, int64_t v_to) {
-    // line 1114
+    // line 1124
     t_2ir_Inst _t1 = v_i;
     rc_retain_t_2ir_Inst(_t1);
     t_2ir_Inst v_o = _t1;
-    // line 1115
+    // line 1125
     int64_t _t2 = v_i.m_a;
     bool _t3 = _t2 >= 0;
     bool _t4 = _t3;
@@ -148676,7 +148725,7 @@ t_2ir_Inst f_3opt_renamed_one(t_2ir_Inst v_i, int64_t v_from, int64_t v_to) {
         _t19 = _t21;
     }
     bool v_reads_a = _t19;
-    // line 1117
+    // line 1127
     bool _t22 = v_reads_a;
     if (_t22) {
         int64_t _t23 = v_i.m_a;
@@ -148684,33 +148733,33 @@ t_2ir_Inst f_3opt_renamed_one(t_2ir_Inst v_i, int64_t v_from, int64_t v_to) {
         _t22 = _t24;
     }
     if (_t22) {
-        // line 1117
+        // line 1127
         v_o.m_a = v_to;
     }
-    // line 1118
+    // line 1128
     int64_t _t25 = v_i.m_b;
     bool _t26 = _t25 == v_from;
     if (_t26) {
-        // line 1118
+        // line 1128
         v_o.m_b = v_to;
     }
-    // line 1119
+    // line 1129
     int64_t _t27 = v_i.m_args->len;
     int64_t _t28 = _t27;
     for (int64_t _t29 = 0; _t29 < _t28; _t29++) {
         int64_t v_k = _t29;
-        // line 1120
-        int64_t _t30 = *(int64_t *)vela_at(v_i.m_args, v_k, sizeof(int64_t), "compiler/src/opt.vl:1120:18");
+        // line 1130
+        int64_t _t30 = *(int64_t *)vela_at(v_i.m_args, v_k, sizeof(int64_t), "compiler/src/opt.vl:1130:18");
         int64_t _t31 = _t30;
         bool _t32 = _t31 == v_from;
         if (_t32) {
-            // line 1120
+            // line 1130
             vela_unique(&v_o.m_args);
-            int64_t *_t33 = (int64_t *)vela_at(v_o.m_args, v_k, sizeof(int64_t), "compiler/src/opt.vl:1120:38");
+            int64_t *_t33 = (int64_t *)vela_at(v_o.m_args, v_k, sizeof(int64_t), "compiler/src/opt.vl:1130:38");
             *_t33 = v_to;
         }
     }
-    // line 1122
+    // line 1132
     t_2ir_Inst _t34 = v_o;
     rc_retain_t_2ir_Inst(_t34);
     t_2ir_Inst _t35 = _t34;
@@ -148720,11 +148769,11 @@ t_2ir_Inst f_3opt_renamed_one(t_2ir_Inst v_i, int64_t v_from, int64_t v_to) {
 /* vela: part */
 
 t_2ir_Inst f_3opt_renamed(t_2ir_Inst v_i, vela_array * v_rep) {
-    // line 1126
+    // line 1136
     t_2ir_Inst _t1 = v_i;
     rc_retain_t_2ir_Inst(_t1);
     t_2ir_Inst v_o = _t1;
-    // line 1127
+    // line 1137
     int64_t _t2 = v_i.m_a;
     bool _t3 = _t2 >= 0;
     bool _t4 = _t3;
@@ -148764,49 +148813,49 @@ t_2ir_Inst f_3opt_renamed(t_2ir_Inst v_i, vela_array * v_rep) {
         _t19 = _t21;
     }
     bool v_reads_a = _t19;
-    // line 1129
+    // line 1139
     if (v_reads_a) {
-        // line 1130
-        int64_t _t22 = *(int64_t *)vela_at(v_rep, v_i.m_a, sizeof(int64_t), "compiler/src/opt.vl:1130:18");
+        // line 1140
+        int64_t _t22 = *(int64_t *)vela_at(v_rep, v_i.m_a, sizeof(int64_t), "compiler/src/opt.vl:1140:18");
         v_o.m_a = _t22;
     }
-    // line 1132
+    // line 1142
     int64_t _t23 = v_i.m_b;
     bool _t24 = _t23 >= 0;
     if (_t24) {
-        // line 1133
-        int64_t _t25 = *(int64_t *)vela_at(v_rep, v_i.m_b, sizeof(int64_t), "compiler/src/opt.vl:1133:18");
+        // line 1143
+        int64_t _t25 = *(int64_t *)vela_at(v_rep, v_i.m_b, sizeof(int64_t), "compiler/src/opt.vl:1143:18");
         v_o.m_b = _t25;
     }
-    // line 1135
+    // line 1145
     int64_t _t26 = v_i.m_args->len;
     int64_t _t27 = _t26;
     bool _t28 = _t27 > 0;
     if (_t28) {
-        // line 1136
+        // line 1146
         vela_array * _t29 = vela_array_new(&vela_type_int, 0);
         vela_array * v_args = _t29;
-        // line 1137
+        // line 1147
         vela_array * _t31 = v_i.m_args;
         vela_array_retain(_t31);
         vela_array * _t30 = _t31;
         vela_unique(&v_args);
         for (int64_t _t32 = 0; _t32 < _t30->len; _t32++) {
             int64_t v_a = ((int64_t *)_t30->data)[_t32];
-            // line 1138
-            int64_t _t33 = *(int64_t *)vela_at(v_rep, v_a, sizeof(int64_t), "compiler/src/opt.vl:1138:31");
+            // line 1148
+            int64_t _t33 = *(int64_t *)vela_at(v_rep, v_a, sizeof(int64_t), "compiler/src/opt.vl:1148:31");
             int64_t _t34 = _t33;
             vela_push(v_args, &_t34, sizeof(int64_t));
         }
         vela_array_release(_t30);
-        // line 1140
+        // line 1150
         vela_array * _t35 = v_args;
         vela_array_retain(_t35);
         vela_array_release(v_o.m_args);
         v_o.m_args = _t35;
         vela_array_release(v_args);
     }
-    // line 1142
+    // line 1152
     t_2ir_Inst _t36 = v_o;
     rc_retain_t_2ir_Inst(_t36);
     t_2ir_Inst _t37 = _t36;
@@ -148816,13 +148865,13 @@ t_2ir_Inst f_3opt_renamed(t_2ir_Inst v_i, vela_array * v_rep) {
 /* vela: part */
 
 t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
-    // line 1146
+    // line 1156
     vela_array * _t1 = f_3opt_def_counts(v_f);
     vela_array * v_defs = _t1;
-    // line 1147
+    // line 1157
     vela_map * _t2 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_known = _t2;
-    // line 1148
+    // line 1158
     vela_array * _t4 = v_f.m_insts;
     vela_array_retain(_t4);
     vela_array * _t3 = _t4;
@@ -148830,18 +148879,18 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
     for (int64_t _t5 = 0; _t5 < _t3->len; _t5++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t3->data)[_t5];
         rc_retain_t_2ir_Inst(v_i);
-        // line 1149
+        // line 1159
         t_2ir_Op _t6 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
         bool _t7 = v_i.m_op.tag == _t6.tag;
         bool _t8 = _t7;
         if (_t8) {
-            int64_t _t9 = *(int64_t *)vela_at(v_defs, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1149:39");
+            int64_t _t9 = *(int64_t *)vela_at(v_defs, v_i.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1159:39");
             int64_t _t10 = _t9;
             bool _t11 = _t10 == 1;
             _t8 = _t11;
         }
         if (_t8) {
-            // line 1150
+            // line 1160
             int64_t _t12 = v_i.m_dst;
             int64_t _t13 = v_i.m_imm;
             vela_map_set(v_known, &_t12, &_t13);
@@ -148849,15 +148898,15 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t3);
-    // line 1153
+    // line 1163
     t_2ir_Func _t14 = v_f;
     rc_retain_t_2ir_Func(_t14);
     t_2ir_Func v_out = _t14;
-    // line 1154
+    // line 1164
     vela_array * _t15 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t15;
-    // line 1155
+    // line 1165
     vela_array * _t17 = v_f.m_insts;
     vela_array_retain(_t17);
     vela_array * _t16 = _t17;
@@ -148865,39 +148914,39 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
     for (int64_t _t18 = 0; _t18 < _t16->len; _t18++) {
         t_2ir_Inst v_i_2 = ((t_2ir_Inst *)_t16->data)[_t18];
         rc_retain_t_2ir_Inst(v_i_2);
-        // line 1156
+        // line 1166
         t_2ir_Inst _t19 = v_i_2;
         rc_retain_t_2ir_Inst(_t19);
         t_2ir_Inst v_o = _t19;
-        // line 1157
+        // line 1167
         int64_t _t21 = v_i_2.m_a;
         int64_t *_t20 = vela_map_find(v_known, &_t21);
         bool _t22 = _t20 != NULL;
         bool v_ak = _t22;
-        // line 1157
+        // line 1167
         int64_t _t24 = v_i_2.m_b;
         int64_t *_t23 = vela_map_find(v_known, &_t24);
         bool _t25 = _t23 != NULL;
         bool v_bk = _t25;
-        // line 1158
+        // line 1168
         int64_t v_a = 2;
-        // line 1158
+        // line 1168
         int64_t v_b = 2;
-        // line 1158
+        // line 1168
         if (v_ak) {
-            // line 1158
+            // line 1168
             int64_t _t27 = v_i_2.m_a;
-            int64_t _t26 = *(int64_t *)vela_map_at(v_known, &_t27, "compiler/src/opt.vl:1158:56");
+            int64_t _t26 = *(int64_t *)vela_map_at(v_known, &_t27, "compiler/src/opt.vl:1168:56");
             v_a = _t26;
         }
-        // line 1158
+        // line 1168
         if (v_bk) {
-            // line 1158
+            // line 1168
             int64_t _t29 = v_i_2.m_b;
-            int64_t _t28 = *(int64_t *)vela_map_at(v_known, &_t29, "compiler/src/opt.vl:1158:82");
+            int64_t _t28 = *(int64_t *)vela_map_at(v_known, &_t29, "compiler/src/opt.vl:1168:82");
             v_b = _t28;
         }
-        // line 1159
+        // line 1169
         t_2ir_Op _t30 = (t_2ir_Op){ .tag = t_2ir_Op_Add };
         bool _t31 = v_i_2.m_op.tag == _t30.tag;
         bool _t32 = _t31;
@@ -148907,7 +148956,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
             _t32 = _t34;
         }
         bool v_add = _t32;
-        // line 1160
+        // line 1170
         t_2ir_Op _t35 = (t_2ir_Op){ .tag = t_2ir_Op_Sub };
         bool _t36 = v_i_2.m_op.tag == _t35.tag;
         bool _t37 = _t36;
@@ -148917,7 +148966,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
             _t37 = _t39;
         }
         bool v_sub = _t37;
-        // line 1161
+        // line 1171
         t_2ir_Op _t40 = (t_2ir_Op){ .tag = t_2ir_Op_Mul };
         bool _t41 = v_i_2.m_op.tag == _t40.tag;
         bool _t42 = _t41;
@@ -148927,7 +148976,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
             _t42 = _t44;
         }
         bool v_mul = _t42;
-        // line 1162
+        // line 1172
         t_2ir_Op _t45 = (t_2ir_Op){ .tag = t_2ir_Op_Div };
         bool _t46 = v_i_2.m_op.tag == _t45.tag;
         bool _t47 = _t46;
@@ -148937,7 +148986,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
             _t47 = _t49;
         }
         bool v_div = _t47;
-        // line 1163
+        // line 1173
         t_2ir_Op _t50 = (t_2ir_Op){ .tag = t_2ir_Op_Rem };
         bool _t51 = v_i_2.m_op.tag == _t50.tag;
         bool _t52 = _t51;
@@ -148947,7 +148996,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
             _t52 = _t54;
         }
         bool v_rem = _t52;
-        // line 1164
+        // line 1174
         bool _t55 = v_sub;
         if (_t55) {
             int64_t _t56 = v_i_2.m_a;
@@ -149019,7 +149068,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
             _t72 = _t75;
         }
         if (_t72) {
-            // line 1165
+            // line 1175
             t_2ir_Op _t83 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
             t_2ir_Inst _t84 = f_2ir_inst(_t83, v_i_2.m_dst, -1, -1, 0);
             rc_release_t_2ir_Inst(v_o);
@@ -149104,7 +149153,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                 _t111 = _t115;
             }
             if (_t111) {
-                // line 1167
+                // line 1177
                 t_2ir_Op _t118 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
                 t_2ir_Inst _t119 = f_2ir_inst(_t118, v_i_2.m_dst, v_i_2.m_a, -1, 0);
                 rc_release_t_2ir_Inst(v_o);
@@ -149151,7 +149200,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                     _t129 = _t133;
                 }
                 if (_t129) {
-                    // line 1169
+                    // line 1179
                     t_2ir_Op _t136 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
                     t_2ir_Inst _t137 = f_2ir_inst(_t136, v_i_2.m_dst, v_i_2.m_b, -1, 0);
                     rc_release_t_2ir_Inst(v_o);
@@ -149159,12 +149208,12 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                 }
             }
         }
-        // line 1171
+        // line 1181
         int64_t _t138 = v_i_2.m_dst;
         bool _t139 = _t138 >= 0;
         bool _t140 = _t139;
         if (_t140) {
-            int64_t _t141 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1171:30");
+            int64_t _t141 = *(int64_t *)vela_at(v_defs, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1181:30");
             int64_t _t142 = _t141;
             bool _t143 = _t142 == 1;
             _t140 = _t143;
@@ -149177,70 +149226,70 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
             _t144 = _t147;
         }
         if (_t144) {
-            // line 1172
+            // line 1182
             int64_t _t149 = v_i_2.m_a;
-            int64_t _t148 = *(int64_t *)vela_map_at(v_known, &_t149, "compiler/src/opt.vl:1172:26");
+            int64_t _t148 = *(int64_t *)vela_map_at(v_known, &_t149, "compiler/src/opt.vl:1182:26");
             int64_t v_a_2 = _t148;
-            // line 1172
+            // line 1182
             int64_t v_n = v_a_2;
-            // line 1172
+            // line 1182
             bool v_folded = true;
-            // line 1173
+            // line 1183
             t_2ir_Op _t150 = (t_2ir_Op){ .tag = t_2ir_Op_AddImm };
             bool _t151 = v_i_2.m_op.tag == _t150.tag;
             if (_t151) {
-                // line 1173
+                // line 1183
                 int64_t _t152 = v_a_2;
-                int64_t _t153 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t152), (uint64_t)(v_i_2.m_imm), 64, true, 0, 2, "compiler/src/opt.vl:1173:48", NULL), 64);
+                int64_t _t153 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t152), (uint64_t)(v_i_2.m_imm), 64, true, 0, 2, "compiler/src/opt.vl:1183:48", NULL), 64);
                 v_n = _t153;
             } else {
                 t_2ir_Op _t154 = (t_2ir_Op){ .tag = t_2ir_Op_MulImm };
                 bool _t155 = v_i_2.m_op.tag == _t154.tag;
                 if (_t155) {
-                    // line 1173
+                    // line 1183
                     int64_t _t156 = v_a_2;
-                    int64_t _t157 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t156), (uint64_t)(v_i_2.m_imm), 64, true, 2, 2, "compiler/src/opt.vl:1173:113", NULL), 64);
+                    int64_t _t157 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t156), (uint64_t)(v_i_2.m_imm), 64, true, 2, 2, "compiler/src/opt.vl:1183:113", NULL), 64);
                     v_n = _t157;
                 } else {
                     t_2ir_Op _t158 = (t_2ir_Op){ .tag = t_2ir_Op_Inv };
                     bool _t159 = v_i_2.m_op.tag == _t158.tag;
                     if (_t159) {
-                        // line 1173
-                        int64_t _t160 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(v_a_2), (uint64_t)(0), 64, true, 9, 0, "compiler/src/opt.vl:1173:170", NULL), 64);
+                        // line 1183
+                        int64_t _t160 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(v_a_2), (uint64_t)(0), 64, true, 9, 0, "compiler/src/opt.vl:1183:170", NULL), 64);
                         v_n = _t160;
                     } else {
                         t_2ir_Op _t161 = (t_2ir_Op){ .tag = t_2ir_Op_Extend };
                         bool _t162 = v_i_2.m_op.tag == _t161.tag;
                         if (_t162) {
-                            // line 1174
+                            // line 1184
                             int64_t _t163 = v_i_2.m_imm;
                             bool _t164 = _t163 < 64;
                             if (_t164) {
-                                // line 1174
+                                // line 1184
                                 int64_t _t165 = 1;
-                                int64_t _t166 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t165), (uint64_t)(v_i_2.m_imm), 64, true, 10, 0, "compiler/src/opt.vl:1174:47", NULL), 64);
+                                int64_t _t166 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t165), (uint64_t)(v_i_2.m_imm), 64, true, 10, 0, "compiler/src/opt.vl:1184:47", NULL), 64);
                                 int64_t _t167 = _t166;
-                                int64_t _t168 = vela_sub(_t167, 1, "compiler/src/opt.vl:1174:57");
+                                int64_t _t168 = vela_sub(_t167, 1, "compiler/src/opt.vl:1184:57");
                                 int64_t v_mask = _t168;
-                                // line 1174
+                                // line 1184
                                 int64_t _t169 = v_a_2;
-                                int64_t _t170 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t169), (uint64_t)(v_mask), 64, true, 6, 0, "compiler/src/opt.vl:1174:68", NULL), 64);
+                                int64_t _t170 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t169), (uint64_t)(v_mask), 64, true, 6, 0, "compiler/src/opt.vl:1184:68", NULL), 64);
                                 v_n = _t170;
-                                // line 1174
+                                // line 1184
                                 int64_t _t171 = v_i_2.m_imm2;
                                 bool _t172 = _t171 != 0;
                                 if (_t172) {
-                                    // line 1174
+                                    // line 1184
                                     int64_t _t173 = 1;
                                     int64_t _t174 = v_i_2.m_imm;
-                                    int64_t _t175 = vela_sub(_t174, 1, "compiler/src/opt.vl:1174:116");
-                                    int64_t _t176 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t173), (uint64_t)(_t175), 64, true, 10, 0, "compiler/src/opt.vl:1174:106", NULL), 64);
+                                    int64_t _t175 = vela_sub(_t174, 1, "compiler/src/opt.vl:1184:116");
+                                    int64_t _t176 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t173), (uint64_t)(_t175), 64, true, 10, 0, "compiler/src/opt.vl:1184:106", NULL), 64);
                                     int64_t v_sign = _t176;
-                                    // line 1174
+                                    // line 1184
                                     int64_t _t177 = v_n;
-                                    int64_t _t178 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t177), (uint64_t)(v_sign), 64, true, 8, 0, "compiler/src/opt.vl:1174:129", NULL), 64);
+                                    int64_t _t178 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t177), (uint64_t)(v_sign), 64, true, 8, 0, "compiler/src/opt.vl:1184:129", NULL), 64);
                                     int64_t _t179 = _t178;
-                                    int64_t _t180 = vela_sub(_t179, v_sign, "compiler/src/opt.vl:1174:137");
+                                    int64_t _t180 = vela_sub(_t179, v_sign, "compiler/src/opt.vl:1184:137");
                                     v_n = _t180;
                                 }
                             }
@@ -149266,64 +149315,64 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                                 _t189 = _t191;
                             }
                             if (_t189) {
-                                // line 1176
+                                // line 1186
                                 v_n = v_a_2;
                             } else {
                                 int64_t _t193 = v_i_2.m_b;
                                 int64_t *_t192 = vela_map_find(v_known, &_t193);
                                 bool _t194 = _t192 != NULL;
                                 if (_t194) {
-                                    // line 1178
+                                    // line 1188
                                     int64_t _t196 = v_i_2.m_b;
-                                    int64_t _t195 = *(int64_t *)vela_map_at(v_known, &_t196, "compiler/src/opt.vl:1178:30");
+                                    int64_t _t195 = *(int64_t *)vela_map_at(v_known, &_t196, "compiler/src/opt.vl:1188:30");
                                     int64_t v_b_2 = _t195;
-                                    // line 1179
+                                    // line 1189
                                     t_2ir_Op _t197 = (t_2ir_Op){ .tag = t_2ir_Op_Add };
                                     bool _t198 = v_i_2.m_op.tag == _t197.tag;
                                     if (_t198) {
-                                        // line 1179
+                                        // line 1189
                                         int64_t _t199 = v_a_2;
-                                        int64_t _t200 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t199), (uint64_t)(v_b_2), 64, true, 0, 2, "compiler/src/opt.vl:1179:49", NULL), 64);
+                                        int64_t _t200 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t199), (uint64_t)(v_b_2), 64, true, 0, 2, "compiler/src/opt.vl:1189:49", NULL), 64);
                                         v_n = _t200;
                                     } else {
                                         t_2ir_Op _t201 = (t_2ir_Op){ .tag = t_2ir_Op_Sub };
                                         bool _t202 = v_i_2.m_op.tag == _t201.tag;
                                         if (_t202) {
-                                            // line 1179
+                                            // line 1189
                                             int64_t _t203 = v_a_2;
-                                            int64_t _t204 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t203), (uint64_t)(v_b_2), 64, true, 1, 2, "compiler/src/opt.vl:1179:107", NULL), 64);
+                                            int64_t _t204 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t203), (uint64_t)(v_b_2), 64, true, 1, 2, "compiler/src/opt.vl:1189:107", NULL), 64);
                                             v_n = _t204;
                                         } else {
                                             t_2ir_Op _t205 = (t_2ir_Op){ .tag = t_2ir_Op_Mul };
                                             bool _t206 = v_i_2.m_op.tag == _t205.tag;
                                             if (_t206) {
-                                                // line 1179
+                                                // line 1189
                                                 int64_t _t207 = v_a_2;
-                                                int64_t _t208 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t207), (uint64_t)(v_b_2), 64, true, 2, 2, "compiler/src/opt.vl:1179:165", NULL), 64);
+                                                int64_t _t208 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t207), (uint64_t)(v_b_2), 64, true, 2, 2, "compiler/src/opt.vl:1189:165", NULL), 64);
                                                 v_n = _t208;
                                             } else {
                                                 t_2ir_Op _t209 = (t_2ir_Op){ .tag = t_2ir_Op_And };
                                                 bool _t210 = v_i_2.m_op.tag == _t209.tag;
                                                 if (_t210) {
-                                                    // line 1179
+                                                    // line 1189
                                                     int64_t _t211 = v_a_2;
-                                                    int64_t _t212 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t211), (uint64_t)(v_b_2), 64, true, 6, 0, "compiler/src/opt.vl:1179:220", NULL), 64);
+                                                    int64_t _t212 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t211), (uint64_t)(v_b_2), 64, true, 6, 0, "compiler/src/opt.vl:1189:220", NULL), 64);
                                                     v_n = _t212;
                                                 } else {
                                                     t_2ir_Op _t213 = (t_2ir_Op){ .tag = t_2ir_Op_Or };
                                                     bool _t214 = v_i_2.m_op.tag == _t213.tag;
                                                     if (_t214) {
-                                                        // line 1179
+                                                        // line 1189
                                                         int64_t _t215 = v_a_2;
-                                                        int64_t _t216 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t215), (uint64_t)(v_b_2), 64, true, 7, 0, "compiler/src/opt.vl:1179:259", NULL), 64);
+                                                        int64_t _t216 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t215), (uint64_t)(v_b_2), 64, true, 7, 0, "compiler/src/opt.vl:1189:259", NULL), 64);
                                                         v_n = _t216;
                                                     } else {
                                                         t_2ir_Op _t217 = (t_2ir_Op){ .tag = t_2ir_Op_Xor };
                                                         bool _t218 = v_i_2.m_op.tag == _t217.tag;
                                                         if (_t218) {
-                                                            // line 1179
+                                                            // line 1189
                                                             int64_t _t219 = v_a_2;
-                                                            int64_t _t220 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t219), (uint64_t)(v_b_2), 64, true, 8, 0, "compiler/src/opt.vl:1179:299", NULL), 64);
+                                                            int64_t _t220 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t219), (uint64_t)(v_b_2), 64, true, 8, 0, "compiler/src/opt.vl:1189:299", NULL), 64);
                                                             v_n = _t220;
                                                         } else {
                                                             t_2ir_Op _t221 = (t_2ir_Op){ .tag = t_2ir_Op_Shl };
@@ -149341,9 +149390,9 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                                                                 _t226 = _t228;
                                                             }
                                                             if (_t226) {
-                                                                // line 1179
+                                                                // line 1189
                                                                 int64_t _t229 = v_a_2;
-                                                                int64_t _t230 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t229), (uint64_t)(v_b_2), 64, true, 10, 0, "compiler/src/opt.vl:1179:359", NULL), 64);
+                                                                int64_t _t230 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t229), (uint64_t)(v_b_2), 64, true, 10, 0, "compiler/src/opt.vl:1189:359", NULL), 64);
                                                                 v_n = _t230;
                                                             } else {
                                                                 t_2ir_Op _t231 = (t_2ir_Op){ .tag = t_2ir_Op_Sar };
@@ -149361,12 +149410,12 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                                                                     _t236 = _t238;
                                                                 }
                                                                 if (_t236) {
-                                                                    // line 1179
+                                                                    // line 1189
                                                                     int64_t _t239 = v_a_2;
-                                                                    int64_t _t240 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t239), (uint64_t)(v_b_2), 64, true, 11, 0, "compiler/src/opt.vl:1179:420", NULL), 64);
+                                                                    int64_t _t240 = (int64_t)vela_fixed_signed(vela_fixed_inline((uint64_t)(_t239), (uint64_t)(v_b_2), 64, true, 11, 0, "compiler/src/opt.vl:1189:420", NULL), 64);
                                                                     v_n = _t240;
                                                                 } else {
-                                                                    // line 1179
+                                                                    // line 1189
                                                                     v_folded = false;
                                                                 }
                                                             }
@@ -149377,7 +149426,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                                         }
                                     }
                                 } else {
-                                    // line 1180
+                                    // line 1190
                                     v_folded = false;
                                 }
                             }
@@ -149385,20 +149434,20 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                     }
                 }
             }
-            // line 1181
+            // line 1191
             if (v_folded) {
-                // line 1181
+                // line 1191
                 t_2ir_Op _t241 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
                 t_2ir_Inst _t242 = f_2ir_inst(_t241, v_i_2.m_dst, -1, -1, v_n);
                 rc_release_t_2ir_Inst(v_o);
                 v_o = _t242;
-                // line 1181
+                // line 1191
                 int64_t _t243 = v_i_2.m_dst;
                 int64_t _t244 = v_n;
                 vela_map_set(v_known, &_t243, &_t244);
             }
         }
-        // line 1183
+        // line 1193
         t_2ir_Op _t245 = (t_2ir_Op){ .tag = t_2ir_Op_Cmp };
         bool _t246 = v_i_2.m_op.tag == _t245.tag;
         bool _t247 = _t246;
@@ -149416,12 +149465,12 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
             _t251 = _t254;
         }
         if (_t251) {
-            // line 1184
+            // line 1194
             t_2ir_Op _t255 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
             int64_t _t257 = v_i_2.m_a;
-            int64_t _t256 = *(int64_t *)vela_map_at(v_known, &_t257, "compiler/src/opt.vl:1184:80");
+            int64_t _t256 = *(int64_t *)vela_map_at(v_known, &_t257, "compiler/src/opt.vl:1194:80");
             int64_t _t259 = v_i_2.m_b;
-            int64_t _t258 = *(int64_t *)vela_map_at(v_known, &_t259, "compiler/src/opt.vl:1184:92");
+            int64_t _t258 = *(int64_t *)vela_map_at(v_known, &_t259, "compiler/src/opt.vl:1194:92");
             bool _t260 = f_3opt_holds(v_i_2.m_imm, _t256, _t258);
             int64_t _t261 = f_3opt_bool_int(_t260);
             t_2ir_Inst _t262 = f_2ir_inst(_t255, v_i_2.m_dst, -1, -1, _t261);
@@ -149438,10 +149487,10 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                 _t265 = _t268;
             }
             if (_t265) {
-                // line 1186
+                // line 1196
                 t_2ir_Op _t269 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
                 int64_t _t271 = v_i_2.m_a;
-                int64_t _t270 = *(int64_t *)vela_map_at(v_known, &_t271, "compiler/src/opt.vl:1186:80");
+                int64_t _t270 = *(int64_t *)vela_map_at(v_known, &_t271, "compiler/src/opt.vl:1196:80");
                 bool _t272 = f_3opt_holds(v_i_2.m_imm, _t270, v_i_2.m_imm2);
                 int64_t _t273 = f_3opt_bool_int(_t272);
                 t_2ir_Inst _t274 = f_2ir_inst(_t269, v_i_2.m_dst, -1, -1, _t273);
@@ -149458,14 +149507,14 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                     _t277 = _t280;
                 }
                 if (_t277) {
-                    // line 1189
+                    // line 1199
                     t_2ir_Op _t281 = (t_2ir_Op){ .tag = t_2ir_Op_CmpImm };
                     t_2ir_Inst _t282 = f_2ir_inst(_t281, v_i_2.m_dst, v_i_2.m_a, -1, v_i_2.m_imm);
                     rc_release_t_2ir_Inst(v_o);
                     v_o = _t282;
-                    // line 1190
+                    // line 1200
                     int64_t _t284 = v_i_2.m_b;
-                    int64_t _t283 = *(int64_t *)vela_map_at(v_known, &_t284, "compiler/src/opt.vl:1190:27");
+                    int64_t _t283 = *(int64_t *)vela_map_at(v_known, &_t284, "compiler/src/opt.vl:1200:27");
                     v_o.m_imm2 = _t283;
                 } else {
                     t_2ir_Op _t285 = (t_2ir_Op){ .tag = t_2ir_Op_Branch };
@@ -149478,19 +149527,19 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                         _t287 = _t290;
                     }
                     if (_t287) {
-                        // line 1192
+                        // line 1202
                         int64_t _t292 = v_i_2.m_a;
-                        int64_t _t291 = *(int64_t *)vela_map_at(v_known, &_t292, "compiler/src/opt.vl:1192:21");
+                        int64_t _t291 = *(int64_t *)vela_map_at(v_known, &_t292, "compiler/src/opt.vl:1202:21");
                         int64_t _t293 = _t291;
                         bool _t294 = _t293 != 0;
                         if (_t294) {
-                            // line 1193
+                            // line 1203
                             t_2ir_Op _t295 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
                             t_2ir_Inst _t296 = f_2ir_inst(_t295, -1, -1, -1, v_i_2.m_imm);
                             rc_release_t_2ir_Inst(v_o);
                             v_o = _t296;
                         } else {
-                            // line 1195
+                            // line 1205
                             t_2ir_Op _t297 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
                             t_2ir_Inst _t298 = f_2ir_inst(_t297, -1, -1, -1, v_i_2.m_imm2);
                             rc_release_t_2ir_Inst(v_o);
@@ -149514,20 +149563,20 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                             _t305 = _t308;
                         }
                         if (_t305) {
-                            // line 1198
+                            // line 1208
                             int64_t _t310 = v_i_2.m_a;
-                            int64_t _t309 = *(int64_t *)vela_map_at(v_known, &_t310, "compiler/src/opt.vl:1198:41");
+                            int64_t _t309 = *(int64_t *)vela_map_at(v_known, &_t310, "compiler/src/opt.vl:1208:41");
                             int64_t _t312 = v_i_2.m_b;
-                            int64_t _t311 = *(int64_t *)vela_map_at(v_known, &_t312, "compiler/src/opt.vl:1198:53");
+                            int64_t _t311 = *(int64_t *)vela_map_at(v_known, &_t312, "compiler/src/opt.vl:1208:53");
                             bool _t313 = f_3opt_branch_holds(v_i_2.m_sym, _t309, _t311);
                             if (_t313) {
-                                // line 1199
+                                // line 1209
                                 t_2ir_Op _t314 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
                                 t_2ir_Inst _t315 = f_2ir_inst(_t314, -1, -1, -1, v_i_2.m_imm);
                                 rc_release_t_2ir_Inst(v_o);
                                 v_o = _t315;
                             } else {
-                                // line 1201
+                                // line 1211
                                 rc_release_t_2ir_Inst(v_o);
                                 rc_release_t_2ir_Inst(v_i_2);
                                 continue;
@@ -149537,7 +149586,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
                 }
             }
         }
-        // line 1204
+        // line 1214
         t_2ir_Inst _t316 = v_o;
         rc_retain_t_2ir_Inst(_t316);
         vela_unique(&v_out.m_insts);
@@ -149547,7 +149596,7 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i_2);
     }
     vela_array_release(_t16);
-    // line 1206
+    // line 1216
     t_2ir_Func _t318 = v_out;
     rc_retain_t_2ir_Func(_t318);
     t_2ir_Func _t319 = _t318;
@@ -149559,41 +149608,41 @@ t_2ir_Func f_3opt_fold(t_2ir_Func v_f) {
 /* vela: part */
 
 int64_t f_3opt_bool_int(bool v_b) {
-    // line 1210
+    // line 1220
     if (v_b) {
-        // line 1211
+        // line 1221
         int64_t _t1 = 1;
         return _t1;
     }
-    // line 1213
+    // line 1223
     int64_t _t2 = 0;
     return _t2;
 }
 /* vela: part */
 
 t_2ir_Func f_3opt_drop_dead(t_2ir_Func v_f) {
-    // line 1217
+    // line 1227
     t_2ir_Func _t1 = v_f;
     rc_retain_t_2ir_Func(_t1);
     t_2ir_Func v_out = _t1;
-    // line 1218
+    // line 1228
     int64_t _t2 = 4;
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v__ = _t3;
-        // line 1219
+        // line 1229
         vela_array * _t4 = vela_array_new(&vela_type_int, 0);
         vela_array * v_used = _t4;
-        // line 1220
+        // line 1230
         int64_t _t5 = v_out.m_classes->len;
         int64_t _t6 = _t5;
         vela_unique(&v_used);
         for (int64_t _t7 = 0; _t7 < _t6; _t7++) {
             int64_t v___2 = _t7;
-            // line 1221
+            // line 1231
             int64_t _t8 = 0;
             vela_push(v_used, &_t8, sizeof(int64_t));
         }
-        // line 1223
+        // line 1233
         vela_array * _t10 = v_out.m_insts;
         vela_array_retain(_t10);
         vela_array * _t9 = _t10;
@@ -149603,15 +149652,15 @@ t_2ir_Func f_3opt_drop_dead(t_2ir_Func v_f) {
         for (int64_t _t11 = 0; _t11 < _t9->len; _t11++) {
             t_2ir_Inst v_i = ((t_2ir_Inst *)_t9->data)[_t11];
             rc_retain_t_2ir_Inst(v_i);
-            // line 1224
+            // line 1234
             vela_array * _t14 = f_2ir_reads(v_i);
             vela_array * _t13 = _t14;
             for (int64_t _t15 = 0; _t15 < _t13->len; _t15++) {
                 int64_t v_r = ((int64_t *)_t13->data)[_t15];
-                // line 1225
-                int64_t _t16 = *(int64_t *)vela_at_in(_t12, _t12n, v_r, sizeof(int64_t), "compiler/src/opt.vl:1225:31");
+                // line 1235
+                int64_t _t16 = *(int64_t *)vela_at_in(_t12, _t12n, v_r, sizeof(int64_t), "compiler/src/opt.vl:1235:31");
                 int64_t _t17 = _t16;
-                int64_t _t18 = vela_add(_t17, 1, "compiler/src/opt.vl:1225:35");
+                int64_t _t18 = vela_add(_t17, 1, "compiler/src/opt.vl:1235:35");
                 int64_t *_t19 = ((int64_t *)_t12 + v_r);
                 *_t19 = _t18;
             }
@@ -149619,12 +149668,12 @@ t_2ir_Func f_3opt_drop_dead(t_2ir_Func v_f) {
             rc_release_t_2ir_Inst(v_i);
         }
         vela_array_release(_t9);
-        // line 1228
+        // line 1238
         vela_array * _t20 = vela_array_new(vt_t_2ir_Inst(), 0);
         vela_array * v_kept = _t20;
-        // line 1229
+        // line 1239
         bool v_dropped = false;
-        // line 1230
+        // line 1240
         vela_array * _t22 = v_out.m_insts;
         vela_array_retain(_t22);
         vela_array * _t21 = _t22;
@@ -149632,7 +149681,7 @@ t_2ir_Func f_3opt_drop_dead(t_2ir_Func v_f) {
         for (int64_t _t23 = 0; _t23 < _t21->len; _t23++) {
             t_2ir_Inst v_i_2 = ((t_2ir_Inst *)_t21->data)[_t23];
             rc_retain_t_2ir_Inst(v_i_2);
-            // line 1231
+            // line 1241
             int64_t _t24 = v_i_2.m_dst;
             bool _t25 = _t24 >= 0;
             bool _t26 = _t25;
@@ -149642,19 +149691,19 @@ t_2ir_Func f_3opt_drop_dead(t_2ir_Func v_f) {
             }
             bool _t28 = _t26;
             if (_t28) {
-                int64_t _t29 = *(int64_t *)vela_at(v_used, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1231:48");
+                int64_t _t29 = *(int64_t *)vela_at(v_used, v_i_2.m_dst, sizeof(int64_t), "compiler/src/opt.vl:1241:48");
                 int64_t _t30 = _t29;
                 bool _t31 = _t30 == 0;
                 _t28 = _t31;
             }
             if (_t28) {
-                // line 1232
+                // line 1242
                 v_dropped = true;
-                // line 1233
+                // line 1243
                 rc_release_t_2ir_Inst(v_i_2);
                 continue;
             }
-            // line 1235
+            // line 1245
             t_2ir_Inst _t32 = v_i_2;
             rc_retain_t_2ir_Inst(_t32);
             t_2ir_Inst _t33 = _t32;
@@ -149662,15 +149711,15 @@ t_2ir_Func f_3opt_drop_dead(t_2ir_Func v_f) {
             rc_release_t_2ir_Inst(v_i_2);
         }
         vela_array_release(_t21);
-        // line 1237
+        // line 1247
         vela_array * _t34 = v_kept;
         vela_array_retain(_t34);
         vela_array_release(v_out.m_insts);
         v_out.m_insts = _t34;
-        // line 1238
+        // line 1248
         bool _t35 = !v_dropped;
         if (_t35) {
-            // line 1239
+            // line 1249
             vela_array_release(v_kept);
             vela_array_release(v_used);
             break;
@@ -149678,7 +149727,7 @@ t_2ir_Func f_3opt_drop_dead(t_2ir_Func v_f) {
         vela_array_release(v_kept);
         vela_array_release(v_used);
     }
-    // line 1242
+    // line 1252
     t_2ir_Func _t36 = v_out;
     rc_retain_t_2ir_Func(_t36);
     t_2ir_Func _t37 = _t36;
@@ -149688,10 +149737,10 @@ t_2ir_Func f_3opt_drop_dead(t_2ir_Func v_f) {
 /* vela: part */
 
 t_2ir_Func f_3opt_thread_jumps(t_2ir_Func v_f) {
-    // line 1247
+    // line 1257
     vela_map * _t1 = vela_map_new(&vela_type_int, &vela_type_int);
     vela_map * v_to = _t1;
-    // line 1248
+    // line 1258
     int64_t _t2 = v_f.m_insts->len;
     int64_t _t3 = _t2;
     int64_t _t4 = (_t3 - 1);
@@ -149699,15 +149748,15 @@ t_2ir_Func f_3opt_thread_jumps(t_2ir_Func v_f) {
     vela_unique_map(&v_to);
     for (int64_t _t6 = 0; _t6 < _t5; _t6++) {
         int64_t v_k = _t6;
-        // line 1249
-        t_2ir_Inst _t7 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1249:19");
+        // line 1259
+        t_2ir_Inst _t7 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1259:19");
         t_2ir_Op _t8 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t9 = _t7.m_op.tag == _t8.tag;
         bool _t10 = _t9;
         if (_t10) {
             int64_t _t12 = v_k;
             int64_t _t13 = (_t12 + 1);
-            t_2ir_Inst _t11 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t13, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1249:51");
+            t_2ir_Inst _t11 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t13, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1259:51");
             t_2ir_Op _t14 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
             bool _t15 = _t11.m_op.tag == _t14.tag;
             _t10 = _t15;
@@ -149716,30 +149765,30 @@ t_2ir_Func f_3opt_thread_jumps(t_2ir_Func v_f) {
         if (_t16) {
             int64_t _t18 = v_k;
             int64_t _t19 = (_t18 + 1);
-            t_2ir_Inst _t17 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t19, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1249:86");
+            t_2ir_Inst _t17 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t19, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1259:86");
             int64_t _t20 = _t17.m_imm;
-            t_2ir_Inst _t21 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1249:108");
+            t_2ir_Inst _t21 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1259:108");
             bool _t22 = _t20 != _t21.m_imm;
             _t16 = _t22;
         }
         if (_t16) {
-            // line 1250
+            // line 1260
             int64_t _t24 = v_k;
             int64_t _t25 = (_t24 + 1);
-            t_2ir_Inst _t23 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t25, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1250:41");
-            t_2ir_Inst _t26 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1250:23");
+            t_2ir_Inst _t23 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t25, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1260:41");
+            t_2ir_Inst _t26 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1260:23");
             int64_t _t27 = _t26.m_imm;
             int64_t _t28 = _t23.m_imm;
             vela_map_set(v_to, &_t27, &_t28);
         }
     }
-    // line 1253
+    // line 1263
     vela_array * _t29 = vela_map_keys(v_to);
     int64_t _t30 = _t29->len;
     int64_t _t31 = _t30;
     bool _t32 = _t31 == 0;
     if (_t32) {
-        // line 1254
+        // line 1264
         t_2ir_Func _t33 = v_f;
         rc_retain_t_2ir_Func(_t33);
         t_2ir_Func _t34 = _t33;
@@ -149748,26 +149797,26 @@ t_2ir_Func f_3opt_thread_jumps(t_2ir_Func v_f) {
         return _t34;
     }
     vela_array_release(_t29);
-    // line 1256
+    // line 1266
     t_2ir_Func _t35 = v_f;
     rc_retain_t_2ir_Func(_t35);
     t_2ir_Func v_out = _t35;
-    // line 1257
+    // line 1267
     vela_array * _t36 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t36;
-    // line 1258
+    // line 1268
     vela_array * _t38 = v_f.m_insts;
     vela_array_retain(_t38);
     vela_array * _t37 = _t38;
     for (int64_t _t39 = 0; _t39 < _t37->len; _t39++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t37->data)[_t39];
         rc_retain_t_2ir_Inst(v_i);
-        // line 1259
+        // line 1269
         t_2ir_Inst _t40 = v_i;
         rc_retain_t_2ir_Inst(_t40);
         t_2ir_Inst v_o = _t40;
-        // line 1260
+        // line 1270
         t_2ir_Op _t41 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
         bool _t42 = v_i.m_op.tag == _t41.tag;
         bool _t43 = _t42;
@@ -149783,19 +149832,19 @@ t_2ir_Func f_3opt_thread_jumps(t_2ir_Func v_f) {
             _t46 = _t48;
         }
         if (_t46) {
-            // line 1261
+            // line 1271
             int64_t _t49 = f_3opt_final_label(v_to, v_i.m_imm);
             v_o.m_imm = _t49;
         }
-        // line 1263
+        // line 1273
         t_2ir_Op _t50 = (t_2ir_Op){ .tag = t_2ir_Op_Branch };
         bool _t51 = v_i.m_op.tag == _t50.tag;
         if (_t51) {
-            // line 1264
+            // line 1274
             int64_t _t52 = f_3opt_final_label(v_to, v_i.m_imm2);
             v_o.m_imm2 = _t52;
         }
-        // line 1266
+        // line 1276
         t_2ir_Inst _t53 = v_o;
         rc_retain_t_2ir_Inst(_t53);
         vela_unique(&v_out.m_insts);
@@ -149805,7 +149854,7 @@ t_2ir_Func f_3opt_thread_jumps(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t37);
-    // line 1268
+    // line 1278
     t_2ir_Func _t55 = v_out;
     rc_retain_t_2ir_Func(_t55);
     t_2ir_Func _t56 = _t55;
@@ -149816,13 +149865,13 @@ t_2ir_Func f_3opt_thread_jumps(t_2ir_Func v_f) {
 /* vela: part */
 
 int64_t f_3opt_final_label(vela_map * v_to, int64_t v_l) {
-    // line 1273
+    // line 1283
     int64_t v_x = v_l;
-    // line 1274
+    // line 1284
     int64_t _t1 = 8;
     for (int64_t _t2 = 0; _t2 < _t1; _t2++) {
         int64_t v__ = _t2;
-        // line 1275
+        // line 1285
         int64_t _t4 = v_x;
         int64_t *_t3 = vela_map_find(v_to, &_t4);
         Option_Int _t5;
@@ -149833,25 +149882,25 @@ int64_t f_3opt_final_label(vela_map * v_to, int64_t v_l) {
         }
         if (_t5.tag == Option_Int_Some) {
             int64_t v_y = _t5.as.m_Some._0;
-            // line 1276
+            // line 1286
             v_x = v_y;
         } else {
-            // line 1277
+            // line 1287
             int64_t _t6 = v_x;
             return _t6;
         }
     }
-    // line 1280
+    // line 1290
     int64_t _t7 = v_x;
     return _t7;
 }
 /* vela: part */
 
 t_2ir_Func f_3opt_drop_unreachable(t_2ir_Func v_f) {
-    // line 1286
+    // line 1296
     vela_map * _t1 = vela_map_new(&vela_type_int, &vela_type_bool);
     vela_map * v_target = _t1;
-    // line 1287
+    // line 1297
     vela_array * _t3 = v_f.m_insts;
     vela_array_retain(_t3);
     vela_array * _t2 = _t3;
@@ -149859,7 +149908,7 @@ t_2ir_Func f_3opt_drop_unreachable(t_2ir_Func v_f) {
     for (int64_t _t4 = 0; _t4 < _t2->len; _t4++) {
         t_2ir_Inst v_i = ((t_2ir_Inst *)_t2->data)[_t4];
         rc_retain_t_2ir_Inst(v_i);
-        // line 1288
+        // line 1298
         t_2ir_Op _t5 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
         bool _t6 = v_i.m_op.tag == _t5.tag;
         bool _t7 = _t6;
@@ -149875,16 +149924,16 @@ t_2ir_Func f_3opt_drop_unreachable(t_2ir_Func v_f) {
             _t10 = _t12;
         }
         if (_t10) {
-            // line 1289
+            // line 1299
             int64_t _t13 = v_i.m_imm;
             bool _t14 = true;
             vela_map_set(v_target, &_t13, &_t14);
         }
-        // line 1291
+        // line 1301
         t_2ir_Op _t15 = (t_2ir_Op){ .tag = t_2ir_Op_Branch };
         bool _t16 = v_i.m_op.tag == _t15.tag;
         if (_t16) {
-            // line 1292
+            // line 1302
             int64_t _t17 = v_i.m_imm2;
             bool _t18 = true;
             vela_map_set(v_target, &_t17, &_t18);
@@ -149892,63 +149941,63 @@ t_2ir_Func f_3opt_drop_unreachable(t_2ir_Func v_f) {
         rc_release_t_2ir_Inst(v_i);
     }
     vela_array_release(_t2);
-    // line 1295
+    // line 1305
     t_2ir_Func _t19 = v_f;
     rc_retain_t_2ir_Func(_t19);
     t_2ir_Func v_out = _t19;
-    // line 1296
+    // line 1306
     vela_array * _t20 = vela_array_new(vt_t_2ir_Inst(), 0);
     vela_array_release(v_out.m_insts);
     v_out.m_insts = _t20;
-    // line 1297
+    // line 1307
     bool v_live = true;
-    // line 1298
+    // line 1308
     int64_t _t21 = v_f.m_insts->len;
     int64_t _t22 = _t21;
     for (int64_t _t23 = 0; _t23 < _t22; _t23++) {
         int64_t v_k = _t23;
-        // line 1299
-        t_2ir_Inst _t24 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1299:24");
+        // line 1309
+        t_2ir_Inst _t24 = *(t_2ir_Inst *)vela_at(v_f.m_insts, v_k, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1309:24");
         rc_retain_t_2ir_Inst(_t24);
         t_2ir_Inst v_i_2 = _t24;
-        // line 1300
+        // line 1310
         t_2ir_Op _t25 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
         bool _t26 = v_i_2.m_op.tag == _t25.tag;
         if (_t26) {
-            // line 1301
+            // line 1311
             int64_t _t28 = v_i_2.m_imm;
             bool *_t27 = vela_map_find(v_target, &_t28);
             bool _t29 = _t27 != NULL;
             if (_t29) {
-                // line 1302
+                // line 1312
                 v_live = true;
             } else {
                 bool _t30 = !v_live;
                 if (_t30) {
-                    // line 1304
+                    // line 1314
                     rc_release_t_2ir_Inst(v_i_2);
                     continue;
                 }
             }
-            // line 1307
+            // line 1317
             int64_t _t32 = v_i_2.m_imm;
             bool *_t31 = vela_map_find(v_target, &_t32);
             bool _t33 = _t31 != NULL;
             bool _t34 = !_t33;
             if (_t34) {
-                // line 1308
+                // line 1318
                 rc_release_t_2ir_Inst(v_i_2);
                 continue;
             }
         }
-        // line 1311
+        // line 1321
         bool _t35 = !v_live;
         if (_t35) {
-            // line 1312
+            // line 1322
             rc_release_t_2ir_Inst(v_i_2);
             continue;
         }
-        // line 1315
+        // line 1325
         t_2ir_Op _t36 = (t_2ir_Op){ .tag = t_2ir_Op_Jump };
         bool _t37 = v_i_2.m_op.tag == _t36.tag;
         bool _t38 = _t37;
@@ -149964,7 +150013,7 @@ t_2ir_Func f_3opt_drop_unreachable(t_2ir_Func v_f) {
         if (_t44) {
             int64_t _t46 = v_k;
             int64_t _t47 = (_t46 + 1);
-            t_2ir_Inst _t45 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t47, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1315:65");
+            t_2ir_Inst _t45 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t47, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1325:65");
             t_2ir_Op _t48 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
             bool _t49 = _t45.m_op.tag == _t48.tag;
             _t44 = _t49;
@@ -149973,31 +150022,31 @@ t_2ir_Func f_3opt_drop_unreachable(t_2ir_Func v_f) {
         if (_t50) {
             int64_t _t52 = v_k;
             int64_t _t53 = (_t52 + 1);
-            t_2ir_Inst _t51 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t53, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1315:101");
+            t_2ir_Inst _t51 = *(t_2ir_Inst *)vela_at(v_f.m_insts, _t53, sizeof(t_2ir_Inst), "compiler/src/opt.vl:1325:101");
             int64_t _t54 = _t51.m_imm;
             bool _t55 = _t54 == v_i_2.m_imm;
             _t50 = _t55;
         }
         if (_t50) {
-            // line 1316
+            // line 1326
             rc_release_t_2ir_Inst(v_i_2);
             continue;
         }
-        // line 1318
+        // line 1328
         t_2ir_Inst _t56 = v_i_2;
         rc_retain_t_2ir_Inst(_t56);
         vela_unique(&v_out.m_insts);
         t_2ir_Inst _t57 = _t56;
         vela_push(v_out.m_insts, &_t57, sizeof(t_2ir_Inst));
-        // line 1319
+        // line 1329
         bool _t58 = f_2ir_ends_block(v_i_2.m_op);
         if (_t58) {
-            // line 1320
+            // line 1330
             v_live = false;
         }
         rc_release_t_2ir_Inst(v_i_2);
     }
-    // line 1323
+    // line 1333
     t_2ir_Func _t59 = v_out;
     rc_retain_t_2ir_Func(_t59);
     t_2ir_Func _t60 = _t59;
@@ -150008,109 +150057,109 @@ t_2ir_Func f_3opt_drop_unreachable(t_2ir_Func v_f) {
 /* vela: part */
 
 t_2ir_Program f_3opt_small_program(void) {
-    // line 1330
+    // line 1340
     int64_t _t1 = f_2ir_INT();
     t_2ir_Func _t2 = f_2ir_new_func(VELA_STR("f_id", 4), _t1);
     t_2ir_Func v_id = _t2;
-    // line 1331
+    // line 1341
     int64_t _t3 = f_2ir_INT();
     int64_t _t4 = f_2ir_param(&v_id, _t3);
     int64_t v_x = _t4;
-    // line 1332
+    // line 1342
     int64_t _t5 = f_2ir_INT();
     int64_t _t6 = f_2ir_reg(&v_id, _t5);
     int64_t v_y = _t6;
-    // line 1333
+    // line 1343
     t_2ir_Op _t7 = (t_2ir_Op){ .tag = t_2ir_Op_Move };
     t_2ir_Inst _t8 = f_2ir_inst(_t7, v_y, v_x, -1, 0);
     f_2ir_add(&v_id, _t8);
     rc_release_t_2ir_Inst(_t8);
-    // line 1334
+    // line 1344
     t_2ir_Op _t9 = (t_2ir_Op){ .tag = t_2ir_Op_Ret };
     t_2ir_Inst _t10 = f_2ir_inst(_t9, -1, v_y, -1, 0);
     f_2ir_add(&v_id, _t10);
     rc_release_t_2ir_Inst(_t10);
-    // line 1335
+    // line 1345
     t_2ir_Func _t11 = f_2ir_new_func(VELA_STR("f_main", 6), -1);
     t_2ir_Func v_m = _t11;
-    // line 1336
+    // line 1346
     int64_t _t12 = f_2ir_INT();
     int64_t _t13 = f_2ir_reg(&v_m, _t12);
     int64_t v_three = _t13;
-    // line 1337
+    // line 1347
     t_2ir_Op _t14 = (t_2ir_Op){ .tag = t_2ir_Op_Const };
     t_2ir_Inst _t15 = f_2ir_inst(_t14, v_three, -1, -1, 3);
     f_2ir_add(&v_m, _t15);
     rc_release_t_2ir_Inst(_t15);
-    // line 1338
+    // line 1348
     int64_t _t16 = f_2ir_INT();
     int64_t _t17 = f_2ir_reg(&v_m, _t16);
     int64_t v_r = _t17;
-    // line 1339
+    // line 1349
     t_2ir_Op _t18 = (t_2ir_Op){ .tag = t_2ir_Op_Call };
     t_2ir_Inst _t19 = f_2ir_inst(_t18, v_r, -1, -1, 0);
     t_2ir_Inst v_c = _t19;
-    // line 1340
+    // line 1350
     vela_str_release(v_c.m_sym);
     v_c.m_sym = VELA_STR("f_id", 4);
-    // line 1341
+    // line 1351
     vela_array * _t20 = vela_array_new(&vela_type_int, 1);
     int64_t _t21 = v_three;
     vela_push(_t20, &_t21, sizeof(int64_t));
     vela_array_release(v_c.m_args);
     v_c.m_args = _t20;
-    // line 1342
+    // line 1352
     t_2ir_Inst _t22 = v_c;
     rc_retain_t_2ir_Inst(_t22);
     f_2ir_add(&v_m, _t22);
     rc_release_t_2ir_Inst(_t22);
-    // line 1343
+    // line 1353
     int64_t _t23 = f_2ir_INT();
     int64_t _t24 = f_2ir_reg(&v_m, _t23);
     int64_t v_same = _t24;
-    // line 1344
+    // line 1354
     t_2ir_Op _t25 = (t_2ir_Op){ .tag = t_2ir_Op_Cmp };
     t_2ir_Inst _t26 = f_2ir_inst(_t25, v_same, v_r, v_three, 0);
     f_2ir_add(&v_m, _t26);
     rc_release_t_2ir_Inst(_t26);
-    // line 1345
+    // line 1355
     int64_t _t27 = f_2ir_label(&v_m);
     int64_t v_yes = _t27;
-    // line 1346
+    // line 1356
     int64_t _t28 = f_2ir_label(&v_m);
     int64_t v_no = _t28;
-    // line 1347
+    // line 1357
     t_2ir_Op _t29 = (t_2ir_Op){ .tag = t_2ir_Op_Branch };
     t_2ir_Inst _t30 = f_2ir_inst(_t29, -1, v_same, -1, v_yes);
     t_2ir_Inst v_b = _t30;
-    // line 1348
+    // line 1358
     v_b.m_imm2 = v_no;
-    // line 1349
+    // line 1359
     t_2ir_Inst _t31 = v_b;
     rc_retain_t_2ir_Inst(_t31);
     f_2ir_add(&v_m, _t31);
     rc_release_t_2ir_Inst(_t31);
-    // line 1350
+    // line 1360
     t_2ir_Op _t32 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
     t_2ir_Inst _t33 = f_2ir_inst(_t32, -1, -1, -1, v_yes);
     f_2ir_add(&v_m, _t33);
     rc_release_t_2ir_Inst(_t33);
-    // line 1351
+    // line 1361
     t_2ir_Op _t34 = (t_2ir_Op){ .tag = t_2ir_Op_Ret };
     t_2ir_Inst _t35 = f_2ir_inst(_t34, -1, -1, -1, 0);
     f_2ir_add(&v_m, _t35);
     rc_release_t_2ir_Inst(_t35);
-    // line 1352
+    // line 1362
     t_2ir_Op _t36 = (t_2ir_Op){ .tag = t_2ir_Op_Label };
     t_2ir_Inst _t37 = f_2ir_inst(_t36, -1, -1, -1, v_no);
     f_2ir_add(&v_m, _t37);
     rc_release_t_2ir_Inst(_t37);
-    // line 1353
+    // line 1363
     t_2ir_Op _t38 = (t_2ir_Op){ .tag = t_2ir_Op_Unreachable };
     t_2ir_Inst _t39 = f_2ir_inst(_t38, -1, -1, -1, 0);
     f_2ir_add(&v_m, _t39);
     rc_release_t_2ir_Inst(_t39);
-    // line 1354
+    // line 1364
     vela_array * _t40 = vela_array_new(vt_t_2ir_Func(), 2);
     t_2ir_Func _t41 = v_id;
     rc_retain_t_2ir_Func(_t41);

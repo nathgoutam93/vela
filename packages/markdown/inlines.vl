@@ -13,7 +13,7 @@ pub type Ref = struct {
 }
 
 // A run of * or _ that may open or close emphasis.
-type Delim = struct {
+pub type Delim = struct {
     cc: Byte
     count: Int  // delimiters left
     orig: Int  // delimiters in the run
@@ -25,7 +25,7 @@ type Delim = struct {
 }
 
 // A [ or ![ that may open a link or image.
-type Bracket = struct {
+pub type Bracket = struct {
     node: Int
     prev_delim: Int  // the delimiter on top when it opened
     index: Int  // where its [ is
@@ -34,11 +34,15 @@ type Bracket = struct {
     after: Bool  // whether a bracket opened after it
 }
 
-type Parser = struct {
+// One serves a whole document, reset for each block, so that its stacks
+// keep their storage.
+pub type Parser = struct {
     s: Str
     pos: Int
     delims: [Delim]
+    live_delims: Int  // the entries of `delims` in use, as arrays have no pop
     top: Int  // the last delimiter, or -1
+    openers_bottom: [Int]  // for process_emphasis
     brackets: [Bracket]
     open_brackets: Int  // the live entries of `brackets`, as arrays have no pop
     // Where the last run of backticks of each length up to 1000 starts, once
@@ -49,8 +53,11 @@ type Parser = struct {
     ticks_scanned: Bool
 }
 
-fn parser(s: Str) -> Parser {
-    return Parser { s: s, pos: 0, delims: [], top: -1, brackets: [], open_brackets: 0, ticks: [], ticks_scanned: false }
+pub fn parser(s: Str) -> Parser {
+    return Parser {
+        s: s, pos: 0, delims: [], live_delims: 0, top: -1, openers_bottom: [], brackets: [], open_brackets: 0, ticks: [],
+        ticks_scanned: false,
+    }
 }
 
 fn peek(p: Parser) -> Int {
@@ -68,8 +75,16 @@ fn byte_at(s: Str, i: Int) -> Int {
 }
 
 // The block's text as inline nodes under it.
-pub fn parse(d: mut nodes.Doc, block: Int, refs: Map[Str, Ref]) {
-    let mut p = parser(nodes.trim(d.data[d.nodes[block].data].content))
+pub fn parse(p: mut Parser, d: mut nodes.Doc, block: Int, refs: Map[Str, Ref]) {
+    p.s = nodes.trim(d.data[d.nodes[block].data].content)
+    p.pos = 0
+    p.live_delims = 0
+    p.top = -1
+    p.open_brackets = 0
+    if len(p.ticks) > 0 {
+        p.ticks = []
+    }
+    p.ticks_scanned = false
     d.data[d.nodes[block].data].content = ""
     for p.pos < len(p.s) {
         inline(mut p, mut d, block, refs)
@@ -281,8 +296,14 @@ fn handle_delim(p: mut Parser, d: mut nodes.Doc, block: Int, cc: Byte) -> Bool {
     let node = nodes.text(mut d, p.s[start..p.pos])
     add(mut d, block, node)
     if can_open || can_close {
-        push(mut p.delims, Delim { cc: cc, count: n, orig: n, node: node, prev: p.top, next: -1, can_open: can_open, can_close: can_close })
-        let me = len(p.delims) - 1
+        let delim = Delim { cc: cc, count: n, orig: n, node: node, prev: p.top, next: -1, can_open: can_open, can_close: can_close }
+        let me = p.live_delims
+        if me < len(p.delims) {
+            p.delims[me] = delim
+        } else {
+            push(mut p.delims, delim)
+        }
+        p.live_delims = me + 1
         if p.top >= 0 {
             p.delims[p.top].next = me
         }
@@ -306,9 +327,16 @@ fn remove_delim(p: mut Parser, i: Int) {
 
 // Pair delimiter runs above `bottom` into emphasis, innermost first.
 fn process_emphasis(p: mut Parser, d: mut nodes.Doc, bottom: Int) {
-    let mut openers_bottom: [Int] = []
-    for _ in 0..14 {
-        push(mut openers_bottom, bottom)
+    if p.top == bottom {
+        return  // no delimiters above it
+    }
+    if len(p.openers_bottom) == 0 {
+        for _ in 0..14 {
+            push(mut p.openers_bottom, bottom)
+        }
+    }
+    for i in 0..14 {
+        p.openers_bottom[i] = bottom
     }
     let mut closer = p.top
     for closer >= 0 && p.delims[closer].prev != bottom {
@@ -330,7 +358,7 @@ fn process_emphasis(p: mut Parser, d: mut nodes.Doc, bottom: Int) {
         which = which + c.orig % 3
         let mut opener = c.prev
         let mut found = false
-        for opener >= 0 && opener != bottom && opener != openers_bottom[which] {
+        for opener >= 0 && opener != bottom && opener != p.openers_bottom[which] {
             let o = p.delims[opener]
             let odd = (c.can_open || o.can_close) && c.orig % 3 != 0 && (o.orig + c.orig) % 3 == 0
             if o.cc == c.cc && o.can_open && !odd {
@@ -382,7 +410,7 @@ fn process_emphasis(p: mut Parser, d: mut nodes.Doc, bottom: Int) {
             }
         } else {
             closer = c.next
-            openers_bottom[which] = p.delims[old].prev
+            p.openers_bottom[which] = p.delims[old].prev
             if !p.delims[old].can_open {
                 remove_delim(mut p, old)
             }
@@ -508,8 +536,7 @@ fn close_bracket(p: mut Parser, d: mut nodes.Doc, block: Int, refs: Map[Str, Ref
         kind = nodes.Kind.Image
     }
     let link = nodes.add(mut d, kind, 0)
-    d.data[d.nodes[link].data].destination = dest
-    d.data[d.nodes[link].data].title = title
+    d.links[d.nodes[link].data] = nodes.Link { destination: dest, title: title }
     let mut tmp = d.nodes[opener.node].next
     for tmp >= 0 {
         let next = d.nodes[tmp].next
@@ -671,7 +698,7 @@ fn autolink(p: mut Parser, d: mut nodes.Doc, block: Int) -> Bool {
         dest = normalize_uri("mailto:" + s[p.pos + 1..p.pos + size - 1])
     }
     let link = nodes.add(mut d, nodes.Kind.Link, 0)
-    d.data[d.nodes[link].data].destination = dest
+    d.links[d.nodes[link].data].destination = dest
     nodes.append(mut d, link, nodes.text(mut d, s[p.pos + 1..p.pos + size - 1]))
     add(mut d, block, link)
     p.pos = p.pos + size
@@ -781,9 +808,10 @@ fn tag_name_end(s: Str, at: Int) -> Int {
 }
 
 fn find(s: Str, at: Int, part: Str) -> Int {
+    let first = part[0]
     let mut i = at
     for i + len(part) <= len(s) {
-        if s[i..i + len(part)] == part {
+        if s[i] == first && s[i..i + len(part)] == part {
             return i
         }
         i = i + 1
@@ -869,20 +897,20 @@ pub fn html_tag(s: Str, at: Int) -> Int {
     if c != '!' {
         return 0
     }
-    if find(s, at, "<!-->") == at {
+    if nodes.text_at(s, at, "<!-->") {
         return 5
     }
-    if find(s, at, "<!--->") == at {
+    if nodes.text_at(s, at, "<!--->") {
         return 6
     }
-    if find(s, at, "<!--") == at {
+    if nodes.text_at(s, at, "<!--") {
         let e = find(s, at + 4, "-->")
         if e < 0 {
             return 0
         }
         return e + 3 - at
     }
-    if find(s, at, "<![CDATA[") == at {
+    if nodes.text_at(s, at, "<![CDATA[") {
         let e = find(s, at + 9, "]]>")
         if e < 0 {
             return 0

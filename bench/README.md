@@ -7,6 +7,7 @@ Run commands from the repository root after building `build/vela`.
 | [run.py](run.py) | Algorithm workloads in Vela, C and Rust; output checks and release/native parity gates |
 | [real_programs.py](real_programs.py) | JSON service and compressor in C, Vela, optional Rust; compiler, scale and compilation/query budgets |
 | [peers.py](peers.py) | Opt-in C/Rust/Go/Swift/Vela JSON, allocation and concurrent TCP comparison |
+| [markdown_compare.py](markdown_compare.py) | The markdown package against a given cmark executable, outputs checked equal first |
 | [network_compare.py](network_compare.py) | Interleaved socket-runtime snapshots with separate untimed operation counters |
 | [scale.py](scale.py) | Generate the large-source checking workload |
 | [compare.py](compare.py) | Compare compiler revisions with matching C or native workloads |
