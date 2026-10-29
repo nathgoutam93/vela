@@ -1066,8 +1066,10 @@ fn for_each(g: mut Gen, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
         let elem = c_type(g, local_ty(g, lid))
         let mut item = "((" + elem + " *)" + it + "->data)[" + i + "]"
         if types.is_fixed(g.k.table, t) { item = "*(" + elem + " *)vela_fixed_at(&" + it + ", " + i + ", " + length + ", sizeof(" + elem + "), " + loc_of(g, iterable) + ")" }
-        let name = declare(mut g, lid, item)
-        emit(mut g, retain(mut g, local_ty(g, lid), name))
+        // The loop's own reference keeps every element alive: the element is
+        // borrowed, as the native backend does (TL-113), and whatever keeps
+        // it (a store, a push, a return) retains it then.
+        emit(mut g, elem + " " + local(mut g, lid) + " = " + item + ";")
     }
     for inner in body.stmts {
         stmt(mut g, inner)

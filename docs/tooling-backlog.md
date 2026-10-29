@@ -3310,7 +3310,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-113: The C backend retains each element a for loop reads
 
-- **Status:** open (observed).
+- **Status:** resolved.
 - **Discovery:** post-M30 follow-up on the markdown package and cmark.
 - **Evidence (observed):** for `for name in names { if len(name) == n {
   ... } }` over a `[Str]`, `build/vela c` emits `vela_str_retain(v_name)`
@@ -3327,6 +3327,22 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Proposed improvement:** borrow loop elements in the C backend as the
   native one does when the body neither stores nor moves the element.
 - **Verify:** the C of the loop above has no per-element retain or release.
+- **Resolution:** `codegen.for_each` binds an array or fixed array's
+  element as a borrowed local, as match bindings already are (M16b). It is
+  declared without a retain and is not in any frame, so nothing releases it.
+  The loop's own reference to the array keeps every element alive, as in
+  the native backend. Whatever keeps the element (a store, a push, a map
+  entry, a return, a closure, an assignment to an outer variable) reads the
+  variable through `consume`, which retains it.
+- **Validation:** the C of the loop above has no `vela_str_retain` or
+  `vela_str_release`. A loop testing six names against a table of 62, 1.2
+  million times, through C: 1.90 G to 0.95 G instructions, 0.122 s to
+  0.052 s. Markdown CLI through C -0.43%, wordfreq -0.41%; other benchmarks
+  unchanged, outputs the same. The C-built compiler checks its own source in
+  1.6% fewer instructions. `tests/run/loop_borrow.vl` keeps elements in each
+  of those ways, walks an array the body changes, and reassigns the walked
+  variable. It passes on both back ends and under `--sanitize` (ASan, UBSan,
+  leak detection).
 
 ### TL-114: Copy propagation hung on dead code holding a copy cycle
 
