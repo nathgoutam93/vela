@@ -1,0 +1,651 @@
+{
+ "purpose": "VAL-001: Linux x86-64 native and sanitizer validation",
+ "host": {
+  "machine": "x86_64",
+  "kernel": "6.18.44-fc-v185",
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cores": "4",
+  "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "clang": "Ubuntu clang version 18.1.3 (1ubuntu1)",
+  "python": "3.13.17",
+  "z3": "Z3 version 4.8.12 - 64 bit",
+  "landlock_abi": "7"
+ },
+ "commit": "bc73a4fda97294b3810ed825be68ede56db1f6f1",
+ "worktree_changes": [
+  "M docs/tooling-backlog.md",
+  " M run_tests.py",
+  "?? bench/results/2026-10-29-linux-real-programs.json",
+  "?? bench/results/2026-10-29-linux-release-parity.json",
+  "?? bench/results/2026-10-29-linux-validation.json"
+ ],
+ "runs": [
+  {
+   "name": "bootstrap fixed points (C and native)",
+   "command": "sh compiler/bootstrap/bootstrap.sh --native",
+   "log": "bootstrap.log",
+   "summary": [
+    "fixed point: generations 2 and 3 write identical C (172439 lines)",
+    "native fixed point: natives 1 and 2 write identical assembly (1947562 lines)",
+    "bootstrap exit 0"
+   ],
+   "failures": []
+  },
+  {
+   "name": "compiler emission parity: native-built compiler against C-built, its own source",
+   "command": "build/vela c|asm compiler/src/main.vl; build/vela-native c|asm compiler/src/main.vl; cmp",
+   "log": "emission-parity.log",
+   "summary": [
+    "C emission identical (172439 lines)",
+    "asm emission identical (1947562 lines)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "complete suite, C",
+   "command": "python3 run_tests.py --backend c --jobs 4 -v",
+   "log": "suite-c.log",
+   "summary": [
+    "ok    tests/run/early_exits.vl",
+    "ok    tests/run/exit_terminates.vl",
+    "ok    tests/run/panic_exit_code.vl",
+    "ok    tests/run/read_error_exit.vl",
+    "337 passed, 0 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "complete suite, native",
+   "command": "python3 run_tests.py --backend native --jobs 4 -v",
+   "log": "suite-native.log",
+   "summary": [
+    "ok    tests/run/early_exits.vl",
+    "ok    tests/run/exit_terminates.vl",
+    "ok    tests/run/panic_exit_code.vl",
+    "ok    tests/run/read_error_exit.vl",
+    "337 passed, 0 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "complete suite, C, VELA_OPT=0 (before TL-115)",
+   "command": "VELA_OPT=0 python3 run_tests.py --backend c --jobs 4 -v",
+   "log": "suite-c-opt0.log",
+   "summary": [
+    "ok    tests/run/early_exits.vl",
+    "ok    tests/run/exit_terminates.vl",
+    "ok    tests/run/panic_exit_code.vl",
+    "ok    tests/run/read_error_exit.vl",
+    "FAIL  tests/cli/native_asm.vl",
+    "FAIL  tests/cli/native_ir.vl",
+    "335 passed, 2 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": [
+    "FAIL  tests/cli/native_asm.vl",
+    "FAIL  tests/cli/native_ir.vl"
+   ]
+  },
+  {
+   "name": "complete suite, native, VELA_OPT=0 (before TL-115)",
+   "command": "VELA_OPT=0 python3 run_tests.py --backend native --jobs 4 -v",
+   "log": "suite-native-opt0.log",
+   "summary": [
+    "ok    tests/run/early_exits.vl",
+    "ok    tests/run/exit_terminates.vl",
+    "ok    tests/run/panic_exit_code.vl",
+    "ok    tests/run/read_error_exit.vl",
+    "FAIL  tests/cli/native_asm.vl",
+    "FAIL  tests/cli/native_ir.vl",
+    "335 passed, 2 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": [
+    "FAIL  tests/cli/native_asm.vl",
+    "FAIL  tests/cli/native_ir.vl"
+   ]
+  },
+  {
+   "name": "ir/asm snapshots, C, VELA_OPT=0 (after TL-115)",
+   "command": "VELA_OPT=0 python3 run_tests.py --backend c native_ir native_asm",
+   "log": "suite-c-opt0-snapshots.log",
+   "summary": [
+    "2 passed, 0 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "ir/asm snapshots, native, VELA_OPT=0 (after TL-115)",
+   "command": "VELA_OPT=0 python3 run_tests.py --backend native native_ir native_asm",
+   "log": "suite-native-opt0-snapshots.log",
+   "summary": [
+    "2 passed, 0 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "complete suite, C, ASan+UBSan with leak checks",
+   "command": "python3 run_tests.py --sanitize --backend c --jobs 4 -v",
+   "log": "asan-c.log",
+   "summary": [
+    "ok    tests/run/early_exits.vl",
+    "ok    tests/run/exit_terminates.vl",
+    "ok    tests/run/panic_exit_code.vl",
+    "ok    tests/run/read_error_exit.vl",
+    "337 passed, 0 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "complete suite, native, ASan+UBSan with leak checks (runtime instrumented; emitted assembly is not)",
+   "command": "python3 run_tests.py --sanitize --backend native --jobs 4 -v",
+   "log": "asan-native.log",
+   "summary": [
+    "ok    tests/run/early_exits.vl",
+    "ok    tests/run/exit_terminates.vl",
+    "ok    tests/run/panic_exit_code.vl",
+    "ok    tests/run/read_error_exit.vl",
+    "337 passed, 0 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "complete suite, C, TSan",
+   "command": "python3 run_tests.py --tsan --backend c --jobs 4 -v",
+   "log": "tsan-c.log",
+   "summary": [
+    "ok    tests/run/early_exits.vl",
+    "ok    tests/run/exit_terminates.vl",
+    "ok    tests/run/panic_exit_code.vl",
+    "ok    tests/run/read_error_exit.vl",
+    "337 passed, 0 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "complete suite, native, TSan (runtime instrumented; emitted assembly is not)",
+   "command": "python3 run_tests.py --tsan --backend native --jobs 4 -v",
+   "log": "tsan-native.log",
+   "summary": [
+    "ok    tests/run/early_exits.vl",
+    "ok    tests/run/exit_terminates.vl",
+    "ok    tests/run/panic_exit_code.vl",
+    "ok    tests/run/read_error_exit.vl",
+    "337 passed, 0 failed, 0 skipped  (compiler: /home/user/vela/build/vela)"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m17 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m17_test.py $PWD/build/vela",
+   "log": "m17-opt1.log",
+   "summary": [
+    "m17: modules passed",
+    "m17: edits passed",
+    "m17: catalog passed",
+    "m17: guide_and_install passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m17 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m17_test.py $PWD/build/vela",
+   "log": "m17-opt0.log",
+   "summary": [
+    "m17: modules passed",
+    "m17: edits passed",
+    "m17: catalog passed",
+    "m17: guide_and_install passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m19 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m19_test.py $PWD/build/vela",
+   "log": "m19-opt1.log",
+   "summary": [
+    "m19: rejected passed",
+    "m19: containers passed",
+    "m19: cache passed",
+    "m19: hashes passed",
+    "9696 integer arithmetic and bit-operation oracle results match",
+    "m19: native 1 oracle passed",
+    "m19: native 1 boundaries passed",
+    "m19: native 1 containers passed",
+    "9696 integer arithmetic and bit-operation oracle results match",
+    "m19: native 0 oracle passed",
+    "m19: native 0 boundaries passed",
+    "m19: native 0 containers passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m19 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m19_test.py $PWD/build/vela",
+   "log": "m19-opt0.log",
+   "summary": [
+    "m19: rejected passed",
+    "m19: containers passed",
+    "m19: cache passed",
+    "m19: hashes passed",
+    "9696 integer arithmetic and bit-operation oracle results match",
+    "m19: native 1 oracle passed",
+    "m19: native 1 boundaries passed",
+    "m19: native 1 containers passed",
+    "9696 integer arithmetic and bit-operation oracle results match",
+    "m19: native 0 oracle passed",
+    "m19: native 0 boundaries passed",
+    "m19: native 0 containers passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m20 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m20_test.py $PWD/build/vela",
+   "log": "m20-opt1.log",
+   "summary": [
+    "m20: acceptance passed",
+    "m20: dispatch passed",
+    "m20: rejected passed",
+    "m20: tooling passed",
+    "m20: obligations passed",
+    "m20: native optimization 1 passed",
+    "m20: native optimization 0 passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m20 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m20_test.py $PWD/build/vela",
+   "log": "m20-opt0.log",
+   "summary": [
+    "m20: acceptance passed",
+    "m20: dispatch passed",
+    "m20: rejected passed",
+    "m20: tooling passed",
+    "m20: obligations passed",
+    "m20: native optimization 1 passed",
+    "m20: native optimization 0 passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m21 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m21_test.py $PWD/build/vela",
+   "log": "m21-opt1.log",
+   "summary": [
+    "m21: abi passed",
+    "m21: memory passed",
+    "m21: effects passed",
+    "m21: tooling passed",
+    "m21: libraries passed",
+    "m21: examples passed",
+    "m21: native optimization 1 passed",
+    "m21: native optimization 0 passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m21 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m21_test.py $PWD/build/vela",
+   "log": "m21-opt0.log",
+   "summary": [
+    "m21: abi passed",
+    "m21: memory passed",
+    "m21: effects passed",
+    "m21: tooling passed",
+    "m21: libraries passed",
+    "m21: examples passed",
+    "m21: native optimization 1 passed",
+    "m21: native optimization 0 passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m22 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m22_test.py $PWD/build/vela",
+   "log": "m22-opt1.log",
+   "summary": [
+    "m22: fixed passed",
+    "m22: buffers passed",
+    "m22: lifetime passed",
+    "m22: panics passed",
+    "m22: rejected passed",
+    "m22: varints passed",
+    "m22: tooling passed",
+    "m22: native optimization 1 passed",
+    "m22: native optimization 0 passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m22 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m22_test.py $PWD/build/vela",
+   "log": "m22-opt0.log",
+   "summary": [
+    "m22: fixed passed",
+    "m22: buffers passed",
+    "m22: lifetime passed",
+    "m22: panics passed",
+    "m22: rejected passed",
+    "m22: varints passed",
+    "m22: tooling passed",
+    "m22: native optimization 1 passed",
+    "m22: native optimization 0 passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m23 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m23_test.py $PWD/build/vela",
+   "log": "m23-opt1.log",
+   "summary": [
+    "native: real_processes passed",
+    "native: real_directories passed",
+    "native: real_network passed",
+    "native: http_deadline passed",
+    "native: duplex passed",
+    "native: socket_storage passed",
+    "native: socket_sigpipe passed",
+    "native: socket_close_race passed",
+    "native: cache passed",
+    "native: tooling passed",
+    "native: negative passed",
+    "M23 systems library checks passed: c, native."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m23 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m23_test.py $PWD/build/vela",
+   "log": "m23-opt0.log",
+   "summary": [
+    "native: real_processes passed",
+    "native: real_directories passed",
+    "native: real_network passed",
+    "native: http_deadline passed",
+    "native: duplex passed",
+    "native: socket_storage passed",
+    "native: socket_sigpipe passed",
+    "native: socket_close_race passed",
+    "native: cache passed",
+    "native: tooling passed",
+    "native: negative passed",
+    "M23 systems library checks passed: c, native."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m24 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m24_test.py $PWD/build/vela",
+   "log": "m24-opt1.log",
+   "summary": [
+    "c: type_impact passed",
+    "c: measured passed",
+    "c: cache passed",
+    "native: basic passed",
+    "native: file_policy passed",
+    "native: foreign passed",
+    "native: fakes passed",
+    "native: queries passed",
+    "native: type_impact passed",
+    "native: measured passed",
+    "native: cache passed",
+    "M24 capability/query checks passed: c, native."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m24 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m24_test.py $PWD/build/vela",
+   "log": "m24-opt0.log",
+   "summary": [
+    "c: type_impact passed",
+    "c: measured passed",
+    "c: cache passed",
+    "native: basic passed",
+    "native: file_policy passed",
+    "native: foreign passed",
+    "native: fakes passed",
+    "native: queries passed",
+    "native: type_impact passed",
+    "native: measured passed",
+    "native: cache passed",
+    "M24 capability/query checks passed: c, native."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m25 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m25_test.py $PWD/build/vela",
+   "log": "m25-opt1.log",
+   "summary": [
+    "M25: native 1 literals passed",
+    "M25: native 1 evaluation passed",
+    "M25: native 1 borrowed_values passed",
+    "M25: native 1 arithmetic_edges passed",
+    "M25: native 0 pressure passed",
+    "M25: native 0 sharing passed",
+    "M25: native 0 enum_lifetimes passed",
+    "M25: native 0 strength passed",
+    "M25: native 0 literals passed",
+    "M25: native 0 evaluation passed",
+    "M25: native 0 borrowed_values passed",
+    "M25: native 0 arithmetic_edges passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m25 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m25_test.py $PWD/build/vela",
+   "log": "m25-opt0.log",
+   "summary": [
+    "M25: native 1 literals passed",
+    "M25: native 1 evaluation passed",
+    "M25: native 1 borrowed_values passed",
+    "M25: native 1 arithmetic_edges passed",
+    "M25: native 0 pressure passed",
+    "M25: native 0 sharing passed",
+    "M25: native 0 enum_lifetimes passed",
+    "M25: native 0 strength passed",
+    "M25: native 0 literals passed",
+    "M25: native 0 evaluation passed",
+    "M25: native 0 borrowed_values passed",
+    "M25: native 0 arithmetic_edges passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m26a integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m26a_test.py $PWD/build/vela",
+   "log": "m26a-opt1.log",
+   "summary": [
+    "M26a target checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m26a integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m26a_test.py $PWD/build/vela",
+   "log": "m26a-opt0.log",
+   "summary": [
+    "M26a target checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m26 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m26_test.py $PWD/build/vela",
+   "log": "m26-opt1.log",
+   "summary": [
+    "target diagnostics passed",
+    "platform-header cache invalidation passed",
+    "linux: independent C ABI execution passed",
+    "M26 target checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m26 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m26_test.py $PWD/build/vela",
+   "log": "m26-opt0.log",
+   "summary": [
+    "target diagnostics passed",
+    "platform-header cache invalidation passed",
+    "linux: independent C ABI execution passed",
+    "M26 target checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m27 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m27_test.py $PWD/build/vela",
+   "log": "m27-opt1.log",
+   "summary": [
+    "M27: c callback passed.",
+    "M27: c debugger passed.",
+    "M27: c trace/profile/source checks passed.",
+    "M27: native traces passed.",
+    "M27: native profiling passed.",
+    "M27: native returns passed.",
+    "M27: native callback passed.",
+    "M27: native debugger passed.",
+    "M27: native trace/profile/source checks passed.",
+    "M27: cache modes passed.",
+    "M27: runtime boundaries passed.",
+    "M27 observation checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m27 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m27_test.py $PWD/build/vela",
+   "log": "m27-opt0.log",
+   "summary": [
+    "M27: c callback passed.",
+    "M27: c debugger passed.",
+    "M27: c trace/profile/source checks passed.",
+    "M27: native traces passed.",
+    "M27: native profiling passed.",
+    "M27: native returns passed.",
+    "M27: native callback passed.",
+    "M27: native debugger passed.",
+    "M27: native trace/profile/source checks passed.",
+    "M27: cache modes passed.",
+    "M27: runtime boundaries passed.",
+    "M27 observation checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m28 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m28_test.py $PWD/build/vela",
+   "log": "m28-opt1.log",
+   "summary": [
+    "M28: warnings passed",
+    "M28: cheap passed",
+    "M28: boundaries passed",
+    "M28: generated passed",
+    "M28: repair passed",
+    "M28: SMT exact-width and freshness checks passed.",
+    "M28 verification checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m28 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m28_test.py $PWD/build/vela",
+   "log": "m28-opt0.log",
+   "summary": [
+    "M28: warnings passed",
+    "M28: cheap passed",
+    "M28: boundaries passed",
+    "M28: generated passed",
+    "M28: repair passed",
+    "M28: SMT exact-width and freshness checks passed.",
+    "M28 verification checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m29 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m29_test.py $PWD/build/vela",
+   "log": "m29-opt1.log",
+   "summary": [
+    "M29: c cache checks passed",
+    "M29: native cache checks passed",
+    "M29: real programs, incremental edit outputs and partial-gate guards passed",
+    "M29 scale and incremental checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m29 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m29_test.py $PWD/build/vela",
+   "log": "m29-opt0.log",
+   "summary": [
+    "M29: c cache checks passed",
+    "M29: native cache checks passed",
+    "M29: real programs, incremental edit outputs and partial-gate guards passed",
+    "M29 scale and incremental checks passed."
+   ],
+   "failures": []
+  },
+  {
+   "name": "m30 integration, VELA_OPT=1",
+   "command": "VELA_OPT=1 python3 tests/m30_test.py $PWD/build/vela",
+   "log": "m30-opt1.log",
+   "summary": [
+    "m30: frozen inventory passed",
+    "m30: frozen corpus c optimization 1 passed",
+    "m30: frozen corpus c optimization 0 passed",
+    "m30: frozen corpus native optimization 1 passed",
+    "m30: frozen corpus native optimization 0 passed",
+    "m30: specification and guide passed",
+    "m30: diagnostics passed",
+    "m30: queries passed",
+    "m30: evidence passed",
+    "m30: properties passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "m30 integration, VELA_OPT=0",
+   "command": "VELA_OPT=0 python3 tests/m30_test.py $PWD/build/vela",
+   "log": "m30-opt0.log",
+   "summary": [
+    "m30: frozen inventory passed",
+    "m30: frozen corpus c optimization 1 passed",
+    "m30: frozen corpus c optimization 0 passed",
+    "m30: frozen corpus native optimization 1 passed",
+    "m30: frozen corpus native optimization 0 passed",
+    "m30: specification and guide passed",
+    "m30: diagnostics passed",
+    "m30: queries passed",
+    "m30: evidence passed",
+    "m30: properties passed"
+   ],
+   "failures": []
+  },
+  {
+   "name": "release parity gate",
+   "command": "python3 bench/run.py --compiler build/vela --languages c vela-native --runs 5 --require-native-parity --json build/val001/release-parity.json",
+   "log": "release-parity.log",
+   "summary": [
+    "Geometric mean of native / C: 1.226",
+    "release-parity exit 0"
+   ],
+   "failures": []
+  },
+  {
+   "name": "real-program gate",
+   "command": "python3 bench/real_programs.py --compiler build/vela --gate --runs 5 --json build/val001/real-programs.json",
+   "log": "real-programs.log",
+   "summary": [
+    "json_service: outputs agree; {'c': 0.2551, 'vela': 0.2537, 'vela-native': 0.2013}",
+    "compressor: outputs agree; {'c': 0.684, 'vela': 0.6985, 'vela-native': 0.6841}",
+    "  \"passed\": true,",
+    "real-programs exit 0"
+   ],
+   "failures": []
+  }
+ ]
+}

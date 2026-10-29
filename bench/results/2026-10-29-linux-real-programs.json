@@ -1,0 +1,1178 @@
+{
+  "format": "vela.scale.benchmark",
+  "version": 1,
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "os": "Linux x86_64",
+    "gcc": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "commit": "bc73a4f",
+    "date": "2026-10-29"
+  },
+  "quick": false,
+  "runs": 5,
+  "apps_only": false,
+  "with_rust": false,
+  "source_sha256": {
+    "bench/arena_trees/main.c": "790c8477cee0dc85f9691d660d37df9131a2396c308ca41dd3cf2716176abbd8",
+    "bench/arena_trees/main.rs": "5a6fe7ee4db16c8654e60caa62b66675a266522c88e3990c157f3983f90579c4",
+    "bench/arena_trees/main.vl": "119a5a953a399f31d490c8be0a4d4a6f0abbea92597d2134fb78ea614bc63f46",
+    "bench/binarytrees/main.c": "807b5207d2e2c909c27a7cd38abc6be7ec8d4dbcaea5f53df09f56e117dd67e9",
+    "bench/binarytrees/main.go": "d9a47ae2c8eba9e04d72ccd6eb325578d9843562c2e176b63f73f1dd6136e073",
+    "bench/binarytrees/main.rs": "18a3f5a701027b80a412ae9c10de12fb2bbe95728fc111b23ad615f87a8717b9",
+    "bench/binarytrees/main.swift": "64ad879f5cef97048c71eaab35cd217b65f92210d9bdcd4b903c6b16dcbcf161",
+    "bench/binarytrees/main.vl": "e3c6a0ca77d1fe82d2faf94934b62c9b0c3117bab8ecb565a33168750362dfc7",
+    "bench/crc32/crc32.vl": "940fa4bc09d8d34ab68ac3fe6df50e70981cbec778b472d827deb62b1f558e57",
+    "bench/crc32/main.c": "64bf516e5d8779b1eedc2e1f021988e1b1e1c3fe342c856911728fa3b4ab62db",
+    "bench/crc32/main.rs": "74a089aa854974eeaf33918a7219fbbd26a9db4b4d45e809df8285b07de8887f",
+    "bench/crc32/main.vl": "659c723a12dbaaf51a65f34d887ec4c65db0596c79af9fbc001b2b82cf535dc5",
+    "bench/fannkuch/main.c": "a1ec5b5c667ece096aa1f2cd04739f76593eea2b43b6372d3058dba6bff0e13e",
+    "bench/fannkuch/main.rs": "3e626af496e38f6b47aa64c539c7d2aecdec033962b6be9c512f5cae516baf9f",
+    "bench/fannkuch/main.vl": "2cb271ad4643034b362d6a8c1a4d91bb3a8cd64be2b37773c277eff0d85e4e90",
+    "bench/fasta/main.c": "03be9f68bd99069af99047436911e760b9d5fb86632ee043a6c70149eaea2792",
+    "bench/fasta/main.rs": "cdff5a5b3d25cf183a8835afd5fb9327e05eb417e4938be4cc7e81460b27b354",
+    "bench/fasta/main.vl": "ee59d048bb7cf3938a8e8225b9e7a5b082e65beeec3467e701ec094219ad8e67",
+    "bench/knucleotide/main.c": "affc9b77f4f43c8301716674e5d33a587a05a02154874e4f579dbc03353a58e0",
+    "bench/knucleotide/main.rs": "39f67eef31b7507d1be74ab6bca7effb41d6847fd1358ad5bb9a7f08d900e056",
+    "bench/knucleotide/main.vl": "5e4a06d16bdf96665e2089a48d7d96652323effe14790953b0e82a34dc6677f0",
+    "bench/mandelbrot/main.c": "70fcbd2ecab80142938a24ff3ba7377fe481ce3ddeb7eba6e99310faf522952d",
+    "bench/mandelbrot/main.rs": "b9db05ae4fa127c31230d8df33b975e6f3aa1dc3fcf1f8f67b19706062011870",
+    "bench/mandelbrot/main.vl": "5a255fd48f78acf90834f647e3a41e086acda9eef15ea0bcd86dc7a655dcd742",
+    "bench/nbody/main.c": "8fcbc5b9479a1586461e0615c34358abbc7b9fd39847372567ab22b09fcb3f7f",
+    "bench/nbody/main.rs": "ebb2be9217c923cc0f109aa96682640208ee8d38e0daa8f01c3ade522f7ecaa0",
+    "bench/nbody/main.vl": "3d4c424478aacba2f38f2bf85a11b7b11a3d695a26c6a03e3afa4ae6d9b9fb8a",
+    "bench/run.py": "d82d0dadcfe908ebe060f0de204b23631d19c4920438bf865c103f85affd2b3d",
+    "bench/sha256/main.c": "1b870bbf6256a16fe2288cc52d03ca3165d91796982d670eafaa3237866bd436",
+    "bench/sha256/main.rs": "42ba06a4758adff7ec42a7db64a4dd10dbc8ced5cb4cdf61774dee852bfd7ae4",
+    "bench/sha256/main.vl": "4e2e40e32af28142fd28a32eaabee00c3ec7f209a5ec3e4b26b87e1392c66858",
+    "bench/sha256/sha256.vl": "b6c34fef785be9a10097bf16a3b265b3dfc9a899dd9b33a7a511bf301429fcd3",
+    "bench/spectralnorm/main.c": "d01b6c87575c26a2e5afa31df0caed6d73a08981c6153486fc1a32748098adc3",
+    "bench/spectralnorm/main.rs": "9ec719ecc97c466308a5e6c0fbfe4a723470f51276e77fea15a628586b655b78",
+    "bench/spectralnorm/main.vl": "c4f949bd409afbd7c1ae84ef6516959db85cbea9ef9e222adc6776f1c3ee44c6",
+    "bench/varints/main.c": "c17814b48cb1c11279da2d1641c5a84f3362d83b719fbb328a95b8299b119640",
+    "bench/varints/main.rs": "6972054b0f58eb681ec5234991904832106baa63fa23be309c9f5d99c10de584",
+    "bench/varints/main.vl": "04bfc7d67540aa0f8090b52d3e890fc27629d6cea1aa1653dbc401011486162d",
+    "bench/varints/varints.vl": "7ceb978c501c606f14d4ff850945de76d90513406bd239700ec5414d2beeb2bf",
+    "bench/wordfreq/main.c": "7789ed080b0ddb73b56ef481655117e012993932bf04bd9fc077a2e02ea32bb2",
+    "bench/wordfreq/main.rs": "0f5adc4d239d122d3880af961131bb4324299f6c588e024932ee2736f8b3eb00",
+    "bench/wordfreq/main.vl": "7f68b12f36f130d2de2390916275c19b10a266ff4e580abca835b48369cb74ff",
+    "compiler/src/agent_queries.vl": "9a717de947f1ea4fbf4ad677fa9b6ca731cb15351fb13e59d61ebee84e503bc6",
+    "compiler/src/arm64.vl": "74400d4dad26339b9ad1eeaf1c0c19fea28bac08920d6256a114e3b28e1328ea",
+    "compiler/src/ast.vl": "71be5595bf344c9ed88c60276e59789cda435bccc8d19b753b46d68a4fa8b45a",
+    "compiler/src/bits.vl": "8e14141f4f203c1850984ff0355df3d69092ac62327602eeed4fef93314f0b96",
+    "compiler/src/call_graph.vl": "07cf773d2aa93e647983787bfcfcbde08a6aed430e8296d4d8aa7017d2ffd18a",
+    "compiler/src/capabilities.vl": "0144e730299587cb00b36e4bfc6bcfc051622a1fd0522aa02b1f8fa934519555",
+    "compiler/src/cffi.vl": "6b98f14d1e4d85b4a595de6337fa258387fee7160d4e9df2a3816abcedb7f636",
+    "compiler/src/chars.vl": "c42a95f8a5cb41d535981094761ccd447db7eb643ba40a8449b3504e7e7652d9",
+    "compiler/src/checker.vl": "ab1f6e488e20fc12b098aab829ecf0ec7d5225ce0fe9ec5b042142a39c41138f",
+    "compiler/src/codegen.vl": "2b9386c280f7efb406b99372f0c327d025cc2e40573fc540e21e669baf369179",
+    "compiler/src/complete.vl": "99507944d5e2a03249b93154e4dede64c68c5f2d4d8990fee683882bc7b8e4f8",
+    "compiler/src/contract_checks.vl": "8217ea347cd43147a54c21293c9cc9f46cf265f055754e5f7adfefebc2749cc2",
+    "compiler/src/debug_info.vl": "afbc5d8080374561aebcfae0ba7c0e84c492b4c085d26dc454ca737ab96ea8ae",
+    "compiler/src/diagnostics.vl": "efbd34c072253d3151727fb0d0d04f2ae7b7f7d7f281c2d04aa681bf863b0c7d",
+    "compiler/src/errors.vl": "2a31eea563f9ea1b591e700955c82c1ee887bd24b4797bb7c9eb3d5d733a8e27",
+    "compiler/src/evidence.vl": "cf93679034d67041f9ef769586ab59f3cfb4b2474298cdb78f49ac3362b8cd97",
+    "compiler/src/fixer.vl": "7370240f796cc19c3e6b38f0e03dc66061d0e6343154f29b31e7a7d9ac87a2a8",
+    "compiler/src/format.vl": "d8a7a58a851aa909e1e7818a8850888c11998c25c8eee56915cad77c93b5baf0",
+    "compiler/src/guide.vl": "d4189e2f4515904abf9e2985d3c596229f441f7e286b031e5f9adade4b5723e9",
+    "compiler/src/incremental.vl": "790f0082f28929fab4b56d51f013aa49a3bfbdfba8cdbf551cda44dc47e29eb3",
+    "compiler/src/index.vl": "6f2eefb333042ce50c1d9ca374e84afdcfa93352cf07b255e2db9021d51d9a2b",
+    "compiler/src/integers.vl": "45739d073e59c93f31718f5f8cf9a9424e192f2157e89d1de8fcdefa7747593a",
+    "compiler/src/interfaces.vl": "990c820ed20895079cc23b0a926d935f32844d30919da49fb91d8f8875af110f",
+    "compiler/src/ir.vl": "ec50c7bc815a4561fa9502ce0011279abe6d92e46ed6cdd9ebf729aea909e615",
+    "compiler/src/layout.vl": "a9ac2d37a3abd85fc5d44689175c21ad2ac080c2686708d6a463e13c8d55e205",
+    "compiler/src/lexer.vl": "b253ef64ffe1a5e5f8466e666c8379010eba177c28d2a619d7a6d666ebfcc2e3",
+    "compiler/src/live.vl": "ee646800be014abb679b7221eb76a747ef77e576ca78e31077b255ee39e2fc21",
+    "compiler/src/loops.vl": "49946114da9d77587087cd10bb75d1141592e5c46d0ef8d7f61119afbc283ed6",
+    "compiler/src/lower.vl": "21bf5991935505b05f4bd543438725a72a527c1808ddee4065d9b1e16617150e",
+    "compiler/src/lsp.vl": "4c5d880e580b92557dfffcd9eabf6fccc7c3d78130b83148e58c42ef1b1d5ead",
+    "compiler/src/main.vl": "c3b72d639ba120505f1776c84e335ebaef93d569abb9d558e653466f84f5c5a1",
+    "compiler/src/match_check.vl": "e91be1b1bf88c868bba3b5c986d66834688dc1f626922357d594d781ba4bc8b5",
+    "compiler/src/memops.vl": "938eae0dd685ef057699207b39b259d9ea74604b248e0bbff70e2c69eb1c97ad",
+    "compiler/src/modules.vl": "dcfc9b578645b8ae8288947b11245b17ac8432bae505e604d11f2c6f37d87ad2",
+    "compiler/src/mono.vl": "be0e0e52218cdf2bf99abc8677c39657992b491cd3d036e90de3894d3bd54265",
+    "compiler/src/opt.vl": "88bb1e2f517258e998413aaaa0e8f94a51008b36cd8c9960fdd20ec8afd210fb",
+    "compiler/src/packages.vl": "cd98d157c68171a52844f4f3a788b2e53c6042f16c7828da30e2e698fcdace85",
+    "compiler/src/parser.vl": "e714ee9ed7889b9ba33b4878d56e2a6cd432597d904d603e00e1c3ec6bd9f3c7",
+    "compiler/src/profile_report.vl": "610d2168d059d4346420f4c674a0e030f5962877fbd232df2ca24f6b7f698d2a",
+    "compiler/src/promote.vl": "5ca08aabda7253bc17950b672342d3d3377bd12911132852ddda406409d20947",
+    "compiler/src/proof_hash.vl": "0bcf5e34ec2c3d55df0ed8367e9dc4a7dd00fe23e3472dd6bc34c895277566a0",
+    "compiler/src/properties.vl": "b9eb4ab9427b506b7a070799fe5812cfc69becffee5dc86ebf902dfb8f04d256",
+    "compiler/src/query.vl": "938e5af3e4ada777893cfe2a0ab4df3a9db30340ef1fdd01c92ee092d06fe6ab",
+    "compiler/src/ranges.vl": "a59cbf515dfd7cd689658db64e81c68500e71e5dd0cff615fce05047dd37193a",
+    "compiler/src/regalloc.vl": "35f82f1df1d7c8df219a6a2ec4d337e52f9a724fc6891efd0690911d35341367",
+    "compiler/src/rename.vl": "c419d39210d1939fcf8185054890100c14562d3c38b41b0438304290a8d3dfe8",
+    "compiler/src/repairs.vl": "0583b8d36f2795b67e581d504264f6ee15cf2ab19847fa180217190192ee7050",
+    "compiler/src/sysops.vl": "88ef58a847c9974699e0db2ea975c8f2f7b21bd6a3876b724a38d5a4f0026063",
+    "compiler/src/targets.vl": "087b0839d331aec59179eac4d461c2dae64b7acabbf318d1dcc865052a07a423",
+    "compiler/src/types.vl": "ef9fb29799b2575d8cbebb0c86aefe25d530d83bc99f14c3099fe9f4970037ff",
+    "compiler/src/unsafe_query.vl": "08450ad03a8d7f7e6acd5e8e93e52e6156e70bbd50cfa2886e7d0c78c0a9007f",
+    "compiler/src/vela.mod": "18f82215f73e5afcf851294625b97f44fe3cf82463e23d6a2f4367f7828d36c5",
+    "compiler/src/verification.vl": "b9eb96182c3412b79b6b11e54809bcf2885a34881ab03074eacecbf3ecc57a31",
+    "compiler/src/x64.vl": "2635e59385228871e70b09d6cf38ddce6915c4a24b4e6f49ac04f0992741f401",
+    "packages/json/json.vl": "15933fc4a2d0bcaf8b9f74eb61bb456377b4ff52850c6c9492cfb700738085bf",
+    "packages/json/vela.mod": "e6ac090348f113d70cc4e564e211901c9b8a82d43e26e844d2af3c865568794b",
+    "runtime/vela_int.h": "e600cfd5cab132401aba9e03b5e4a3c45995c33cbbab7f8b581739a258d74059",
+    "runtime/vela_observe.inc": "dc40350cf17f4358c505175d5fceb7d50b2f8d4c4e539fdb133c296db842895f",
+    "runtime/vela_policy.inc": "6190d454af03f53c3f1cbce6042c64059c9b97d09078829278bf9bd80e253338",
+    "runtime/vela_policy_portable.inc": "1737295f17af3f86658850d28134a6131387b09a279431340f4e11ad31ccc84d",
+    "runtime/vela_rt.c": "0f3fa2e2b491c77547a2aa1a2b4026be4b6ff10d90c261d884ed353806978981",
+    "runtime/vela_rt.h": "5a27e21c4889bd67ddc4632e0ed2048da017dd07240d23b2dbaaa12481f97485",
+    "runtime/vela_sys.inc": "ff780c09b380dc765fe0c5b5ed48e79724d5b9dc7b116f7b2405d821dce4f4e2",
+    "runtime/vela_threads.h": "ac583b3dd0069704b12f2aaa6bf4c0ef282111e7004814ac8306a67b8558f3db",
+    "runtime/vela_windows.h": "e630e02b37a51eca8cfd64d811171734033d83019b0d01f9c01f01155bc225dc",
+    "runtime/vela_windows_net.h": "16591563be67a14e5ff84d4e5e680c700e24f4645c9893071cf67b0e72420e15",
+    "runtime/vela_windows_process.inc": "70dc8c7c9f23874f69c1ae8db52c1f0795d8e1f24029c1a8b942e4dfd2643d9d",
+    "std/arenas.vl": "7712c21cd8f2c734be19a0cfe266242b4db4e8d352e48facf8f26678fb340c5e",
+    "std/buffers.vl": "d5f89c0c7efa5a137a6fdc111733aebbba30a82776f6f229b648307339191854",
+    "std/bytes.vl": "2a893336976e500559bd2684d211454bb70226423e53c6f9550911988510d6cc",
+    "std/http.vl": "408d3a5179ce05077b34fef7fcc623e9544df4d07d30b1263e855c185ae3aed4",
+    "std/io.vl": "c258a1047ca0dbc3038a5cb6f85be8c422c15e526dc5db3b5e5f607968c412c4",
+    "std/lists.vl": "dfbc5cf2b06d0b26af0e6e312da5024fb0dd8bba774df005d592712f47996f59",
+    "std/net.vl": "7e39b15bbb0fe1f61f575d55c7552997c20c5cf756460c8aaa75209e720050cb",
+    "std/paths.vl": "0e46f2ae7b152f3127c156279c53662477955d9f037c4334df50937384919812",
+    "std/processes.vl": "cbdb77e8000a706444b415499cbe08109626348f930db25177f5d08c7c28d92e",
+    "std/property.vl": "840f78599482fdc4f82a5b95872b60fe28065b823ec9fdbdb9b2403e1a5d624c",
+    "std/text.vl": "8e3fcd808bfd5d8f8e4f0028e0043850a85173b50c78aaf3d4410e1df0f95bfa",
+    "std/time.vl": "c2183e86f32cc9d10857e0ef606a1e056789938cd0f91d4862d8afa4b7f8c4d5",
+    "std/unicode.vl": "0870ced2fd92f50a354ebe193a663ff7a962d4bf91b24da4c7bd1fb884fec158",
+    "std/views.vl": "63b6c03f6b0c9e3954cef246c2f9e869dc53ac244fe8057168ab40b14188a314",
+    "bench/real/markdown/vela.mod": "9f38e40d500cb600bd24ec898d23652a3fb8c28db7fbaf37d32146d553c140b9",
+    "bench/real/markdown/main.vl": "83add39f76a8b82f03941447088d287f7c8850f126b1ec6ebb17478e34ff5a23",
+    "bench/real/compressor/vela.mod": "4d0e6ed8ac544e05474f8ea5f98e8ac590df3e445694949846fc173136b709d2",
+    "bench/real/compressor/zlib.vl": "2c049b417eead2a29fd71ddca93042ea3b1139f6d48d7e1ca24cac2f1ac5dbc9",
+    "bench/real/compressor/main.rs": "988d50a3718e35dc7fb0425fef437ca6be2fbd81f7204d2eb78cd7671cfa39a6",
+    "bench/real/compressor/main.c": "c1e05f5cd201f21ee28109248b209ebfff70c34ae6cd252eb9648d2a9a05ea9b",
+    "bench/real/compressor/main.vl": "8cd58ac89a2f27da2f215769adf46971377cc6850cd2a04620d41a10e76f8299",
+    "bench/real/tcp_echo/client.c": "735ede033db0174a0e59099ba47f28db3aad64d09a624bc8421f0c183b532760",
+    "bench/real/tcp_echo/main.swift": "5a22b88a07939c1c5d3486c4ef595a3398686386db456d84d55cf7113120259b",
+    "bench/real/tcp_echo/main.go": "7ac28862e1443b78c80cdf855f0bd06d8cbd245291b58fa764cd7d3ef9a6af91",
+    "bench/real/tcp_echo/main.rs": "21e395078f3d865af179fce3b30ac332a3fdd35e852d6c65a140d509f026bf26",
+    "bench/real/tcp_echo/main.c": "774565fa76900e94f9da71db48e6a5e2ac27d22e60cd4fcb50c0d80584aff662",
+    "bench/real/tcp_echo/main.vl": "cbb6d8a07c984105f88702ccf532206ee504508035ce5112e856b05f8ac65be2",
+    "bench/real/tcp_echo/net_common.h": "ba3c55dea107eabe5a82d4ba1a0648eda0761638a9f9600a3b77bc7571c2458b",
+    "bench/real/json_service/main.swift": "33ea6b0e2f8c833170009b027786b2665cd6f82a908cc78fa8697a9adf8d78b3",
+    "bench/real/json_service/vela.mod": "8149e5a5731e106c59f37852da2979aa15f45016d8872e995006364c903cdaf8",
+    "bench/real/json_service/main.go": "99016d01a35f37fe7a3bc5a9defb9e9165502586e55adf2752286b726fe16817",
+    "bench/real/json_service/main.rs": "4664a085d67082ce2a82056befb4fde5f4d692fe104751f0d2fcef66671e0375",
+    "bench/real/json_service/main.c": "5222ad03882eb52c58d066ab553ce44c3c7ce6fac1c504e36e31486a0c7d155e",
+    "bench/real/json_service/main.vl": "f66219ca576539904fd5a39fb5f4faf05826658f0e081ccd8151dde5c2b77243",
+    "bench/real_programs.py": "5a73cd4a3f2c70e398fe2ec5aecd4fb81d3092a183c36bdab984a32bb22c1b10",
+    "bench/scale.py": "c765e2a57166f09fc7a2cd649becf8d3b8f1c838a2f4aecdfc65b84996c82474",
+    "bench/m29-budgets.json": "410a8efc3488f0f5904dab3b1d48f511ca4a42bb2f705e815ac8822efb3a9017"
+  },
+  "programs": {
+    "json_service": {
+      "c": {
+        "build": {
+          "seconds": 0.17753504200027237,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "binary_bytes": 21128,
+        "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5",
+        "timing": {
+          "best": 0.21076863599955686,
+          "median": 0.2550672150000537,
+          "samples": [
+            {
+              "seconds": 0.25105325399999856,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.21076863599955686,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.2550672150000537,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.2605131299997083,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.2613188730001639,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            }
+          ]
+        }
+      },
+      "vela": {
+        "build": {
+          "seconds": 0.7733487289997356,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "binary_bytes": 184504,
+        "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5",
+        "timing": {
+          "best": 0.20821308999984467,
+          "median": 0.25373510099962004,
+          "samples": [
+            {
+              "seconds": 0.20821308999984467,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.26771185399957176,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.25373510099962004,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.26831336700070096,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.22572505800053477,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            }
+          ]
+        }
+      },
+      "vela-native": {
+        "build": {
+          "seconds": 0.18383768999956374,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "binary_bytes": 193104,
+        "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5",
+        "timing": {
+          "best": 0.18561495099947933,
+          "median": 0.20130056400012108,
+          "samples": [
+            {
+              "seconds": 0.18561495099947933,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.24934098700032337,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.20130056400012108,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.22240432499984308,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            },
+            {
+              "seconds": 0.19659961799970915,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+            }
+          ]
+        }
+      }
+    },
+    "compressor": {
+      "c": {
+        "build": {
+          "seconds": 0.056181011000262515,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "binary_bytes": 16592,
+        "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157",
+        "timing": {
+          "best": 0.6143569309997474,
+          "median": 0.6839590970002973,
+          "samples": [
+            {
+              "seconds": 0.7217398700004196,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6143569309997474,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6833504329997595,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.7469062229993142,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6839590970002973,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            }
+          ]
+        }
+      },
+      "vela": {
+        "build": {
+          "seconds": 0.32900036000046384,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "binary_bytes": 149736,
+        "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157",
+        "timing": {
+          "best": 0.6828181790006056,
+          "median": 0.6984997979998298,
+          "samples": [
+            {
+              "seconds": 0.7186969650001629,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.7021047499993074,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6984997979998298,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6876411309995092,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6828181790006056,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            }
+          ]
+        }
+      },
+      "vela-native": {
+        "build": {
+          "seconds": 0.08579959100006818,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "binary_bytes": 154056,
+        "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157",
+        "timing": {
+          "best": 0.6289904190007292,
+          "median": 0.6841283760004444,
+          "samples": [
+            {
+              "seconds": 0.6716789430001882,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6892292559996349,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6289904190007292,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.6841283760004444,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            },
+            {
+              "seconds": 0.7158778279999751,
+              "max_rss_bytes": null,
+              "stdout_sha256": "e7b3b052b7206d669006451e91ac8c94cae8e25420497ad9595fff87bfd3b157"
+            }
+          ]
+        }
+      }
+    },
+    "compiler": {
+      "c": {
+        "timing": {
+          "best": 0.8052905429995008,
+          "median": 0.8285491080005158,
+          "samples": [
+            {
+              "seconds": 0.9314739380006358,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.8285491080005158,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.8800464910000301,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.8052905429995008,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.8146520399996007,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            }
+          ]
+        },
+        "binary_bytes": 5309480,
+        "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3",
+        "reference_kind": "same-source compiler built via C"
+      },
+      "vela": {
+        "timing": {
+          "best": 0.737905652000336,
+          "median": 0.8339973570000438,
+          "samples": [
+            {
+              "seconds": 0.8638949980004327,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.8087060910002037,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.8339973570000438,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.737905652000336,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.9233685730005163,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            }
+          ]
+        },
+        "binary_bytes": 5309480,
+        "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3",
+        "reference_kind": "same-source compiler built via C"
+      },
+      "vela-native": {
+        "timing": {
+          "best": 0.5421710499995243,
+          "median": 0.6067677159999221,
+          "samples": [
+            {
+              "seconds": 0.6067677159999221,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.6900183650004692,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.5421710499995243,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.5768764399999782,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            },
+            {
+              "seconds": 0.7080534279994026,
+              "max_rss_bytes": null,
+              "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3"
+            }
+          ]
+        },
+        "binary_bytes": 8075064,
+        "stdout_sha256": "6122eb33b852ad9b3827d704805d94f0146da80fa690aca19b599a64826027e3",
+        "reference_kind": "same-source compiler built via C"
+      }
+    }
+  },
+  "solver": {
+    "requested": false
+  },
+  "toolchain": {
+    "command": [
+      "cc"
+    ],
+    "version": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+    "build_environment": {
+      "VELA_CC": null,
+      "VELA_CFLAGS": null,
+      "VELA_SYSROOT": null,
+      "VELA_OPT": null,
+      "VELA_INLINE": null,
+      "VELA_THREADS": null,
+      "SDKROOT": null,
+      "MACOSX_DEPLOYMENT_TARGET": null
+    },
+    "python_zlib_version": "1.3",
+    "python_version": "3.13.17"
+  },
+  "driver": {
+    "file": "/home/user/vela/build/vela",
+    "sha256": "8e3e1d8f6acf14cba992198fb00507c182d2f37bebcded7161d0481e6c0ed8ad"
+  },
+  "compilers": {
+    "c": {
+      "sha256": "8e3e1d8f6acf14cba992198fb00507c182d2f37bebcded7161d0481e6c0ed8ad",
+      "bytes": 5309480
+    },
+    "native": {
+      "sha256": "a392e4a1012774b9670275af71be62e5df68ba022a155b60d52654d5945496a2",
+      "bytes": 8075064
+    }
+  },
+  "compiler_builds": {
+    "c": {
+      "seconds": 17.38707938400057,
+      "max_rss_bytes": null,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "native": {
+      "seconds": 18.20426390800003,
+      "max_rss_bytes": null,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "inputs": {
+    "json_service": {
+      "sha256": "b3cee234b7aa40ad948d9939463f570d672d9df724dc0aa190d85edc298b5728",
+      "bytes": 3277019,
+      "rounds": 8,
+      "oracle": {
+        "python_response_sha256": "6ee21e0988db2fb43a29b91e49b561b174a04cbbbab45812ed9ddc4585a397a5"
+      }
+    },
+    "compressor": {
+      "sha256": "128c9c2ffde47e0c2413bf0d9c90eae698e21aab8009238deb2bb598048de5da",
+      "bytes": 4194304,
+      "rounds": 8,
+      "oracle": {
+        "python_original_adler32": 74791918,
+        "compressed_stream_reference": "independent C application, same host zlib"
+      }
+    }
+  },
+  "frontend": {
+    "project": {
+      "main": "/tmp/vela-m29-h7nq56xx/scale/main.vl",
+      "modules": 101,
+      "functions": 10000,
+      "lines": 100304,
+      "expected_stdout": "10000\n",
+      "source_sha256": {
+        "m000.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m001.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m002.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m003.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m004.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m005.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m006.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m007.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m008.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m009.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m010.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m011.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m012.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m013.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m014.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m015.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m016.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m017.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m018.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m019.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m020.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m021.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m022.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m023.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m024.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m025.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m026.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m027.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m028.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m029.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m030.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m031.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m032.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m033.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m034.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m035.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m036.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m037.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m038.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m039.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m040.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m041.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m042.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m043.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m044.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m045.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m046.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m047.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m048.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m049.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m050.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m051.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m052.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m053.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m054.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m055.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m056.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m057.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m058.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m059.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m060.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m061.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m062.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m063.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m064.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m065.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m066.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m067.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m068.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m069.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m070.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m071.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m072.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m073.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m074.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m075.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m076.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m077.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m078.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m079.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m080.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m081.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m082.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m083.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m084.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m085.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m086.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m087.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m088.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m089.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m090.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m091.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m092.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m093.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m094.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m095.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m096.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m097.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m098.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "m099.vl": "859fb75d3bdb8d7db9aee6992e3411017d773d762b79ae560c7f142e042a4715",
+        "main.vl": "0cea5f51e0a0e809906501a4a6422a402b57ecfef674d975ea3409d3c2f2d26a"
+      }
+    },
+    "check": {
+      "best": 0.38923016500029917,
+      "median": 0.4359474430002592,
+      "samples": [
+        {
+          "seconds": 0.4869887770000787,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "seconds": 0.40359252899997955,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "seconds": 0.4359474430002592,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "seconds": 0.5314644729996871,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "seconds": 0.38923016500029917,
+          "max_rss_bytes": null,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    "queries": {
+      "summary": {
+        "best": 0.46378085300057137,
+        "median": 0.4927705469999637,
+        "samples": [
+          {
+            "seconds": 0.46378085300057137,
+            "max_rss_bytes": null,
+            "stdout_sha256": "40c07d7f2bd45e7e277d1c40cfbc05818985081af1af7a7d210972e3ab053176"
+          },
+          {
+            "seconds": 0.49414605399942957,
+            "max_rss_bytes": null,
+            "stdout_sha256": "40c07d7f2bd45e7e277d1c40cfbc05818985081af1af7a7d210972e3ab053176"
+          },
+          {
+            "seconds": 0.5260072639994178,
+            "max_rss_bytes": null,
+            "stdout_sha256": "40c07d7f2bd45e7e277d1c40cfbc05818985081af1af7a7d210972e3ab053176"
+          },
+          {
+            "seconds": 0.4643492610002795,
+            "max_rss_bytes": null,
+            "stdout_sha256": "40c07d7f2bd45e7e277d1c40cfbc05818985081af1af7a7d210972e3ab053176"
+          },
+          {
+            "seconds": 0.4927705469999637,
+            "max_rss_bytes": null,
+            "stdout_sha256": "40c07d7f2bd45e7e277d1c40cfbc05818985081af1af7a7d210972e3ab053176"
+          }
+        ]
+      },
+      "impact": {
+        "best": 0.711567321000075,
+        "median": 0.7770455640002183,
+        "samples": [
+          {
+            "seconds": 0.711567321000075,
+            "max_rss_bytes": null,
+            "stdout_sha256": "c0c1be06806b0b429e3df347ace13ccced98b9ff350cf8564ddd060067b1ae48"
+          },
+          {
+            "seconds": 0.8235407960000884,
+            "max_rss_bytes": null,
+            "stdout_sha256": "c0c1be06806b0b429e3df347ace13ccced98b9ff350cf8564ddd060067b1ae48"
+          },
+          {
+            "seconds": 0.7679845390002811,
+            "max_rss_bytes": null,
+            "stdout_sha256": "c0c1be06806b0b429e3df347ace13ccced98b9ff350cf8564ddd060067b1ae48"
+          },
+          {
+            "seconds": 0.7770455640002183,
+            "max_rss_bytes": null,
+            "stdout_sha256": "c0c1be06806b0b429e3df347ace13ccced98b9ff350cf8564ddd060067b1ae48"
+          },
+          {
+            "seconds": 0.8276150629999393,
+            "max_rss_bytes": null,
+            "stdout_sha256": "c0c1be06806b0b429e3df347ace13ccced98b9ff350cf8564ddd060067b1ae48"
+          }
+        ]
+      }
+    },
+    "builds": {
+      "c": {
+        "normal": {
+          "timing": {
+            "seconds": 8.019000991000212,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "c",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": false,
+            "reason": "not requested",
+            "hits": 0,
+            "compiled": 5,
+            "units": [
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "",
+                "hit": false
+              }
+            ]
+          },
+          "binary_bytes": 1732168
+        },
+        "normal_warm": {
+          "timing": {
+            "seconds": 6.819502448000094,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "c",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": false,
+            "reason": "not requested",
+            "hits": 1,
+            "compiled": 4,
+            "units": [
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/runtime-1007403113-1375904197.o",
+                "hit": true
+              }
+            ]
+          },
+          "binary_bytes": 1732168
+        },
+        "cold": {
+          "timing": {
+            "seconds": 10.261700220999955,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "c",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 0,
+            "compiled": 5,
+            "units": [
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/ee887cfb17e251e106de16fdae9af1db6207756b4f910e7d505ef14dbbf7c807.o",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/25e7d099a438063dc7aa956886afcb41ec78585e507a159c106bab6961e21eb6.o",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/335b91d7ad11644a59a5de3f2f7984ea491be278d72c0ec0f7cecda1b6d11dde.o",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/8e1d38fb86067f5830b79b811ce7f5a0ee0c5902b00308ee7812ff6f4900ffeb.o",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/4b523a9560df1271c8397e61ed9b7071b959468840b6ed3b018fb8cf9844dbb1.o",
+                "hit": false
+              }
+            ]
+          },
+          "binary_bytes": 1732424
+        },
+        "warm": {
+          "timing": {
+            "seconds": 2.4449670099993455,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "c",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 5,
+            "compiled": 0,
+            "units": [
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/ee887cfb17e251e106de16fdae9af1db6207756b4f910e7d505ef14dbbf7c807.o",
+                "hit": true
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/25e7d099a438063dc7aa956886afcb41ec78585e507a159c106bab6961e21eb6.o",
+                "hit": true
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/335b91d7ad11644a59a5de3f2f7984ea491be278d72c0ec0f7cecda1b6d11dde.o",
+                "hit": true
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/8e1d38fb86067f5830b79b811ce7f5a0ee0c5902b00308ee7812ff6f4900ffeb.o",
+                "hit": true
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/4b523a9560df1271c8397e61ed9b7071b959468840b6ed3b018fb8cf9844dbb1.o",
+                "hit": true
+              }
+            ]
+          },
+          "binary_bytes": 1732424
+        },
+        "edit": {
+          "timing": {
+            "seconds": 7.653113351000684,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "c",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 4,
+            "compiled": 1,
+            "units": [
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/eb1b2824114795b0c89f02723b7426c4cb8c95710bd5de36eff30f7cd9bc946a.o",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/25e7d099a438063dc7aa956886afcb41ec78585e507a159c106bab6961e21eb6.o",
+                "hit": true
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/335b91d7ad11644a59a5de3f2f7984ea491be278d72c0ec0f7cecda1b6d11dde.o",
+                "hit": true
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/8e1d38fb86067f5830b79b811ce7f5a0ee0c5902b00308ee7812ff6f4900ffeb.o",
+                "hit": true
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-c/objects-v1/4b523a9560df1271c8397e61ed9b7071b959468840b6ed3b018fb8cf9844dbb1.o",
+                "hit": true
+              }
+            ]
+          },
+          "binary_bytes": 1732424
+        }
+      },
+      "native": {
+        "normal": {
+          "timing": {
+            "seconds": 5.751106897999307,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "native",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": false,
+            "reason": "not requested",
+            "hits": 0,
+            "compiled": 2,
+            "units": [
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-native/runtime-1007403113-1375904197.o",
+                "hit": false
+              }
+            ]
+          },
+          "binary_bytes": 1580440
+        },
+        "normal_warm": {
+          "timing": {
+            "seconds": 3.685815544000434,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "native",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": false,
+            "reason": "not requested",
+            "hits": 1,
+            "compiled": 1,
+            "units": [
+              {
+                "key": "",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-native/runtime-1007403113-1375904197.o",
+                "hit": true
+              }
+            ]
+          },
+          "binary_bytes": 1580440
+        },
+        "cold": {
+          "timing": {
+            "seconds": 5.942718747999606,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "native",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 0,
+            "compiled": 2,
+            "units": [
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-native/objects-v1/e83734898d237e9f57c9fe54af84e6c27362d6d2004d25b896be51017975aeec.o",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-native/objects-v1/67b265c2ceff12bcd0f4d5bbc0a7b0b07871ac91ef6797052d99eff392682587.o",
+                "hit": false
+              }
+            ]
+          },
+          "binary_bytes": 1580440
+        },
+        "warm": {
+          "timing": {
+            "seconds": 3.7621385920001558,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "native",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 2,
+            "compiled": 0,
+            "units": [
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-native/objects-v1/e83734898d237e9f57c9fe54af84e6c27362d6d2004d25b896be51017975aeec.o",
+                "hit": true
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-native/objects-v1/67b265c2ceff12bcd0f4d5bbc0a7b0b07871ac91ef6797052d99eff392682587.o",
+                "hit": true
+              }
+            ]
+          },
+          "binary_bytes": 1580496
+        },
+        "edit": {
+          "timing": {
+            "seconds": 3.950126845000341,
+            "max_rss_bytes": null,
+            "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "cache": {
+            "format": "vela.build.cache",
+            "version": 1,
+            "status": "ok",
+            "backend": "native",
+            "target": "x86_64-unknown-linux-gnu",
+            "enabled": true,
+            "reason": "enabled",
+            "hits": 1,
+            "compiled": 1,
+            "units": [
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-native/objects-v1/93a13273816543b93e25cba08e94a8972d48a6609ad3ea143c2ac20e5f3a84e6.o",
+                "hit": false
+              },
+              {
+                "key": "/tmp/vela-m29-h7nq56xx/incremental-native/objects-v1/67b265c2ceff12bcd0f4d5bbc0a7b0b07871ac91ef6797052d99eff392682587.o",
+                "hit": true
+              }
+            ]
+          },
+          "binary_bytes": 1580440
+        }
+      }
+    }
+  },
+  "budgets": {
+    "version": 1,
+    "check_100k_seconds": 1.0,
+    "query_seconds": 1.0,
+    "cold_build_seconds": 30.0,
+    "warm_build_seconds": 20.0,
+    "edit_build_seconds": 30.0,
+    "real_program_geometric_mean": 1.2
+  },
+  "acceptance": {
+    "passed": true,
+    "errors": [],
+    "geometric_mean": {
+      "vela": 1.0074793694167958,
+      "vela-native": 0.8330428584480107
+    },
+    "budgets": {
+      "version": 1,
+      "check_100k_seconds": 1.0,
+      "query_seconds": 1.0,
+      "cold_build_seconds": 30.0,
+      "warm_build_seconds": 20.0,
+      "edit_build_seconds": 30.0,
+      "real_program_geometric_mean": 1.2
+    }
+  },
+  "sources_unchanged": true,
+  "changed_sources": []
+}

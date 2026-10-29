@@ -3355,6 +3355,25 @@ the same entry. Close it with a commit or validation result; keep its history.
   0.1 s and runs as on C (`tests/run/bool_chains.vl`). Suites, fixed points
   and differential seeds are as listed in TL-111.
 
+### TL-115: A whole-suite VELA_OPT=0 run failed the optimized IR snapshots
+
+- **Status:** resolved.
+- **Discovery:** post-M30, VAL-001 on Linux x86-64:
+  `VELA_OPT=0 python3 run_tests.py --backend c` (and `--backend native`).
+- **Evidence (observed):** 335 of 337 passed; `tests/cli/native_ir.vl` and
+  `tests/cli/native_asm.vl` failed. Their `.expected` files record the
+  optimizer's output, and the run's `VELA_OPT=0` reached `vela ir` and
+  `vela asm`, which printed unoptimized code.
+- **Impact:** an unoptimized run of the whole suite reported two failures
+  that were not compiler faults. Earlier sessions ran `VELA_OPT=0` over
+  `tests/run` only and did not see them.
+- **Workaround:** run the unoptimized suite over `tests/run` and the
+  integration scripts.
+- **Resolution:** `run_tests.py` drops `VELA_OPT` for CLI snapshots of `ir`
+  and `asm`, which record the default output.
+- **Verification:** both snapshots pass with and without `VELA_OPT=0`, on
+  both back ends.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
@@ -3433,7 +3452,10 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### VAL-001: Linux native and sanitizer validation
 
-- **Status:** open; carried from M17 and extended through M25/M26a.
+- **Status:** resolved on Linux x86-64 after M30 (evidence at the end of
+  this entry). Two limits remain, both by design or owned elsewhere: the
+  sanitizers instrument the C runtime, not the assembly the native backend
+  emits, and native-host debugging is VAL-006.
 - **Evidence:** the C bootstrap, supported C suite, UBSan runtime tests, and
   benchmark output checks passed. Native `os.executable` lowering assembles
   for Linux x86-64, but was not executed there. This macOS ARM64 host has no
@@ -3579,6 +3601,43 @@ the same entry. Close it with a commit or validation result; keep its history.
   the unchanged release gate passes at 1.459× C with faster native compiler.
   Foreign-host performance/sanitizer evidence is still required separately.
 
+- **Linux x86-64 evidence (post-M30):** host: Intel Xeon @ 2.10 GHz,
+  4 cores, Linux 6.18.44 (Landlock ABI 7, seccomp), gcc 13.3, clang 18.1,
+  Python 3.13, z3 4.8.12. Commit `bc73a4f` plus TL-115's harness fix.
+  Results are recorded in
+  [the validation report](../bench/results/2026-10-29-linux-validation.json):
+  - Both bootstrap fixed points hold: C 172,439 lines, native 1,947,562
+    lines. The native-built compiler emits byte for byte the same C and
+    assembly for its own source as the C-built one.
+  - Complete suites pass 337 of 337 for C and for native.
+  - With `VELA_OPT=0`, 335 of 337 passed. The two failures were the
+    optimized `ir`/`asm` snapshots, a harness expectation, now TL-115.
+    After that fix both snapshots pass unoptimized on both back ends.
+  - Under ASan+UBSan with leak detection (`--sanitize`), both complete suites
+    pass 337 of 337, every M17-M30 integration included.
+  - Under TSan (`--tsan`), both complete suites pass 337 of 337. Unlike the
+    M26 Docker run, TSan works here: the binaries carry `__tsan_` and
+    `__asan_` instrumentation, and a deliberate data race exits 66 with a
+    report.
+  - Each of `tests/m17,m19-m30_test.py` passes run directly, with `VELA_OPT=1`
+    and `VELA_OPT=0`. This covers the M19 oracle (9,696 results), boundaries
+    and containers, natively at both settings, plus its cache and hash
+    groups; M20-M22 native optimization 1 and 0; M23 C and native; M24 C and
+    native with seccomp and Landlock enforcing (VAL-004); M25's eight
+    groups for both back ends at both settings; M27 observation; M28 with
+    z3; and M29 scale, cache and incremental checks.
+  - The release parity gate (`bench/run.py --languages c vela-native --runs 5
+    --require-native-parity`) passes at a native geometric mean of 1.226×
+    C. The native-built compiler checks in 0.265 s against 0.311 s, and
+    writes C in 0.611 s against 0.861 s
+    ([report](../bench/results/2026-10-29-linux-release-parity.json)).
+  - The real-program gate (`bench/real_programs.py --gate --runs 5`) passes:
+    1.007× C through C and 0.833× C natively (budget 1.2). It checks 100k
+    lines in 0.389 s, its slowest query takes 0.71 s, and cold, warm and edit
+    builds are within budget; samples, cache behaviour and binary sizes are
+    retained ([report](../bench/results/2026-10-29-linux-real-programs.json)).
+    Timings come from one shared host whose wall times vary (TL-085).
+
 ### VAL-002: Measure M17 with agents
 
 - **Status:** open; carried from M17.
@@ -3696,6 +3755,25 @@ the same entry. Close it with a commit or validation result; keep its history.
   restrictions. Exercise coverage under denied fs and the sanitizer selections.
 - **Acceptance:** retain kernel/ABI/toolchain/commit and actual commands/results.
   A cross-compiled object or successful safe wrapper is not the C syscall proof.
+- **Linux x86-64 evidence (post-M30, with VAL-001):** Linux 6.18.44 with
+  Landlock ABI 7 and seccomp. `python3 tests/m24_test.py $PWD/build/vela`
+  passes with `VELA_OPT=1` and `VELA_OPT=0`, on C and native. Its groups
+  were basic, file_policy, foreign, fakes, queries, type_impact, measured
+  and cache. Among them:
+  - `run --deny clock`, the step that failed under Docker/Rosetta, passes.
+  - A foreign C library's `socket()` is refused both in a constructor
+    before `main` and after it under `--deny net`, without Landlock file
+    rules.
+  - File confinement holds, including a symlink escape.
+  - A spawned `/bin/cat` child inherits the boundary.
+  - Coverage runs under the denials.
+  - M24 also passes under ASan+UBSan and TSan in the complete suites.
+
+  Still open: a disabled or older Landlock kernel refusing scoped fs with
+  E6011 without launching the target. This host's ABI is 7, so that case
+  was not exercised. Descriptor closure was not separately confirmed beyond
+  what the groups above check. See
+  [the validation report](../bench/results/2026-10-29-linux-validation.json).
 
 ### VAL-005: Complete native Windows platform acceptance
 

@@ -317,6 +317,10 @@ def run_cli_test(compiler: list[str], path: Path, expect: Expectations,
     else:
         words = [*words, path.name]
     expected_file = path.with_suffix(".expected")
+    # An `ir` or `asm` snapshot records the default, optimized output: a run
+    # of the whole suite with VELA_OPT=0 does not change what it shows.
+    if words[0] in ("ir", "asm"):
+        env = {k: v for k, v in env.items() if k != "VELA_OPT"}
     with tempfile.TemporaryDirectory(prefix="vela-test-") as tmp:
         workdir = Path(tmp) / "work"
         if path.name == "main.vl" and path.parent.parent.name == "cli":
