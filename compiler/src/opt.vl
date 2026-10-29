@@ -823,8 +823,22 @@ fn known_branches(f: ir.Func) -> ir.Func {
         if i.op == ir.Op.Const && defs[i.dst] == 1 && i.imm >= 0 { bounds[i.dst] = true }
         if i.op == ir.Op.BranchCmp && i.sym == "ult" && i.b >= 0 && defs[i.b] == 1 && bounds_check(f, k) { bounds[i.b] = true }
     }
-    let mut facts: Map[Str, Bool] = [:]
-    let mut saved: Map[Int, Map[Str, Bool]] = [:]
+    // A fact about two registers matters only where they are tested again:
+    // pairs tested at two places or more. (A switch's tests each compare
+    // with a constant of their own.)
+    let mut seen: Map[Int, Int] = [:]
+    let mut tested: Map[Int, Bool] = [:]
+    for i in f.insts {
+        if testable(f, defs, i) {
+            let p = pair(i.a, i.b)
+            let n = ways_to(seen, p)
+            seen[p] = n + 1
+            if n >= 1 { tested[p] = true }
+        }
+    }
+    if len(f.classes) >= 1 << 28 { return f }  // the facts' keys hold register numbers in 28 bits
+    let mut facts: Map[Int, Bool] = [:]
+    let mut saved: Map[Int, Map[Int, Bool]] = [:]
     let mut arrivals: Map[Int, Int] = [:]
     let mut falls = false
     let mut changed = false
@@ -836,8 +850,7 @@ fn known_branches(f: ir.Func) -> ir.Func {
             if falls { meet(mut saved, mut arrivals, i.imm, facts) }
             if ways_to(arrivals, i.imm) == n && n > 0 { facts = saved[i.imm] } else { facts = [:] }
         }
-        if i.op == ir.Op.BranchCmp && i.a >= 0 && i.b >= 0 && defs[i.a] == 1 && defs[i.b] == 1 && inverse(i.sym) != "" &&
-            f.classes[i.a] != ir.FLOAT() && f.classes[i.b] != ir.FLOAT() {
+        if testable(f, defs, i) {
             let known = decided(facts, bounds, i.sym, i.a, i.b)
             if known == 1 {
                 changed = true
@@ -852,9 +865,9 @@ fn known_branches(f: ir.Func) -> ir.Func {
                 continue  // never taken
             }
             let mut taken = facts
-            learn(mut taken, bounds, i.sym, i.a, i.b)
+            learn(mut taken, bounds, tested, i.sym, i.a, i.b)
             meet(mut saved, mut arrivals, i.imm, taken)
-            learn(mut facts, bounds, inverse(i.sym), i.a, i.b)
+            learn(mut facts, bounds, tested, inverse(i.sym), i.a, i.b)
             push(mut out.insts, i)
             falls = true
             continue
@@ -867,9 +880,21 @@ fn known_branches(f: ir.Func) -> ir.Func {
     return out
 }
 
-// The fact that `a cond b`, written one way for each pair of equivalent
+// A test known_branches can decide: integer registers, each set once.
+fn testable(f: ir.Func, defs: [Int], i: ir.Inst) -> Bool {
+    return i.op == ir.Op.BranchCmp && i.a >= 0 && i.b >= 0 && defs[i.a] == 1 && defs[i.b] == 1 && inverse(i.sym) != "" &&
+        f.classes[i.a] != ir.FLOAT() && f.classes[i.b] != ir.FLOAT()
+}
+
+// Two registers in either order, as a key.
+fn pair(a: Int, b: Int) -> Int {
+    if b < a { return (b << 28) | a }
+    return (a << 28) | b
+}
+
+// The fact that `a cond b`, as a key, one for each pair of equivalent
 // conditions: a > b is b < a.
-fn fact(cond: Str, a: Int, b: Int) -> Str {
+fn fact(cond: Str, a: Int, b: Int) -> Int {
     let mut c = cond
     let mut x = a
     let mut y = b
@@ -882,18 +907,22 @@ fn fact(cond: Str, a: Int, b: Int) -> Str {
         x = b
         y = a
     }
-    return c + ":" + strings.from_int(x) + ":" + strings.from_int(y)
+    let code = match c { "lt" => 1, "le" => 2, "ult" => 3, "ule" => 4, "eq" => 5, _ => 6 }
+    return (code << 56) | (x << 28) | y
 }
 
 // Know that `a cond b`, and what follows from it directly, signs included:
 // x <= y with x >= 0 makes y >= 0, and x <u y with y >= 0 makes x >= 0 and
-// x < y, as no negative number is below y unsigned.
-fn learn(facts: mut Map[Str, Bool], bounds: Map[Int, Bool], cond: Str, a: Int, b: Int) {
-    facts[fact(cond, a, b)] = true
-    let also = match cond {
-        "lt" => ["le", "ne"], "gt" => ["ge", "ne"], "ult" => ["ule", "ne"], "ugt" => ["uge", "ne"], "eq" => ["le", "ge", "ule", "uge"], _ => [],
+// x < y, as no negative number is below y unsigned. Facts about a pair
+// tested nowhere else are not kept.
+fn learn(facts: mut Map[Int, Bool], bounds: Map[Int, Bool], tested: Map[Int, Bool], cond: Str, a: Int, b: Int) {
+    if maps.has(tested, pair(a, b)) {
+        facts[fact(cond, a, b)] = true
+        let also = match cond {
+            "lt" => ["le", "ne"], "gt" => ["ge", "ne"], "ult" => ["ule", "ne"], "ugt" => ["uge", "ne"], "eq" => ["le", "ge", "ule", "uge"], _ => [],
+        }
+        for c in also { facts[fact(c, a, b)] = true }
     }
-    for c in also { facts[fact(c, a, b)] = true }
     let mut small = a
     let mut big = b
     if cond == "gt" || cond == "ge" || cond == "ugt" || cond == "uge" {
@@ -901,29 +930,34 @@ fn learn(facts: mut Map[Str, Bool], bounds: Map[Int, Bool], cond: Str, a: Int, b
         big = a
     }
     if cond == "lt" || cond == "le" || cond == "gt" || cond == "ge" {
-        if nonneg(facts, bounds, small) { facts[sign(big)] = true }
+        if nonneg(facts, bounds, small) { know_sign(mut facts, bounds, big) }
     } else if cond == "eq" {
         if nonneg(facts, bounds, a) || nonneg(facts, bounds, b) {
-            facts[sign(a)] = true
-            facts[sign(b)] = true
+            know_sign(mut facts, bounds, a)
+            know_sign(mut facts, bounds, b)
         }
     } else if cond != "ne" && nonneg(facts, bounds, big) {
-        facts[sign(small)] = true
-        if cond == "ult" || cond == "ugt" { learn(mut facts, bounds, "lt", small, big) } else { learn(mut facts, bounds, "le", small, big) }
+        know_sign(mut facts, bounds, small)
+        if cond == "ult" || cond == "ugt" { learn(mut facts, bounds, tested, "lt", small, big) } else { learn(mut facts, bounds, tested, "le", small, big) }
     }
 }
 
-fn sign(r: Int) -> Str {
-    return "nn:" + strings.from_int(r)
+// That `r` is not negative; nothing to note for a constant or a bound.
+fn know_sign(facts: mut Map[Int, Bool], bounds: Map[Int, Bool], r: Int) {
+    if !maps.has(bounds, r) { facts[sign(r)] = true }
 }
 
-fn nonneg(facts: Map[Str, Bool], bounds: Map[Int, Bool], r: Int) -> Bool {
+fn sign(r: Int) -> Int {
+    return (7 << 56) | r
+}
+
+fn nonneg(facts: Map[Int, Bool], bounds: Map[Int, Bool], r: Int) -> Bool {
     return maps.has(bounds, r) || maps.has(facts, sign(r))
 }
 
 // Whether `a cond b` is known: 1 true, 0 false, -1 not known. An unsigned
 // test of numbers known not negative is the signed one.
-fn decided(facts: Map[Str, Bool], bounds: Map[Int, Bool], cond: Str, a: Int, b: Int) -> Int {
+fn decided(facts: Map[Int, Bool], bounds: Map[Int, Bool], cond: Str, a: Int, b: Int) -> Int {
     if maps.has(facts, fact(cond, a, b)) { return 1 }
     if maps.has(facts, fact(inverse(cond), a, b)) { return 0 }
     let unsigned = cond == "ult" || cond == "ule" || cond == "ugt" || cond == "uge"
@@ -959,12 +993,12 @@ fn bounds_check(f: ir.Func, k: Int) -> Bool {
 
 // One more way into `label`, with `facts` known on it: keep what every way so
 // far agrees on.
-fn meet(saved: mut Map[Int, Map[Str, Bool]], arrivals: mut Map[Int, Int], label: Int, facts: Map[Str, Bool]) {
+fn meet(saved: mut Map[Int, Map[Int, Bool]], arrivals: mut Map[Int, Int], label: Int, facts: Map[Int, Bool]) {
     if ways_to(arrivals, label) == 0 {
         saved[label] = facts
     } else {
         let have = saved[label]
-        let mut both: Map[Str, Bool] = [:]
+        let mut both: Map[Int, Bool] = [:]
         for key in maps.keys(facts) {
             if maps.has(have, key) { both[key] = true }
         }

@@ -3121,8 +3121,23 @@ the same entry. Close it with a commit or validation result; keep its history.
   covers overlapping ranges, both ends of Int, u64 ranges across 2^63, i8
   and Byte. It gives the same output from the old and new compilers on both
   back ends, and under `-Werror`.
-- **Remaining:** natively, the binary searches make a very large table's
-  function slower to optimize (above).
+- **Native build time (follow-up):** the slower native build of the flat
+  table came from `opt.known_branches`. It keyed facts by strings made
+  with `strings.from_int`, which went through `snprintf` (about 840 M
+  instructions), and it copied its fact map at every branch (`vela_map_unique`,
+  740 M), though each of the dispatch's tests compares with a constant of
+  its own, so its facts can never decide another test. Facts are now keyed by
+  integers. A fact about two registers is kept only when the pair is tested
+  at two places or more; signs are still kept. The runtime also writes
+  integers in decimal with its own digit loop instead of `snprintf`
+  (`format_int`). That serves `print`, `strings.from_int` and builders,
+  with the same text. Compiling the flat table natively takes 3.55 G
+  instructions (`vela asm`, callgrind), against 5.36 G before this and
+  3.81 G before TL-107. In wall time that is 0.51 to 0.54 s, against main's
+  0.48 to 0.56 s before TL-107. The assembly for the markdown program and for
+  the whole compiler is byte for byte the same, so no test is decided
+  differently. A native build of the compiler takes 13.8 to 14.6 s instead
+  of 16.2 to 17.4 s.
 
 ### TL-108: Tables cannot be module-level constants
 
