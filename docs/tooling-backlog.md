@@ -3055,7 +3055,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-107: Large match tables compile slowly and match strings one by one
 
-- **Status:** resolved for literal arms (below); range arms open.
+- **Status:** resolved (literal arms, then range arms; below).
 - **Discovery:** post-M30 CommonMark port.
 - **Evidence (observed):** `packages/markdown/tables.vl` (four functions,
   about 4,000 arms) takes 3.9 s to build natively and 13.4 s through C on its
@@ -3105,8 +3105,24 @@ the same entry. Close it with a commit or validation result; keep its history.
   build 25.2 s before and 24.6 s after (one noisy host,
   [report](../bench/results/2026-10-29-friction-fixes.md)). Suites,
   fixed points, differential seeds 20000-20999 and the markdown test pass.
+- **Range arms (follow-up):** a match whose arms before the last are
+  eight or more integer or Byte literals and `lo..=hi` ranges now goes
+  through `codegen.switch_spans`. It splits the values into ascending,
+  non-overlapping spans, each going to the first arm that takes it, and
+  merges neighbours that go to the same arm. Natively the spans are a
+  binary search, unsigned for u64 (`lower.span_switch`). Through C an
+  if-tree sets the arm's number, leaving out comparisons that could never
+  fail, which `-Wextra` would warn about. A copy of markdown's
+  `tables.punctuation` (340 arms, mostly ranges) does 4,000,000 lookups
+  natively in 0.015 s instead of 0.55 s. Through C it is the same (0.013 s;
+  gcc already turned the chain into a search). The markdown CLI on the
+  repository's docs is unchanged (138.25 M instructions natively): those
+  inputs rarely reach the Unicode tables. `tests/run/match_ranges.vl`
+  covers overlapping ranges, both ends of Int, u64 ranges across 2^63, i8
+  and Byte. It gives the same output from the old and new compilers on both
+  back ends, and under `-Werror`.
 - **Remaining:** natively, the binary searches make a very large table's
-  function slower to optimize (above). Range arms are still tested in turn.
+  function slower to optimize (above).
 
 ### TL-108: Tables cannot be module-level constants
 
