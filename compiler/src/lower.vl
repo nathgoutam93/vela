@@ -29,6 +29,7 @@ import errors
 import integers
 import ir
 import layout
+import lists
 import loops
 import maps
 import mono
@@ -2115,12 +2116,22 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
     let borrowed = unchanging(g, scrutinee)
     let end = label(mut g)
     let mut all_end = true  // every arm returns, breaks or continues
+    // Many literals: the arm is chosen first, and each arm starts at a label.
+    let texts = codegen.switch_texts(arms)
+    let numbers = switch_numbers(arms)
+    let mut arm_at: [Int] = []
+    if len(texts) > 0 || len(numbers) > 0 {
+        for _ in arms { push(mut arm_at, label(mut g)) }
+        if len(texts) > 0 { text_switch(mut g, v, texts, arm_at) } else { number_switch(mut g, scalar(mut g, v), numbers, arm_at) }
+    }
     for i in 0..len(arms) {
         let a = arms[i]
         let last = i == len(arms) - 1
         g.fs.dead = false  // each arm is reachable, whatever the last one ended with
         let mut next = -1
-        if !last {
+        if len(arm_at) > 0 {
+            place_label(mut g, arm_at[i])
+        } else if !last {
             next = label(mut g)
             tests(mut g, a.pattern, v, t, next)
         }
@@ -2166,7 +2177,7 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
         if !g.fs.dead {
             jump(mut g, end)
         }
-        if !last {
+        if next >= 0 {
             place_label(mut g, next)
         }
     }
@@ -2252,13 +2263,7 @@ fn tests(g: mut Low, p: ast.Pattern, path: Val, t: Int, fail: Int) {
                         branch_cmp(mut g, "ne", s, konst(mut g, 0), fail)
                     }
                 }
-                ast.ExprKind.StrLit(s) => {
-                    if !literal_test(mut g, path, s, fail) {
-                        let lit = sym_addr(mut g, str_literal(mut g, s))
-                        let eq = ccall(mut g, "vela_str_eq_ptr", [address(mut g, path), lit], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_BOOL(), -1)
-                        fail_unless(mut g, eq, fail)
-                    }
-                }
+                ast.ExprKind.StrLit(s) => text_test(mut g, path, s, fail, false)
                 ast.ExprKind.IntLit(n) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
                 ast.ExprKind.FixedIntLit(n, _, _) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
                 ast.ExprKind.ByteLit(n) => branch_cmp(mut g, "ne", scalar(mut g, path), konst(mut g, n), fail)
@@ -2284,6 +2289,115 @@ fn tests(g: mut Low, p: ast.Pattern, path: Val, t: Int, fail: Int) {
             }
         }
     }
+}
+
+// Go to `fail` unless the Str at `path` is `text`; `sized` when its length
+// is known to be text's.
+fn text_test(g: mut Low, path: Val, text: Str, fail: Int, sized: Bool) {
+    if !literal_test(mut g, path, text, fail, sized) {
+        let lit = sym_addr(mut g, str_literal(mut g, text))
+        let eq = ccall(mut g, "vela_str_eq_ptr", [address(mut g, path), lit], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_BOOL(), -1)
+        fail_unless(mut g, eq, fail)
+    }
+}
+
+// ---- Matches of many literals (TL-107) ----
+
+// Goes to arm_at[i] when the Str at `path` is texts[i], else to the last
+// arm: by length, then by the bytes that tell the texts of that length
+// apart, halving the values at each, then one full comparison.
+fn text_switch(g: mut Low, path: Val, texts: [Str], arm_at: [Int]) {
+    let other = arm_at[len(arm_at) - 1]
+    let groups = codegen.by_length(texts)
+    let mut lengths: [Int] = []
+    let mut to: [Int] = []
+    for group in groups {
+        push(mut lengths, group[0])
+        push(mut to, label(mut g))
+    }
+    int_switch(mut g, load(mut g, path.reg, path.off + 16, 8), lengths, to, 0, len(lengths), other)
+    for k in 0..len(groups) {
+        place_label(mut g, to[k])
+        let mut ids: [Int] = []
+        for j in 1..len(groups[k]) { push(mut ids, groups[k][j]) }
+        text_tree(mut g, path, texts, ids, arm_at, other)
+    }
+}
+
+fn text_tree(g: mut Low, path: Val, texts: [Str], ids: [Int], arm_at: [Int], other: Int) {
+    let s = codegen.split(texts, ids)
+    if len(ids) <= 2 || s.at < 0 {
+        for id in ids {
+            let next = label(mut g)
+            text_test(mut g, path, texts[id], next, true)
+            jump(mut g, arm_at[id])
+            place_label(mut g, next)
+        }
+        jump(mut g, other)
+        return
+    }
+    let data = load(mut g, path.reg, path.off + 8, 8)
+    let mut to: [Int] = []
+    for _ in s.bytes { push(mut to, label(mut g)) }
+    int_switch(mut g, load(mut g, data, s.at, 1), s.bytes, to, 0, len(to), other)
+    for k in 0..len(to) {
+        place_label(mut g, to[k])
+        text_tree(mut g, path, texts, s.groups[k], arm_at, other)
+    }
+}
+
+// The values of the arms before the last when each is an integer or Byte
+// literal and there are enough of them, as [value, arm] pairs by value (of
+// arms with the same value, the first), else none.
+fn switch_numbers(arms: [ast.Arm]) -> [[Int]] {
+    let none: [[Int]] = []
+    if len(arms) - 1 < 8 {
+        return none
+    }
+    let mut first: Map[Int, Int] = [:]
+    for i in 0..len(arms) - 1 {
+        match arms[i].pattern.kind {
+            ast.PatternKind.Lit(e) => {
+                match e.kind {
+                    ast.ExprKind.IntLit(_) => {}
+                    ast.ExprKind.FixedIntLit(_, _, _) => {}
+                    ast.ExprKind.ByteLit(_) => {}
+                    _ => return none
+                }
+                if !maps.has(first, literal(e)) { first[literal(e)] = i }
+            }
+            _ => return none
+        }
+    }
+    let mut out: [[Int]] = []
+    for n in lists.sort(maps.keys(first)) { push(mut out, [n, first[n]]) }
+    return out
+}
+
+fn number_switch(g: mut Low, v: Int, numbers: [[Int]], arm_at: [Int]) {
+    let mut values: [Int] = []
+    let mut to: [Int] = []
+    for pair in numbers {
+        push(mut values, pair[0])
+        push(mut to, arm_at[pair[1]])
+    }
+    int_switch(mut g, v, values, to, 0, len(values), arm_at[len(arm_at) - 1])
+}
+
+// Goes to to[k] when the register `v` is keys[k], for k from `lo` to before
+// `hi` (keys ascending), else to `other`: a few tests in turn, or halves.
+fn int_switch(g: mut Low, v: Int, keys: [Int], to: [Int], lo: Int, hi: Int, other: Int) {
+    if hi - lo <= 4 {
+        for k in lo..hi { branch_cmp(mut g, "eq", v, konst(mut g, keys[k]), to[k]) }
+        jump(mut g, other)
+        return
+    }
+    let half = lo + (hi - lo) / 2
+    let upper = label(mut g)
+    branch_cmp(mut g, "ge", v, konst(mut g, keys[half]), upper)
+    int_switch(mut g, v, keys, to, lo, half, other)
+    place_label(mut g, upper)
+    int_switch(mut g, v, keys, to, half, hi, other)
 }
 
 fn literal(e: ast.Expr) -> Int {
@@ -3182,7 +3296,7 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
             }, _ => {} }
             if found && len(literal) <= 16 {
                 let result = temp_reg(mut g, types.BOOL()); emit(mut g, ir.inst(ir.Op.Const, result.reg, -1, -1, 0)); let done = label(mut g)
-                literal_test(mut g, path, literal, done)
+                literal_test(mut g, path, literal, done, false)
                 emit(mut g, ir.inst(ir.Op.Const, result.reg, -1, -1, 1)); place_label(mut g, done)
                 if op == "==" { return result }
                 let r = reg(mut g, ir.INT()); emit(mut g, ir.inst(ir.Op.Not, r, result.reg, -1, 0)); return reg_val(r, types.BOOL())
@@ -3215,9 +3329,9 @@ fn operation(g: mut Low, e: ast.Expr, op: Str, left: Val, right: Val, operand: I
 
 // A short literal comparison reads only bytes proved present by the length
 // test. Exact chunks also cover unaligned slices and embedded zero bytes.
-fn literal_test(g: mut Low, path: Val, text: Str, fail: Int) -> Bool {
+fn literal_test(g: mut Low, path: Val, text: Str, fail: Int, sized: Bool) -> Bool {
     let n = len(text); if n > 16 { return false }
-    branch_cmp(mut g, "ne", load(mut g, path.reg, path.off + 16, 8), konst(mut g, n), fail)
+    if !sized { branch_cmp(mut g, "ne", load(mut g, path.reg, path.off + 16, 8), konst(mut g, n), fail) }
     if n == 0 { return true }
     let data = load(mut g, path.reg, path.off + 8, 8); let mut at = 0
     for at < n {

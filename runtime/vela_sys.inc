@@ -562,6 +562,7 @@ bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {
         // Receive into the owned string instead of copying a temporary buffer.
         vela_strobj *obj=vela_alloc(checked_bytes((uint64_t)max,1,sizeof(vela_strobj)));
         obj->rc=1;
+        obj->cap=max;
         int64_t deadline=sys_until(timeout,opened,limit);
         for (; ; ) {
             if (!sys_wait(fd,POLLIN,deadline,e)) {
@@ -579,7 +580,10 @@ bool vela_sys_net_read(vela_io_handle *h,int64_t max,vela_str *o,vela_str *e) {
                     // after a short read. A failed shrink leaves valid storage.
                     if (n<max) {
                         vela_strobj *smaller=realloc(obj,sizeof(vela_strobj)+(size_t)n);
-                        if (smaller) obj=smaller;
+                        if (smaller) {
+                            obj=smaller;
+                            obj->cap=n;
+                        }
                     }
                     *o=(vela_str){obj,obj->bytes,n};
                 }

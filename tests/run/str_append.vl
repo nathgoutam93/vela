@@ -1,0 +1,58 @@
+// `s = s + t` appends in place when s holds the only reference to its
+// bytes and they have room (TL-110). Any other holder of those bytes sees
+// them unchanged.
+// out: abcabc
+// out: base+x base+y base
+// out: 0,01,012,0123,01234
+// out: hel|hello world!
+// out: [ab|cd]
+// out: 1000000 1000000
+// out: 3 aaa aaa! aaa?
+import strings
+
+fn twice(s: Str) -> Str {
+    return s + s
+}
+
+fn main() {
+    print(twice("abc"[0..3] + ""))
+    // A copy kept while the original grows.
+    let mut s = "base" + ""
+    let x = s + "+x"
+    let y = s + "+y"
+    print(x + " " + y + " " + s)
+    // Copies kept in an array.
+    let mut steps: [Str] = []
+    let mut acc = ""
+    for i in 0..5 {
+        acc = acc + "0123456789"[i..i + 1]
+        push(mut steps, acc)
+    }
+    let mut joined = ""
+    for k in 0..len(steps) {
+        if k > 0 { joined = joined + "," }
+        joined = joined + steps[k]
+    }
+    print(joined)
+    // A slice of a longer Str, appended to after the longer one is gone.
+    let mut long = "hello" + " world"
+    let short = long[0..3]
+    long = long + "!"
+    print(short + "|" + long)
+    // Appending through a join, a field and an element.
+    let mut parts = ["[" + "", "x"]
+    parts[0] = parts[0] + "ab" + "|" + "cd"
+    parts[1] = parts[0] + "]"
+    print(parts[1])
+    let mut big = ""
+    let mut other = ""
+    for _ in 0..100000 {
+        big = big + "0123456789"
+        other = other + "01234" + "56789"
+    }
+    print(strings.from_int(len(big)) + " " + strings.from_int(len(other)))
+    let base = "aa" + "a"
+    let a = base + "!"
+    let b = base + "?"
+    print(strings.from_int(len(base)) + " " + base + " " + a + " " + b)
+}

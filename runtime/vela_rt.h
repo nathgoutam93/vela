@@ -164,9 +164,12 @@ static inline void *vela_fixed_at(void *base, int64_t i, int64_t length, size_t 
 //
 // A Str is a view of `len` bytes at `data`, plus the heap object that owns
 // them (NULL for literals, which live in the program's data forever). A
-// slice points into its parent's bytes and shares its object.
+// slice points into its parent's bytes and shares its object. An object has
+// room for `cap` bytes; while one reference holds it, bytes past that view's
+// end are nobody's, so appending to it can write them (TL-110).
 typedef struct vela_strobj {
     int64_t rc;
+    int64_t cap;
     uint8_t bytes[];
 } vela_strobj;
 

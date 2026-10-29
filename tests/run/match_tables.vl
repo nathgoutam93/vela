@@ -1,0 +1,135 @@
+// A match with many Str literals chooses its arm by length, then by bytes,
+// then compares once; one with many integer or Byte literals halves the
+// values (TL-107). Same texts and values as tested one by one.
+// out: 1 2 3 4 5 6 7 8 9 10 12 13 14 0 0 0 0 0 0 0 0 0
+// out: m5 zero one two three other ten other hundred other answer max min+1 other
+// out: 10 20 30 40 50 60 70 80 0 0
+// out: big top 0 low mid other
+// out: lt amp eacute quot - -
+fn kw(s: Str) -> Int {
+    return match s {
+        "fn" => 1
+        "let" => 2
+        "mut" => 3
+        "if" => 4
+        "else" => 5
+        "for" => 6
+        "match" => 7
+        "return" => 8
+        "break" => 9
+        "" => 10
+        "continue" => 12
+        "a-very-long-keyword-over-sixteen" => 13
+        "é" => 14
+        _ => 0
+    }
+}
+
+fn num(n: Int) -> Str {
+    return match n {
+        -5 => "m5"
+        0 => "zero"
+        1 => "one"
+        2 => "two"
+        3 => "three"
+        10 => "ten"
+        100 => "hundred"
+        9223372036854775807 => "max"
+        -9223372036854775807 => "min+1"
+        42 => "answer"
+        _ => "other"
+    }
+}
+
+fn letter(c: Byte) -> Int {
+    return match c {
+        'a' => 10
+        'b' => 20
+        'c' => 30
+        'd' => 40
+        'x' => 50
+        'y' => 60
+        'z' => 70
+        '\n' => 80
+        _ => 0
+    }
+}
+
+fn wide(n: u64) -> Str {
+    return match n {
+        18446744073709551615u64 => "top"
+        9223372036854775808u64 => "big"
+        0u64 => "0"
+        1u64 => "low"
+        2u64 => "low"
+        3u64 => "low"
+        1000u64 => "mid"
+        2000u64 => "mid"
+        3000u64 => "mid"
+        _ => "other"
+    }
+}
+
+fn entity(name: Str) -> Str {
+    return match name {
+        "lt" => "<"
+        "gt" => ">"
+        "amp" => "&"
+        "quot" => "\""
+        "apos" => "'"
+        "nbsp" => " "
+        "eacute" => "é"
+        "egrave" => "è"
+        "ecirc" => "ê"
+        _ => ""
+    }
+}
+
+fn line(words: [Str]) -> Str {
+    let mut out = ""
+    for w in words {
+        if out != "" { out = out + " " }
+        out = out + w
+    }
+    return out
+}
+
+fn main() {
+    let mut a: [Str] = []
+    for w in ["fn", "let", "mut", "if", "else", "for", "match", "return", "break", "", "continue", "a-very-long-keyword-over-sixteen", "é", "a-very-long-keyword-over-sixteeN", "x", "lett", "le", "ma", "matcH", "returm", "è", "ff"] {
+        push(mut a, int_text(kw(w)))
+    }
+    print(line(a))
+    let mut b: [Str] = []
+    for n in [-5, 0, 1, 2, 3, 4, 10, 99, 100, 101, 42, 9223372036854775807, -9223372036854775807, -9223372036854775807 - 1] { push(mut b, num(n)) }
+    print(line(b))
+    let mut c: [Str] = []
+    for x in "abcdxyz\nAe" { push(mut c, int_text(letter(x))) }
+    print(line(c))
+    let mut d: [Str] = []
+    for n in [9223372036854775808u64, 18446744073709551615u64, 0u64, 2u64, 2000u64, 18446744073709551614u64] { push(mut d, wide(n)) }
+    print(line(d))
+    let mut e: [Str] = []
+    for n in ["lt", "amp", "eacute", "quot", "eacutf", "Lt"] {
+        let x = entity(n)
+        if x == "<" { push(mut e, "lt") } else if x == "&" { push(mut e, "amp") } else if x == "é" { push(mut e, "eacute") } else if x == "\"" { push(mut e, "quot") } else { push(mut e, "-") }
+    }
+    print(line(e))
+}
+
+fn int_text(n: Int) -> Str {
+    return match n {
+        0 => "0"
+        _ => digits(n)
+    }
+}
+
+fn digits(n: Int) -> Str {
+    let mut out = ""
+    let mut x = n
+    for x > 0 {
+        out = match x % 10 { 0 => "0", 1 => "1", 2 => "2", 3 => "3", 4 => "4", 5 => "5", 6 => "6", 7 => "7", 8 => "8", _ => "9" } + out
+        x = x / 10
+    }
+    return out
+}

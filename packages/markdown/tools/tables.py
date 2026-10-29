@@ -72,8 +72,9 @@ for cp in range(0x110000):
     if f != c:
         out.append(f'        {cp} => {vela_str(f)}')
 out += ['        _ => ""', '    }', '}', '']
-# A match on Str compares arm by arm (TL-107), so the names are matched
-# by first letter, then by length, and only then by text.
+# The names are matched by first letter, then by length, and only then by
+# text: a match on Str compared arm by arm until TL-107, and small matches
+# still keep each function small.
 entities = {}
 for name in sorted(html.entities.html5):
     if name.endswith(';'):

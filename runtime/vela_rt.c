@@ -258,19 +258,38 @@ void vela_str_release(vela_str s) {
     if (s.obj && vela_rc_dec(&s.obj->rc)) free(s.obj);
 }
 
+// The Str `a` followed by `n` bytes still to be written at the end: in a's
+// own object when the only reference to it is a's and it has room, so a
+// string built by repeated `s = s + t` is not copied at every step (TL-110);
+// else in a new object, with room to spare when a's was its alone.
+static vela_str str_extend(vela_str a, int64_t n) {
+    int64_t len;
+    if (__builtin_add_overflow(a.len, n, &len)) vela_panic("vela runtime", "string too long");
+    vela_strobj *o = a.obj;
+    bool alone = o && __atomic_load_n(&o->rc, __ATOMIC_RELAXED) == 1;
+    if (alone && (a.data - o->bytes) + len <= o->cap) {
+        o->rc = 2;
+        return (vela_str){o, a.data, len};
+    }
+    int64_t cap = len;
+    if (alone && len <= INT64_MAX / 3 * 2) cap = len + len / 2;
+    vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)cap, 1, sizeof(vela_strobj)));
+    obj->rc = 1;
+    obj->cap = cap;
+    if (a.len) memcpy(obj->bytes, a.data, (size_t)a.len);
+    return (vela_str){obj, obj->bytes, len};
+}
+
 vela_str vela_str_concat(vela_str a, vela_str b) {
     VELA_PROFILE_SCOPE("strings");
     // Strings are immutable. Keep the other operand alive when no bytes need
     // joining, including slices whose storage belongs to a larger string.
     if (a.len == 0) { vela_str_retain(b); return b; }
     if (b.len == 0) { vela_str_retain(a); return a; }
-    int64_t len;
-    if (__builtin_add_overflow(a.len, b.len, &len)) vela_panic("vela runtime", "string too long");
-    vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
-    obj->rc = 1;
-    if (a.len) memcpy(obj->bytes, a.data, (size_t)a.len);
-    if (b.len) memcpy(obj->bytes + a.len, b.data, (size_t)b.len);
-    return (vela_str){obj, obj->bytes, len};
+    vela_str out = str_extend(a, b.len);
+    // b may be a itself, borrowed: its bytes are before the new ones.
+    memmove((uint8_t *)out.data + a.len, b.data, (size_t)b.len);
+    return out;
 }
 
 // a + b + c + ...: one allocation for the whole chain, where concatenating
@@ -284,14 +303,13 @@ vela_str vela_str_join(const vela_str *parts, int64_t n) {
         if (__builtin_add_overflow(len, parts[i].len, &len)) vela_panic("vela runtime", "string too long");
     }
     if (filled <= 1) { vela_str_retain(parts[only]); return parts[only]; }
-    vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
-    obj->rc = 1;
-    int64_t at = 0;
-    for (int64_t i = 0; i < n; i++) {
-        if (parts[i].len) memcpy(obj->bytes + at, parts[i].data, (size_t)parts[i].len);
+    vela_str out = str_extend(parts[0], len - parts[0].len);
+    int64_t at = parts[0].len;
+    for (int64_t i = 1; i < n; i++) {
+        if (parts[i].len) memmove((uint8_t *)out.data + at, parts[i].data, (size_t)parts[i].len);
         at += parts[i].len;
     }
-    return (vela_str){obj, obj->bytes, len};
+    return out;
 }
 
 // The parts a join owned, in one call rather than a release per part: a
@@ -1249,6 +1267,7 @@ static vela_str str_from(const char *data, size_t len) {
     VELA_PROFILE_SCOPE("strings");
     vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)len, 1, sizeof(vela_strobj)));
     obj->rc = 1;
+    obj->cap = (int64_t)len;
     if (len) memcpy(obj->bytes, data, len);
     return (vela_str){obj, obj->bytes, (int64_t)len};
 }
@@ -1322,6 +1341,7 @@ bool vela_files_read(vela_str path, vela_str *out) {
         return false;
     }
     obj->rc = 1;
+    obj->cap = (int64_t)cap;
     *out = (vela_str){obj, obj->bytes, (int64_t)len};
     return true;
 }
@@ -1735,6 +1755,7 @@ vela_str vela_os_read(int64_t n, const char *loc) {
     fflush(stdout);
     vela_strobj *obj = vela_alloc(checked_bytes((uint64_t)n, 1, sizeof(vela_strobj)));
     obj->rc = 1;
+    obj->cap = n;
     size_t got = 0;
     flockfile(stdin);
     while (got < (size_t)n) {
