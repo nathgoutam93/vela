@@ -3137,22 +3137,47 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-111: A short-circuit Bool used only by a branch is materialized
 
-- **Status:** open (proposal).
+- **Status:** resolved.
 - **Discovery:** post-M30 CommonMark port: native code of
   `inlines.plain` (`vela asm bench/real/markdown/main.vl`).
 - **Evidence:** `special(c)`, a chain of `c == x || ...`, inlined into a
   loop that only branches on it, computes each comparison into a register
-  (`sete`, `movzx`, `test`, `jnz`) instead of branching directly; the
-  bounds check after the loop's signed test is repeated because the index
-  is a copy of the tested register (TL-103's facts follow registers set
-  once).
-- **Impact:** character-classification loops, common in parsers, run
-  about twice the instructions they need.
-- **Workaround:** test the common case before calling the function.
-- **Proposed improvement:** when a Bool phi of a short-circuit expression is
-  only branched on, thread the branches through it; let known facts follow
-  moves.
-- **Verify:** the loop in `inlines.plain` and the markdown throughput.
+  (`sete`, `movzx`, `test`, `jnz`) instead of branching directly. `vela ir`
+  shows why: each `||` sets the result register on both ways into a join,
+  copies it, and branches on it again after the join (`%18 = cmpi`,
+  `branch %18 L9 L8`, `L9: %22 = move %18`, `branch %18 L11 L10`, ...).
+  The entry also said the bounds check after the loop's signed test is
+  repeated because the index is a copy of the tested register. That was a
+  suspected cause, and it is wrong: `p.pos` is a field and may be negative,
+  so `p.pos < len(p.s)` does not imply the unsigned bounds check, and
+  facts that followed moves would not remove it.
+- **Resolution:** `opt.thread_bools`, run in `simplify`, follows each way
+  out of a `branch %r`. Where %r's value is known (true on one way, false
+  on the other, through the copies made just before the branch), the way
+  goes through labels, jumps, moves, constants and negations and past every
+  branch whose register's value is then known, and it goes straight to
+  where the last such branch would have gone. Copies still read where it
+  lands (found by a liveness pass over just these registers) go on an
+  edge block of their own, each reading the first source of its chain. Then
+  defs of these registers that nothing reads are dropped, and a comparison
+  read only by the branch after it becomes a `branch.cmp`. The loop in
+  `scan` (tests/run/bool_chains.vl) is now five `branch.cmp eq` to the
+  exit, and `inlines.plain` likewise. A function that returns the Bool keeps one
+  move per edge block.
+- **Verification:** callgrind instruction counts, native, before (main at
+  `2e587dc`) and after on this host, with output unchanged: the markdown CLI on
+  the repository's docs (959 KB) 148.7 M to 137.7 M (-7.4%); arena_trees
+  -14.7%, varints -2.3%, mandelbrot -0.8%, and the other eight benchmarks
+  within 0.01%. A native build of the compiler takes the same time
+  (17.1 s against 17.8 s). `tests/run/bool_chains.vl` covers `||`, `&&`,
+  `!`, a Bool read again after its branch, and a returned Bool. Native and C
+  suites pass, the native fixed point holds, the markdown test passes on
+  both back ends, and differential seeds 7000-7999 and 12000-12999 agree
+  (after TL-114, which seed 7648 found).
+- **Remaining:** the loop in `inlines.plain` still makes the signed test and
+  then the bounds check. When the length is known not to be negative, testing `i <u n`
+  first, and `i < n` only when that fails, would put one comparison on
+  the hot path. This is a proposal, not part of this fix.
 
 ### TL-112: The native markdown program trails its C build on arm64
 
@@ -3228,6 +3253,33 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Proposed improvement:** borrow loop elements in the C backend as the
   native one does when the body neither stores nor moves the element.
 - **Verify:** the C of the loop above has no per-element retain or release.
+
+### TL-114: Copy propagation hung on dead code holding a copy cycle
+
+- **Status:** resolved.
+- **Discovery:** post-M30, while validating TL-111: differential seed 7648
+  (`python3 tests/differential_test.py --start 7648 --count 1`) timed out
+  natively. The compiler, not the program, was looping: `vela asm` of the
+  reduced program (the end of `tests/run/bool_chains.vl`) does not finish
+  with the compiler at main `2e587dc` either, so the bug predates TL-111.
+- **Evidence (observed):** a backtrace of the hung compiler is in
+  `opt.propagate`, whose chain walk (`for rep[x] != x`) found the copies
+  `%655 = move %327` and `%327 = move %655`, each register set once, after
+  a constant condition made the code around them unreachable (the source
+  says `m42 = match ... { _ => m42 }`). `drop_unreachable` removed code
+  after a jump or return only up to the next label that any jump targets,
+  and dead code jumping within itself kept its labels targeted. So the
+  dead region stayed, and the pass's premise, that a register set once
+  holds one value everywhere it is read, failed there.
+- **Impact:** a native build or `vela ir` never finishes on such programs.
+- **Workaround:** none needed after the fix. Before it, the only way out was
+  rewriting the dead code.
+- **Resolution:** `drop_unreachable` walks from the entry, following the
+  jumps of code it has reached. Code that only dead code jumps to is dropped
+  with it.
+- **Verification:** seed 7648 agrees, and the reduced program compiles in
+  0.1 s and runs as on C (`tests/run/bool_chains.vl`). Suites, fixed points
+  and differential seeds are as listed in TL-111.
 
 ## Outstanding validation
 

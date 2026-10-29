@@ -1,0 +1,104 @@
+// A Bool made by `||` or `&&`, or returned by an inlined function, and then
+// branched on: each way out of one of its tests goes straight to where the
+// Bool sends it (opt.thread_bools), keeping it only where it is read.
+// out: 12
+// out: true
+// out: false
+// out: 300
+// out: 200
+// out: 4
+// out: 1
+// out: 500
+// out: 20
+// out: 20
+import ints
+
+fn special(c: Byte) -> Bool {
+    return c == '\n' || c == '`' || c == '[' || c == ']' || c == '!'
+}
+
+fn scan(s: Str) -> Int {
+    let mut i = 0
+    for i < len(s) {
+        if special(s[i]) {
+            break
+        }
+        i = i + 1
+    }
+    return i
+}
+
+fn word(c: Byte) -> Bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
+}
+
+// The Bool is read again after the branch on it.
+fn count_kept(s: Str) -> Int {
+    let mut n = 0
+    let mut last = false
+    for c in s {
+        let w = word(c) && !special(c)
+        if w {
+            n = n + 1
+        }
+        last = w
+    }
+    if last {
+        return n * 100
+    }
+    return n
+}
+
+// Negated and with an `&&` inside an `||`.
+fn outside(x: Int, lo: Int, hi: Int) -> Bool {
+    return !(x >= lo && x <= hi) || x == 7
+}
+
+fn count_outside(xs: [Int]) -> Int {
+    let mut n = 0
+    for x in xs {
+        if outside(x, 2, 8) {
+            n = n + 1
+        }
+    }
+    return n
+}
+
+// A copy of a variable into itself inside code that never runs (reduced
+// from differential seed 7648): unreachable code must go entirely, or its
+// copies, each set once, form a cycle.
+fn f16(p0: i32) -> u64 {
+    let mut m17: u64 = 7u64
+    return ints.wrapping_sub(ints.wrapping_rem(ints.wrapping_div(m17, (m17 | 1u64)), ((4u64 >> (6u64 & 63u64)) | 1u64)), ints.wrapping_add(m17, ints.wrapping_neg(m17)))
+}
+
+fn f29(p0: u64) -> u32 {
+    let mut m30: u32 = 20u32
+    let v33: i32 = ints.wrapping_add(ints.wrapping_sub(((-166234692i32) << 21i32), ((-6i32) ^ (-16i32))), (match (ints.wrapping_mul(12072400050909127829u64, p0) >= f16(2058348501i32)) { true => (match 0i32 { -17i32 => (-2147483648i32), _ => 13i32 }), false => (0i32 << 31i32) }))
+    if (32767i16 <= ((~(-2i16)) >> (1i16 & 15i16))) {
+    } else {
+        return m30
+    }
+    let mut m42: i16 = ints.wrapping_neg((-26239i16))
+    if (9926u16 == 27199u16) {
+        if (60i8 != (~ints.wrapping_mul(10i8, (-13i8)))) {
+        }
+        m42 = (match ((10i16 | m42) >> (ints.wrapping_sub(m42, m42) & 15i16)) { -32767i16 => m42, _ => m42 })
+        if ((match (p0 >> 42u64) { 12513631030947215865u64 => ints.wrapping_neg(p0), _ => (0u64 ^ p0) }) <= ((p0 | 12436946413374987585u64) & p0)) {
+        }
+    }
+    return ints.wrapping_div(u32(ints.wrapping_mul(m42, m42) & 32767i16), (ints.wrapping_sub(m30, (m30 ^ 2881321u32)) | 1u32))
+}
+
+fn main() {
+    print(scan("hello world [x]"))
+    print(special('!'))
+    print(special('a'))
+    print(count_kept("ab [c"))
+    print(count_kept("x y"))
+    print(count_outside([1, 2, 7, 8, 9, 10, 5]))
+    print(count_kept("a!"))
+    print(count_kept("abcd!e"))
+    print(f29(3u64))
+    print(f29(12513631030947215865u64))
+}

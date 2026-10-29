@@ -231,6 +231,7 @@ fn simplify(f: ir.Func) -> ir.Func {
         out = reuse(out)
         out = known_branches(out)
         out = fold(out)
+        out = thread_bools(out)
         out = fuse_branches(out)
         out = drop_dead(out)
         out = thread_jumps(out)
@@ -1290,35 +1291,42 @@ fn final_label(to: Map[Int, Int], l: Int) -> Int {
     return x
 }
 
-// After a jump, a return or code that never returns, nothing runs until a
-// label something jumps to.
+// Only code reachable from the entry stays: a jump, a return or code that
+// never returns ends a run of it, which goes on at each label a reachable
+// instruction jumps to (code reachable only from dead code is dead too).
+// A label nothing reachable jumps to, reached by falling through, stays out.
 fn drop_unreachable(f: ir.Func) -> ir.Func {
+    let mut label_at: Map[Int, Int] = [:]
+    for k in 0..len(f.insts) {
+        if f.insts[k].op == ir.Op.Label { label_at[f.insts[k].imm] = k }
+    }
+    let mut seen: [Bool] = []
+    for _ in f.insts { push(mut seen, false) }
     let mut target: Map[Int, Bool] = [:]
-    for i in f.insts {
-        if i.op == ir.Op.Jump || i.op == ir.Op.Branch || i.op == ir.Op.BranchCmp {
-            target[i.imm] = true
-        }
-        if i.op == ir.Op.Branch {
-            target[i.imm2] = true
+    let mut work = [0]
+    let mut n = 1
+    for n > 0 {
+        n = n - 1
+        let mut k = work[n]
+        for k < len(f.insts) && !seen[k] {
+            seen[k] = true
+            let i = f.insts[k]
+            for t in targets(i) {
+                if !maps.has(target, t) {
+                    target[t] = true
+                    if n < len(work) { work[n] = label_at[t] } else { push(mut work, label_at[t]) }
+                    n = n + 1
+                }
+            }
+            if ir.ends_block(i.op) { break }
+            k = k + 1
         }
     }
     let mut out = f
     out.insts = []
-    let mut live = true
     for k in 0..len(f.insts) {
         let i = f.insts[k]
-        if i.op == ir.Op.Label {
-            if maps.has(target, i.imm) {
-                live = true
-            } else if !live {
-                continue
-            }
-            // A label nothing jumps to, reached by falling through, stays out.
-            if !maps.has(target, i.imm) {
-                continue
-            }
-        }
-        if !live {
+        if !seen[k] || i.op == ir.Op.Label && !maps.has(target, i.imm) {
             continue
         }
         // A jump to the label right after it.
@@ -1326,9 +1334,326 @@ fn drop_unreachable(f: ir.Func) -> ir.Func {
             continue
         }
         push(mut out.insts, i)
-        if ir.ends_block(i.op) {
-            live = false
+    }
+    return out
+}
+
+// A Bool made by `a || b` or `a && b`, or returned by an inlined function,
+// is a register set on each way in and branched on after the join:
+//     %r = cmp ...    branch %r L1 L0    L0: %r = cmp ...    L1: %s = move %r    branch %r L3 L2
+// On each way out of a branch on %r its value is known, so a way that only
+// moves it on to another branch on it can go where that branch would:
+// `branch %r L3 L0` here. Moves still needed where it lands go on an edge
+// block of their own. Afterwards, defs of these registers nothing reads are
+// dropped, and a comparison only a branch reads becomes a `branch.cmp`.
+fn thread_bools(f: ir.Func) -> ir.Func {
+    let track = branched_bools(f)
+    let mut count = 0
+    for t in track { if t >= 0 { count = count + 1 } }
+    if count == 0 { return f }
+    let mut label_at: Map[Int, Int] = [:]
+    for k in 0..len(f.insts) { if f.insts[k].op == ir.Op.Label { label_at[f.insts[k].imm] = k } }
+    // Each branch's two ways: [the label taken, then the label not].
+    let mut threads: Map[Int, [Thread]] = [:]
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        if i.op == ir.Op.Branch && i.imm != i.imm2 {
+            let same = copies_at(f, k)
+            let yes = follow(f, label_at, i.imm, same, 1)
+            let no = follow(f, label_at, i.imm2, same, 0)
+            if yes.target >= 0 && yes.target != i.imm || no.target >= 0 && no.target != i.imm2 { threads[k] = [yes, no] }
         }
+    }
+    if len(maps.keys(threads)) == 0 { return f }
+    if !ir.ends_block(f.insts[len(f.insts) - 1].op) { return f }
+    let words = count / 62 + 1
+    let live = live_at_labels(f, track, words)
+    let mut out = f
+    out.insts = []
+    let mut edges: [ir.Inst] = []
+    for k in 0..len(f.insts) {
+        let i = f.insts[k]
+        let mut o = i
+        match maps.get(threads, k) {
+            Some(ways) => {
+                for way in 0..2 {
+                    let t = ways[way]
+                    let mut from = i.imm
+                    if way == 1 { from = i.imm2 }
+                    if t.target < 0 || t.target == from { continue }
+                    let kept = needed(t.moves, copies_at(f, k), live[t.target], track)
+                    let mut land = t.target
+                    if len(kept) > 0 {
+                        land = ir.label(mut out)
+                        push(mut edges, ir.inst(ir.Op.Label, -1, -1, -1, land))
+                        for m in kept { push(mut edges, m) }
+                        push(mut edges, ir.inst(ir.Op.Jump, -1, -1, -1, t.target))
+                    }
+                    if way == 0 { o.imm = land } else { o.imm2 = land }
+                }
+            }
+            None => {}
+        }
+        push(mut out.insts, o)
+    }
+    for e in edges { push(mut out.insts, e) }
+    return dead_bools(drop_unreachable(out), track, words)
+}
+
+// The registers branched on, and those moved or negated to or from them:
+// their numbers in the sets below, -1 for the others.
+fn branched_bools(f: ir.Func) -> [Int] {
+    let mut on: [Bool] = []
+    for _ in f.classes { push(mut on, false) }
+    for i in f.insts { if i.op == ir.Op.Branch { on[i.a] = true } }
+    let mut grew = true
+    for grew {
+        grew = false
+        for i in f.insts {
+            if (i.op == ir.Op.Move || i.op == ir.Op.Not) && on[i.dst] != on[i.a] {
+                on[i.a] = true
+                on[i.dst] = true
+                grew = true
+            }
+        }
+    }
+    let mut track: [Int] = []
+    let mut n = 0
+    for r in 0..len(on) {
+        if on[r] {
+            push(mut track, n)
+            n = n + 1
+        } else {
+            push(mut track, -1)
+        }
+    }
+    return track
+}
+
+type Thread = struct {
+    target: Int  // -1 when no branch on the way is decided
+    moves: [ir.Inst]  // what runs on the way there
+}
+
+// The registers holding the same value as the one the branch at `k` tests,
+// through the moves before it in its block.
+fn copies_at(f: ir.Func, k: Int) -> [Int] {
+    let mut same = [f.insts[k].a]
+    let mut set: Map[Int, Bool] = [:]  // registers set between there and the branch
+    let mut j = k - 1
+    for j >= 0 && k - j < 32 {
+        let i = f.insts[j]
+        if i.op == ir.Op.Label || ir.ends_block(i.op) { break }
+        if i.op == ir.Op.Move && !maps.has(set, i.dst) && !maps.has(set, i.a) {
+            let has_dst = contains_reg(same, i.dst)
+            let has_a = contains_reg(same, i.a)
+            if has_dst && !has_a { push(mut same, i.a) }
+            if has_a && !has_dst { push(mut same, i.dst) }
+        }
+        if i.dst >= 0 { set[i.dst] = true }
+        j = j - 1
+    }
+    return same
+}
+
+fn contains_reg(rs: [Int], r: Int) -> Bool {
+    for x in rs { if x == r { return true } }
+    return false
+}
+
+// Where the way into `start` goes with registers `same` known to be `truth`
+// (1 or 0): through labels, jumps, moves, constants and negations, past each
+// branch on a register whose value is known, to the label after the last.
+fn follow(f: ir.Func, label_at: Map[Int, Int], start: Int, same: [Int], truth: Int) -> Thread {
+    let mut known: Map[Int, Int] = [:]  // 1 nonzero, 0 zero, -1 not known
+    for r in same { known[r] = truth }
+    let mut best = Thread { target: -1, moves: [] }
+    let mut moves: [ir.Inst] = []
+    let mut k = label_at[start]
+    for _ in 0..64 {
+        let i = f.insts[k]
+        if i.op == ir.Op.Label {
+            k = k + 1
+        } else if i.op == ir.Op.Jump {
+            k = label_at[i.imm]
+        } else if i.op == ir.Op.Move || i.op == ir.Op.Not || i.op == ir.Op.Const {
+            let mut v = -1
+            if i.op == ir.Op.Const {
+                v = bool_int(i.imm != 0)
+            } else if f.classes[i.a] != ir.FLOAT() {
+                v = known_value(known, i.a)
+                if v >= 0 && i.op == ir.Op.Not { v = 1 - v }
+            }
+            known[i.dst] = v
+            push(mut moves, i)
+            k = k + 1
+        } else if i.op == ir.Op.Branch {
+            let v = known_value(known, i.a)
+            if v < 0 { break }
+            let mut to = i.imm2
+            if v == 1 { to = i.imm }
+            best = Thread { target: to, moves: moves }
+            k = label_at[to]
+        } else {
+            break
+        }
+    }
+    return best
+}
+
+fn known_value(known: Map[Int, Int], r: Int) -> Int {
+    match maps.get(known, r) {
+        Some(v) => return v
+        None => return -1
+    }
+}
+
+// The moves on a threaded way whose results are read where it lands:
+// backwards from the registers live there. Untracked ones always stay. A
+// move of a move reads the first source instead when nothing on the way
+// sets it, so a chain of copies leaves only the last; a copy of the
+// register branched on (`same`) reads that register.
+fn needed(path: [ir.Inst], same: [Int], live: [Int], track: [Int]) -> [ir.Inst] {
+    let mut written: Map[Int, Bool] = [:]
+    for m in path { written[m.dst] = true }
+    let mut root: Map[Int, Int] = [:]
+    let mut moves: [ir.Inst] = []
+    for m in path {
+        let mut o = m
+        if m.op == ir.Op.Move {
+            let mut from = m.a
+            match maps.get(root, m.a) { Some(x) => from = x, None => {} }
+            if contains_reg(same, from) { from = same[0] }
+            if !maps.has(written, from) { o.a = from }
+            root[m.dst] = o.a
+        } else {
+            root[m.dst] = m.dst
+        }
+        push(mut moves, o)
+    }
+    let mut want = live
+    let mut keep: [Bool] = []
+    for _ in moves { push(mut keep, false) }
+    let mut k = len(moves) - 1
+    for k >= 0 {
+        let m = moves[k]
+        if track[m.dst] < 0 || has_bit(want, track[m.dst]) {
+            keep[k] = true
+            if track[m.dst] >= 0 { set_bit(mut want, track[m.dst], false) }
+            if m.op != ir.Op.Const && track[m.a] >= 0 { set_bit(mut want, track[m.a], true) }
+        }
+        k = k - 1
+    }
+    let mut out: [ir.Inst] = []
+    for k2 in 0..len(moves) { if keep[k2] { push(mut out, moves[k2]) } }
+    return out
+}
+
+fn has_bit(s: [Int], k: Int) -> Bool {
+    return (s[k / 62] >> (k % 62)) & 1 == 1
+}
+
+fn set_bit(s: mut [Int], k: Int, on: Bool) {
+    let bit = 1 << (k % 62)
+    if on { s[k / 62] = s[k / 62] | bit } else { s[k / 62] = s[k / 62] & ~bit }
+}
+
+fn same_bits(a: [Int], b: [Int]) -> Bool {
+    for k in 0..len(a) { if a[k] != b[k] { return false } }
+    return true
+}
+
+fn union_bits(a: [Int], b: [Int]) -> [Int] {
+    let mut out = a
+    for k in 0..len(a) { out[k] = a[k] | b[k] }
+    return out
+}
+
+// The tracked registers live just before `i`, given those live after it
+// (on to the next instruction) and where each label starts.
+fn live_before(i: ir.Inst, after: [Int], at: Map[Int, [Int]], track: [Int]) -> [Int] {
+    let mut live = after
+    if i.op == ir.Op.Jump {
+        live = at[i.imm]
+    } else if i.op == ir.Op.Branch {
+        live = union_bits(at[i.imm], at[i.imm2])
+    } else if i.op == ir.Op.BranchCmp {
+        live = union_bits(after, at[i.imm])
+    } else if i.op == ir.Op.Ret || i.op == ir.Op.Unreachable {
+        for k in 0..len(live) { live[k] = 0 }
+    }
+    if i.dst >= 0 && track[i.dst] >= 0 { set_bit(mut live, track[i.dst], false) }
+    for r in ir.reads(i) { if track[r] >= 0 { set_bit(mut live, track[r], true) } }
+    return live
+}
+
+// The tracked registers live where each label starts: read before they are
+// set on some way on from there.
+fn live_at_labels(f: ir.Func, track: [Int], words: Int) -> Map[Int, [Int]] {
+    let mut empty: [Int] = []
+    for _ in 0..words { push(mut empty, 0) }
+    let mut at: Map[Int, [Int]] = [:]
+    for i in f.insts { if i.op == ir.Op.Label { at[i.imm] = empty } }
+    let mut changed = true
+    for changed {
+        changed = false
+        let mut live = empty
+        let mut k = len(f.insts) - 1
+        for k >= 0 {
+            let i = f.insts[k]
+            live = live_before(i, live, at, track)
+            if i.op == ir.Op.Label && !same_bits(at[i.imm], live) {
+                at[i.imm] = live
+                changed = true
+            }
+            k = k - 1
+        }
+    }
+    return at
+}
+
+// Drops the tracked registers' defs that nothing reads on any way on, then
+// makes a comparison read only by the branch after it a `branch.cmp`.
+fn dead_bools(f: ir.Func, track: [Int], words: Int) -> ir.Func {
+    let at = live_at_labels(f, track, words)
+    let mut drop: [Bool] = []
+    for _ in f.insts { push(mut drop, false) }
+    let mut live: [Int] = []
+    for _ in 0..words { push(mut live, 0) }
+    let mut k = len(f.insts) - 1
+    for k >= 0 {
+        let i = f.insts[k]
+        let quiet = i.op == ir.Op.Move || i.op == ir.Op.Not || i.op == ir.Op.Const || i.op == ir.Op.Cmp || i.op == ir.Op.CmpImm
+        if quiet && track[i.dst] >= 0 && !has_bit(live, track[i.dst]) {
+            drop[k] = true
+        } else {
+            live = live_before(i, live, at, track)
+        }
+        k = k - 1
+    }
+    let mut kept: [ir.Inst] = []
+    for k2 in 0..len(f.insts) { if !drop[k2] { push(mut kept, f.insts[k2]) } }
+    let mut out = f
+    out.insts = []
+    let mut j = 0
+    for j < len(kept) {
+        let i = kept[j]
+        if (i.op == ir.Op.Cmp || i.op == ir.Op.CmpImm) && track[i.dst] >= 0 && j + 1 < len(kept) {
+            let next = kept[j + 1]
+            if next.op == ir.Op.Branch && next.a == i.dst && !has_bit(at[next.imm], track[i.dst]) && !has_bit(at[next.imm2], track[i.dst]) &&
+                (i.op == ir.Op.CmpImm || i.b != i.dst) && i.a != i.dst {
+                let mut b = i.b
+                if i.op == ir.Op.CmpImm { b = ir.reg(mut out, ir.INT()); push(mut out.insts, ir.inst(ir.Op.Const, b, -1, -1, i.imm2)) }
+                let mut branch = ir.inst(ir.Op.BranchCmp, -1, i.a, b, next.imm)
+                branch.sym = match i.imm { 0 => "eq", 1 => "ne", 2 => "lt", 3 => "le", 4 => "gt", _ => "ge" }
+                push(mut out.insts, branch)
+                push(mut out.insts, ir.inst(ir.Op.Jump, -1, -1, -1, next.imm2))
+                j = j + 2
+                continue
+            }
+        }
+        push(mut out.insts, i)
+        j = j + 1
     }
     return out
 }
