@@ -1,0 +1,1840 @@
+// Regular expressions that run in time linear in the text, whatever the
+// pattern: `compile` turns a pattern into a program, and a Pike VM runs it
+// over the text's code points, every possible match at once, so no pattern
+// can make a search take exponential time. The syntax is RE2's and Rust's,
+// without backreferences or lookaround, which no linear-time engine can
+// offer. Matches are leftmost-first, as Perl, Python and Rust report them.
+//
+//     let re = regex.must("(?P<key>\\w+)=(?P<value>\\d+)")
+//     match regex.captures(re, "x=12") { Some(c) => ..., None => ... }
+//
+// Supported: literals; `.`; classes `[a-z]`, `[^...]`, `[[:alpha:]]`;
+// `\d \w \s` and their negations; `\b \B ^ $ \A \z`, `\< \>` and
+// `\b{start}`, `\b{end}`, `\b{start-half}`, `\b{end-half}`; groups `(...)`,
+// `(?:...)`, `(?P<name>...)`, `(?<name>...)`; `|`; `* + ? {n} {n,} {n,m}`
+// and their lazy forms; flags `(?imsUxR)` and `(?i:...)`; escapes `\n \t \r
+// \f \v \a \e \0`, `\xHH`, `\x{H...}`. `\d \w \s \b` and case folding cover
+// ASCII; `.` and classes match any code point.
+import maps
+import strings
+
+pub type Regex = struct {
+    pattern: Str
+    // The program, an instruction per index: its op, its operands, and a
+    // class's ranges.
+    ops: [Int]
+    xs: [Int]
+    ys: [Int]
+    sets: [[Int]]
+    groups: Int  // capture groups, the whole match included
+    names: [Str]  // each group's name, "" for none
+    first: [Bool]  // the bytes a match can start with; empty when any can
+    prefix: Str  // bytes every match starts with
+    anchored: Bool  // every match starts at the start of the text
+}
+
+// A match: where it starts and ends in the text, as byte offsets.
+pub type Match = struct {
+    start: Int
+    end: Int
+}
+
+// ---- Searching ----
+
+// The pattern compiled, or a message saying what is wrong with it.
+pub fn compile(pattern: Str) -> Result[Regex, Str] {
+    let mut p = Parser { text: pattern, pos: 0, error: "", groups: 1, names: [""], flags: Flags { i: false, m: false, s: false, u: false, x: false, r: false }, depth: 0 }
+    let tree = alternation(mut p)
+    if p.error == "" && p.pos < len(pattern) {
+        fail(mut p, "unmatched ')'")
+    }
+    if p.error != "" {
+        return Err(p.error)
+    }
+    let mut c = Compiler { program: [], error: "" }
+    emit(mut c, Inst { op: SAVE(), a: 0, b: 0, ranges: [] })
+    gen(mut c, tree)
+    emit(mut c, Inst { op: SAVE(), a: 1, b: 0, ranges: [] })
+    emit(mut c, Inst { op: MATCH(), a: 0, b: 0, ranges: [] })
+    if c.error != "" {
+        return Err(c.error)
+    }
+    let mut re = Regex { pattern: pattern, ops: [], xs: [], ys: [], sets: [], groups: p.groups, names: p.names, first: first_bytes(c.program),
+        prefix: literal_prefix(c.program), anchored: starts_anchored(c.program) }
+    for i in c.program {
+        push(mut re.ops, i.op)
+        push(mut re.xs, i.a)
+        push(mut re.ys, i.b)
+        push(mut re.sets, i.ranges)
+    }
+    return Ok(re)
+}
+
+// The pattern compiled; a panic if it is not a valid one, for patterns
+// written in the program.
+pub fn must(pattern: Str) -> Regex {
+    match compile(pattern) {
+        Ok(re) => return re
+        Err(e) => {
+            assert(e == "")
+            return Regex { pattern: "", ops: [], xs: [], ys: [], sets: [], groups: 0, names: [], first: [], prefix: "", anchored: false }
+        }
+    }
+}
+
+pub fn is_match(re: Regex, text: Str) -> Bool {
+    return len(find_one(re, text, 0, len(text), false, 2)) > 0
+}
+
+// The leftmost match.
+pub fn find(re: Regex, text: Str) -> Option[Match] {
+    return find_at(re, text, 0)
+}
+
+// The leftmost match starting at `start` or after it.
+pub fn find_at(re: Regex, text: Str, start: Int) -> Option[Match] {
+    let slots = find_one(re, text, start, len(text), false, 2)
+    if len(slots) == 0 {
+        return None
+    }
+    return Some(Match { start: slots[0], end: slots[1] })
+}
+
+// Every match, left to right, not overlapping, as Rust's regex finds them
+// (see all_slots).
+pub fn find_all(re: Regex, text: Str) -> [Match] {
+    let mut out: [Match] = []
+    for slots in all_slots(re, text, 0, len(text), false, -1, 2) {
+        push(mut out, Match { start: slots[0], end: slots[1] })
+    }
+    return out
+}
+
+// The groups of the leftmost match, the whole match first: each a start
+// and an end, or -1 and -1 for a group that took no part in it.
+pub fn captures(re: Regex, text: Str) -> Option[[Match]] {
+    let slots = find_one(re, text, 0, len(text), false, re.groups * 2)
+    if len(slots) == 0 {
+        return None
+    }
+    return Some(groups_of(slots))
+}
+
+// Every match's groups, as `captures` gives them.
+pub fn captures_all(re: Regex, text: Str) -> [[Match]] {
+    let mut out: [[Match]] = []
+    for slots in all_slots(re, text, 0, len(text), false, -1, re.groups * 2) {
+        push(mut out, groups_of(slots))
+    }
+    return out
+}
+
+// The text of a group of a match, by number; "" if it took no part.
+pub fn group_text(text: Str, groups: [Match], n: Int) -> Str {
+    if n < 0 || n >= len(groups) || groups[n].start < 0 {
+        return ""
+    }
+    return text[groups[n].start..groups[n].end]
+}
+
+// A named group's number, or -1.
+pub fn group_index(re: Regex, name: Str) -> Int {
+    for i in 0..len(re.names) {
+        if re.names[i] == name && name != "" {
+            return i
+        }
+    }
+    return -1
+}
+
+// The text with every match replaced. In the replacement, $1 or ${1} is a
+// group's text, ${name} a named group's, and $$ a dollar sign.
+pub fn replace_all(re: Regex, text: Str, replacement: Str) -> Str {
+    let mut b = strings.builder()
+    let mut last = 0
+    let mut width = 2
+    for c in replacement {
+        if c == '$' {
+            width = re.groups * 2  // the replacement may name a group
+        }
+    }
+    for slots in all_slots(re, text, 0, len(text), false, -1, width) {
+        strings.add(mut b, text[last..slots[0]])
+        expand(mut b, re, text, slots, replacement)
+        last = slots[1]
+    }
+    strings.add(mut b, text[last..len(text)])
+    return strings.build(b)
+}
+
+// The text between the matches.
+pub fn split(re: Regex, text: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut last = 0
+    for slots in all_slots(re, text, 0, len(text), false, -1, 2) {
+        push(mut out, text[last..slots[0]])
+        last = slots[1]
+    }
+    push(mut out, text[last..len(text)])
+    return out
+}
+
+// Matches of the text between `start` and `end`, up to `limit` of them
+// (-1 for all), each as its groups' slots: start and end of group 0, then
+// of group 1, and so on, -1 for a group not taking part. Anchored, each
+// match must start where the search for it starts. The text outside the
+// bounds still decides what `^`, `$` and `\b` see.
+pub fn search_all(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, limit: Int) -> [[Int]] {
+    return all_slots(re, text, start, end, anchored, limit, re.groups * 2)
+}
+
+fn groups_of(slots: [Int]) -> [Match] {
+    let mut out: [Match] = []
+    for g in 0..len(slots) / 2 {
+        push(mut out, Match { start: slots[2 * g], end: slots[2 * g + 1] })
+    }
+    return out
+}
+
+// Matches as Rust's regex iterates them: after an empty match where the
+// previous one ended, the search goes on a byte further; and an empty match
+// inside a code point's bytes is not one (anchored, the search stops).
+fn all_slots(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, limit: Int, width: Int) -> [[Int]] {
+    let mut out: [[Int]] = []
+    let mut at = start
+    let mut last_end = -1
+    for limit < 0 || len(out) < limit {
+        let mut slots = find_one(re, text, at, end, anchored, width)
+        if len(slots) == 0 {
+            break
+        }
+        if slots[0] == slots[1] && slots[1] == last_end {
+            if at >= end {
+                break
+            }
+            slots = find_one(re, text, at + 1, end, anchored, width)
+            if len(slots) == 0 {
+                break
+            }
+        }
+        push(mut out, slots)
+        last_end = slots[1]
+        at = slots[1]
+    }
+    return out
+}
+
+// The first match from `at`, with `width` capture slots (2: the whole
+// match only, which spares copying the groups' slots).
+fn find_one(re: Regex, text: Str, at: Int, end: Int, anchored: Bool, width: Int) -> [Int] {
+    let mut start = at
+    for start <= end {
+        let slots = search(re, text, start, end, anchored, width)
+        if len(slots) == 0 || slots[0] != slots[1] || boundary(text, slots[0]) {
+            return slots
+        }
+        if anchored {
+            break
+        }
+        start = slots[0] + 1
+    }
+    return []
+}
+
+// Whether a code point starts at byte `at` (or the text ends there).
+fn boundary(text: Str, at: Int) -> Bool {
+    return at <= 0 || at >= len(text) || int(text[at]) & 0xC0 != 0x80
+}
+
+fn expand(b: mut strings.Builder, re: Regex, text: Str, slots: [Int], r: Str) {
+    let mut i = 0
+    for i < len(r) {
+        let c = r[i]
+        if c != '$' || i + 1 >= len(r) {
+            strings.add_byte(mut b, c)
+            i = i + 1
+            continue
+        }
+        if r[i + 1] == '$' {
+            strings.add_byte(mut b, '$')
+            i = i + 2
+            continue
+        }
+        let mut name = ""
+        let mut j = i + 1
+        if r[j] == '{' {
+            let close = index_from(r, '}', j)
+            if close < 0 {
+                strings.add_byte(mut b, c)
+                i = i + 1
+                continue
+            }
+            name = r[j + 1..close]
+            j = close + 1
+        } else {
+            for j < len(r) && word_byte(r[j]) {
+                j = j + 1
+            }
+            name = r[i + 1..j]
+        }
+        if name == "" {
+            strings.add_byte(mut b, c)
+            i = i + 1
+            continue
+        }
+        let mut g = number(name)
+        if g < 0 {
+            g = group_index(re, name)
+        }
+        if g >= 0 && 2 * g + 1 < len(slots) && slots[2 * g] >= 0 {
+            strings.add(mut b, text[slots[2 * g]..slots[2 * g + 1]])
+        }
+        i = j
+    }
+}
+
+fn index_from(s: Str, c: Byte, from: Int) -> Int {
+    for i in from..len(s) {
+        if s[i] == c {
+            return i
+        }
+    }
+    return -1
+}
+
+// The decimal number `s` is, or -1.
+fn number(s: Str) -> Int {
+    if len(s) == 0 || len(s) > 9 {
+        return -1
+    }
+    let mut n = 0
+    for c in s {
+        if c < '0' || c > '9' {
+            return -1
+        }
+        n = n * 10 + int(c) - int('0')
+    }
+    return n
+}
+
+// ---- Parsing ----
+
+type Flags = struct {
+    i: Bool  // ASCII letters match either case
+    m: Bool  // ^ and $ match at line ends too
+    s: Bool  // . matches \n too
+    u: Bool  // (U) repetitions are lazy unless marked with ?
+    x: Bool  // spaces and # comments in the pattern are ignored
+    r: Bool  // (R) \r\n ends a line: ^ and $ with m, and what . leaves out
+}
+
+// The pattern as a tree. A class is its ranges, sorted and not touching:
+// [lo, hi, lo, hi, ...].
+type Node = enum {
+    Empty
+    Lit(Int)
+    Class([Int])
+    Look(Int)  // an assertion: START, END, ...
+    Group(Int, [Node])  // a capture group's number and its one node
+    Concat([Node])
+    Alt([Node])
+    Repeat([Node], Int, Int, Bool)  // its one node, at least, at most (-1: no limit), greedy
+}
+
+type Parser = struct {
+    text: Str
+    pos: Int
+    error: Str
+    groups: Int
+    names: [Str]
+    flags: Flags
+    depth: Int
+}
+
+fn max_depth() -> Int {
+    return 200
+}
+
+fn fail(p: mut Parser, message: Str) {
+    if p.error == "" {
+        p.error = "regex error at offset " + strings.from_int(p.pos) + ": " + message
+    }
+}
+
+fn more(p: Parser) -> Bool {
+    return p.pos < len(p.text)
+}
+
+fn peek(p: Parser) -> Byte {
+    if p.pos < len(p.text) {
+        return p.text[p.pos]
+    }
+    return byte(0)
+}
+
+// With the x flag, spaces and comments between pieces of the pattern.
+fn skip_ignored(p: mut Parser) {
+    if !p.flags.x {
+        return
+    }
+    for more(p) {
+        let c = p.text[p.pos]
+        if c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == byte(12) {
+            p.pos = p.pos + 1
+        } else if c == '#' {
+            for more(p) && p.text[p.pos] != '\n' {
+                p.pos = p.pos + 1
+            }
+        } else {
+            return
+        }
+    }
+}
+
+fn alternation(p: mut Parser) -> Node {
+    let mut branches = [concatenation(mut p)]
+    for p.error == "" && peek(p) == '|' {
+        p.pos = p.pos + 1
+        push(mut branches, concatenation(mut p))
+    }
+    if len(branches) == 1 {
+        return branches[0]
+    }
+    return Node.Alt(branches)
+}
+
+fn concatenation(p: mut Parser) -> Node {
+    let mut items: [Node] = []
+    for p.error == "" {
+        skip_ignored(mut p)
+        if !more(p) || peek(p) == '|' || peek(p) == ')' {
+            break
+        }
+        let atom = atom_node(mut p)
+        if p.error != "" {
+            break
+        }
+        push(mut items, repetition(mut p, atom))
+    }
+    if len(items) == 0 {
+        return Node.Empty
+    }
+    if len(items) == 1 {
+        return items[0]
+    }
+    return Node.Concat(items)
+}
+
+fn repetition(p: mut Parser, atom: Node) -> Node {
+    let mut node = atom
+    for p.error == "" {
+        skip_ignored(mut p)
+        let c = peek(p)
+        let mut min = 0
+        let mut max = -1
+        if c == '*' {
+            p.pos = p.pos + 1
+        } else if c == '+' {
+            min = 1
+            p.pos = p.pos + 1
+        } else if c == '?' {
+            max = 1
+            p.pos = p.pos + 1
+        } else if c == '{' && counted(p) {
+            let bounds = counts(mut p)
+            if p.error != "" {
+                return node
+            }
+            min = bounds[0]
+            max = bounds[1]
+        } else {
+            return node
+        }
+        match node {
+            Node.Concat(items) => {
+                if len(items) == 0 {
+                    fail(mut p, "a repetition of flags")
+                    return node
+                }
+            }
+            _ => {}
+        }
+        let mut greedy = true
+        if peek(p) == '?' {
+            greedy = false
+            p.pos = p.pos + 1
+        }
+        if p.flags.u {
+            greedy = !greedy
+        }
+        node = Node.Repeat([node], min, max, greedy)
+    }
+    return node
+}
+
+// Whether a `{` starts a counted repetition: {n}, {n,} or {n,m}.
+fn counted(p: Parser) -> Bool {
+    let mut i = p.pos + 1
+    let mut digits = 0
+    for i < len(p.text) && p.text[i] >= '0' && p.text[i] <= '9' {
+        i = i + 1
+        digits = digits + 1
+    }
+    return digits > 0 && i < len(p.text) && (p.text[i] == '}' || p.text[i] == ',')
+}
+
+fn counts(p: mut Parser) -> [Int] {
+    p.pos = p.pos + 1
+    let min = decimal(mut p)
+    let mut max = min
+    if peek(p) == ',' {
+        p.pos = p.pos + 1
+        if peek(p) == '}' {
+            max = -1
+        } else {
+            max = decimal(mut p)
+        }
+    }
+    if peek(p) != '}' {
+        fail(mut p, "a counted repetition without its '}'")
+        return [0, 0]
+    }
+    p.pos = p.pos + 1
+    if min > 100000 || max > 100000 {
+        fail(mut p, "a repetition count above 100000")
+    } else if max >= 0 && max < min {
+        fail(mut p, "a repetition {n,m} with m below n")
+    }
+    return [min, max]
+}
+
+fn decimal(p: mut Parser) -> Int {
+    let start = p.pos
+    let mut n = 0
+    for more(p) && peek(p) >= '0' && peek(p) <= '9' {
+        if n < 100000 {
+            n = n * 10 + int(peek(p)) - int('0')
+        }
+        p.pos = p.pos + 1
+    }
+    if p.pos == start {
+        fail(mut p, "expected a number")
+    }
+    return n
+}
+
+fn atom_node(p: mut Parser) -> Node {
+    let c = peek(p)
+    if c == '(' {
+        return group(mut p)
+    }
+    if c == '[' {
+        return Node.Class(class(mut p))
+    }
+    if c == '.' {
+        p.pos = p.pos + 1
+        if p.flags.s {
+            return Node.Class([0, 0x10FFFF])
+        }
+        if p.flags.r {
+            return Node.Class([0, 9, 11, 12, 14, 0x10FFFF])
+        }
+        return Node.Class([0, 9, 11, 0x10FFFF])
+    }
+    if c == '^' {
+        p.pos = p.pos + 1
+        if p.flags.m && p.flags.r {
+            return Node.Look(CRLF_START())
+        }
+        if p.flags.m {
+            return Node.Look(LINE_START())
+        }
+        return Node.Look(TEXT_START())
+    }
+    if c == '$' {
+        p.pos = p.pos + 1
+        if p.flags.m && p.flags.r {
+            return Node.Look(CRLF_END())
+        }
+        if p.flags.m {
+            return Node.Look(LINE_END())
+        }
+        return Node.Look(TEXT_END())
+    }
+    if c == '\\' {
+        return escape(mut p)
+    }
+    if c == '*' || c == '+' || c == '?' {
+        fail(mut p, "a repetition of nothing")
+        return Node.Empty
+    }
+    if c == ')' {
+        fail(mut p, "unmatched ')'")
+        return Node.Empty
+    }
+    let d = decode(p.text, p.pos)
+    p.pos = p.pos + d[1]
+    return literal(p.flags, d[0])
+}
+
+fn literal(flags: Flags, cp: Int) -> Node {
+    if flags.i && is_ascii_letter(cp) {
+        return Node.Class(fold(flags, [cp, cp]))
+    }
+    return Node.Lit(cp)
+}
+
+fn is_ascii_letter(c: Int) -> Bool {
+    return c >= int('a') && c <= int('z') || c >= int('A') && c <= int('Z')
+}
+
+fn group(p: mut Parser) -> Node {
+    let open = p.pos
+    p.pos = p.pos + 1
+    p.depth = p.depth + 1
+    if p.depth > max_depth() {
+        fail(mut p, "groups nested more than " + strings.from_int(max_depth()) + " deep")
+        return Node.Empty
+    }
+    let outer = p.flags
+    let mut capture = true
+    let mut name = ""
+    if peek(p) == '?' {
+        p.pos = p.pos + 1
+        capture = false
+        if peek(p) == 'P' && p.pos + 1 < len(p.text) && p.text[p.pos + 1] == '<' || peek(p) == '<' {
+            if peek(p) == 'P' {
+                p.pos = p.pos + 1
+            }
+            p.pos = p.pos + 1
+            let start = p.pos
+            for more(p) && peek(p) != '>' {
+                p.pos = p.pos + 1
+            }
+            name = p.text[start..p.pos]
+            if !more(p) || !valid_name(name) {
+                fail(mut p, "a group name must be letters, digits and _, not starting with a digit")
+                return Node.Empty
+            }
+            for n in p.names {
+                if n == name {
+                    fail(mut p, "the group name " + name + " is used twice")
+                    return Node.Empty
+                }
+            }
+            p.pos = p.pos + 1
+            capture = true
+        } else {
+            // Flags, for the rest of the enclosing group or for this one.
+            let mut on = true
+            let mut any = false
+            for more(p) && peek(p) != ')' && peek(p) != ':' {
+                let f = peek(p)
+                if f == '-' {
+                    if !on {
+                        fail(mut p, "a second '-' in flags")
+                        return Node.Empty
+                    }
+                    on = false
+                } else if f == 'i' {
+                    p.flags.i = on
+                } else if f == 'm' {
+                    p.flags.m = on
+                } else if f == 's' {
+                    p.flags.s = on
+                } else if f == 'U' {
+                    p.flags.u = on
+                } else if f == 'x' {
+                    p.flags.x = on
+                } else if f == 'R' {
+                    p.flags.r = on
+                } else if f == 'u' {
+                    // Unicode mode: \d \w \s and folding stay ASCII here.
+                } else {
+                    fail(mut p, "an unknown flag or group syntax (lookaround and backreferences are not supported)")
+                    return Node.Empty
+                }
+                any = true
+                p.pos = p.pos + 1
+            }
+            if !more(p) {
+                fail(mut p, "a group without its ')'")
+                return Node.Empty
+            }
+            if peek(p) == ')' {
+                if !any || !on && p.text[p.pos - 1] == '-' {
+                    fail(mut p, "empty flags")
+                    return Node.Empty
+                }
+                p.pos = p.pos + 1
+                p.depth = p.depth - 1
+                return Node.Concat([])  // the flags stay set; nothing to match, and nothing to repeat
+            }
+            p.pos = p.pos + 1  // ':'
+        }
+    }
+    let mut index = -1
+    if capture {
+        index = p.groups
+        p.groups = p.groups + 1
+        push(mut p.names, name)
+    }
+    let inner = alternation(mut p)
+    if p.error != "" {
+        return Node.Empty
+    }
+    if peek(p) != ')' {
+        p.pos = open
+        fail(mut p, "a group without its ')'")
+        return Node.Empty
+    }
+    p.pos = p.pos + 1
+    p.depth = p.depth - 1
+    p.flags = outer
+    if capture {
+        return Node.Group(index, [inner])
+    }
+    return inner
+}
+
+fn valid_name(s: Str) -> Bool {
+    if len(s) == 0 || s[0] >= '0' && s[0] <= '9' {
+        return false
+    }
+    for c in s {
+        if !word_byte(c) {
+            return false
+        }
+    }
+    return true
+}
+
+fn word_byte(c: Byte) -> Bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_'
+}
+
+// An escape outside a class.
+fn escape(p: mut Parser) -> Node {
+    if p.pos + 1 >= len(p.text) {
+        fail(mut p, "a '\\' at the end of the pattern")
+        return Node.Empty
+    }
+    let c = p.text[p.pos + 1]
+    if c == '<' || c == '>' {
+        p.pos = p.pos + 2
+        if c == '<' {
+            return Node.Look(WORD_START())
+        }
+        return Node.Look(WORD_END())
+    }
+    if c == 'b' && p.pos + 2 < len(p.text) && p.text[p.pos + 2] == '{' {
+        let close = index_from(p.text, '}', p.pos)
+        if close > 0 {
+            let kind = match p.text[p.pos + 3..close] {
+                "start" => WORD_START()
+                "end" => WORD_END()
+                "start-half" => WORD_START_HALF()
+                "end-half" => WORD_END_HALF()
+                _ => -1
+            }
+            if kind >= 0 {
+                p.pos = close + 1
+                return Node.Look(kind)
+            }
+        }
+        fail(mut p, "an unknown word boundary \\b{...}")
+        return Node.Empty
+    }
+    if c == 'b' || c == 'B' || c == 'A' || c == 'z' {
+        p.pos = p.pos + 2
+        return Node.Look(match c {
+            'b' => WORD()
+            'B' => NOT_WORD()
+            'A' => TEXT_START()
+            _ => TEXT_END()
+        })
+    }
+    let named = class_escape(c)
+    if len(named) > 0 {
+        p.pos = p.pos + 2
+        return Node.Class(named)
+    }
+    let cp = escaped_char(mut p)
+    return literal(p.flags, cp)
+}
+
+// \d \w \s and their negations, as ranges; none for another letter.
+fn class_escape(c: Byte) -> [Int] {
+    return match c {
+        'd' => [48, 57]
+        'D' => negate([48, 57])
+        'w' => [48, 57, 65, 90, 95, 95, 97, 122]
+        'W' => negate([48, 57, 65, 90, 95, 95, 97, 122])
+        's' => [9, 13, 32, 32]
+        'S' => negate([9, 13, 32, 32])
+        _ => []
+    }
+}
+
+// An escape that stands for one character, from its backslash.
+fn escaped_char(p: mut Parser) -> Int {
+    let c = p.text[p.pos + 1]
+    p.pos = p.pos + 2
+    let simple = match c {
+        'n' => 10
+        't' => 9
+        'r' => 13
+        'f' => 12
+        'v' => 11
+        'a' => 7
+        'e' => 27
+        '0' => 0
+        _ => -1
+    }
+    if simple >= 0 {
+        return simple
+    }
+    if c == 'x' {
+        if peek(p) == '{' {
+            let close = index_from(p.text, '}', p.pos)
+            if close < 0 {
+                fail(mut p, "\\x{ without its '}'")
+                return 0
+            }
+            let v = hex(p.text[p.pos + 1..close])
+            p.pos = close + 1
+            if v < 0 || v > 0x10FFFF || v >= 0xD800 && v <= 0xDFFF {
+                fail(mut p, "\\x{...} must be a Unicode scalar value in hexadecimal")
+                return 0
+            }
+            return v
+        }
+        if p.pos + 2 > len(p.text) {
+            fail(mut p, "\\x needs two hexadecimal digits")
+            return 0
+        }
+        let v = hex(p.text[p.pos..p.pos + 2])
+        if v < 0 {
+            fail(mut p, "\\x needs two hexadecimal digits")
+            return 0
+        }
+        p.pos = p.pos + 2
+        return v
+    }
+    if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' {
+        p.pos = p.pos - 2
+        fail(mut p, "an escape this syntax does not have: \\" + p.text[p.pos + 1..p.pos + 2])
+        return 0
+    }
+    // Any other escaped character stands for itself: \. \* \\ \- ...
+    let d = decode(p.text, p.pos - 1)
+    p.pos = p.pos - 1 + d[1]
+    return d[0]
+}
+
+fn hex(s: Str) -> Int {
+    if len(s) == 0 || len(s) > 8 {
+        return -1
+    }
+    let mut v = 0
+    for c in s {
+        let mut d = -1
+        if c >= '0' && c <= '9' {
+            d = int(c) - int('0')
+        } else if c >= 'a' && c <= 'f' {
+            d = int(c) - int('a') + 10
+        } else if c >= 'A' && c <= 'F' {
+            d = int(c) - int('A') + 10
+        }
+        if d < 0 {
+            return -1
+        }
+        v = v * 16 + d
+    }
+    return v
+}
+
+// [...]: its ranges, normalized.
+fn class(p: mut Parser) -> [Int] {
+    let open = p.pos
+    p.pos = p.pos + 1
+    let mut negated = false
+    if peek(p) == '^' {
+        negated = true
+        p.pos = p.pos + 1
+    }
+    let mut ranges: [Int] = []
+    let mut first = true
+    for p.error == "" {
+        if !more(p) {
+            p.pos = open
+            fail(mut p, "a class without its ']'")
+            return []
+        }
+        let c = peek(p)
+        if c == ']' && !first {
+            p.pos = p.pos + 1
+            break
+        }
+        first = false
+        if c == '[' && p.pos + 1 < len(p.text) && p.text[p.pos + 1] == ':' {
+            let named = posix_class(mut p)
+            for r in named {
+                push(mut ranges, r)
+            }
+            continue
+        }
+        if c == '[' {
+            fail(mut p, "a nested class or class operation (not supported)")
+            return []
+        }
+        let lo = class_item(mut p)
+        if p.error != "" {
+            return []
+        }
+        if lo[0] == -1 {
+            for r in lo[1..len(lo)] {
+                push(mut ranges, r)
+            }
+            continue
+        }
+        if peek(p) == '-' && p.pos + 1 < len(p.text) && p.text[p.pos + 1] != ']' {
+            p.pos = p.pos + 1
+            let hi = class_item(mut p)
+            if p.error != "" {
+                return []
+            }
+            if hi[0] == -1 {
+                fail(mut p, "a range ending in a class")
+                return []
+            }
+            if hi[1] < lo[1] {
+                fail(mut p, "a range whose end is before its start")
+                return []
+            }
+            push(mut ranges, lo[1])
+            push(mut ranges, hi[1])
+        } else {
+            push(mut ranges, lo[1])
+            push(mut ranges, lo[1])
+        }
+    }
+    // Case folding comes before negation: (?i)[^x] matches neither x nor X.
+    let mut out = fold(p.flags, normalize(ranges))
+    if negated {
+        out = negate(out)
+    }
+    return out
+}
+
+// One item of a class: [0, code point], or [-1, ranges...] for \d, \w...
+fn class_item(p: mut Parser) -> [Int] {
+    let c = peek(p)
+    if c == '\\' {
+        if p.pos + 1 >= len(p.text) {
+            fail(mut p, "a '\\' at the end of the pattern")
+            return [0, 0]
+        }
+        let named = class_escape(p.text[p.pos + 1])
+        if len(named) > 0 {
+            p.pos = p.pos + 2
+            let mut out = [-1]
+            for r in named {
+                push(mut out, r)
+            }
+            return out
+        }
+        let e = p.text[p.pos + 1]
+        if e == 'b' {
+            p.pos = p.pos + 2
+            return [0, 8]  // backspace, inside a class
+        }
+        return [0, escaped_char(mut p)]
+    }
+    let d = decode(p.text, p.pos)
+    p.pos = p.pos + d[1]
+    return [0, d[0]]
+}
+
+fn posix_class(p: mut Parser) -> [Int] {
+    let close = index_from(p.text, ']', p.pos)
+    if close < 0 || p.text[close - 1] != ':' {
+        fail(mut p, "a malformed [:name:] class")
+        return []
+    }
+    let mut name = p.text[p.pos + 2..close - 1]
+    let mut negated = false
+    if len(name) > 0 && name[0] == '^' {
+        negated = true
+        name = name[1..len(name)]
+    }
+    let ranges = match name {
+        "alnum" => [48, 57, 65, 90, 97, 122]
+        "alpha" => [65, 90, 97, 122]
+        "ascii" => [0, 127]
+        "blank" => [9, 9, 32, 32]
+        "cntrl" => [0, 31, 127, 127]
+        "digit" => [48, 57]
+        "graph" => [33, 126]
+        "lower" => [97, 122]
+        "print" => [32, 126]
+        "punct" => [33, 47, 58, 64, 91, 96, 123, 126]
+        "space" => [9, 13, 32, 32]
+        "upper" => [65, 90]
+        "word" => [48, 57, 65, 90, 95, 95, 97, 122]
+        "xdigit" => [48, 57, 65, 70, 97, 102]
+        _ => []
+    }
+    if len(ranges) == 0 {
+        fail(mut p, "an unknown class [:" + name + ":]")
+        return []
+    }
+    p.pos = close + 1
+    if negated {
+        return negate(ranges)
+    }
+    return ranges
+}
+
+// Ranges sorted, with overlapping and touching ones merged.
+fn normalize(ranges: [Int]) -> [Int] {
+    let n = len(ranges) / 2
+    let mut order: [Int] = []
+    for i in 0..n {
+        push(mut order, i)
+    }
+    // Insertion sort by start: classes are small.
+    for i in 1..n {
+        let x = order[i]
+        let mut j = i - 1
+        for j >= 0 && ranges[2 * order[j]] > ranges[2 * x] {
+            order[j + 1] = order[j]
+            j = j - 1
+        }
+        order[j + 1] = x
+    }
+    let mut out: [Int] = []
+    for k in order {
+        let lo = ranges[2 * k]
+        let hi = ranges[2 * k + 1]
+        let m = len(out)
+        if m > 0 && lo <= out[m - 1] + 1 {
+            if hi > out[m - 1] {
+                out[m - 1] = hi
+            }
+        } else {
+            push(mut out, lo)
+            push(mut out, hi)
+        }
+    }
+    return out
+}
+
+fn negate(ranges: [Int]) -> [Int] {
+    let mut out: [Int] = []
+    let mut next = 0
+    for k in 0..len(ranges) / 2 {
+        if ranges[2 * k] > next {
+            push(mut out, next)
+            push(mut out, ranges[2 * k] - 1)
+        }
+        next = ranges[2 * k + 1] + 1
+    }
+    if next <= 0x10FFFF {
+        push(mut out, next)
+        push(mut out, 0x10FFFF)
+    }
+    return out
+}
+
+// With the i flag, a class takes the other case of every ASCII letter in it.
+fn fold(flags: Flags, ranges: [Int]) -> [Int] {
+    if !flags.i {
+        return ranges
+    }
+    let mut out = ranges
+    for k in 0..len(ranges) / 2 {
+        let lo = ranges[2 * k]
+        let hi = ranges[2 * k + 1]
+        let a = max(lo, int('a'))
+        let b = min(hi, int('z'))
+        if a <= b {
+            push(mut out, a - 32)
+            push(mut out, b - 32)
+        }
+        let c = max(lo, int('A'))
+        let d = min(hi, int('Z'))
+        if c <= d {
+            push(mut out, c + 32)
+            push(mut out, d + 32)
+        }
+    }
+    return normalize(out)
+}
+
+fn max(a: Int, b: Int) -> Int {
+    if a > b {
+        return a
+    }
+    return b
+}
+
+fn min(a: Int, b: Int) -> Int {
+    if a < b {
+        return a
+    }
+    return b
+}
+
+// The code point at byte `at`, and its length in bytes: [-1, 1] for a byte
+// that does not start a valid UTF-8 sequence, which nothing matches.
+fn decode(s: Str, at: Int) -> [Int] {
+    let c = int(s[at])
+    if c < 0x80 {
+        return [c, 1]
+    }
+    let mut need = 0
+    let mut cp = 0
+    let mut least = 0
+    if c >= 0xC2 && c <= 0xDF {
+        need = 1
+        cp = c & 0x1F
+        least = 0x80
+    } else if c >= 0xE0 && c <= 0xEF {
+        need = 2
+        cp = c & 0x0F
+        least = 0x800
+    } else if c >= 0xF0 && c <= 0xF4 {
+        need = 3
+        cp = c & 0x07
+        least = 0x10000
+    } else {
+        return [-1, 1]
+    }
+    if at + need >= len(s) {
+        return [-1, 1]
+    }
+    for k in 1..need + 1 {
+        let x = int(s[at + k])
+        if x & 0xC0 != 0x80 {
+            return [-1, 1]
+        }
+        cp = cp << 6 | x & 0x3F
+    }
+    if cp < least || cp > 0x10FFFF || cp >= 0xD800 && cp <= 0xDFFF {
+        return [-1, 1]
+    }
+    return [cp, need + 1]
+}
+
+fn width_at(s: Str, at: Int) -> Int {
+    if at >= len(s) {
+        return 1
+    }
+    return decode(s, at)[1]
+}
+
+// ---- Compiling ----
+
+fn CHAR() -> Int {
+    return 0
+}
+
+fn CLASS() -> Int {
+    return 1
+}
+
+fn SPLIT() -> Int {
+    return 2
+}
+
+fn JUMP() -> Int {
+    return 3
+}
+
+fn SAVE() -> Int {
+    return 4
+}
+
+fn LOOK() -> Int {
+    return 5
+}
+
+fn MATCH() -> Int {
+    return 6
+}
+
+fn TEXT_START() -> Int {
+    return 0
+}
+
+fn TEXT_END() -> Int {
+    return 1
+}
+
+fn LINE_START() -> Int {
+    return 2
+}
+
+fn LINE_END() -> Int {
+    return 3
+}
+
+fn WORD() -> Int {
+    return 4
+}
+
+fn NOT_WORD() -> Int {
+    return 5
+}
+
+fn WORD_START() -> Int {
+    return 6
+}
+
+fn WORD_END() -> Int {
+    return 7
+}
+
+fn WORD_START_HALF() -> Int {
+    return 8
+}
+
+fn WORD_END_HALF() -> Int {
+    return 9
+}
+
+fn CRLF_START() -> Int {
+    return 10
+}
+
+fn CRLF_END() -> Int {
+    return 11
+}
+
+// One instruction: CHAR a; CLASS ranges; SPLIT to a, then b (a first);
+// JUMP to a; SAVE slot a; LOOK assertion a; MATCH.
+type Inst = struct {
+    op: Int
+    a: Int
+    b: Int
+    ranges: [Int]
+}
+
+type Compiler = struct {
+    program: [Inst]
+    error: Str
+}
+
+// Programs past this size are refused, so a pattern like (a{1000}){1000}
+// cannot take the memory of millions of instructions.
+fn max_program() -> Int {
+    return 200000
+}
+
+fn emit(c: mut Compiler, i: Inst) -> Int {
+    if len(c.program) >= max_program() {
+        if c.error == "" {
+            c.error = "regex error: the pattern compiles to more than " + strings.from_int(max_program()) + " instructions"
+        }
+        return len(c.program) - 1
+    }
+    push(mut c.program, i)
+    return len(c.program) - 1
+}
+
+fn gen(c: mut Compiler, n: Node) {
+    if c.error != "" {
+        return
+    }
+    match n {
+        Node.Empty => {}
+        Node.Lit(cp) => {
+            let _ = emit(mut c, Inst { op: CHAR(), a: cp, b: 0, ranges: [] })
+        }
+        Node.Class(ranges) => {
+            if len(ranges) == 2 && ranges[0] == ranges[1] {
+                let _ = emit(mut c, Inst { op: CHAR(), a: ranges[0], b: 0, ranges: [] })
+            } else {
+                let _ = emit(mut c, Inst { op: CLASS(), a: 0, b: 0, ranges: ranges })
+            }
+        }
+        Node.Look(kind) => {
+            let _ = emit(mut c, Inst { op: LOOK(), a: kind, b: 0, ranges: [] })
+        }
+        Node.Group(index, inner) => {
+            let _ = emit(mut c, Inst { op: SAVE(), a: 2 * index, b: 0, ranges: [] })
+            gen(mut c, inner[0])
+            let _ = emit(mut c, Inst { op: SAVE(), a: 2 * index + 1, b: 0, ranges: [] })
+        }
+        Node.Concat(items) => {
+            for x in items {
+                gen(mut c, x)
+            }
+        }
+        Node.Alt(branches) => {
+            // split L1, next; L1: a; jump end; next: split L2, ...
+            let mut jumps: [Int] = []
+            for k in 0..len(branches) {
+                if k < len(branches) - 1 {
+                    let split = emit(mut c, Inst { op: SPLIT(), a: 0, b: 0, ranges: [] })
+                    c.program[split].a = len(c.program)
+                    gen(mut c, branches[k])
+                    push(mut jumps, emit(mut c, Inst { op: JUMP(), a: 0, b: 0, ranges: [] }))
+                    c.program[split].b = len(c.program)
+                } else {
+                    gen(mut c, branches[k])
+                }
+                if c.error != "" {
+                    return
+                }
+            }
+            for j in jumps {
+                c.program[j].a = len(c.program)
+            }
+        }
+        Node.Repeat(inner, lo, hi, greedy) => {
+            if hi < 0 {
+                // e* is (e+)?, and e+ is `L: e; split L, out`, so an
+                // iteration that matches the empty string still sets its
+                // groups, as RE2 and Rust do.
+                for _ in 0..lo - 1 {
+                    gen(mut c, inner[0])
+                    if c.error != "" {
+                        return
+                    }
+                }
+                let mut skip = -1
+                if lo == 0 {
+                    skip = emit(mut c, Inst { op: SPLIT(), a: 0, b: 0, ranges: [] })
+                }
+                let body = len(c.program)
+                gen(mut c, inner[0])
+                let again = emit(mut c, Inst { op: SPLIT(), a: 0, b: 0, ranges: [] })
+                prefer(mut c, again, body, len(c.program), greedy)
+                if skip >= 0 {
+                    prefer(mut c, skip, body, len(c.program), greedy)
+                }
+                return
+            }
+            for _ in 0..lo {
+                gen(mut c, inner[0])
+                if c.error != "" {
+                    return
+                }
+            }
+            if hi >= 0 {
+                // Each optional copy: split body, out.
+                let mut splits: [Int] = []
+                for _ in lo..hi {
+                    let split = emit(mut c, Inst { op: SPLIT(), a: 0, b: 0, ranges: [] })
+                    push(mut splits, split)
+                    gen(mut c, inner[0])
+                    if c.error != "" {
+                        return
+                    }
+                }
+                let out = len(c.program)
+                for s in splits {
+                    prefer(mut c, s, s + 1, out, greedy)
+                }
+            }
+        }
+    }
+}
+
+fn prefer(c: mut Compiler, split: Int, body: Int, out: Int, greedy: Bool) {
+    if split >= len(c.program) {
+        return
+    }
+    if greedy {
+        c.program[split].a = body
+        c.program[split].b = out
+    } else {
+        c.program[split].a = out
+        c.program[split].b = body
+    }
+}
+
+// Whether every way through the program meets \A before reading anything.
+fn starts_anchored(program: [Inst]) -> Bool {
+    let mut pc = 0
+    for pc < len(program) {
+        let i = program[pc]
+        if i.op == SAVE() {
+            pc = pc + 1
+        } else if i.op == LOOK() && i.a == TEXT_START() {
+            return true
+        } else {
+            return false
+        }
+    }
+    return false
+}
+
+// The bytes of the characters every match starts with, before any choice.
+fn literal_prefix(program: [Inst]) -> Str {
+    let mut b = strings.builder()
+    let mut pc = 0
+    for pc < len(program) && program[pc].op == SAVE() {
+        pc = pc + 1
+    }
+    for pc < len(program) && program[pc].op == CHAR() {
+        add_utf8(mut b, program[pc].a)
+        pc = pc + 1
+    }
+    return strings.build(b)
+}
+
+fn add_utf8(b: mut strings.Builder, cp: Int) {
+    if cp < 0x80 {
+        strings.add_byte(mut b, byte(cp))
+    } else if cp < 0x800 {
+        strings.add_byte(mut b, byte(0xC0 | cp >> 6))
+        strings.add_byte(mut b, byte(0x80 | cp & 0x3F))
+    } else if cp < 0x10000 {
+        strings.add_byte(mut b, byte(0xE0 | cp >> 12))
+        strings.add_byte(mut b, byte(0x80 | cp >> 6 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | cp & 0x3F))
+    } else {
+        strings.add_byte(mut b, byte(0xF0 | cp >> 18))
+        strings.add_byte(mut b, byte(0x80 | cp >> 12 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | cp >> 6 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | cp & 0x3F))
+    }
+}
+
+// The bytes the first character of a match can start with, from the
+// program's start through every split and assertion: empty when a match
+// can be empty or start with any byte, so no position can be skipped.
+fn first_bytes(program: [Inst]) -> [Bool] {
+    let mut set: [Bool] = []
+    for _ in 0..256 {
+        push(mut set, false)
+    }
+    let mut seen: [Bool] = []
+    for _ in program {
+        push(mut seen, false)
+    }
+    let mut stack = [0]
+    let mut n = 1
+    let mut count = 0
+    for n > 0 {
+        n = n - 1
+        let pc = stack[n]
+        if seen[pc] {
+            continue
+        }
+        seen[pc] = true
+        let i = program[pc]
+        if i.op == MATCH() {
+            return []
+        } else if i.op == SAVE() || i.op == LOOK() {
+            n = push_pc(mut stack, n, pc + 1)
+        } else if i.op == JUMP() {
+            n = push_pc(mut stack, n, i.a)
+        } else if i.op == SPLIT() {
+            n = push_pc(mut stack, n, i.a)
+            n = push_pc(mut stack, n, i.b)
+        } else if i.op == CHAR() {
+            let b = lead_byte(i.a)
+            if !set[b] {
+                set[b] = true
+                count = count + 1
+            }
+        } else {
+            for k in 0..len(i.ranges) / 2 {
+                let lo = lead_byte(i.ranges[2 * k])
+                let hi = lead_byte(i.ranges[2 * k + 1])
+                for b in lo..hi + 1 {
+                    if !set[b] {
+                        set[b] = true
+                        count = count + 1
+                    }
+                }
+            }
+        }
+    }
+    if count >= 256 {
+        return []
+    }
+    return set
+}
+
+fn push_pc(stack: mut [Int], n: Int, pc: Int) -> Int {
+    if n < len(stack) {
+        stack[n] = pc
+    } else {
+        push(mut stack, pc)
+    }
+    return n + 1
+}
+
+// The first byte of a code point's UTF-8 encoding.
+fn lead_byte(cp: Int) -> Int {
+    if cp < 0x80 {
+        return cp
+    }
+    if cp < 0x800 {
+        return 0xC0 | cp >> 6
+    }
+    if cp < 0x10000 {
+        return 0xE0 | cp >> 12
+    }
+    return 0xF0 | cp >> 18
+}
+
+// ---- The Pike VM ----
+
+// Threads at one position: the program counters in priority order, and
+// each one's capture slots in `slots` (`width` of them per thread).
+type Threads = struct {
+    pcs: [Int]
+    count: Int
+    gen: Int  // which position the list is for: a pc is in it when on[pc] == gen
+    on: [Int]
+    slots: [Int]
+}
+
+fn threads(size: Int, width: Int) -> Threads {
+    let mut t = Threads { pcs: [], count: 0, gen: 0, on: [], slots: [] }
+    for _ in 0..size {
+        push(mut t.pcs, 0)
+        push(mut t.on, -1)
+    }
+    for _ in 0..size * width {
+        push(mut t.slots, -1)
+    }
+    return t
+}
+
+fn is_word(text: Str, at: Int, before: Bool) -> Bool {
+    if before {
+        if at <= 0 {
+            return false
+        }
+        return word_byte(text[at - 1])
+    }
+    if at >= len(text) {
+        return false
+    }
+    return word_byte(text[at])
+}
+
+fn holds(kind: Int, text: Str, at: Int) -> Bool {
+    if kind == TEXT_START() {
+        return at == 0
+    }
+    if kind == TEXT_END() {
+        return at == len(text)
+    }
+    if kind == LINE_START() {
+        return at == 0 || text[at - 1] == '\n'
+    }
+    if kind == LINE_END() {
+        return at == len(text) || text[at] == '\n'
+    }
+    // In CRLF mode, never between the \r and the \n of a line ending.
+    if kind == CRLF_START() {
+        return at == 0 || text[at - 1] == '\n' || text[at - 1] == '\r' && (at >= len(text) || text[at] != '\n')
+    }
+    if kind == CRLF_END() {
+        return at == len(text) || text[at] == '\r' || text[at] == '\n' && (at == 0 || text[at - 1] != '\r')
+    }
+    let before = is_word(text, at, true)
+    let after = is_word(text, at, false)
+    if kind == WORD() {
+        return before != after
+    }
+    if kind == NOT_WORD() {
+        return before == after
+    }
+    if kind == WORD_START() {
+        return !before && after
+    }
+    if kind == WORD_END() {
+        return before && !after
+    }
+    if kind == WORD_START_HALF() {
+        return !before
+    }
+    return !after
+}
+
+// Adds the thread at `pc0`, with the captures `src[off..off + width]`, to
+// `t`, following splits, jumps, saves and assertions at text position `at`,
+// in priority order. `work` holds the captures as they change on the way;
+// `stack` has room for two entries for each instruction.
+fn add(re: Regex, t: mut Threads, pc0: Int, src: [Int], off: Int, width: Int, text: Str, at: Int, stack: mut [Int], work: mut [Int]) {
+    for s in 0..width {
+        work[s] = src[off + s]
+    }
+    // A stack of [pc, slot to restore (-1 for none), its old value]. Each
+    // instruction is visited once, and pushes at most two entries.
+    stack[0] = pc0
+    stack[1] = -1
+    let mut n = 3
+    for n > 0 {
+        n = n - 3
+        let pc = stack[n]
+        let slot = stack[n + 1]
+        if slot >= 0 {
+            work[slot] = stack[n + 2]  // leaving a save: put the slot back
+            continue
+        }
+        if t.on[pc] == t.gen {
+            continue
+        }
+        t.on[pc] = t.gen
+        let op = re.ops[pc]
+        if op == JUMP() {
+            stack[n] = re.xs[pc]
+            stack[n + 1] = -1
+            n = n + 3
+        } else if op == SPLIT() {
+            stack[n] = re.ys[pc]
+            stack[n + 1] = -1
+            stack[n + 3] = re.xs[pc]
+            stack[n + 4] = -1
+            n = n + 6
+        } else if op == SAVE() {
+            let x = re.xs[pc]
+            if x < width {
+                stack[n] = 0
+                stack[n + 1] = x
+                stack[n + 2] = work[x]
+                n = n + 3
+                work[x] = at
+            }
+            stack[n] = pc + 1
+            stack[n + 1] = -1
+            n = n + 3
+        } else if op == LOOK() {
+            if holds(re.xs[pc], text, at) {
+                stack[n] = pc + 1
+                stack[n + 1] = -1
+                n = n + 3
+            }
+        } else {
+            let k = t.count
+            t.pcs[k] = pc
+            let base = k * width
+            for s in 0..width {
+                t.slots[base + s] = work[s]
+            }
+            t.count = k + 1
+        }
+    }
+}
+
+fn in_class(ranges: [Int], cp: Int) -> Bool {
+    if cp < 0 {
+        return false
+    }
+    let mut lo = 0
+    let mut hi = len(ranges) / 2
+    for lo < hi {
+        let mid = (lo + hi) / 2
+        if cp < ranges[2 * mid] {
+            hi = mid
+        } else if cp > ranges[2 * mid + 1] {
+            lo = mid + 1
+        } else {
+            return true
+        }
+    }
+    return false
+}
+
+// The leftmost-first match between `start` and `end`, as `width` capture
+// slots, or none.
+fn search(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, width: Int) -> [Int] {
+    let size = len(re.ops)
+    let mut clist = threads(size, width)
+    let mut nlist = threads(size, width)
+    let mut empty: [Int] = []
+    for _ in 0..width {
+        push(mut empty, -1)
+    }
+    let mut work = empty
+    let mut stack: [Int] = []
+    for _ in 0..6 * size + 3 {
+        push(mut stack, 0)
+    }
+    let mut best: [Int] = []
+    let mut at = start
+    let only_start = anchored || re.anchored
+    let skip = len(re.first) > 0
+    let prefix = re.prefix
+    for {
+        if len(best) == 0 && !(only_start && at > start) {
+            // No match yet: start a thread here, after skipping places
+            // where no match can start.
+            if clist.count == 0 && !only_start {
+                if len(prefix) > 1 {
+                    at = find_bytes(text, prefix, at, end)
+                    if at < 0 {
+                        break
+                    }
+                } else if skip {
+                    for at < end && !re.first[int(text[at])] {
+                        at = at + 1
+                    }
+                    if at >= end {
+                        break
+                    }
+                }
+            }
+            add(re, mut clist, 0, empty, 0, width, text, at, mut stack, mut work)
+        }
+        if clist.count == 0 {
+            // Every thread died here: unless a match is found or the search
+            // is anchored, try again a code point further on.
+            if len(best) > 0 || only_start || at >= end {
+                break
+            }
+            at = at + width_at(text, at)
+            clist.gen = clist.gen + 1  // a new position: nothing is in the list
+            continue
+        }
+        let mut cp = -1
+        let mut w = 1
+        if at < end {
+            let b = int(text[at])
+            if b < 0x80 {
+                cp = b
+            } else {
+                let d = decode(text, at)
+                cp = d[0]
+                w = d[1]
+            }
+        }
+        nlist.gen = nlist.gen + 1
+        nlist.count = 0
+        for k in 0..clist.count {
+            let pc = clist.pcs[k]
+            let op = re.ops[pc]
+            if op == MATCH() {
+                best = []
+                for s in 0..width {
+                    push(mut best, clist.slots[k * width + s])
+                }
+                break  // threads after this one have lower priority
+            }
+            if at < end && (op == CHAR() && re.xs[pc] == cp || op == CLASS() && in_class(re.sets[pc], cp)) {
+                add(re, mut nlist, pc + 1, clist.slots, k * width, width, text, at + w, mut stack, mut work)
+            }
+        }
+        if at >= end {
+            break
+        }
+        let tmp = clist
+        clist = nlist
+        nlist = tmp
+        at = at + w
+    }
+    return best
+}
+
+// The first place at or after `from` where `part` occurs and ends by `end`,
+// or -1.
+fn find_bytes(text: Str, part: Str, from: Int, end: Int) -> Int {
+    let n = len(part)
+    let first = part[0]
+    let mut at = from
+    for at + n <= end {
+        if text[at] == first {
+            let mut k = 1
+            for k < n && text[at + k] == part[k] {
+                k = k + 1
+            }
+            if k == n {
+                return at
+            }
+        }
+        at = at + 1
+    }
+    return -1
+}
+
+// ---- Tests ----
+
+fn spans(re: Regex, text: Str) -> Str {
+    let mut b = strings.builder()
+    for m in find_all(re, text) {
+        strings.add(mut b, "[" + strings.from_int(m.start) + "," + strings.from_int(m.end) + ")")
+    }
+    return strings.build(b)
+}
+
+fn error_of(pattern: Str) -> Str {
+    match compile(pattern) {
+        Ok(_) => return "compiled"
+        Err(e) => return e
+    }
+}
+
+test "leftmost-first matches" {
+    assert(spans(must("a+"), "baaab aa") == "[1,4)[6,8)")
+    assert(spans(must("a|ab"), "ab") == "[0,1)")
+    assert(spans(must("ab|a"), "ab") == "[0,2)")
+    assert(spans(must("a*?"), "aa") == "[0,0)[1,1)[2,2)")
+    assert(spans(must("x*"), "ab") == "[0,0)[1,1)[2,2)")
+    assert(is_match(must("^\\d{4}-\\d{2}$"), "2026-10"))
+    assert(!is_match(must("^\\d{4}-\\d{2}$"), "2026-1"))
+}
+
+test "groups and replacement" {
+    let re = must("(?P<key>\\w+)=(?P<value>\\d+)?")
+    match captures(re, "a b=12 c") {
+        Some(g) => {
+            assert(group_text("a b=12 c", g, 0) == "b=12")
+            assert(group_text("a b=12 c", g, group_index(re, "key")) == "b")
+            assert(group_text("a b=12 c", g, 2) == "12")
+        }
+        None => assert(false)
+    }
+    match captures(re, "x=") {
+        Some(g) => assert(g[2].start == -1 && group_text("x=", g, 2) == "")
+        None => assert(false)
+    }
+    assert(replace_all(re, "a=1, b=2", "${value}:$key$$") == "1:a$, 2:b$")
+    assert(replace_all(must("\\s+"), " a  b ", "_") == "_a_b_")
+    let parts = split(must(",\\s*"), "a, b,c")
+    assert(len(parts) == 3 && parts[0] == "a" && parts[1] == "b" && parts[2] == "c")
+}
+
+test "flags, classes and assertions" {
+    assert(spans(must("(?i)straße|[^x]Y"), "STRAßE aY") == "[0,7)[8,10)")
+    assert(spans(must("(?m)^\\w"), "ab\ncd") == "[0,1)[3,4)")
+    assert(spans(must("\\bis\\b"), "this is") == "[5,7)")
+    assert(spans(must("[[:digit:]a-c]+"), "x1b2-d") == "[1,4)")
+    assert(spans(must("(?s)a.b"), "a\nb") == "[0,3)")
+    assert(spans(must("a.b"), "a\nb aéb") == "[4,8)")
+    assert(spans(must("(?x) a  b # a comment\n c"), "abc") == "[0,3)")
+}
+
+test "empty matches stay on code point boundaries" {
+    assert(spans(must(""), "é") == "[0,0)[2,2)")
+    assert(len(split(must(""), "aé")) == 4)
+}
+
+test "linear time on patterns that backtracking makes exponential" {
+    let mut text = ""
+    for _ in 0..5000 {
+        text = text + "a"
+    }
+    assert(!is_match(must("(a+)+$"), text + "b"))
+    assert(!is_match(must("(a|aa)+c"), text))
+    assert(!is_match(must("(x+x+)+y"), text))
+}
+
+test "errors" {
+    assert(error_of("(a") == "regex error at offset 0: a group without its ')'")
+    assert(error_of("*a") != "compiled")
+    assert(error_of("[z-a]") != "compiled")
+    assert(error_of("a{3,2}") != "compiled")
+    assert(error_of("\\1") != "compiled")
+    assert(error_of("(?<n>a)(?<n>b)") != "compiled")
+    assert(error_of("a{100001}") != "compiled")
+}

@@ -1,0 +1,83 @@
+// The regex package from the command line.
+//
+//     regex --count PATTERN FILE   the number of matches in FILE
+//     regex --batch CASES.json     each case's matches, as JSON
+//
+// A case is {"regex": ..., "haystack": ..., "start": 0, "end": n,
+// "anchored": false, "limit": -1}; its result is {"error": message} or
+// {"matches": [[start0, end0, start1, end1, ...], ...]}, every match's
+// capture slots (-1 for a group that took no part).
+import files
+import json
+import os
+import regex
+import strings
+
+fn main() uses fs, os {
+    let args = os.args()
+    if len(args) == 4 && args[1] == "--count" {
+        match regex.compile(args[2]) {
+            Ok(re) => {
+                match files.read(args[3]) {
+                    Ok(text) => print(len(regex.find_all(re, text)))
+                    Err(e) => {
+                        os.eprint(e)
+                        os.exit(2)
+                    }
+                }
+            }
+            Err(e) => {
+                os.eprint(e)
+                os.exit(1)
+            }
+        }
+        return
+    }
+    if len(args) == 3 && args[1] == "--batch" {
+        match files.read(args[2]) {
+            Ok(text) => {
+                match json.parse(text) {
+                    Ok(cases) => {
+                        let mut out: [json.Json] = []
+                        for c in json.items(cases) {
+                            push(mut out, run(c))
+                        }
+                        os.write(json.show(json.array(out)) + "\n")
+                    }
+                    Err(e) => {
+                        os.eprint(e)
+                        os.exit(2)
+                    }
+                }
+            }
+            Err(e) => {
+                os.eprint(e)
+                os.exit(2)
+            }
+        }
+        return
+    }
+    os.eprint("usage: regex --count PATTERN FILE | regex --batch CASES.json")
+    os.exit(2)
+}
+
+fn run(c: json.Json) -> json.Json {
+    let text = json.str_or(json.get(c, "haystack"), "")
+    match regex.compile(json.str_or(json.get(c, "regex"), "")) {
+        Ok(re) => {
+            let start = json.int_or(json.get(c, "start"), 0)
+            let end = json.int_or(json.get(c, "end"), len(text))
+            let found = regex.search_all(re, text, start, end, json.bool_or(json.get(c, "anchored"), false), json.int_or(json.get(c, "limit"), -1))
+            let mut matches: [json.Json] = []
+            for slots in found {
+                let mut xs: [json.Json] = []
+                for s in slots {
+                    push(mut xs, json.integer(s))
+                }
+                push(mut matches, json.array(xs))
+            }
+            return json.object([json.member("matches", json.array(matches))])
+        }
+        Err(e) => return json.object([json.member("error", json.string(e))])
+    }
+}

@@ -59,7 +59,7 @@ x86-64 and macOS ARM64. Use `VELA_BACKEND=c` to select C explicitly.
 | [compiler/](compiler/README.md) | Self-hosted compiler: `src/` for source, `bootstrap/` for the generated seed and build script |
 | [runtime/](runtime) | C runtime, platform adapters and public headers |
 | [std/](std) | Standard library modules written in Vela |
-| [packages/](packages) | In-repository packages: JSON (used by the compiler), CommonMark Markdown and TOML 1.0 |
+| [packages/](packages) | In-repository packages: JSON (used by the compiler), CommonMark Markdown, TOML 1.0 and linear-time regular expressions |
 | [examples/](examples) | Programs using modules, packages, concurrency, C interop and systems APIs |
 | [tests/](tests/README.md) | Golden fixtures, integration suites and retained compatibility corpus |
 | [bench/](bench/README.md) | Benchmark tools, workloads and retained measurement reports |

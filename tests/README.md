@@ -28,6 +28,7 @@ platform limits when recording results.
 | `m*_test.py` | Active feature/acceptance regressions, named for their discovery milestone |
 | [markdown_test.py](markdown_test.py) | The markdown package against the 652 CommonMark 0.31.2 examples, and pathological inputs within a time limit |
 | [toml_test.py](toml_test.py) | The toml package against toml-test's 205 valid and 474 invalid TOML 1.0 cases, a write round trip, stress documents within a time limit; `--fuzz N` compares mutated documents with Python's tomllib |
+| [regex_test.py](regex_test.py) | The regex package against the Rust regex crate's test data (each test it leaves out counted under its reason), patterns that make backtracking exponential within a time limit; `--fuzz N` compares random patterns and texts with Python's re |
 | [format_test.py](format_test.py) | The compiler, standard library, packages, examples, benchmarks and evaluation tasks are as `vela fmt` writes them |
 | [differential_test.py](differential_test.py) | Generated programs agree across back ends and optimization settings, and integer results match a Python oracle; `--count N` runs more |
 | `*_test.py`, `lsp_client.py`, `nvim_test.lua` | Package, cache, native, benchmark, evaluation and editor integration |
