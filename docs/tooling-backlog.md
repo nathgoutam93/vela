@@ -3653,6 +3653,39 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Verification:** the program above compiles no `f_7unicode_ranges`, and
   builds and runs as before; both bootstrap fixed points hold.
 
+### TL-125: No string interpolation
+
+- **Status:** proposed (a language extension; recorded, not authorized).
+- **Discovery:** post-M30, a user question after TL-106.
+- **Evidence (observed):** a message with values is a `+` chain with
+  explicit conversions, `"user " + name + " has " + strings.from_int(n) +
+  " items"`, or a builder. `"n=" + n` is E3101 ("operator '+' joins two
+  Strs"). Three or more `+` already compile to one `vela_str_join`, so
+  the cost is legibility, not speed.
+- **Impact:** verbose formatting in every program that prints or logs
+  values, and a conversion call per value.
+- **Workaround:** `+` with `strings.from_int`, `strings.from_float`,
+  `ints.to_str`; `strings.builder` for loops; `text.pad_left` and
+  `pad_right` for widths.
+- **Proposed improvement:** `f"user {name} has {n} items"`, a compatible
+  extension since `f"` is an error today (`{` keeps its meaning in plain
+  strings). It needs:
+  - a token and an AST node, not lexer-level desugaring, so `vela fmt` and
+    the language server keep the literal as written and diagnostics inside
+    `{...}` have the right positions;
+  - a conversion for Str, integers of every width, Float and Bool, with no
+    user-visible name, since a new builtin would reserve an identifier;
+  - `{{` and `}}` for braces, and perhaps `fr"..."`;
+  - the specification, `vela guide` (within its budget: 47 bytes are
+    left after TL-106), and the editor grammars.
+
+  Open questions: which types (a Show-like interface for user types?),
+  any expression or only paths inside the braces, and whether format
+  specs (`{x:08.2}`) belong there or stay in `std/text`.
+- **Verification:** run, fail and dump tests of the literal (nested
+  quotes, braces, errors inside `{...}` at their own columns), `vela fmt`
+  keeping it, and both bootstrap fixed points.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
