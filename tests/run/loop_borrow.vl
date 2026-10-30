@@ -1,0 +1,100 @@
+// The element a for loop reads is borrowed from the loop's own reference
+// to the array (TL-113): whatever keeps it retains it then. Each way of
+// keeping one, and a loop that changes the array it walks.
+// out: 2
+// out: bb,cc
+// out: cc
+// out: 2
+// out: kept cc
+// out: last: ddd
+// out: abc
+// out: 4 5
+// out: x|y
+// out: 3
+import maps
+import strings
+
+type Box = struct {
+    name: Str
+    parts: [Str]
+}
+
+fn count(names: [Str], n: Int) -> Int {
+    let mut k = 0
+    for name in names {
+        if len(name) == n {
+            k = k + 1
+        }
+    }
+    return k
+}
+
+fn first_long(names: [Str]) -> Str {
+    for name in names {
+        if len(name) > 2 {
+            return name
+        }
+    }
+    return ""
+}
+
+fn main() {
+    let names = ["a" + "", "bb" + "", "cc" + "", "ddd" + ""]
+    print(count(names, 2))
+    // Pushed into another array and kept in a struct.
+    let mut kept: [Str] = []
+    let mut b = Box { name: "", parts: [] }
+    for name in names {
+        if len(name) == 2 {
+            push(mut kept, name)
+            b.name = name
+        }
+    }
+    let mut joined = ""
+    for k in kept {
+        if joined != "" { joined = joined + "," }
+        joined = joined + k
+    }
+    print(joined)
+    print(b.name)
+    // A map's keys and values.
+    let mut m: Map[Str, Str] = [:]
+    for name in names {
+        if len(name) == 2 { m[name] = name + "!" }
+    }
+    print(len(maps.keys(m)))
+    // Kept in a variable after the loop, and captured by a closure.
+    let mut last = ""
+    let mut hold = fn() -> Str { return "" }
+    for name in names {
+        last = name
+        if name == "cc" {
+            hold = fn() -> Str { return "kept " + name }
+        }
+    }
+    print(hold())
+    print("last: " + last)
+    print(first_long(["a" + "", "abc" + ""]) + first_long(["a!" + ""]) + first_long([]))
+    // The loop walks its own snapshot while the variable changes.
+    let mut grow = ["x" + "", "y" + ""]
+    for g in grow {
+        push(mut grow, g + g)
+        push(mut grow, g)
+    }
+    let mut lengths = 0
+    for g in grow { lengths = lengths + len(g) }
+    print(strings.from_int(len(grow) - 2) + " " + strings.from_int(lengths - 3))
+    // Arrays of arrays: the inner array is borrowed and kept.
+    let grid = [["x" + ""], ["y" + ""]]
+    let mut rows: [[Str]] = []
+    for row in grid { push(mut rows, row) }
+    print(rows[0][0] + "|" + rows[1][0])
+    // The element outlives a reassignment of the array it came from.
+    let mut cur = ["one" + "", "two" + ""]
+    let mut out: [Str] = []
+    for c in cur {
+        cur = []
+        push(mut out, c)
+    }
+    print(strings.from_int(len(out[0]) + len(cur)))
+}
