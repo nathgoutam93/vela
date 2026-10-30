@@ -27,6 +27,7 @@ Run tools from [bench/](../README.md) and put fresh scratch reports in `build/`.
 | `2026-10-29-linux-validation.json`, `2026-10-29-linux-release-parity.json`, `2026-10-29-linux-real-programs.json` | VAL-001 on Linux x86-64: fixed points, complete suites (optimized, unoptimized, ASan+UBSan, TSan), every milestone integration, emission parity and both performance gates |
 | [`2026-10-30-toml-port.md`](2026-10-30-toml-port.md) | The TOML 1.0 package: toml-test conformance, fuzzing against tomllib, throughput, memory and friction |
 | [`2026-10-30-regex-port.md`](2026-10-30-regex-port.md) | The regex package: Rust regex test conformance, linear time on backtracking-exponential patterns, fuzzing against Python re, speed, memory and friction |
+| [`2026-10-30-regex-lazy-dfa.md`](2026-10-30-regex-lazy-dfa.md) | The regex package's lazy DFA: design, differential testing against the Pike VM, a VM bug it found, speed on long and short texts |
 | `*-validation.json` | Commands, environments, outcomes and validation limits |
 
 Reports retain their original bytes. Paths, commands, source digests and

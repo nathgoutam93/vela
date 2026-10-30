@@ -1,7 +1,11 @@
 // Regular expressions that run in time linear in the text, whatever the
 // pattern: `compile` turns a pattern into a program, and a Pike VM runs it
 // over the text's code points, every possible match at once, so no pattern
-// can make a search take exponential time. The syntax is RE2's and Rust's,
+// can make a search take exponential time. On texts of 256 bytes and more,
+// a lazy DFA built from the program during the search finds each match's
+// bounds a code point at a time, and the VM runs only over the match, for
+// its groups; a pattern needing more than a few thousand states runs on the
+// VM alone. The syntax is RE2's and Rust's,
 // without backreferences or lookaround, which no linear-time engine can
 // offer. Matches are leftmost-first, as Perl, Python and Rust report them.
 //
@@ -15,6 +19,7 @@
 // and their lazy forms; flags `(?imsUxR)` and `(?i:...)`; escapes `\n \t \r
 // \f \v \a \e \0`, `\xHH`, `\x{H...}`. `\d \w \s \b` and case folding cover
 // ASCII; `.` and classes match any code point.
+import lists
 import maps
 import strings
 
@@ -26,6 +31,14 @@ pub type Regex = struct {
     xs: [Int]
     ys: [Int]
     sets: [[Int]]
+    // The pattern reversed, as a program without captures, which finds where
+    // a match starts from where it ends.
+    rops: [Int]
+    rxs: [Int]
+    rys: [Int]
+    rsets: [[Int]]
+    looks: Bool  // the pattern has assertions
+    cuts: [Int]  // where code points past ASCII change the pattern's literals and classes they are in
     groups: Int  // capture groups, the whole match included
     names: [Str]  // each group's name, "" for none
     first: [Bool]  // the bytes a match can start with; empty when any can
@@ -51,7 +64,7 @@ pub fn compile(pattern: Str) -> Result[Regex, Str] {
     if p.error != "" {
         return Err(p.error)
     }
-    let mut c = Compiler { program: [], error: "" }
+    let mut c = Compiler { program: [], error: "", reverse: false }
     emit(mut c, Inst { op: SAVE(), a: 0, b: 0, ranges: [] })
     gen(mut c, tree)
     emit(mut c, Inst { op: SAVE(), a: 1, b: 0, ranges: [] })
@@ -59,13 +72,28 @@ pub fn compile(pattern: Str) -> Result[Regex, Str] {
     if c.error != "" {
         return Err(c.error)
     }
-    let mut re = Regex { pattern: pattern, ops: [], xs: [], ys: [], sets: [], groups: p.groups, names: p.names, first: first_bytes(c.program),
-        prefix: literal_prefix(c.program), anchored: starts_anchored(c.program) }
+    let mut r = Compiler { program: [], error: "", reverse: true }
+    gen(mut r, tree)
+    emit(mut r, Inst { op: MATCH(), a: 0, b: 0, ranges: [] })
+    if r.error != "" {
+        return Err(r.error)
+    }
+    let mut re = Regex { pattern: pattern, ops: [], xs: [], ys: [], sets: [], rops: [], rxs: [], rys: [], rsets: [], looks: false, cuts: cuts_of(c.program), groups: p.groups, names: p.names,
+        first: first_bytes(c.program), prefix: literal_prefix(c.program), anchored: starts_anchored(c.program) }
     for i in c.program {
         push(mut re.ops, i.op)
         push(mut re.xs, i.a)
         push(mut re.ys, i.b)
         push(mut re.sets, i.ranges)
+        if i.op == LOOK() {
+            re.looks = true
+        }
+    }
+    for i in r.program {
+        push(mut re.rops, i.op)
+        push(mut re.rxs, i.a)
+        push(mut re.rys, i.b)
+        push(mut re.rsets, i.ranges)
     }
     return Ok(re)
 }
@@ -77,13 +105,15 @@ pub fn must(pattern: Str) -> Regex {
         Ok(re) => return re
         Err(e) => {
             assert(e == "")
-            return Regex { pattern: "", ops: [], xs: [], ys: [], sets: [], groups: 0, names: [], first: [], prefix: "", anchored: false }
+            return Regex { pattern: "", ops: [], xs: [], ys: [], sets: [], rops: [], rxs: [], rys: [], rsets: [], looks: false, cuts: [], groups: 0, names: [], first: [], prefix: "",
+                anchored: false }
         }
     }
 }
 
 pub fn is_match(re: Regex, text: Str) -> Bool {
-    return len(find_one(re, text, 0, len(text), false, 2)) > 0
+    let mut c = cache(re)
+    return len(find_one(re, mut c, text, 0, len(text), false, 2)) > 0
 }
 
 // The leftmost match.
@@ -93,7 +123,8 @@ pub fn find(re: Regex, text: Str) -> Option[Match] {
 
 // The leftmost match starting at `start` or after it.
 pub fn find_at(re: Regex, text: Str, start: Int) -> Option[Match] {
-    let slots = find_one(re, text, start, len(text), false, 2)
+    let mut c = cache(re)
+    let slots = find_one(re, mut c, text, start, len(text), false, 2)
     if len(slots) == 0 {
         return None
     }
@@ -113,7 +144,8 @@ pub fn find_all(re: Regex, text: Str) -> [Match] {
 // The groups of the leftmost match, the whole match first: each a start
 // and an end, or -1 and -1 for a group that took no part in it.
 pub fn captures(re: Regex, text: Str) -> Option[[Match]] {
-    let slots = find_one(re, text, 0, len(text), false, re.groups * 2)
+    let mut c = cache(re)
+    let slots = find_one(re, mut c, text, 0, len(text), false, re.groups * 2)
     if len(slots) == 0 {
         return None
     }
@@ -201,10 +233,11 @@ fn groups_of(slots: [Int]) -> [Match] {
 // inside a code point's bytes is not one (anchored, the search stops).
 fn all_slots(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, limit: Int, width: Int) -> [[Int]] {
     let mut out: [[Int]] = []
+    let mut c = cache(re)
     let mut at = start
     let mut last_end = -1
     for limit < 0 || len(out) < limit {
-        let mut slots = find_one(re, text, at, end, anchored, width)
+        let mut slots = find_one(re, mut c, text, at, end, anchored, width)
         if len(slots) == 0 {
             break
         }
@@ -212,7 +245,7 @@ fn all_slots(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, limit: 
             if at >= end {
                 break
             }
-            slots = find_one(re, text, at + 1, end, anchored, width)
+            slots = find_one(re, mut c, text, at + 1, end, anchored, width)
             if len(slots) == 0 {
                 break
             }
@@ -226,10 +259,10 @@ fn all_slots(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, limit: 
 
 // The first match from `at`, with `width` capture slots (2: the whole
 // match only, which spares copying the groups' slots).
-fn find_one(re: Regex, text: Str, at: Int, end: Int, anchored: Bool, width: Int) -> [Int] {
+fn find_one(re: Regex, c: mut Cache, text: Str, at: Int, end: Int, anchored: Bool, width: Int) -> [Int] {
     let mut start = at
     for start <= end {
-        let slots = search(re, text, start, end, anchored, width)
+        let slots = search(re, mut c, text, start, end, anchored, width)
         if len(slots) == 0 || slots[0] != slots[1] || boundary(text, slots[0]) {
             return slots
         }
@@ -1089,9 +1122,15 @@ fn min(a: Int, b: Int) -> Int {
 // The code point at byte `at`, and its length in bytes: [-1, 1] for a byte
 // that does not start a valid UTF-8 sequence, which nothing matches.
 fn decode(s: Str, at: Int) -> [Int] {
+    let cp = code_point(s, at)
+    return [cp, cp_width(cp)]
+}
+
+// The code point at byte `at`, or -1 if a code point does not start there.
+fn code_point(s: Str, at: Int) -> Int {
     let c = int(s[at])
     if c < 0x80 {
-        return [c, 1]
+        return c
     }
     let mut need = 0
     let mut cp = 0
@@ -1109,22 +1148,36 @@ fn decode(s: Str, at: Int) -> [Int] {
         cp = c & 0x07
         least = 0x10000
     } else {
-        return [-1, 1]
+        return -1
     }
     if at + need >= len(s) {
-        return [-1, 1]
+        return -1
     }
     for k in 1..need + 1 {
         let x = int(s[at + k])
         if x & 0xC0 != 0x80 {
-            return [-1, 1]
+            return -1
         }
         cp = cp << 6 | x & 0x3F
     }
     if cp < least || cp > 0x10FFFF || cp >= 0xD800 && cp <= 0xDFFF {
-        return [-1, 1]
+        return -1
     }
-    return [cp, need + 1]
+    return cp
+}
+
+// The bytes of a code point (1 for -1, the byte that is not one).
+fn cp_width(cp: Int) -> Int {
+    if cp < 0x80 {
+        return 1
+    }
+    if cp < 0x800 {
+        return 2
+    }
+    if cp < 0x10000 {
+        return 3
+    }
+    return 4
 }
 
 fn width_at(s: Str, at: Int) -> Int {
@@ -1224,6 +1277,7 @@ type Inst = struct {
 type Compiler = struct {
     program: [Inst]
     error: Str
+    reverse: Bool  // the pattern backwards, without captures
 }
 
 // Programs past this size are refused, so a pattern like (a{1000}){1000}
@@ -1263,13 +1317,21 @@ fn gen(c: mut Compiler, n: Node) {
             let _ = emit(mut c, Inst { op: LOOK(), a: kind, b: 0, ranges: [] })
         }
         Node.Group(index, inner) => {
+            if c.reverse {
+                gen(mut c, inner[0])
+                return
+            }
             let _ = emit(mut c, Inst { op: SAVE(), a: 2 * index, b: 0, ranges: [] })
             gen(mut c, inner[0])
             let _ = emit(mut c, Inst { op: SAVE(), a: 2 * index + 1, b: 0, ranges: [] })
         }
         Node.Concat(items) => {
-            for x in items {
-                gen(mut c, x)
+            for k in 0..len(items) {
+                if c.reverse {
+                    gen(mut c, items[len(items) - 1 - k])
+                } else {
+                    gen(mut c, items[k])
+                }
             }
         }
         Node.Alt(branches) => {
@@ -1647,8 +1709,8 @@ fn in_class(ranges: [Int], cp: Int) -> Bool {
 }
 
 // The leftmost-first match between `start` and `end`, as `width` capture
-// slots, or none.
-fn search(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, width: Int) -> [Int] {
+// slots, or none: the Pike VM, which every search falls back on.
+fn pike(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, width: Int) -> [Int] {
     let size = len(re.ops)
     let mut clist = threads(size, width)
     let mut nlist = threads(size, width)
@@ -1671,6 +1733,7 @@ fn search(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, width: Int
             // No match yet: start a thread here, after skipping places
             // where no match can start.
             if clist.count == 0 && !only_start {
+                let from = at
                 if len(prefix) > 1 {
                     at = find_bytes(text, prefix, at, end)
                     if at < 0 {
@@ -1683,6 +1746,9 @@ fn search(re: Regex, text: Str, start: Int, end: Int, anchored: Bool, width: Int
                     if at >= end {
                         break
                     }
+                }
+                if at != from {
+                    clist.gen = clist.gen + 1  // a new position: what the list met at the old one is not met here
                 }
             }
             add(re, mut clist, 0, empty, 0, width, text, at, mut stack, mut work)
@@ -1755,6 +1821,533 @@ fn find_bytes(text: Str, part: Str, from: Int, end: Int) -> Int {
         at = at + 1
     }
     return -1
+}
+
+// ---- The lazy DFA ----
+//
+// A search first runs a DFA, built while it runs: a state is the list of
+// threads the Pike VM would have before their closure, in priority order,
+// with the class of the byte read last when the pattern has assertions, and
+// each transition, on a code point, is worked out once, when first taken,
+// and then is a table lookup. The forward DFA finds where the leftmost-first
+// match ends; one of the reversed pattern, run backwards from there, finds
+// the leftmost place it can start, which is the match's start; and the VM
+// then runs only over the match, and only for groups. Past a number of
+// states, the DFA gives up and the VM does the searching.
+
+type Dfa = struct {
+    reverse: Bool  // of the reversed program, run backwards
+    limit: Int  // states before giving up
+    failed: Bool
+    pcs: [[Int]]  // each state's threads; LOOP() starts the search again
+    sides: [Int]  // each state's class of the byte read last (0 without assertions)
+    idle: [Bool]  // the state only waits for a match to start
+    ids: Map[Int, Int]  // a hash of a state's side and threads: the last state made with it
+    same: [Int]  // each state: the one made before it with the same hash, or -1
+    row: Int  // transitions of a state: one for each ASCII byte, -1, and each of the regex's ranges of other code points
+    table: [Int]  // state * row + column: -1 not yet known, or next state * 2 + 1 if a match ends before the code point
+    on: [Int]  // closure: instructions met, when equal to gen
+    gen: Int
+    stack: [Int]
+    list: [Int]  // closure: the threads reached, in priority order
+}
+
+// The DFAs of one call, kept from one match to the next. Until they have
+// states, a search of fewer than `least` bytes goes to the VM: on a short
+// text, making the states costs more than the VM's whole search.
+type Cache = struct {
+    dfas: [Dfa]  // forward, then reverse, each made when first needed
+    least: Int
+    limit: Int  // states each DFA may make
+}
+
+fn cache(re: Regex) -> Cache {
+    return Cache { dfas: [], least: 256, limit: 3000 }
+}
+
+fn dfa(re: Regex, reverse: Bool, limit: Int) -> Dfa {
+    let mut size = len(re.ops)
+    if reverse {
+        size = len(re.rops)
+    }
+    let mut d = Dfa { reverse: reverse, limit: limit, failed: false, pcs: [], sides: [], idle: [], ids: [:], same: [], row: 130 + len(re.cuts), table: [],
+        on: [], gen: 0, stack: [], list: [] }
+    for _ in 0..size {
+        push(mut d.on, -1)
+    }
+    for _ in 0..2 * size + 2 {
+        push(mut d.stack, 0)
+    }
+    let _ = state(mut d, [], 0)  // 0: no threads left
+    return d
+}
+
+fn LOOP() -> Int {
+    return -1
+}
+
+// The class of a byte beside a position, as assertions see it: 0 the edge
+// of the text, 1 \n, 2 \r, 3 a word byte, 4 any other. A code point's
+// class is its first and its last byte's.
+fn class_of(cp: Int) -> Int {
+    if cp == 10 {
+        return 1
+    }
+    if cp == 13 {
+        return 2
+    }
+    if cp >= 0 && cp < 0x80 && word_byte(byte(cp)) {
+        return 3
+    }
+    return 4
+}
+
+fn byte_class(text: Str, at: Int) -> Int {
+    if at < 0 || at >= len(text) {
+        return 0
+    }
+    return class_of(int(text[at]))
+}
+
+// Whether an assertion holds between bytes of classes `before` and `after`
+// (as `holds` decides from the text).
+fn holds_between(kind: Int, before: Int, after: Int) -> Bool {
+    if kind == TEXT_START() {
+        return before == 0
+    }
+    if kind == TEXT_END() {
+        return after == 0
+    }
+    if kind == LINE_START() {
+        return before == 0 || before == 1
+    }
+    if kind == LINE_END() {
+        return after == 0 || after == 1
+    }
+    if kind == CRLF_START() {
+        return before == 0 || before == 1 || before == 2 && after != 1
+    }
+    if kind == CRLF_END() {
+        return after == 0 || after == 2 || after == 1 && before != 2
+    }
+    let b = before == 3
+    let a = after == 3
+    if kind == WORD() {
+        return b != a
+    }
+    if kind == NOT_WORD() {
+        return b == a
+    }
+    if kind == WORD_START() {
+        return !b && a
+    }
+    if kind == WORD_END() {
+        return b && !a
+    }
+    if kind == WORD_START_HALF() {
+        return !b
+    }
+    return !a
+}
+
+// The state of these threads, made if it is new.
+fn state(d: mut Dfa, pcs: [Int], side: Int) -> Int {
+    if len(pcs) == 0 && len(d.pcs) > 0 {
+        return 0
+    }
+    let mut h = side
+    for p in pcs {
+        h = (h * 31 + p + 2) & 0xFFFFFFFFFFF
+    }
+    let mut last = -1
+    match maps.get(d.ids, h) {
+        Some(id) => last = id
+        None => {}
+    }
+    let mut k = last
+    for k >= 0 {
+        if d.sides[k] == side && same(d.pcs[k], pcs) {
+            return k
+        }
+        k = d.same[k]
+    }
+    if len(d.pcs) >= d.limit || len(d.table) + d.row > 130 * d.limit {
+        d.failed = true
+        return 0
+    }
+    let id = len(d.pcs)
+    push(mut d.pcs, pcs)
+    push(mut d.sides, side)
+    push(mut d.idle, len(pcs) == 1 && pcs[0] == LOOP())
+    push(mut d.same, last)
+    for _ in 0..d.row {
+        push(mut d.table, -1)
+    }
+    d.ids[h] = id
+    return id
+}
+
+// The closure of state `s`'s threads between bytes of classes `before` and
+// `after`, into `d.list`: the threads that read a code point next, in
+// priority order. Whether a match ends there; forward, the threads after
+// the match are cut, as they could only give matches of lower priority.
+fn closure(re: Regex, d: mut Dfa, s: Int, before: Int, after: Int) -> Bool {
+    d.gen = d.gen + 1
+    d.list = []
+    let pcs = d.pcs[s]
+    let mut matched = false
+    for p in pcs {
+        let mut pc = p
+        if p == LOOP() {
+            pc = 0
+        }
+        if follow(re, mut d, pc, before, after) {
+            matched = true
+            if !d.reverse {
+                return true
+            }
+        }
+        if p == LOOP() {
+            push(mut d.list, LOOP())
+        }
+    }
+    return matched
+}
+
+fn follow(re: Regex, d: mut Dfa, pc0: Int, before: Int, after: Int) -> Bool {
+    let mut ops = re.ops
+    let mut xs = re.xs
+    let mut ys = re.ys
+    if d.reverse {
+        ops = re.rops
+        xs = re.rxs
+        ys = re.rys
+    }
+    let mut matched = false
+    d.stack[0] = pc0
+    let mut n = 1
+    for n > 0 {
+        n = n - 1
+        let pc = d.stack[n]
+        if d.on[pc] == d.gen {
+            continue
+        }
+        d.on[pc] = d.gen
+        let op = ops[pc]
+        if op == JUMP() {
+            d.stack[n] = xs[pc]
+            n = n + 1
+        } else if op == SPLIT() {
+            d.stack[n] = ys[pc]
+            d.stack[n + 1] = xs[pc]
+            n = n + 2
+        } else if op == SAVE() {
+            d.stack[n] = pc + 1
+            n = n + 1
+        } else if op == LOOK() {
+            if holds_between(xs[pc], before, after) {
+                d.stack[n] = pc + 1
+                n = n + 1
+            }
+        } else if op == MATCH() {
+            matched = true
+            if !d.reverse {
+                return true
+            }
+        } else {
+            push(mut d.list, pc)
+        }
+    }
+    return matched
+}
+
+// The transition of state `s` on code point `cp` (-1 for a byte that is
+// not UTF-8), worked out and kept: the next state * 2, plus 1 when a match
+// ends before the code point.
+fn step(re: Regex, d: mut Dfa, s: Int, cp: Int) -> Int {
+    let cls = class_of(cp)
+    let side = d.sides[s]
+    let mut matched = false
+    if d.reverse {
+        matched = closure(re, mut d, s, cls, side)
+    } else {
+        matched = closure(re, mut d, s, side, cls)
+    }
+    let mut ops = re.ops
+    let mut xs = re.xs
+    let mut sets = re.sets
+    if d.reverse {
+        ops = re.rops
+        xs = re.rxs
+        sets = re.rsets
+    }
+    let mut next: [Int] = []
+    for t in d.list {
+        if t == LOOP() {
+            push(mut next, LOOP())
+        } else if ops[t] == CHAR() && xs[t] == cp || ops[t] == CLASS() && in_class(sets[t], cp) {
+            push(mut next, t + 1)
+        }
+    }
+    if d.reverse {
+        sort_ints(mut next)  // backwards, every match counts, in any order
+    }
+    let mut new_side = 0
+    if re.looks {
+        new_side = cls
+    }
+    let mut v = state(mut d, next, new_side) * 2
+    if matched {
+        v = v + 1
+    }
+    d.table[s * d.row + column(re, cp)] = v
+    return v
+}
+
+fn same(a: [Int], b: [Int]) -> Bool {
+    if len(a) != len(b) {
+        return false
+    }
+    for i in 0..len(a) {
+        if a[i] != b[i] {
+            return false
+        }
+    }
+    return true
+}
+
+fn sort_ints(xs: mut [Int]) {
+    for i in 1..len(xs) {
+        let x = xs[i]
+        let mut j = i
+        for j > 0 && xs[j - 1] > x {
+            xs[j] = xs[j - 1]
+            j = j - 1
+        }
+        xs[j] = x
+    }
+}
+
+// Where the leftmost-first match between `start` and `end` ends: -1 if
+// there is none, -2 if the DFA gave up. It reads the text as `pike` does,
+// a code point at a time from `start`.
+fn forward(re: Regex, d: mut Dfa, text: Str, start: Int, end: Int, anchored: Bool) -> Int {
+    if d.failed {
+        return -2
+    }
+    let mut side = 0
+    if re.looks {
+        side = byte_class(text, start - 1)
+    }
+    let mut s = 0
+    if anchored {
+        s = state(mut d, [0], side)
+    } else {
+        s = state(mut d, [LOOP()], side)
+    }
+    let skip = len(re.prefix) > 1 || len(re.first) > 0
+    let mut at = start
+    let mut last = -1
+    for at < end && !d.failed {
+        if skip && d.idle[s] {
+            // No match has started: on to where one can.
+            let from = at
+            if len(re.prefix) > 1 {
+                at = find_bytes(text, re.prefix, at, end)
+                if at < 0 {
+                    return -1
+                }
+            } else {
+                for at < end && !re.first[int(text[at])] {
+                    at = at + 1
+                }
+                if at >= end {
+                    return -1
+                }
+            }
+            if at != from && re.looks {
+                s = state(mut d, [LOOP()], byte_class(text, at - 1))
+            }
+        }
+        let mut cp = int(text[at])
+        let mut w = 1
+        let mut col = cp
+        if cp >= 0x80 {
+            cp = code_point(text, at)
+            w = cp_width(cp)
+            col = column(re, cp)
+        }
+        let mut v = d.table[s * d.row + col]
+        if v < 0 {
+            v = step(re, mut d, s, cp)
+        }
+        if d.failed {
+            return -2
+        }
+        if v & 1 == 1 {
+            last = at
+        }
+        s = v >> 1
+        if s == 0 {
+            return last
+        }
+        at = at + w
+    }
+    if d.failed {
+        return -2
+    }
+    if closure(re, mut d, s, d.sides[s], byte_class(text, at)) {
+        last = at
+    }
+    return last
+}
+
+// The leftmost place at or after `start` where a match of the pattern can
+// start and end at `end`, by the reversed pattern read backwards: -1 if
+// there is none, -2 if the DFA gave up.
+fn backward(re: Regex, d: mut Dfa, text: Str, start: Int, end: Int) -> Int {
+    if d.failed {
+        return -2
+    }
+    let mut side = 0
+    if re.looks {
+        side = byte_class(text, end)
+    }
+    let mut s = state(mut d, [0], side)
+    let mut at = end
+    let mut first = -1
+    for at > start && !d.failed {
+        let mut cp = int(text[at - 1])
+        let mut w = 1
+        let mut col = cp
+        if cp >= 0x80 {
+            cp = code_point_before(text, start, at)
+            w = cp_width(cp)
+            col = column(re, cp)
+        }
+        let mut v = d.table[s * d.row + col]
+        if v < 0 {
+            v = step(re, mut d, s, cp)
+        }
+        if d.failed {
+            return -2
+        }
+        if v & 1 == 1 {
+            first = at
+        }
+        s = v >> 1
+        if s == 0 {
+            return first
+        }
+        at = at - w
+    }
+    if d.failed {
+        return -2
+    }
+    if closure(re, mut d, s, byte_class(text, at - 1), d.sides[s]) {
+        first = at
+    }
+    return first
+}
+
+// The code point that ends at byte `at`, as decoding forward from `start`
+// reads it, or -1 for a byte that is not part of one.
+fn code_point_before(text: Str, start: Int, at: Int) -> Int {
+    for k in 1..5 {
+        if at - k < start {
+            return -1
+        }
+        if int(text[at - k]) & 0xC0 != 0x80 {
+            let cp = code_point(text, at - k)
+            if cp >= 0 && cp_width(cp) == k {
+                return cp
+            }
+            return -1
+        }
+    }
+    return -1
+}
+
+// The column of a code point in a state's transitions: ASCII bytes, then
+// -1, then the ranges of other code points that no literal or class of the
+// pattern tells apart.
+fn column(re: Regex, cp: Int) -> Int {
+    if cp < 0x80 {
+        if cp < 0 {
+            return 128
+        }
+        return cp
+    }
+    // The number of cuts at or before cp.
+    let mut lo = 0
+    let mut hi = len(re.cuts)
+    for lo < hi {
+        let mid = (lo + hi) / 2
+        if re.cuts[mid] <= cp {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return 129 + lo
+}
+
+// Where the literals and classes of a program start or stop including code
+// points past ASCII: between two cuts, each code point is in the same ones.
+fn cuts_of(program: [Inst]) -> [Int] {
+    let mut cuts: [Int] = []
+    for i in program {
+        if i.op == CHAR() && i.a >= 0x80 {
+            push(mut cuts, i.a)
+            push(mut cuts, i.a + 1)
+        } else if i.op == CLASS() {
+            for k in 0..len(i.ranges) {
+                let x = i.ranges[k] + k % 2  // a range's start, or after its end
+                if x > 0x80 && x <= 0x10FFFF {
+                    push(mut cuts, x)
+                }
+            }
+        }
+    }
+    let mut out: [Int] = []
+    for x in lists.sort(cuts) {
+        if len(out) == 0 || out[len(out) - 1] != x {
+            push(mut out, x)
+        }
+    }
+    return out
+}
+
+// The leftmost-first match between `start` and `end`, as `width` capture
+// slots, or none.
+fn search(re: Regex, c: mut Cache, text: Str, start: Int, end: Int, anchored: Bool, width: Int) -> [Int] {
+    if len(c.dfas) == 0 {
+        if end - start < c.least {
+            return pike(re, text, start, end, anchored, width)
+        }
+        push(mut c.dfas, dfa(re, false, c.limit))
+    }
+    let only_start = anchored || re.anchored
+    let e = forward(re, mut c.dfas[0], text, start, end, only_start)
+    if e == -1 {
+        return []
+    }
+    if e >= 0 {
+        let mut s = start
+        if !only_start {
+            if len(c.dfas) == 1 {
+                push(mut c.dfas, dfa(re, true, c.limit))  // made for the first match
+            }
+            s = backward(re, mut c.dfas[1], text, start, e)
+        }
+        if s >= 0 {
+            if width == 2 {
+                return [s, e]
+            }
+            return pike(re, text, s, e, true, width)
+        }
+    }
+    return pike(re, text, start, end, anchored, width)
 }
 
 // ---- Tests ----
@@ -1837,4 +2430,116 @@ test "errors" {
     assert(error_of("\\1") != "compiled")
     assert(error_of("(?<n>a)(?<n>b)") != "compiled")
     assert(error_of("a{100001}") != "compiled")
+}
+
+// The DFAs against the Pike VM alone, from every byte of texts with
+// assertions' edge cases, code points of every width, and bytes that are
+// not UTF-8; and with a DFA that gives up at once.
+test "the DFAs find what the Pike VM finds" {
+    let patterns = ["a+", "(a|ab)(c|bcd)(d*)", "\\bé\\w*", "(?m)^.+$", "(?R)^b$", "(?i)Ab|é+", "x*", "[^a]+?b", "\\B..\\b", "(?s).{2,3}",
+        "\\b{start}\\w+\\b{end}", "\\<b|\\>", "(é|€)+𝄞?", "$", "\\Ab|c\\z", "(?m)(?:\\r?\\n)+", "a(?:b|)*c", "[[:space:]]\\S+", "\\w\\b{end-half}", "(?U)a+"]
+    let mut bad = strings.builder()
+    strings.add(mut bad, "ab")
+    strings.add_byte(mut bad, byte(0xFF))
+    strings.add(mut bad, "é")
+    strings.add_byte(mut bad, byte(0xC3))
+    strings.add(mut bad, "ab\n")
+    let texts = ["aabcd ab abcd", "é€𝄞 éa xé\n€é", "a\r\nb\r\n\r\nc\nb", "ab Ab éé", strings.build(bad), "", "\n", "bbb ab é b"]
+    for p in patterns {
+        let re = must(p)
+        for text in texts {
+            for start in 0..len(text) + 1 {
+                for anchored in [false, true] {
+                    for width in [2, re.groups * 2] {
+                        let mut c = cache(re)
+                        c.least = 0
+                        let got = search(re, mut c, text, start, len(text), anchored, width)
+                        let want = pike(re, text, start, len(text), anchored, width)
+                        if !same(got, want) {
+                            print(p + " on " + text + " from " + strings.from_int(start))
+                        }
+                        assert(same(got, want))
+                        let mut small = cache(re)
+                        small.least = 0
+                        small.limit = 2
+                        assert(same(search(re, mut small, text, start, len(text), anchored, width), want))
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn next_random(seed: mut Int) -> Int {
+    seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+    return seed >> 8
+}
+
+fn random_pattern(seed: mut Int, depth: Int) -> Str {
+    let atoms = ["a", "b", ".", "\\w", "\\s", "\\D", "[a-c]", "[^b]", "é", "€", "[à-ü]", "[^é]", "\\b", "\\B", "^", "$", "(?m:^)", "(?m:$)", "(?R:$)", "\\r",
+        "\\n", "(?i:A)", "(?s:.)", "\\b{end}", "\\<"]
+    let r = next_random(mut seed) % 20
+    if depth > 3 || r < 7 {
+        return atoms[next_random(mut seed) % len(atoms)]
+    }
+    if r < 11 {
+        return random_pattern(mut seed, depth + 1) + random_pattern(mut seed, depth + 1)
+    }
+    if r < 13 {
+        return random_pattern(mut seed, depth + 1) + "|" + random_pattern(mut seed, depth + 1)
+    }
+    if r < 16 {
+        return "(" + random_pattern(mut seed, depth + 1) + ")"
+    }
+    let reps = ["*", "+", "?", "{2}", "{0,2}", "*?", "+?"]
+    return "(?:" + random_pattern(mut seed, depth + 1) + ")" + reps[next_random(mut seed) % len(reps)]
+}
+
+fn random_text(seed: mut Int) -> Str {
+    let parts = ["a", "b", "c", " ", "\n", "\r", "é", "€", "ü", "A", "-"]
+    let mut b = strings.builder()
+    let n = next_random(mut seed) % 14
+    for _ in 0..n {
+        let k = next_random(mut seed) % (len(parts) + 1)
+        if k == len(parts) {
+            strings.add_byte(mut b, byte(0x80 + next_random(mut seed) % 0x7F))  // not UTF-8 here
+        } else {
+            strings.add(mut b, parts[k])
+        }
+    }
+    return strings.build(b)
+}
+
+test "the DFAs find what the Pike VM finds, on random patterns" {
+    let mut seed = 7
+    for _ in 0..2000 {
+        let p = random_pattern(mut seed, 0)
+        match compile(p) {
+            Ok(re) => {
+                for _ in 0..3 {
+                    let text = random_text(mut seed)
+                    for start in 0..len(text) + 1 {
+                        for anchored in [false, true] {
+                            let width = re.groups * 2
+                            let mut c = cache(re)
+                            c.least = 0
+                            let want = pike(re, text, start, len(text), anchored, width)
+                            let got = search(re, mut c, text, start, len(text), anchored, width)
+                            if !same(got, want) {
+                                print(p + " on " + text + " from " + strings.from_int(start))
+                            }
+                            assert(same(got, want))
+                        }
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+    }
+}
+
+test "a skip to where a match can start forgets the assertions met before it" {
+    // The \b after \n failed at 1; skipped to 3, it holds.
+    assert(spans(must("(?:\\n)?\\b\\w+"), "\néAb-c") == "[3,5)[6,7)")
+    assert(spans(must("b|(?:\\n)?\\b\\w+"), "\néAb") == "[3,5)")
 }

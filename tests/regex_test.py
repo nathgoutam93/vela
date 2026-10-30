@@ -14,7 +14,8 @@ on long texts within a limit a backtracking engine would miss by far.
 
 --fuzz compares random patterns and texts with Python's re (with re.ASCII,
 whose \\w, \\d, \\s, \\b and case folding are the package's): the first
-match and its groups must be the same.
+match and its groups must be the same. Texts of 256 bytes or more take the
+lazy DFA's way, shorter ones the Pike VM's.
 """
 import argparse
 import codecs
@@ -196,7 +197,8 @@ def stress(exe, tmp):
 
 # ---- Fuzzing against Python's re ----
 
-ATOMS = ['a', 'b', 'c', '.', '\\d', '\\w', '\\s', '\\D', '[a-c]', '[^b]', '[[:alpha:]]', 'x', '\\.', '-', ' ', '\\b', '\\B', '^', '$']
+ATOMS = ['a', 'b', 'c', '.', '\\d', '\\w', '\\s', '\\D', '[a-c]', '[^b]', '[[:alpha:]]', 'x', '\\.', '-', ' ', '\\b', '\\B', '^', '$',
+         'é', '[à-ü]', '[^é]']
 
 
 def gen(rng, depth):
@@ -260,7 +262,10 @@ def fuzz(exe, tmp, args):
         if len(names) != len(set(names)):
             continue
         pattern = (f'(?{flags})' if flags else '') + body
-        text = ''.join(rng.choice('abcx .-\n1Aé') for _ in range(rng.randint(0, 16)))
+        # Texts of 256 bytes and more are searched by the lazy DFA, shorter
+        # ones by the Pike VM alone.
+        size = rng.randint(256, 400) if rng.random() < 0.3 else rng.randint(0, 16)
+        text = ''.join(rng.choice('abcx .-\n1Aé') for _ in range(size))
         if text == '' and '\\B' in pattern:
             continue  # Python's \B never matches the empty text; Rust's does
         try:
