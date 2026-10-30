@@ -3539,6 +3539,24 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Verification:** `packages/regex` tests written with raw patterns, and a
   lexer test for the literal's bounds.
 
+### TL-123: `vela test` cannot run one test of a file
+
+- **Status:** proposed.
+- **Discovery:** post-M30 regex lazy DFA, reproducing one failing case
+  among `packages/regex/regex.vl`'s tests.
+- **Evidence (observed):** `vela test FILE` runs every `test` block of
+  the file; its options are the property-testing ones (`--properties`,
+  `--seed`, `--cases`, ...), and none selects a test by name. Each run of
+  a scratch `test "repro"` block also ran the 2,000-pattern sweep beside
+  it, and the reproduction's output had to be picked out with grep.
+- **Impact:** a slower edit-run loop on files with long tests, and output
+  from tests that are not of interest.
+- **Workaround:** a scratch program, or grep over the whole run's output.
+- **Proposed improvement:** `vela test FILE --only NAME` (a substring of
+  the test's name), reporting how many tests it skipped.
+- **Verification:** a CLI snapshot running one of two tests and naming
+  the one skipped.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
