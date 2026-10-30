@@ -1,0 +1,21 @@
+// \u{HEX} in a string is a Unicode scalar value, as its UTF-8 bytes.
+// out: café
+// out: 3 1 4
+// out: true true true
+import strings
+
+fn main() {
+    print("caf\u{e9}")
+    print(strings.from_int(len("\u{20AC}")) + " " + strings.from_int(len("\u{0}")) + " " + strings.from_int(len("\u{1F600}")))
+    let del = "\u{7f}"
+    let both = "\u{41}" == "A" && "\u{e9}" == "é"
+    let top = len("\u{10FFFF}") == 4 && int("\u{10FFFF}"[0]) == 0xF4
+    print(bool_text(top) + " " + bool_text(both) + " " + bool_text(int(del[0]) == 127))
+}
+
+fn bool_text(b: Bool) -> Str {
+    if b {
+        return "true"
+    }
+    return "false"
+}

@@ -515,13 +515,17 @@ fn string(lx: mut Lexer) {
         }
         if c == int('\\') {
             let e = peek(lx, 0)
+            if e == int('u') {
+                unicode_escape(mut lx, mut value)
+                continue
+            }
             let decoded = decode_escape(e)
             if decoded < 0 {
                 let mut shown = ""
                 if e != -1 && e != int('\n') {
                     shown = chars.chr(e)
                 }
-                error(mut lx, lx.pos - 1, "E1007", "unknown escape '\\" + shown + "'; use \\n \\t \\r \\0 \\\\ or \\\", or a raw string r\"...\" for backslashes as written")
+                error(mut lx, lx.pos - 1, "E1007", "unknown escape '\\" + shown + "'; use \\n \\t \\r \\0 \\\\ \\\" or \\u{HEX}, or a raw string r\"...\" for backslashes as written")
                 continue  // keep scanning the string, so its end is found
             }
             strings.add_byte(mut value, byte(decoded))
@@ -538,6 +542,65 @@ fn string(lx: mut Lexer) {
         error(mut lx, start + 1 + bad, "E1009", "string literal is not valid UTF-8")
     }
     add(mut lx, Kind.Str, chars.replace_invalid(lx.src[start..lx.pos]), start, strings.build(value))
+}
+
+// `\\u{HEX}` in a string: a Unicode scalar value, 1 to 6 hex digits, added
+// as its UTF-8 bytes; lx.pos is at the `u`.
+fn unicode_escape(lx: mut Lexer, value: mut strings.Builder) {
+    let start = lx.pos - 1  // the backslash
+    lx.pos = lx.pos + 1
+    if peek(lx, 0) != int('{') {
+        error(mut lx, start, "E1007", "a \\u escape is written \\u{HEX}, as in \\u{e9}")
+        return
+    }
+    lx.pos = lx.pos + 1
+    let mut cp = 0
+    let mut digits = 0
+    for is_hex(peek(lx, 0)) {
+        if digits < 7 {
+            cp = cp * 16 + hex_value(peek(lx, 0))
+        }
+        digits = digits + 1
+        lx.pos = lx.pos + 1
+    }
+    if peek(lx, 0) != int('}') || digits == 0 || digits > 6 {
+        error(mut lx, start, "E1007", "a \\u escape is written \\u{HEX} with 1 to 6 hex digits, as in \\u{e9}")
+        return
+    }
+    lx.pos = lx.pos + 1
+    if cp > 0x10FFFF || cp >= 0xD800 && cp <= 0xDFFF {
+        error(mut lx, start, "E1007", "\\u{" + lx.src[start + 3..lx.pos - 1] + "} is not a Unicode scalar value")
+        return
+    }
+    if cp < 0x80 {
+        strings.add_byte(mut value, byte(cp))
+    } else if cp < 0x800 {
+        strings.add_byte(mut value, byte(0xC0 | cp >> 6))
+        strings.add_byte(mut value, byte(0x80 | cp & 0x3F))
+    } else if cp < 0x10000 {
+        strings.add_byte(mut value, byte(0xE0 | cp >> 12))
+        strings.add_byte(mut value, byte(0x80 | cp >> 6 & 0x3F))
+        strings.add_byte(mut value, byte(0x80 | cp & 0x3F))
+    } else {
+        strings.add_byte(mut value, byte(0xF0 | cp >> 18))
+        strings.add_byte(mut value, byte(0x80 | cp >> 12 & 0x3F))
+        strings.add_byte(mut value, byte(0x80 | cp >> 6 & 0x3F))
+        strings.add_byte(mut value, byte(0x80 | cp & 0x3F))
+    }
+}
+
+fn is_hex(c: Int) -> Bool {
+    return c >= int('0') && c <= int('9') || c >= int('a') && c <= int('f') || c >= int('A') && c <= int('F')
+}
+
+fn hex_value(c: Int) -> Int {
+    if c <= int('9') {
+        return c - int('0')
+    }
+    if c <= int('F') {
+        return c - int('A') + 10
+    }
+    return c - int('a') + 10
 }
 
 // Whether a raw string starts here: `r`, any number of `#`, then `"`.

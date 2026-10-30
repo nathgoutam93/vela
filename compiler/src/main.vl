@@ -290,7 +290,7 @@ fn checked_target(path: Str, root: Str, library: Bool, target: Str) -> checker.C
     }
     let result = checker.check_target(loaded, library, "", targets.selected(target))
     if len(result.errors) > 0 {
-        fail(path, errors.merged(result.errors, result.warnings))
+        fail(path, modules.hinted(errors.merged(result.errors, result.warnings), loaded, modules.join(root, "std")))
     }
     warn(path, result.warnings)
     return contract_checks.prepare(result)
@@ -1071,7 +1071,7 @@ fn check_json(path: Str, root: Str) uses fs, os {
             if len(errs) == 0 {
                 let k = checker.check_target(loaded, true, "", targets.host())
                 failed = len(k.errors) > 0
-                errs = errors.merged(k.errors, k.warnings)
+                errs = modules.hinted(errors.merged(k.errors, k.warnings), loaded, modules.join(root, "std"))
             } else {
                 failed = true
             }
@@ -1152,7 +1152,7 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
     }
     let k = checker.check_target(loaded, true, "", targets.host())
     if len(k.errors) > 0 {
-        fail(path, errors.merged(k.errors, k.warnings))
+        fail(path, modules.hinted(errors.merged(k.errors, k.warnings), loaded, modules.join(root, "std")))
     }
     warn(path, k.warnings)
     let libraries = link_flags(path)

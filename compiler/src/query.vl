@@ -73,7 +73,7 @@ pub fn analyze_completing(path: Str, source: Str, std_dir: Str, open: Map[Str, S
         return Analysis { loaded: loaded, checked: None, errors: errors.merged(loaded.errors, loaded.warnings) }
     }
     let k = checker.check_target(loaded, true, completing, targets.host())
-    return Analysis { loaded: loaded, checked: Some(k), errors: errors.merged(k.errors, k.warnings) }
+    return Analysis { loaded: loaded, checked: Some(k), errors: modules.hinted(errors.merged(k.errors, k.warnings), loaded, std_dir) }
 }
 
 // The program `path` is checked as part of, as above, with `open` (texts by

@@ -1,0 +1,13 @@
+// A module without the function named says which modules have one by that
+// name (TL-121): standard modules the program does not import, and
+// built-in ones.
+// err: function_elsewhere.vl:10:19: error: module 'strings' has no function 'join'; text.join and paths.join have that name [E3049]
+// err: function_elsewhere.vl:11:19: error: module 'strings' has no function 'to_upper'; text.to_upper and bytes.to_upper have that name [E3049]
+// err: function_elsewhere.vl:12:16: error: module 'text' has no function 'from_int'; strings.from_int has that name [E3049]
+import strings
+import text
+fn main() {
+    print(strings.join(["a"], ","))
+    print(strings.to_upper("a"))
+    print(text.from_int(1))
+}

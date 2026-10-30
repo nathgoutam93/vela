@@ -49,7 +49,9 @@ Decimal, `0x` hexadecimal and `0b` binary integers allow `_` between digits
 and an optional fixed-width suffix, such as `0xffu8`. Float literals have a
 decimal point and/or exponent. String literals use double quotes; byte
 literals use single quotes and decode exactly one byte. Escapes are `\n`,
-`\t`, `\r`, `\0`, `\\`, `\"`, and `\'` in byte literals. Source newlines and
+`\t`, `\r`, `\0`, `\\`, `\"`, and `\'` in byte literals; in strings, `\u{HEX}`
+(1 to 6 hex digits) is a Unicode scalar value, written as its UTF-8 bytes:
+`"\u{e9}"` is `"é"`. Source newlines and
 unescaped control bytes are rejected inside literals. A raw string literal,
 `r"..."`, is its bytes as written, without escapes: `r"\d+"` is `"\\d+"`.
 With `#` signs, `r#"..."#` ends only at a quote followed by as many `#`, so

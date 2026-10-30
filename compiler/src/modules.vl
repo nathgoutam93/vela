@@ -529,6 +529,109 @@ test "paths" {
     assert(normpath("a/./b/../c") == "a/c" && normpath("../x") == "../x" && normpath("a/..") == ".")
 }
 
+// The standard modules written in Vela, files in the std directory.
+pub fn std_modules() -> [Str] {
+    return ["bytes", "lists", "text", "views", "buffers", "arenas", "time", "unicode", "net", "http", "processes", "paths", "io", "property"]
+}
+
+// The errors, with each E3049 (a module without the function named) saying
+// which modules have a public function of that name: `strings.join` points
+// at `text.join` (TL-121). The standard modules the program does not import
+// are read only when there is such an error.
+pub fn hinted(errs: [errors.CompileError], loaded: Loaded, std_dir: Str) -> [errors.CompileError] uses fs {
+    let mut out = errs
+    for i in 0..len(out) {
+        if out[i].code != "E3049" {
+            continue
+        }
+        let quotes = quote_positions(out[i].message)
+        if len(quotes) < 4 {
+            continue
+        }
+        let missing_from = out[i].message[quotes[0] + 1..quotes[1]]
+        let name = out[i].message[quotes[2] + 1..quotes[3]]
+        let mut found: [Str] = []
+        for m in builtin_modules() {
+            for f in builtin_functions(m) {
+                if f == name && m != missing_from {
+                    push(mut found, m)
+                }
+            }
+        }
+        let mut seen: Map[Str, Bool] = [:]
+        for m in loaded.modules {
+            if !m.has_program || m.name == "" {
+                continue
+            }
+            seen[m.name] = true
+            for f in m.program.fns {
+                if f.public && f.name == name && m.name != missing_from {
+                    push(mut found, m.name)
+                }
+            }
+        }
+        for m in std_modules() {
+            if maps.has(seen, m) || m == missing_from {
+                continue
+            }
+            match files.read(join(std_dir, m + ".vl")) {
+                Ok(text) => {
+                    if declares_pub_fn(text, name) {
+                        push(mut found, m)
+                    }
+                }
+                Err(_) => {}
+            }
+        }
+        if len(found) > 0 {
+            let mut names = ""
+            for k in 0..len(found) {
+                if k > 0 && k == len(found) - 1 {
+                    names = names + " and "
+                } else if k > 0 {
+                    names = names + ", "
+                }
+                names = names + found[k] + "." + name
+            }
+            let mut verb = " has"
+            if len(found) > 1 {
+                verb = " have"
+            }
+            out[i].message = out[i].message + "; " + names + verb + " that name"
+        }
+    }
+    return out
+}
+
+fn quote_positions(s: Str) -> [Int] {
+    let mut out: [Int] = []
+    for i in 0..len(s) {
+        if s[i] == '\'' {
+            push(mut out, i)
+        }
+    }
+    return out
+}
+
+// Whether a module's text declares `pub fn name(` or `pub fn name[` at the
+// start of a line.
+fn declares_pub_fn(text: Str, name: Str) -> Bool {
+    let head = "pub fn " + name
+    let mut start = 0
+    for start < len(text) {
+        let mut end = start
+        for end < len(text) && text[end] != '\n' {
+            end = end + 1
+        }
+        let n = len(head)
+        if end - start > n && text[start..start + n] == head && (text[start + n] == '(' || text[start + n] == '[') {
+            return true
+        }
+        start = end + 1
+    }
+    return false
+}
+
 pub fn builtin_modules() -> [Str] {
     return ["sysio", "clock", "memory", "maps", "files", "os", "strings", "tasks", "math", "ints", "c"]
 }
