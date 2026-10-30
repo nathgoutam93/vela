@@ -4,6 +4,7 @@
   "fileTypes": ["vl"],
   "patterns": [
     { "include": "#comment" },
+    { "include": "#raw-string" },
     { "include": "#string" },
     { "include": "#byte" },
     { "include": "#number" },
@@ -16,6 +17,11 @@
     "comment": {
       "name": "comment.line.double-slash.vela",
       "match": "//.*$"
+    },
+    "raw-string": {
+      "name": "string.quoted.raw.vela",
+      "begin": "\\br(#*)\"",
+      "end": "\"\\1"
     },
     "string": {
       "name": "string.quoted.double.vela",

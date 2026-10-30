@@ -9,7 +9,7 @@
 // without backreferences or lookaround, which no linear-time engine can
 // offer. Matches are leftmost-first, as Perl, Python and Rust report them.
 //
-//     let re = regex.must("(?P<key>\\w+)=(?P<value>\\d+)")
+//     let re = regex.must(r"(?P<key>\w+)=(?P<value>\d+)")
 //     match regex.captures(re, "x=12") { Some(c) => ..., None => ... }
 //
 // Supported: literals; `.`; classes `[a-z]`, `[^...]`, `[[:alpha:]]`;
@@ -2373,12 +2373,12 @@ test "leftmost-first matches" {
     assert(spans(must("ab|a"), "ab") == "[0,2)")
     assert(spans(must("a*?"), "aa") == "[0,0)[1,1)[2,2)")
     assert(spans(must("x*"), "ab") == "[0,0)[1,1)[2,2)")
-    assert(is_match(must("^\\d{4}-\\d{2}$"), "2026-10"))
-    assert(!is_match(must("^\\d{4}-\\d{2}$"), "2026-1"))
+    assert(is_match(must(r"^\d{4}-\d{2}$"), "2026-10"))
+    assert(!is_match(must(r"^\d{4}-\d{2}$"), "2026-1"))
 }
 
 test "groups and replacement" {
-    let re = must("(?P<key>\\w+)=(?P<value>\\d+)?")
+    let re = must(r"(?P<key>\w+)=(?P<value>\d+)?")
     match captures(re, "a b=12 c") {
         Some(g) => {
             assert(group_text("a b=12 c", g, 0) == "b=12")
@@ -2392,15 +2392,15 @@ test "groups and replacement" {
         None => assert(false)
     }
     assert(replace_all(re, "a=1, b=2", "${value}:$key$$") == "1:a$, 2:b$")
-    assert(replace_all(must("\\s+"), " a  b ", "_") == "_a_b_")
-    let parts = split(must(",\\s*"), "a, b,c")
+    assert(replace_all(must(r"\s+"), " a  b ", "_") == "_a_b_")
+    let parts = split(must(r",\s*"), "a, b,c")
     assert(len(parts) == 3 && parts[0] == "a" && parts[1] == "b" && parts[2] == "c")
 }
 
 test "flags, classes and assertions" {
     assert(spans(must("(?i)straße|[^x]Y"), "STRAßE aY") == "[0,7)[8,10)")
-    assert(spans(must("(?m)^\\w"), "ab\ncd") == "[0,1)[3,4)")
-    assert(spans(must("\\bis\\b"), "this is") == "[5,7)")
+    assert(spans(must(r"(?m)^\w"), "ab\ncd") == "[0,1)[3,4)")
+    assert(spans(must(r"\bis\b"), "this is") == "[5,7)")
     assert(spans(must("[[:digit:]a-c]+"), "x1b2-d") == "[1,4)")
     assert(spans(must("(?s)a.b"), "a\nb") == "[0,3)")
     assert(spans(must("a.b"), "a\nb aéb") == "[4,8)")
@@ -2427,7 +2427,7 @@ test "errors" {
     assert(error_of("*a") != "compiled")
     assert(error_of("[z-a]") != "compiled")
     assert(error_of("a{3,2}") != "compiled")
-    assert(error_of("\\1") != "compiled")
+    assert(error_of(r"\1") != "compiled")
     assert(error_of("(?<n>a)(?<n>b)") != "compiled")
     assert(error_of("a{100001}") != "compiled")
 }
@@ -2436,8 +2436,8 @@ test "errors" {
 // assertions' edge cases, code points of every width, and bytes that are
 // not UTF-8; and with a DFA that gives up at once.
 test "the DFAs find what the Pike VM finds" {
-    let patterns = ["a+", "(a|ab)(c|bcd)(d*)", "\\bé\\w*", "(?m)^.+$", "(?R)^b$", "(?i)Ab|é+", "x*", "[^a]+?b", "\\B..\\b", "(?s).{2,3}",
-        "\\b{start}\\w+\\b{end}", "\\<b|\\>", "(é|€)+𝄞?", "$", "\\Ab|c\\z", "(?m)(?:\\r?\\n)+", "a(?:b|)*c", "[[:space:]]\\S+", "\\w\\b{end-half}", "(?U)a+"]
+    let patterns = ["a+", "(a|ab)(c|bcd)(d*)", r"\bé\w*", "(?m)^.+$", "(?R)^b$", "(?i)Ab|é+", "x*", "[^a]+?b", r"\B..\b", "(?s).{2,3}",
+        r"\b{start}\w+\b{end}", r"\<b|\>", "(é|€)+𝄞?", "$", r"\Ab|c\z", r"(?m)(?:\r?\n)+", "a(?:b|)*c", r"[[:space:]]\S+", r"\w\b{end-half}", "(?U)a+"]
     let mut bad = strings.builder()
     strings.add(mut bad, "ab")
     strings.add_byte(mut bad, byte(0xFF))
@@ -2476,8 +2476,8 @@ fn next_random(seed: mut Int) -> Int {
 }
 
 fn random_pattern(seed: mut Int, depth: Int) -> Str {
-    let atoms = ["a", "b", ".", "\\w", "\\s", "\\D", "[a-c]", "[^b]", "é", "€", "[à-ü]", "[^é]", "\\b", "\\B", "^", "$", "(?m:^)", "(?m:$)", "(?R:$)", "\\r",
-        "\\n", "(?i:A)", "(?s:.)", "\\b{end}", "\\<"]
+    let atoms = ["a", "b", ".", r"\w", r"\s", r"\D", "[a-c]", "[^b]", "é", "€", "[à-ü]", "[^é]", r"\b", r"\B", "^", "$", "(?m:^)", "(?m:$)", "(?R:$)", r"\r",
+        r"\n", "(?i:A)", "(?s:.)", r"\b{end}", r"\<"]
     let r = next_random(mut seed) % 20
     if depth > 3 || r < 7 {
         return atoms[next_random(mut seed) % len(atoms)]
@@ -2540,6 +2540,6 @@ test "the DFAs find what the Pike VM finds, on random patterns" {
 
 test "a skip to where a match can start forgets the assertions met before it" {
     // The \b after \n failed at 1; skipped to 3, it holds.
-    assert(spans(must("(?:\\n)?\\b\\w+"), "\néAb-c") == "[3,5)[6,7)")
-    assert(spans(must("b|(?:\\n)?\\b\\w+"), "\néAb") == "[3,5)")
+    assert(spans(must(r"(?:\n)?\b\w+"), "\néAb-c") == "[3,5)[6,7)")
+    assert(spans(must(r"b|(?:\n)?\b\w+"), "\néAb") == "[3,5)")
 }

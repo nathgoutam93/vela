@@ -3519,25 +3519,38 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Verification:** a CLI snapshot of the call above whose message names
   `text.join`.
 
-### TL-122: Without raw strings, a regular expression doubles its backslashes
+### TL-122: Without raw strings, a regular expression doubled its backslashes
 
-- **Status:** proposed.
+- **Status:** resolved: raw string literals, added on request after M30 as
+  a compatible extension (`docs/compatibility.md`: `r"` was an error
+  before, so no valid program changes meaning).
 - **Discovery:** post-M30 regex port, writing the package's tests and its
   documented example.
-- **Evidence (observed):** `print(r"a\w+")` fails with `unknown escape
-  '\w'; use \n \t \r \0 \\ or \" [E1007]`: Vela has no raw string
-  literal, so `\w+ing\b` is written `"\\w+ing\\b"`, and a pattern for a
-  literal backslash `\\` is `"\\\\"`.
-- **Impact:** patterns in source are harder to read and to check against
+- **Evidence (observed):** `print(r"a\w+")` failed with `unknown escape
+  '\w'; use \n \t \r \0 \\ or \" [E1007]`: Vela had no raw string
+  literal, so `\w+ing\b` was written `"\\w+ing\\b"`, and a pattern for a
+  literal backslash `\\` was `"\\\\"`.
+- **Impact:** patterns in source were harder to read and to check against
   their documentation; a single backslash too few is a compile error, so
-  the cost is legibility rather than wrong programs.
-- **Workaround:** double each backslash; the E1007 message points at the
-  first one missing.
-- **Proposed improvement:** a raw string literal (`r"..."`, with `r#"..."#`
-  for a quote inside), a language change for after M30 under the design
-  baseline.
-- **Verification:** `packages/regex` tests written with raw patterns, and a
-  lexer test for the literal's bounds.
+  the cost was legibility rather than wrong programs.
+- **Resolution:** `r"..."` is a Str literal of its bytes as written, and
+  `r#"..."#` (any number of `#`) ends only at a quote followed by as many
+  `#`, so it can hold quotes. Raw strings keep the line, control-byte and
+  UTF-8 rules of other strings (E1006, E1008, E1009, with raw wording),
+  and `r` is still an identifier unless a quote, or `#` signs and a quote,
+  follow it directly. The lexer makes the same `str` token, so the parser,
+  checker, both backends and `vela fmt` need nothing new. Completion's and
+  hover's text scanners (`lexer.raw_end`) no longer take a raw string's
+  backslash for an escape. The VS Code and Neovim grammars highlight raw
+  strings. The specification and `vela guide` describe them, and E1007
+  now suggests one.
+- **Verification:**
+  - `tests/run/raw_strings.vl`, `tests/fail/raw_string_errors.vl`,
+    `tests/dump/tokens_raw.vl`, and the completion test's raw cases
+    (which fail with the earlier scanners);
+  - `packages/regex` tests and its documented example written with raw
+    patterns;
+  - both bootstrap fixed points.
 
 ### TL-123: `vela test` cannot run one test of a file
 

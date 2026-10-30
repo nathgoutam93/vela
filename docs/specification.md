@@ -50,7 +50,12 @@ and an optional fixed-width suffix, such as `0xffu8`. Float literals have a
 decimal point and/or exponent. String literals use double quotes; byte
 literals use single quotes and decode exactly one byte. Escapes are `\n`,
 `\t`, `\r`, `\0`, `\\`, `\"`, and `\'` in byte literals. Source newlines and
-unescaped control bytes are rejected inside literals. Str can contain UTF-8,
+unescaped control bytes are rejected inside literals. A raw string literal,
+`r"..."`, is its bytes as written, without escapes: `r"\d+"` is `"\\d+"`.
+With `#` signs, `r#"..."#` ends only at a quote followed by as many `#`, so
+it can contain quotes: `r#"say "hi""#`. Raw strings are Str literals with
+the same line, control-byte and UTF-8 rules. `r` is still an identifier
+unless a quote, or `#` signs and a quote, follow it directly. Str can contain UTF-8,
 NUL and non-text bytes obtained through byte-oriented APIs. Escapes do not
 perform Unicode normalization. A leading minus may form a signed minimum
 integer literal; the positive magnitude need not fit the signed type first.

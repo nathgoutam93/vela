@@ -1,0 +1,10 @@
+// A raw string ends at the end of its line if it is not closed before,
+// and holds no control bytes, as other strings.
+// err: raw_string_errors.vl:7:11: error: raw string literal is not closed before the end of the line; it ends with " [E1006]
+// err: raw_string_errors.vl:8:11: error: raw string literal is not closed before the end of the line; it ends with "## [E1006]
+// err: raw_string_errors.vl:9:15: error: control byte 0x01 in raw string literal; use a string with an escape [E1008]
+fn main() {
+    print(r"abc)
+    print(r##"a"#)
+    print(r"abc")
+}
