@@ -3409,7 +3409,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-117: An enum is as large as its largest payload
 
-- **Status:** open (proposal).
+- **Status:** resolved: large payloads of user enums are boxed.
 - **Discovery:** post-M30 TOML port: peak memory of `bench/real/toml`.
 - **Evidence (observed):** `toml.Value` has a `Datetime(Datetime)` variant
   whose struct holds ten Ints. `layout` boxes only payloads that lead back
@@ -3428,6 +3428,24 @@ the same entry. Close it with a commit or validation result; keep its history.
   semantics, and a large variant then costs a pointer.
 - **Verify:** `bench/real/toml --check` on the same document peaks well
   below 130 MiB with no change to the package.
+- **Resolution:** `layout.find_boxed` also boxes a payload slot of a user
+  enum with two or more variants when the slot is a struct or enum of more
+  than 32 bytes in place (`inline_size`, a boxed slot counting as a
+  pointer). Fixed arrays, `Option` and `Result` stay inline. Both backends
+  already laid out and managed boxed payloads for recursive enums, and
+  they follow the same `is_boxed` decision; a payload is immutable in
+  place, so sharing its box by reference keeps value semantics.
+- **Verification:**
+  - **TOML:** `bench/real/toml --check` on the 10.8 MB document peaks at
+    86 MiB (from 131 MiB) through C and natively, and parses in 0.14 s
+    rather than 0.17 s, with byte-identical output.
+  - **The compiler**, whose own syntax tree enums now box their large
+    variants, checks itself at 74 MiB rather than 86 MiB and in about 8%
+    less time.
+  - **Tests:** `tests/run/large_payloads.vl` covers copies, nested
+    patterns, generic instances, recursion and fixed arrays. Both suites
+    pass, unoptimized and under the sanitizers, and both bootstrap fixed
+    points hold (`bench/results/2026-10-30-raw-strings-enum-payloads.md`).
 
 ### TL-118: `vela fmt` failed on a file without a final newline
 
