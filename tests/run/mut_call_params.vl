@@ -1,0 +1,75 @@
+// A call with a mut argument passes an immutable parameter, or a field of
+// one, without a copy of its own: the mut argument cannot change it, even
+// when it shares the parameter's memory.
+// out: 1,2,3 | 1,2,3,1,2,3
+// out: ab | ab!
+// out: 3 6
+// out: 1,2,3 | 9,2,3
+import strings
+
+type Pair = struct {
+    xs: [Int]
+    name: Str
+}
+
+fn append(from: [Int], to: mut [Int]) {
+    for x in from {
+        push(mut to, x)
+    }
+}
+
+fn shout(s: Str, out: mut Str) {
+    out = out + s + "!"
+}
+
+fn twice(xs: [Int]) -> [Int] {
+    let mut ys = xs  // shares xs's memory until changed
+    append(xs, mut ys)
+    return ys
+}
+
+fn louder(p: Pair) -> Str {
+    let mut out = ""
+    shout(p.name, mut out)
+    return out
+}
+
+fn sum_into(p: Pair, total: mut Int, n: mut Int) {
+    for x in p.xs {
+        total = total + x
+    }
+    n = len(p.xs)
+}
+
+fn set_first(xs: mut [Int], v: Int) {
+    xs[0] = v
+}
+
+fn changed(p: Pair) -> [Int] {
+    let mut ys = p.xs
+    set_first(mut ys, 9)
+    return ys
+}
+
+fn show(xs: [Int]) -> Str {
+    let mut out = ""
+    for x in xs {
+        if out != "" {
+            out = out + ","
+        }
+        out = out + strings.from_int(x)
+    }
+    return out
+}
+
+fn main() {
+    let xs = [1, 2, 3]
+    print(show(xs) + " | " + show(twice(xs)))
+    let p = Pair { xs: xs, name: "ab" }
+    print(p.name + " | " + louder(p))
+    let mut n = 0
+    let mut total = 1
+    sum_into(Pair { xs: [1, 2, 3], name: "" }, mut n, mut total)
+    print(strings.from_int(total) + " " + strings.from_int(n))
+    print(show(p.xs) + " | " + show(changed(p)))
+}

@@ -2647,7 +2647,8 @@ fn call_result(g: mut Low, t: Int, args: mut [Int]) -> Val {
 // borrowing saves a retain and a release per argument, as Lean 4's
 // borrowed parameters do. Unless some argument has a `mut` in it: that can
 // change a variable another argument was read from, so then each is a copy
-// with a reference of its own, kept until the statement ends.
+// with a reference of its own, kept until the statement ends; an
+// immutable parameter needs none, as nothing here can change it.
 fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
     if g.k.fns[id].decl.foreign != "" { return foreign_call(mut g, e, id, args) }
     let mut protect = false
@@ -2659,12 +2660,15 @@ fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
     // The other arguments first, left to right; then the places of the mut
     // ones, so nothing evaluated in between can move them.
     let mut vals: [Val] = []
+    let mut copies: [Val] = []
     for a in args {
         match a.kind {
             ast.ExprKind.MutArg(_) => push(mut vals, no_value())
             _ => {
-                if protect {
-                    push(mut vals, consume(mut g, expr(mut g, a)))
+                if protect && !loops.steady(g.k, a) {
+                    let v = consume(mut g, expr(mut g, a))
+                    push(mut vals, v)
+                    push(mut copies, v)
                 } else {
                     push(mut vals, expr(mut g, a))
                 }
@@ -2692,7 +2696,7 @@ fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
     i.args = regs
     emit(mut g, i)
     if protect {
-        for v in vals {
+        for v in copies {
             if v.reg >= 0 {
                 own(mut g, v)  // released when the statement ends
             }

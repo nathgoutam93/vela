@@ -3478,6 +3478,67 @@ the same entry. Close it with a commit or validation result; keep its history.
   agrees, the classifier of `tests/run/bool_chains.vl` still threads,
   and further differential seed ranges agree (see the TOML port report).
 
+### TL-120: A call with a mut argument copied every other argument
+
+- **Status:** resolved.
+- **Discovery:** post-M30 regex port, profiling the Pike VM
+  (`valgrind --tool=callgrind ./regex --count '\w+ing\b' FILE` on a build
+  of `bench/real/regex`).
+- **Evidence (observed):** both backends protect a call's arguments when any
+  argument has a `mut` in it, since the callee can change a variable another
+  argument was read from: each other argument became a copy with a reference
+  of its own. In the generated C, `add(re, mut clist, ..., text, ...)`
+  retained and released the whole `Regex` struct (each array and string
+  field) and `text` around every call, once per thread at every text
+  position: `vela_array_release` alone was 14% of the instructions.
+- **Impact:** any hot call passing a struct parameter beside a `mut`
+  argument paid a retain and a release per field, though nothing the call
+  can change reaches an immutable parameter.
+- **Resolution:** an argument that only reads an immutable parameter, or
+  fields of one (`loops.steady`), is passed borrowed even then: the caller
+  lent it for the whole call, protected from its own mut arguments, and no
+  mut argument can name it. A parameter whose address went to foreign code
+  is still copied.
+- **Verification:** `tests/run/mut_call_params.vl` (parameters beside mut
+  arguments, one sharing the parameter's memory) on both backends; both
+  suites pass, also under `--sanitize`. The regex benchmark's
+  `\w+ing\b` went from 1.76 s to 1.05 s (C) on that change alone.
+
+### TL-121: An unknown module function does not point at the module that has it
+
+- **Status:** proposed.
+- **Discovery:** post-M30 regex port, writing `tests/run/mut_call_params.vl`.
+- **Evidence (observed):** `strings.join(parts, ",")` reports
+  `module 'strings' has no function 'join' [E3049]`; `text.join` has that
+  name and signature, and nothing in the message says so.
+- **Impact:** a guess at the standard library ends in a search of `std/`;
+  the compiler itself has six private `join` helpers.
+- **Workaround:** `grep -n "^pub fn" std/*.vl`, or a builder loop.
+- **Proposed improvement:** when a module lacks the name, list the standard
+  modules that export it ("`text.join` has this name").
+- **Verification:** a CLI snapshot of the call above whose message names
+  `text.join`.
+
+### TL-122: Without raw strings, a regular expression doubles its backslashes
+
+- **Status:** proposed.
+- **Discovery:** post-M30 regex port, writing the package's tests and its
+  documented example.
+- **Evidence (observed):** `print(r"a\w+")` fails with `unknown escape
+  '\w'; use \n \t \r \0 \\ or \" [E1007]`: Vela has no raw string
+  literal, so `\w+ing\b` is written `"\\w+ing\\b"`, and a pattern for a
+  literal backslash `\\` is `"\\\\"`.
+- **Impact:** patterns in source are harder to read and to check against
+  their documentation; a single backslash too few is a compile error, so
+  the cost is legibility rather than wrong programs.
+- **Workaround:** double each backslash; the E1007 message points at the
+  first one missing.
+- **Proposed improvement:** a raw string literal (`r"..."`, with `r#"..."#`
+  for a quote inside), a language change for after M30 under the design
+  baseline.
+- **Verification:** `packages/regex` tests written with raw patterns, and a
+  lexer test for the literal's bounds.
+
 ## Outstanding validation
 
 ### VAL-007: Recheck CI performance gates after deterministic failures

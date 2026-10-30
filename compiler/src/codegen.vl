@@ -1103,7 +1103,8 @@ fn call_value(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
             // each is a copy with a reference of its own, kept until
             // the statement ends. The other arguments first, left to
             // right; then the places of the mut ones, so nothing
-            // evaluated in between can move them.
+            // evaluated in between can move them. An immutable parameter
+            // needs no copy: nothing here can change it.
             let mut protect = false
             for a in args {
                 if ast.has_mut(a) {
@@ -1116,7 +1117,7 @@ fn call_value(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
                 match a.kind {
                     ast.ExprKind.MutArg(_) => push(mut cs, "")
                     _ => {
-                        if protect {
+                        if protect && !loops.steady(g.k, a) {
                             let v = expr(mut g, a)
                             let c = consume(mut g, v)
                             push(mut cs, c)

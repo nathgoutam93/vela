@@ -12,6 +12,16 @@ pub fn escaped(k: checker.Checked, e: ast.Expr) -> Bool {
         _ => return false
     }
 }
+// Whether `e` reads only an immutable parameter, or fields of one, which a
+// call's mut arguments cannot change: the caller lent it for the whole
+// call, protected from its own mut arguments.
+pub fn steady(k: checker.Checked, e: ast.Expr) -> Bool {
+    match e.kind {
+        ast.ExprKind.Name(_) => { match k.refs[e.id] { checker.Ref.Local(id) => return k.locals[id].kind == "parameter" && !maps.has(k.escaped, id), _ => return false } }
+        ast.ExprKind.Field(x, _) => return steady(k, x)
+        _ => return false
+    }
+}
 pub type Uses = struct {
     k: checker.Checked  // here, not passed beside `mut u`, which would copy it at every call
     writes: [Int]  // locals written: an element, a push
