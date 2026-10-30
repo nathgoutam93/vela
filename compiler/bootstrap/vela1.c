@@ -118545,6 +118545,9 @@ vela_str f_5guide_reference(vela_str v_root) {
     }
     vela_array_release(_t15);
     // line 110
+    vela_unique(&v_out);
+    vela_builder_add(v_out, VELA_STR("\012Each `import NAME` below is std/NAME.vl.\012", 42));
+    // line 111
     vela_array * _t27 = vela_array_new(&vela_type_str, 14);
     vela_str _t28 = VELA_STR("bytes", 5);
     vela_push(_t27, &_t28, sizeof(vela_str));
@@ -118578,36 +118581,35 @@ vela_str f_5guide_reference(vela_str v_root) {
     vela_unique(&v_out);
     for (int64_t _t42 = 0; _t42 < _t26->len; _t42++) {
         vela_str v_module_2 = ((vela_str *)_t26->data)[_t42];
-        // line 111
-        static const vela_str _t43[] = {VELA_STR_INIT("\012## import ", 11), {NULL, NULL, 0}, VELA_STR_INIT(" (from std/", 11), {NULL, NULL, 0}, VELA_STR_INIT(".vl)\012\012```text\012", 14)};
-        vela_str _t44[5];
+        // line 112
+        static const vela_str _t43[] = {VELA_STR_INIT("\012## import ", 11), {NULL, NULL, 0}, VELA_STR_INIT("\012\012```text\012", 10)};
+        vela_str _t44[3];
         memcpy(_t44, _t43, sizeof _t44);
         _t44[1] = v_module_2;
-        _t44[3] = v_module_2;
-        vela_str _t45 = vela_str_join(_t44, 5);
+        vela_str _t45 = vela_str_join(_t44, 3);
         vela_builder_add(v_out, _t45);
         vela_str_release(_t45);
-        // line 112
+        // line 113
         vela_str _t46 = f_7modules_join(v_root, VELA_STR("std", 3));
         vela_str _t47 = vela_str_concat(v_module_2, VELA_STR(".vl", 3));
         vela_str _t48 = f_7modules_join(_t46, _t47);
         vela_str v_path = _t48;
         vela_str_release(_t47);
         vela_str_release(_t46);
-        // line 113
+        // line 114
         vela_str _t49 = VELA_STR("", 0);
         bool _t50 = vela_files_read(v_path, &_t49);
         Result_Str_Str _t51 = _t50 ? (Result_Str_Str){ .tag = Result_Str_Str_Ok, .as.m_Ok = { ._0 = _t49 } } : (Result_Str_Str){ .tag = Result_Str_Str_Err, .as.m_Err = { ._0 = _t49 } };
         if (_t51.tag == Result_Str_Str_Ok) {
             vela_str v_source = _t51.as.m_Ok._0;
             vela_str_retain(v_source);
-            // line 115
+            // line 116
             t_5lexer_Lexed _t52 = f_5lexer_tokenize(v_source);
             t_5lexer_Lexed v_tokens = _t52;
-            // line 116
+            // line 117
             t_6parser_Parsed _t53 = f_6parser_parse(v_tokens.m_tokens, 0);
             t_6parser_Parsed v_parsed = _t53;
-            // line 117
+            // line 118
             int64_t _t54 = v_tokens.m_errors->len;
             int64_t _t55 = _t54;
             bool _t56 = _t55 > 0;
@@ -118619,7 +118621,7 @@ vela_str f_5guide_reference(vela_str v_root) {
                 _t57 = _t60;
             }
             if (_t57) {
-                // line 118
+                // line 119
                 static const vela_str _t61[] = {VELA_STR_INIT("vela: error: cannot generate guide from ", 40), {NULL, NULL, 0}, VELA_STR_INIT(" [E6007]", 8)};
                 vela_str _t62[3];
                 memcpy(_t62, _t61, sizeof _t62);
@@ -118627,30 +118629,30 @@ vela_str f_5guide_reference(vela_str v_root) {
                 vela_str _t63 = vela_str_join(_t62, 3);
                 vela_eprint_str(_t63);
                 vela_str_release(_t63);
-                // line 119
-                vela_os_exit(1, "compiler/src/guide.vl:119:24");
+                // line 120
+                vela_os_exit(1, "compiler/src/guide.vl:120:24");
             }
-            // line 121
+            // line 122
             vela_array * _t65 = v_parsed.m_program.m_fns;
             vela_array_retain(_t65);
             vela_array * _t64 = _t65;
             for (int64_t _t66 = 0; _t66 < _t64->len; _t66++) {
                 t_3ast_FnDecl v_f = ((t_3ast_FnDecl *)_t64->data)[_t66];
-                // line 122
+                // line 123
                 if (v_f.m_public) {
-                    // line 123
+                    // line 124
                     vela_str _t67 = f_5index_signature(v_f);
                     vela_str _t68 = vela_str_concat(_t67, VELA_STR("\012", 1));
                     vela_str_release(_t67);
                     vela_builder_add(v_out, _t68);
                     vela_str_release(_t68);
-                    // line 124
+                    // line 125
                     vela_array * _t70 = v_f.m_requires;
                     vela_array_retain(_t70);
                     vela_array * _t69 = _t70;
                     for (int64_t _t71 = 0; _t71 < _t69->len; _t71++) {
                         t_3ast_Expr v_e = ((t_3ast_Expr *)_t69->data)[_t71];
-                        // line 125
+                        // line 126
                         static const vela_str _t72[] = {VELA_STR_INIT("  requires ", 11), {NULL, NULL, 0}, VELA_STR_INIT("\012", 1)};
                         vela_str _t73[3];
                         memcpy(_t73, _t72, sizeof _t73);
@@ -118662,13 +118664,13 @@ vela_str f_5guide_reference(vela_str v_root) {
                         vela_str_release(_t75);
                     }
                     vela_array_release(_t69);
-                    // line 127
+                    // line 128
                     vela_array * _t77 = v_f.m_ensures;
                     vela_array_retain(_t77);
                     vela_array * _t76 = _t77;
                     for (int64_t _t78 = 0; _t78 < _t76->len; _t78++) {
                         t_3ast_Expr v_e_2 = ((t_3ast_Expr *)_t76->data)[_t78];
-                        // line 128
+                        // line 129
                         static const vela_str _t79[] = {VELA_STR_INIT("  ensures ", 10), {NULL, NULL, 0}, VELA_STR_INIT("\012", 1)};
                         vela_str _t80[3];
                         memcpy(_t80, _t79, sizeof _t80);
@@ -118689,7 +118691,7 @@ vela_str f_5guide_reference(vela_str v_root) {
         } else {
             vela_str v_e_3 = _t51.as.m_Err._0;
             vela_str_retain(v_e_3);
-            // line 134
+            // line 135
             static const vela_str _t83[] = {VELA_STR_INIT("vela: error: ", 13), {NULL, NULL, 0}, VELA_STR_INIT(" [E6001]", 8)};
             vela_str _t84[3];
             memcpy(_t84, _t83, sizeof _t84);
@@ -118697,17 +118699,17 @@ vela_str f_5guide_reference(vela_str v_root) {
             vela_str _t85 = vela_str_join(_t84, 3);
             vela_eprint_str(_t85);
             vela_str_release(_t85);
-            // line 135
-            vela_os_exit(1, "compiler/src/guide.vl:135:20");
+            // line 136
+            vela_os_exit(1, "compiler/src/guide.vl:136:20");
             vela_str_release(v_e_3);
         }
         rc_release_Result_Str_Str(_t51);
-        // line 138
+        // line 139
         vela_builder_add(v_out, VELA_STR("```\012", 4));
         vela_str_release(v_path);
     }
     vela_array_release(_t26);
-    // line 140
+    // line 141
     vela_str _t86 = vela_builder_build(v_out);
     vela_str _t87 = _t86;
     vela_array_release(v_out);
@@ -118716,14 +118718,14 @@ vela_str f_5guide_reference(vela_str v_root) {
 /* vela: part */
 
 void f_5guide_builtin(vela_array * * v_out, vela_str v_module, vela_str v_name) {
-    // line 144
+    // line 145
     vela_str _t1 = v_name;
     vela_str_retain(_t1);
     vela_str v_full = _t1;
-    // line 145
+    // line 146
     bool _t2 = !vela_str_eq(v_module, VELA_STR("", 0));
     if (_t2) {
-        // line 146
+        // line 147
         static const vela_str _t3[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
         vela_str _t4[3];
         memcpy(_t4, _t3, sizeof _t4);
@@ -118733,16 +118735,16 @@ void f_5guide_builtin(vela_array * * v_out, vela_str v_module, vela_str v_name) 
         vela_str_release(v_full);
         v_full = _t5;
     }
-    // line 148
+    // line 149
     vela_array * _t6 = f_5index_builtin_info(v_full);
     vela_array * v_info = _t6;
-    // line 149
+    // line 150
     int64_t _t7 = v_info->len;
     int64_t _t8 = _t7;
     bool _t9 = _t8 == 2;
     if (_t9) {
-        // line 150
-        vela_str _t10 = *(vela_str *)vela_at(v_info, 0, sizeof(vela_str), "compiler/src/guide.vl:150:34");
+        // line 151
+        vela_str _t10 = *(vela_str *)vela_at(v_info, 0, sizeof(vela_str), "compiler/src/guide.vl:151:34");
         vela_str _t11 = vela_str_concat(_t10, VELA_STR("\012", 1));
         vela_unique(&(*v_out));
         vela_builder_add((*v_out), _t11);

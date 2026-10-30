@@ -107,8 +107,9 @@ pub fn reference(root: Str) -> Str uses fs, os {
         }
         strings.add(mut out, "```\n")
     }
+    strings.add(mut out, "\nEach `import NAME` below is std/NAME.vl.\n")
     for module in ["bytes", "lists", "text", "views", "buffers", "arenas", "time", "unicode", "net", "http", "processes", "paths", "io", "property"] {
-        strings.add(mut out, "\n## import " + module + " (from std/" + module + ".vl)\n\n```text\n")
+        strings.add(mut out, "\n## import " + module + "\n\n```text\n")
         let path = modules.join(modules.join(root, "std"), module + ".vl")
         match files.read(path) {
             Ok(source) => {

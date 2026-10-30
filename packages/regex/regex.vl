@@ -13,15 +13,21 @@
 //     match regex.captures(re, "x=12") { Some(c) => ..., None => ... }
 //
 // Supported: literals; `.`; classes `[a-z]`, `[^...]`, `[[:alpha:]]`;
-// `\d \w \s` and their negations; `\b \B ^ $ \A \z`, `\< \>` and
-// `\b{start}`, `\b{end}`, `\b{start-half}`, `\b{end-half}`; groups `(...)`,
-// `(?:...)`, `(?P<name>...)`, `(?<name>...)`; `|`; `* + ? {n} {n,} {n,m}`
-// and their lazy forms; flags `(?imsUxR)` and `(?i:...)`; escapes `\n \t \r
-// \f \v \a \e \0`, `\xHH`, `\x{H...}`. `\d \w \s \b` and case folding cover
-// ASCII; `.` and classes match any code point.
+// `\d \w \s` and their negations; Unicode properties `\pL`, `\p{Lu}`...
+// (general categories and their groups by short or long name, `gc=...`,
+// Any, ASCII, Assigned, Alphabetic, White_Space) and `\P`, `\p{^...}`;
+// `\b \B ^ $ \A \z`, `\< \>` and `\b{start}`, `\b{end}`, `\b{start-half}`,
+// `\b{end-half}`; groups `(...)`, `(?:...)`, `(?P<name>...)`,
+// `(?<name>...)`; `|`; `* + ? {n} {n,} {n,m}` and their lazy forms; flags
+// `(?imsuUxR)` and `(?i:...)`; escapes `\n \t \r \f \v \a \e \0`, `\xHH`,
+// `\x{H...}`. As in Rust, Unicode mode (`u`) is on: `\d` is Nd, `\w` a
+// word character as UTS #18 defines it, `\s` White_Space, `\b` between
+// those, and `(?i)` Unicode's simple case folding; `(?-u)` makes them
+// ASCII's. `.` and classes match any code point. POSIX classes are ASCII.
 import lists
 import maps
 import strings
+import unicode
 
 pub type Regex = struct {
     pattern: Str
@@ -38,6 +44,7 @@ pub type Regex = struct {
     rys: [Int]
     rsets: [[Int]]
     looks: Bool  // the pattern has assertions
+    uword: Bool  // and of them, Unicode word boundaries
     cuts: [Int]  // where code points past ASCII change the pattern's literals and classes they are in
     groups: Int  // capture groups, the whole match included
     names: [Str]  // each group's name, "" for none
@@ -56,7 +63,7 @@ pub type Match = struct {
 
 // The pattern compiled, or a message saying what is wrong with it.
 pub fn compile(pattern: Str) -> Result[Regex, Str] {
-    let mut p = Parser { text: pattern, pos: 0, error: "", groups: 1, names: [""], flags: Flags { i: false, m: false, s: false, u: false, x: false, r: false }, depth: 0 }
+    let mut p = Parser { text: pattern, pos: 0, error: "", groups: 1, names: [""], flags: Flags { i: false, unicode: true, m: false, s: false, u: false, x: false, r: false }, depth: 0 }
     let tree = alternation(mut p)
     if p.error == "" && p.pos < len(pattern) {
         fail(mut p, "unmatched ')'")
@@ -78,7 +85,7 @@ pub fn compile(pattern: Str) -> Result[Regex, Str] {
     if r.error != "" {
         return Err(r.error)
     }
-    let mut re = Regex { pattern: pattern, ops: [], xs: [], ys: [], sets: [], rops: [], rxs: [], rys: [], rsets: [], looks: false, cuts: cuts_of(c.program), groups: p.groups, names: p.names,
+    let mut re = Regex { pattern: pattern, ops: [], xs: [], ys: [], sets: [], rops: [], rxs: [], rys: [], rsets: [], looks: false, uword: false, cuts: [], groups: p.groups, names: p.names,
         first: first_bytes(c.program), prefix: literal_prefix(c.program), anchored: starts_anchored(c.program) }
     for i in c.program {
         push(mut re.ops, i.op)
@@ -87,8 +94,10 @@ pub fn compile(pattern: Str) -> Result[Regex, Str] {
         push(mut re.sets, i.ranges)
         if i.op == LOOK() {
             re.looks = true
+            re.uword = re.uword || i.a >= 12
         }
     }
+    re.cuts = cuts_of(c.program, re.uword)
     for i in r.program {
         push(mut re.rops, i.op)
         push(mut re.rxs, i.a)
@@ -105,7 +114,7 @@ pub fn must(pattern: Str) -> Regex {
         Ok(re) => return re
         Err(e) => {
             assert(e == "")
-            return Regex { pattern: "", ops: [], xs: [], ys: [], sets: [], rops: [], rxs: [], rys: [], rsets: [], looks: false, cuts: [], groups: 0, names: [], first: [], prefix: "",
+            return Regex { pattern: "", ops: [], xs: [], ys: [], sets: [], rops: [], rxs: [], rys: [], rsets: [], looks: false, uword: false, cuts: [], groups: 0, names: [], first: [], prefix: "",
                 anchored: false }
         }
     }
@@ -353,7 +362,8 @@ fn number(s: Str) -> Int {
 // ---- Parsing ----
 
 type Flags = struct {
-    i: Bool  // ASCII letters match either case
+    i: Bool  // letters match either case
+    unicode: Bool  // (u, on by default) \d \w \s \b and case folding are Unicode's, not ASCII's
     m: Bool  // ^ and $ match at line ends too
     s: Bool  // . matches \n too
     u: Bool  // (U) repetitions are lazy unless marked with ?
@@ -611,8 +621,11 @@ fn atom_node(p: mut Parser) -> Node {
 }
 
 fn literal(flags: Flags, cp: Int) -> Node {
-    if flags.i && is_ascii_letter(cp) {
-        return Node.Class(fold(flags, [cp, cp]))
+    if flags.i {
+        let folded = fold(flags, [cp, cp])
+        if len(folded) > 2 || folded[0] != cp {
+            return Node.Class(folded)
+        }
     }
     return Node.Lit(cp)
 }
@@ -682,7 +695,7 @@ fn group(p: mut Parser) -> Node {
                 } else if f == 'R' {
                     p.flags.r = on
                 } else if f == 'u' {
-                    // Unicode mode: \d \w \s and folding stay ASCII here.
+                    p.flags.unicode = on
                 } else {
                     fail(mut p, "an unknown flag or group syntax (lookaround and backreferences are not supported)")
                     return Node.Empty
@@ -756,9 +769,9 @@ fn escape(p: mut Parser) -> Node {
     if c == '<' || c == '>' {
         p.pos = p.pos + 2
         if c == '<' {
-            return Node.Look(WORD_START())
+            return Node.Look(word_look(p.flags, WORD_START()))
         }
-        return Node.Look(WORD_END())
+        return Node.Look(word_look(p.flags, WORD_END()))
     }
     if c == 'b' && p.pos + 2 < len(p.text) && p.text[p.pos + 2] == '{' {
         let close = index_from(p.text, '}', p.pos)
@@ -772,7 +785,7 @@ fn escape(p: mut Parser) -> Node {
             }
             if kind >= 0 {
                 p.pos = close + 1
-                return Node.Look(kind)
+                return Node.Look(word_look(p.flags, kind))
             }
         }
         fail(mut p, "an unknown word boundary \\b{...}")
@@ -781,13 +794,16 @@ fn escape(p: mut Parser) -> Node {
     if c == 'b' || c == 'B' || c == 'A' || c == 'z' {
         p.pos = p.pos + 2
         return Node.Look(match c {
-            'b' => WORD()
-            'B' => NOT_WORD()
+            'b' => word_look(p.flags, WORD())
+            'B' => word_look(p.flags, NOT_WORD())
             'A' => TEXT_START()
             _ => TEXT_END()
         })
     }
-    let named = class_escape(c)
+    if c == 'p' || c == 'P' {
+        return Node.Class(fold(p.flags, property(mut p)))
+    }
+    let named = class_escape(p.flags, c)
     if len(named) > 0 {
         p.pos = p.pos + 2
         return Node.Class(named)
@@ -796,8 +812,30 @@ fn escape(p: mut Parser) -> Node {
     return literal(p.flags, cp)
 }
 
-// \d \w \s and their negations, as ranges; none for another letter.
-fn class_escape(c: Byte) -> [Int] {
+// A word assertion of the ASCII kind given, or its Unicode kind in Unicode
+// mode.
+fn word_look(flags: Flags, kind: Int) -> Int {
+    if flags.unicode {
+        return kind + 8
+    }
+    return kind
+}
+
+// \d \w \s and their negations, as ranges; none for another letter. In
+// Unicode mode, decimal digits (Nd), word characters (UTS #18) and
+// White_Space; otherwise ASCII's.
+fn class_escape(flags: Flags, c: Byte) -> [Int] {
+    if flags.unicode {
+        return match c {
+            'd' => unicode.ranges("Nd")
+            'D' => negate(unicode.ranges("Nd"))
+            'w' => unicode.ranges("Word")
+            'W' => negate(unicode.ranges("Word"))
+            's' => unicode.ranges("White_Space")
+            'S' => negate(unicode.ranges("White_Space"))
+            _ => []
+        }
+    }
     return match c {
         'd' => [48, 57]
         'D' => negate([48, 57])
@@ -968,7 +1006,18 @@ fn class_item(p: mut Parser) -> [Int] {
             fail(mut p, "a '\\' at the end of the pattern")
             return [0, 0]
         }
-        let named = class_escape(p.text[p.pos + 1])
+        let mut named = class_escape(p.flags, p.text[p.pos + 1])
+        if p.text[p.pos + 1] == 'p' || p.text[p.pos + 1] == 'P' {
+            named = property(mut p)
+            if p.error != "" {
+                return [0, 0]
+            }
+            let mut out = [-1]
+            for r in named {
+                push(mut out, r)
+            }
+            return out
+        }
         if len(named) > 0 {
             p.pos = p.pos + 2
             let mut out = [-1]
@@ -1085,6 +1134,9 @@ fn fold(flags: Flags, ranges: [Int]) -> [Int] {
     if !flags.i {
         return ranges
     }
+    if flags.unicode {
+        return fold_unicode(ranges)
+    }
     let mut out = ranges
     for k in 0..len(ranges) / 2 {
         let lo = ranges[2 * k]
@@ -1103,6 +1155,221 @@ fn fold(flags: Flags, ranges: [Int]) -> [Int] {
         }
     }
     return normalize(out)
+}
+
+// The ranges with every code point added that has the same simple case
+// folding as one of them (Unicode's simple case folding, as Rust's and
+// RE2's (?i) use): those folding to what folds from the ranges, and those
+// it folds to.
+fn fold_unicode(ranges: [Int]) -> [Int] {
+    let pairs = unicode.simple_folds()
+    let mut targets: [Int] = []
+    for k in 0..len(pairs) / 2 {
+        if in_class(ranges, pairs[2 * k]) || in_class(ranges, pairs[2 * k + 1]) {
+            push(mut targets, pairs[2 * k + 1])
+        }
+    }
+    if len(targets) == 0 {
+        return ranges
+    }
+    targets = lists.sort(targets)
+    let mut out = ranges
+    for k in 0..len(pairs) / 2 {
+        if sorted_has(targets, pairs[2 * k + 1]) {
+            push(mut out, pairs[2 * k])
+            push(mut out, pairs[2 * k])
+            push(mut out, pairs[2 * k + 1])
+            push(mut out, pairs[2 * k + 1])
+        }
+    }
+    return normalize(out)
+}
+
+fn sorted_has(xs: [Int], x: Int) -> Bool {
+    let mut lo = 0
+    let mut hi = len(xs)
+    for lo < hi {
+        let mid = (lo + hi) / 2
+        if xs[mid] < x {
+            lo = mid + 1
+        } else {
+            hi = mid
+        }
+    }
+    return lo < len(xs) && xs[lo] == x
+}
+
+// A Unicode property class after its backslash: \pL, \p{Greek}... with
+// \P or \p{^...} for its negation. General categories by short or long
+// name (Lu, Uppercase_Letter, L, Letter, gc=Lu, ...), and Any, ASCII,
+// Assigned, Alphabetic and White_Space; names are matched ignoring case,
+// spaces, '_' and '-', as UTS #18 recommends.
+fn property(p: mut Parser) -> [Int] {
+    let negated = p.text[p.pos + 1] == 'P'
+    p.pos = p.pos + 2
+    if !p.flags.unicode {
+        fail(mut p, "a Unicode property class in ASCII mode (?-u)")
+        return [0, 0]
+    }
+    let mut name = ""
+    if more(p) && peek(p) == '{' {
+        let close = index_from(p.text, '}', p.pos)
+        if close < 0 {
+            fail(mut p, "a Unicode property class without its '}'")
+            return [0, 0]
+        }
+        name = p.text[p.pos + 1..close]
+        p.pos = close + 1
+    } else if more(p) {
+        name = p.text[p.pos..p.pos + 1]
+        p.pos = p.pos + 1
+    }
+    let mut neg = negated
+    if len(name) > 0 && name[0] == '^' {
+        neg = !neg
+        name = name[1..len(name)]
+    }
+    let ranges = property_ranges(loose(name))
+    if len(ranges) == 0 {
+        fail(mut p, "an unknown or unsupported Unicode property: " + name)
+        return [0, 0]
+    }
+    if neg {
+        return negate(ranges)
+    }
+    return ranges
+}
+
+// A property name as UAX #44 matches them loosely: lower case, without
+// spaces, '_' or '-'.
+fn loose(name: Str) -> Str {
+    let mut b = strings.builder()
+    for c in name {
+        if c >= 'A' && c <= 'Z' {
+            strings.add_byte(mut b, c + 32)
+        } else if c != ' ' && c != '_' && c != '-' {
+            strings.add_byte(mut b, c)
+        }
+    }
+    return strings.build(b)
+}
+
+fn property_ranges(name: Str) -> [Int] {
+    let eq = index_from(name, '=', 0)
+    let colon = index_from(name, ':', 0)
+    let mut split = eq
+    if split < 0 {
+        split = colon
+    }
+    if split >= 0 {
+        let key = name[0..split]
+        if key != "gc" && key != "generalcategory" {
+            return []
+        }
+        return category_ranges(name[split + 1..len(name)])
+    }
+    return match name {
+        "any" => [0, 0x10FFFF]
+        "ascii" => [0, 0x7F]
+        "assigned" => negate(unicode.ranges("Cn"))
+        "alphabetic" => unicode.ranges("Alphabetic")
+        "alpha" => unicode.ranges("Alphabetic")
+        "whitespace" => unicode.ranges("White_Space")
+        "wspace" => unicode.ranges("White_Space")
+        "space" => unicode.ranges("White_Space")
+        _ => category_ranges(name)
+    }
+}
+
+// A general category or group by its short or long name, loosely matched.
+fn category_ranges(name: Str) -> [Int] {
+    let short = match name {
+        "lu" => "Lu"
+        "uppercaseletter" => "Lu"
+        "ll" => "Ll"
+        "lowercaseletter" => "Ll"
+        "lt" => "Lt"
+        "titlecaseletter" => "Lt"
+        "lc" => "LC"
+        "casedletter" => "LC"
+        "lm" => "Lm"
+        "modifierletter" => "Lm"
+        "lo" => "Lo"
+        "otherletter" => "Lo"
+        "l" => "L"
+        "letter" => "L"
+        "mn" => "Mn"
+        "nonspacingmark" => "Mn"
+        "mc" => "Mc"
+        "spacingmark" => "Mc"
+        "me" => "Me"
+        "enclosingmark" => "Me"
+        "m" => "M"
+        "mark" => "M"
+        "combiningmark" => "M"
+        "nd" => "Nd"
+        "decimalnumber" => "Nd"
+        "digit" => "Nd"
+        "nl" => "Nl"
+        "letternumber" => "Nl"
+        "no" => "No"
+        "othernumber" => "No"
+        "n" => "N"
+        "number" => "N"
+        "pc" => "Pc"
+        "connectorpunctuation" => "Pc"
+        "pd" => "Pd"
+        "dashpunctuation" => "Pd"
+        "ps" => "Ps"
+        "openpunctuation" => "Ps"
+        "pe" => "Pe"
+        "closepunctuation" => "Pe"
+        "pi" => "Pi"
+        "initialpunctuation" => "Pi"
+        "pf" => "Pf"
+        "finalpunctuation" => "Pf"
+        "po" => "Po"
+        "otherpunctuation" => "Po"
+        "p" => "P"
+        "punctuation" => "P"
+        "punct" => "P"
+        "sm" => "Sm"
+        "mathsymbol" => "Sm"
+        "sc" => "Sc"
+        "currencysymbol" => "Sc"
+        "sk" => "Sk"
+        "modifiersymbol" => "Sk"
+        "so" => "So"
+        "othersymbol" => "So"
+        "s" => "S"
+        "symbol" => "S"
+        "zs" => "Zs"
+        "spaceseparator" => "Zs"
+        "zl" => "Zl"
+        "lineseparator" => "Zl"
+        "zp" => "Zp"
+        "paragraphseparator" => "Zp"
+        "z" => "Z"
+        "separator" => "Z"
+        "cc" => "Cc"
+        "control" => "Cc"
+        "cntrl" => "Cc"
+        "cf" => "Cf"
+        "format" => "Cf"
+        "cs" => "Cs"
+        "surrogate" => "Cs"
+        "co" => "Co"
+        "privateuse" => "Co"
+        "cn" => "Cn"
+        "unassigned" => "Cn"
+        "c" => "C"
+        "other" => "C"
+        _ => ""
+    }
+    if short == "" {
+        return []
+    }
+    return unicode.ranges(short)
 }
 
 fn max(a: Int, b: Int) -> Int {
@@ -1583,7 +1850,59 @@ fn is_word(text: Str, at: Int, before: Bool) -> Bool {
     return word_byte(text[at])
 }
 
+// Whether a word assertion holds between a word character or not before and
+// after.
+fn word_holds(kind: Int, before: Bool, after: Bool) -> Bool {
+    if kind == WORD() {
+        return before != after
+    }
+    if kind == NOT_WORD() {
+        return before == after
+    }
+    if kind == WORD_START() {
+        return !before && after
+    }
+    if kind == WORD_END() {
+        return before && !after
+    }
+    if kind == WORD_START_HALF() {
+        return !before
+    }
+    return !after
+}
+
+// Whether the code point before (or at) byte `at` is a Unicode word
+// character; a byte that is not UTF-8 is not one.
+fn unicode_word(text: Str, at: Int, before: Bool) -> Bool {
+    if before && at <= 0 || !before && at >= len(text) {
+        return false
+    }
+    let mut cp = 0
+    if before {
+        cp = int(text[at - 1])
+        if cp >= 0x80 {
+            cp = code_point_before(text, 0, at)
+        }
+    } else {
+        cp = int(text[at])
+        if cp >= 0x80 {
+            cp = code_point(text, at)
+        }
+    }
+    if cp < 0x80 {
+        return cp >= 0 && word_byte(byte(cp))
+    }
+    return unicode.has(cp, "Word")
+}
+
 fn holds(kind: Int, text: Str, at: Int) -> Bool {
+    if kind >= 12 {
+        // A Unicode word assertion: as the ASCII one, with Unicode's word
+        // characters on either side.
+        let before = unicode_word(text, at, true)
+        let after = unicode_word(text, at, false)
+        return word_holds(kind - 8, before, after)
+    }
     if kind == TEXT_START() {
         return at == 0
     }
@@ -1603,24 +1922,7 @@ fn holds(kind: Int, text: Str, at: Int) -> Bool {
     if kind == CRLF_END() {
         return at == len(text) || text[at] == '\r' || text[at] == '\n' && (at == 0 || text[at - 1] != '\r')
     }
-    let before = is_word(text, at, true)
-    let after = is_word(text, at, false)
-    if kind == WORD() {
-        return before != after
-    }
-    if kind == NOT_WORD() {
-        return before == after
-    }
-    if kind == WORD_START() {
-        return !before && after
-    }
-    if kind == WORD_END() {
-        return before && !after
-    }
-    if kind == WORD_START_HALF() {
-        return !before
-    }
-    return !after
+    return word_holds(kind, is_word(text, at, true), is_word(text, at, false))
 }
 
 // Adds the thread at `pc0`, with the captures `src[off..off + width]`, to
@@ -1886,10 +2188,14 @@ fn LOOP() -> Int {
     return -1
 }
 
-// The class of a byte beside a position, as assertions see it: 0 the edge
-// of the text, 1 \n, 2 \r, 3 a word byte, 4 any other. A code point's
-// class is its first and its last byte's.
-fn class_of(cp: Int) -> Int {
+// The class of a code point beside a position, as assertions see it: 0
+// the edge of the text, 1 \n, 2 \r, 3 an ASCII word character, 4 any
+// other, and 5 a word character past ASCII when the pattern has Unicode
+// word assertions (`uword`), which tell it from the others.
+fn class_of(cp: Int, uword: Bool) -> Int {
+    if uword && cp >= 0x80 && unicode.has(cp, "Word") {
+        return 5
+    }
     if cp == 10 {
         return 1
     }
@@ -1902,11 +2208,23 @@ fn class_of(cp: Int) -> Int {
     return 4
 }
 
-fn byte_class(text: Str, at: Int) -> Int {
-    if at < 0 || at >= len(text) {
+// The class of the code point before (or at) byte `at`.
+fn side_class(re: Regex, text: Str, at: Int, before: Bool) -> Int {
+    if before && at <= 0 || !before && at >= len(text) {
         return 0
     }
-    return class_of(int(text[at]))
+    let mut i = at
+    if before {
+        i = at - 1
+    }
+    let b = int(text[i])
+    if b < 0x80 || !re.uword {
+        return class_of(b, false)
+    }
+    if before {
+        return class_of(code_point_before(text, 0, at), true)
+    }
+    return class_of(code_point(text, at), true)
 }
 
 // Whether an assertion holds between bytes of classes `before` and `after`
@@ -1930,24 +2248,10 @@ fn holds_between(kind: Int, before: Int, after: Int) -> Bool {
     if kind == CRLF_END() {
         return after == 0 || after == 2 || after == 1 && before != 2
     }
-    let b = before == 3
-    let a = after == 3
-    if kind == WORD() {
-        return b != a
+    if kind >= 12 {
+        return word_holds(kind - 8, before == 3 || before == 5, after == 3 || after == 5)
     }
-    if kind == NOT_WORD() {
-        return b == a
-    }
-    if kind == WORD_START() {
-        return !b && a
-    }
-    if kind == WORD_END() {
-        return b && !a
-    }
-    if kind == WORD_START_HALF() {
-        return !b
-    }
-    return !a
+    return word_holds(kind, before == 3, after == 3)
 }
 
 // The state of these threads, made if it is new.
@@ -2065,7 +2369,7 @@ fn follow(re: Regex, d: mut Dfa, pc0: Int, before: Int, after: Int) -> Bool {
 // not UTF-8), worked out and kept: the next state * 2, plus 1 when a match
 // ends before the code point.
 fn step(re: Regex, d: mut Dfa, s: Int, cp: Int) -> Int {
-    let cls = class_of(cp)
+    let cls = class_of(cp, re.uword)
     let side = d.sides[s]
     let mut matched = false
     if d.reverse {
@@ -2116,6 +2420,17 @@ fn same(a: [Int], b: [Int]) -> Bool {
     return true
 }
 
+// State `s` with the class of the byte read last as the text has it, which
+// a byte that is not UTF-8 can hide: after one, the code point it belongs
+// to (a search can start inside one) decides what Unicode word assertions
+// see, as it does for the VM.
+fn resided(d: mut Dfa, s: Int, side: Int) -> Int {
+    if d.sides[s] == side {
+        return s
+    }
+    return state(mut d, d.pcs[s], side)
+}
+
 fn sort_ints(xs: mut [Int]) {
     for i in 1..len(xs) {
         let x = xs[i]
@@ -2137,7 +2452,7 @@ fn forward(re: Regex, d: mut Dfa, text: Str, start: Int, end: Int, anchored: Boo
     }
     let mut side = 0
     if re.looks {
-        side = byte_class(text, start - 1)
+        side = side_class(re, text, start, true)
     }
     let mut s = 0
     if anchored {
@@ -2166,7 +2481,7 @@ fn forward(re: Regex, d: mut Dfa, text: Str, start: Int, end: Int, anchored: Boo
                 }
             }
             if at != from && re.looks {
-                s = state(mut d, [LOOP()], byte_class(text, at - 1))
+                s = state(mut d, [LOOP()], side_class(re, text, at, true))
             }
         }
         let mut cp = int(text[at])
@@ -2192,11 +2507,14 @@ fn forward(re: Regex, d: mut Dfa, text: Str, start: Int, end: Int, anchored: Boo
             return last
         }
         at = at + w
+        if cp < 0 && re.uword {
+            s = resided(mut d, s, side_class(re, text, at, true))
+        }
     }
     if d.failed {
         return -2
     }
-    if closure(re, mut d, s, d.sides[s], byte_class(text, at)) {
+    if closure(re, mut d, s, d.sides[s], side_class(re, text, at, false)) {
         last = at
     }
     return last
@@ -2211,7 +2529,7 @@ fn backward(re: Regex, d: mut Dfa, text: Str, start: Int, end: Int) -> Int {
     }
     let mut side = 0
     if re.looks {
-        side = byte_class(text, end)
+        side = side_class(re, text, end, false)
     }
     let mut s = state(mut d, [0], side)
     let mut at = end
@@ -2224,6 +2542,16 @@ fn backward(re: Regex, d: mut Dfa, text: Str, start: Int, end: Int) -> Int {
             cp = code_point_before(text, start, at)
             w = cp_width(cp)
             col = column(re, cp)
+        }
+        if cp < 0 && re.uword {
+            // No thread reads a byte that is not UTF-8 (here, perhaps a
+            // code point the search's start cuts): the search ends, at a
+            // match if one ends here with the code point the text has
+            // before it, as the VM sees it.
+            if closure(re, mut d, s, side_class(re, text, at, true), d.sides[s]) {
+                first = at
+            }
+            return first
         }
         let mut v = d.table[s * d.row + col]
         if v < 0 {
@@ -2244,7 +2572,7 @@ fn backward(re: Regex, d: mut Dfa, text: Str, start: Int, end: Int) -> Int {
     if d.failed {
         return -2
     }
-    if closure(re, mut d, s, byte_class(text, at - 1), d.sides[s]) {
+    if closure(re, mut d, s, side_class(re, text, at, true), d.sides[s]) {
         first = at
     }
     return first
@@ -2294,8 +2622,18 @@ fn column(re: Regex, cp: Int) -> Int {
 
 // Where the literals and classes of a program start or stop including code
 // points past ASCII: between two cuts, each code point is in the same ones.
-fn cuts_of(program: [Inst]) -> [Int] {
+fn cuts_of(program: [Inst], uword: Bool) -> [Int] {
     let mut cuts: [Int] = []
+    if uword {
+        // Unicode word assertions tell word characters from others too.
+        let word = unicode.ranges("Word")
+        for k in 0..len(word) {
+            let x = word[k] + k % 2
+            if x > 0x80 && x <= 0x10FFFF {
+                push(mut cuts, x)
+            }
+        }
+    }
     for i in program {
         if i.op == CHAR() && i.a >= 0x80 {
             push(mut cuts, i.a)
@@ -2477,7 +2815,7 @@ fn next_random(seed: mut Int) -> Int {
 
 fn random_pattern(seed: mut Int, depth: Int) -> Str {
     let atoms = ["a", "b", ".", r"\w", r"\s", r"\D", "[a-c]", "[^b]", "é", "€", "[à-ü]", "[^é]", r"\b", r"\B", "^", "$", "(?m:^)", "(?m:$)", "(?R:$)", r"\r",
-        r"\n", "(?i:A)", "(?s:.)", r"\b{end}", r"\<"]
+        r"\n", "(?i:A)", "(?s:.)", r"\b{end}", r"\<", r"\pL", r"\p{Nd}", r"(?-u:\b)", r"(?-u:\w)", "(?i:É)", "(?i:k)"]
     let r = next_random(mut seed) % 20
     if depth > 3 || r < 7 {
         return atoms[next_random(mut seed) % len(atoms)]
@@ -2496,7 +2834,7 @@ fn random_pattern(seed: mut Int, depth: Int) -> Str {
 }
 
 fn random_text(seed: mut Int) -> Str {
-    let parts = ["a", "b", "c", " ", "\n", "\r", "é", "€", "ü", "A", "-"]
+    let parts = ["a", "b", "c", " ", "\n", "\r", "é", "€", "ü", "A", "-", "K", "ß", "١", "É", "́"]
     let mut b = strings.builder()
     let n = next_random(mut seed) % 14
     for _ in 0..n {
@@ -2539,7 +2877,26 @@ test "the DFAs find what the Pike VM finds, on random patterns" {
 }
 
 test "a skip to where a match can start forgets the assertions met before it" {
-    // The \b after \n failed at 1; skipped to 3, it holds.
-    assert(spans(must(r"(?:\n)?\b\w+"), "\néAb-c") == "[3,5)[6,7)")
-    assert(spans(must(r"b|(?:\n)?\b\w+"), "\néAb") == "[3,5)")
+    // The \b after \n failed at 1; skipped to 3, it holds (with ASCII word
+    // characters: in Unicode mode é is one, and \b holds at 1).
+    assert(spans(must(r"(?-u)(?:\n)?\b\w+"), "\néAb-c") == "[3,5)[6,7)")
+    assert(spans(must(r"(?-u)b|(?:\n)?\b\w+"), "\néAb") == "[3,5)")
+    assert(spans(must(r"(?:\n)?\b\w+"), "\néAb-c") == "[0,5)[6,7)")
+}
+
+test "Unicode classes, properties and case folding" {
+    assert(spans(must(r"\w+"), "naïve café_1") == "[0,6)[7,14)")
+    assert(spans(must(r"(?-u)\w+"), "naïve") == "[0,2)[4,6)")
+    assert(spans(must(r"\d+"), "x٣٤5") == "[1,6)" && spans(must(r"(?-u)\d+"), "x٣٤5") == "[5,6)")
+    // A no-break space (U+00A0) is White_Space; ASCII \s leaves it out.
+    assert(spans(must(r"\s"), "a b") == "[1,3)" && spans(must(r"(?-u)\s"), "a b") == "")
+    assert(spans(must(r"\bé"), "é xé") == "[0,2)" && spans(must(r"(?-u)\bx"), "éx") == "[2,3)")
+    assert(spans(must(r"\pL+"), "ab12αβ") == "[0,2)[4,8)" && spans(must(r"\p{Nd}+"), "ab12αβ") == "[2,4)")
+    assert(spans(must(r"\P{L}+"), "ab12αβ") == "[2,4)" && spans(must(r"\p{^Lu}+"), "AbC") == "[1,2)")
+    assert(spans(must(r"\p{gc=Lowercase_Letter}+"), "AbcD") == "[1,3)" && spans(must(r"[\p{Lu}\d]+"), "aB1c") == "[1,3)")
+    // The Kelvin sign (U+212A) folds to k; ẞ (U+1E9E) to ß.
+    assert(spans(must("(?i)k+"), "kKK") == "[0,5)" && spans(must("(?-u)(?i)k+"), "kKK") == "[0,2)")
+    assert(spans(must("(?i)straße"), "STRAẞE") == "[0,8)" && spans(must("(?i)ω+"), "ΩωΩ") == "[0,6)")
+    assert(spans(must("(?i)(?-u)é"), "É") == "")
+    assert(error_of(r"\p{Greek}") != "compiled" && error_of(r"(?-u)\pL") != "compiled" && error_of(r"\p{L") != "compiled")
 }

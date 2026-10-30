@@ -6,6 +6,7 @@ import maps
 import nodes
 import strings
 import tables
+import unicode
 
 pub type Ref = struct {
     destination: Str
@@ -262,14 +263,15 @@ fn whitespace(cp: Int) -> Bool {
     if cp < 128 {
         return cp == 32 || cp == 9 || cp == 10 || cp == 12 || cp == 13
     }
-    return tables.whitespace(cp)
+    return unicode.category(cp) == "Zs"
 }
 
 fn punctuation(cp: Int) -> Bool {
     if cp < 128 {
         return nodes.is_ascii_punctuation(byte(cp))
     }
-    return tables.punctuation(cp)
+    let c = unicode.category(cp)
+    return c[0] == 'P' || c[0] == 'S'
 }
 
 fn handle_delim(p: mut Parser, d: mut nodes.Doc, block: Int, cc: Byte) -> Bool {
@@ -1072,21 +1074,10 @@ pub fn normalize_label(raw: Str) -> Str {
             strings.add_byte(mut b, ' ')
             space = false
         }
-        if c < 128 {
-            strings.add_byte(mut b, nodes.lower(c))
-            i = i + 1
-            continue
-        }
-        let x = nodes.decode_at(inner, i)
-        let folded = tables.fold(x.cp)
-        if folded == "" {
-            strings.add(mut b, inner[i..i + x.size])
-        } else {
-            strings.add(mut b, folded)
-        }
-        i = i + x.size
+        strings.add_byte(mut b, c)
+        i = i + 1
     }
-    return strings.build(b)
+    return unicode.fold(strings.build(b))
 }
 
 // A link reference definition at the start of `s`: the number of bytes it

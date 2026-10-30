@@ -100,6 +100,7 @@ FORMAT_TEST = TESTS / "format_test.py"
 MARKDOWN_TEST = TESTS / "markdown_test.py"
 TOML_TEST = TESTS / "toml_test.py"
 REGEX_TEST = TESTS / "regex_test.py"
+UNICODE_TEST = TESTS / "unicode_test.py"
 NVIM_TEST = TESTS / "nvim_test.lua"
 KINDS = ("run", "fail", "dump", "cli")
 
@@ -227,6 +228,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(TOML_TEST, compiler, env)
     if path == REGEX_TEST:
         return run_script(REGEX_TEST, compiler, env)
+    if path == UNICODE_TEST:
+        return run_script(UNICODE_TEST, compiler, env)
     if path == M27_TEST:
         return run_script(M27_TEST, compiler, env)
     if path == M26_TEST:
@@ -431,6 +434,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(MARKDOWN_TEST)
     tests.append(TOML_TEST)
     tests.append(REGEX_TEST)
+    tests.append(UNICODE_TEST)
     if shutil.which("nvim"):
         tests.append(NVIM_TEST)
     for kind in KINDS:

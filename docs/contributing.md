@@ -84,6 +84,14 @@ is ignored by Git. Python caches and `.DS_Store` files are ignored too.
 `compiler/bootstrap/vela1.c` is generated but deliberately tracked: it is required
 to build Vela without an existing Vela compiler.
 
+The Unicode tables at the end of `std/unicode.vl` (general categories,
+Alphabetic, White_Space, word characters and case folding, from the Unicode
+Character Database) are generated: change `std/tools/unicode_tables.py` and
+run `python3 std/tools/unicode_tables.py UCD_DIR`, where UCD_DIR holds the
+data files of the version the script pins (it checks their SHA-256), rather
+than editing the tables. `tests/unicode_test.py` compares the result with
+Python's `unicodedata` of the same Unicode version.
+
 `bench/results/` and `evaluation/results/` retain earlier measurements and
 validation records. Keep these reports intact, including their original
 paths, commands and source digests. Such paths describe the checkout at the
