@@ -25,6 +25,7 @@ import checker
 import files
 import index
 import json
+import lexer
 import maps
 import modules
 import query
@@ -410,6 +411,12 @@ fn in_string_or_comment(before: Str) -> Bool {
             } else if c == quote {
                 quote = 0
             }
+        } else if c == '"' && lexer.raw_end(before, i) >= 0 {
+            let e = lexer.raw_end(before, i)
+            if e > len(before) {
+                return true
+            }
+            i = e - 1  // past the raw string, which has no escapes
         } else if c == '"' || c == '\'' {
             quote = c
         } else if c == '/' && i + 1 < len(before) && before[i + 1] == '/' {
@@ -433,6 +440,12 @@ fn closers(before: Str) -> Str {
             } else if c == quote {
                 quote = 0
             }
+        } else if c == '"' && lexer.raw_end(before, i) >= 0 {
+            let e = lexer.raw_end(before, i)
+            if e > len(before) {
+                break
+            }
+            i = e - 1
         } else if c == '"' || c == '\'' {
             quote = c
         } else if c == '(' || c == '[' {
@@ -545,6 +558,10 @@ test "the text around the cursor" {
     assert(len(qualifier("f(x).y", 5)) == 0 && len(qualifier("xs[0].", 6)) == 0 && len(qualifier("print(n)", 6)) == 0)
     assert(in_string_or_comment("let s = \"a.b") && in_string_or_comment("x // p.") && !in_string_or_comment("f(\"a\", p."))
     assert(closers("print(f(a, [1, p.") == "]))" && closers("g(\")\", ") == ")")
+    // A raw string has no escapes: its backslash does not hide the quote.
+    assert(in_string_or_comment("let s = r\"a\\") && !in_string_or_comment("f(r\"a\\\", p.") && in_string_or_comment("x = r#\"a\"b"))
+    assert(closers("g(r\"\\\", ") == ")" && closers("g(r#\")\"#, [") == "])")
+    assert(index.trailing_comment(["x = r\"//\\\"  // note"], 1) == "note" && index.trailing_comment(["x = r\"a // b"], 1) == "")
     assert(indent("\t  x") == "\t  " && joined_lines(["a", "b", "c"], 2, "B") == "a\nB\nc")
 }
 

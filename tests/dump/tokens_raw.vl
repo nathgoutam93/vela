@@ -1,0 +1,8 @@
+// Raw strings are str tokens, shown as written; `r` alone is a name.
+// dump: tokens
+// out: 8:1 ident r
+// out: 8:3 str r"\d"
+// out: 8:9 str r#"a"b"#
+// out: 8:17 ; (newline)
+// out: 9:1 eof
+r r"\d" r#"a"b"#

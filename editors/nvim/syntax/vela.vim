@@ -13,6 +13,8 @@ syn keyword velaBuiltin print len push int byte float assert
 syn match velaNumber "\<\d\+\(\.\d\+\)\=\([eE][+-]\=\d\+\)\=\>"
 syn match velaEscape contained "\\[nrt0\\\"']"
 syn region velaString start=+"+ skip=+\\\\\|\\"+ end=+"+ contains=velaEscape
+syn region velaRawString start=+\<r\z(#*)"+ end=+"\z1+ oneline
+syn region velaRawString start=+\<r\z(#*)"+ end=+"\z1+ oneline
 syn match velaByte "'\(\\.\|[^\\']\)'" contains=velaEscape
 syn keyword velaTodo contained TODO FIXME XXX
 syn match velaComment "//.*$" contains=velaTodo
@@ -30,6 +32,8 @@ hi def link velaBuiltin Function
 hi def link velaFunction Function
 hi def link velaNumber Number
 hi def link velaString String
+hi def link velaRawString String
+hi def link velaRawString String
 hi def link velaByte Character
 hi def link velaEscape SpecialChar
 hi def link velaComment Comment

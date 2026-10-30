@@ -1,0 +1,26 @@
+// Raw strings: bytes as written, without escapes; with #s, they can hold
+// quotes. They are Str values like any other, and `r` is still a name.
+// out: a\w+\b
+// out: say "hi" \n
+// out: a "# b
+// out: 0
+// out: true
+// out: C:\temp\
+// out: é\t€
+// out: 3 4
+// out: |raw|
+import strings
+
+fn main() {
+    print(r"a\w+\b")
+    print(r#"say "hi" \n"#)
+    print(r##"a "# b"##)
+    print(len(r"") + len(r#""#))
+    print(r"\" == "\\" && r#"""# == "\"" && r"\d{4}-\d{2}" == "\\d{4}-\\d{2}")
+    print(r"C:\temp\")
+    print(r"é\t€")
+    let r = 3
+    let parts = [r, r + 1]
+    print(strings.from_int(parts[0]) + " " + strings.from_int(parts[1]))
+    print("|" + r"raw" + "|")
+}

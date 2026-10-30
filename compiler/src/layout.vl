@@ -376,7 +376,11 @@ fn slot_key(t: Int, name: Str, index: Int) -> Str {
     return strings.from_int(t) + " " + name + " " + strings.from_int(index)
 }
 
-// Box every slot of a user type whose type leads back to that type.
+// Box every slot of a user type whose type leads back to that type; and
+// every large struct or enum payload of a user enum, so that one large
+// variant does not make every value of the enum as large (TL-117): its
+// values then cost a pointer, and the payload is shared by reference, as
+// a recursive payload is.
 fn find_boxed(l: mut Layout) {
     for t in l.types {
         if types.is_builtin_enum(l.table, t) {
@@ -388,6 +392,89 @@ fn find_boxed(l: mut Layout) {
             }
         }
     }
+    let mut sizes: Map[Int, Int] = [:]
+    for t in l.types {
+        for s in slots(l, t) {
+            if !is_boxed(l, t, s.name, s.index) && large_payload(l, t, s, mut sizes) {
+                l.boxed[slot_key(t, s.name, s.index)] = true
+            }
+        }
+    }
+}
+
+// A payload is boxed as large past this many bytes: more than a Str and a
+// word, as in a variant holding a struct of a few fields.
+fn large_payload_bytes() -> Int {
+    return 32
+}
+
+fn large_payload(l: Layout, t: Int, s: Slot, sizes: mut Map[Int, Int]) -> Bool {
+    let ti = types.get(l.table, t)
+    if ti.tag != types.Tag.Enum || types.is_builtin_enum(l.table, t) || len(ti.variants) < 2 {
+        return false
+    }
+    let si = types.get(l.table, s.ty)
+    let boxable = si.tag == types.Tag.Struct && !types.is_fixed(l.table, s.ty) || si.tag == types.Tag.Enum
+    return boxable && inline_size(l, s.ty, mut sizes) > large_payload_bytes()
+}
+
+// About how many bytes a value of `t` takes in place, a boxed slot as a
+// pointer (structs and enums are rounded to 8 bytes; it decides boxing,
+// not offsets).
+fn inline_size(l: Layout, t: Int, sizes: mut Map[Int, Int]) -> Int {
+    if t == types.NOTHING() || t == types.UNIT() {
+        return 0
+    }
+    if types.is_integer(t) {
+        return types.integer_width(t) / 8
+    }
+    if t == types.BYTE() || t == types.BOOL() {
+        return 1
+    }
+    if t == types.STR() {
+        return 24
+    }
+    if types.is_func(l.table, t) {
+        return 16
+    }
+    if primitive_c(t) != "" || is_array_like(l.table, t) || types.is_map(l.table, t) {
+        return 8
+    }
+    match maps.get(sizes, t) {
+        Some(n) => return n
+        None => {}
+    }
+    sizes[t] = 8  // in progress: a cycle goes through a boxed slot
+    let ti = types.get(l.table, t)
+    let mut n = 0
+    if types.is_fixed(l.table, t) {
+        n = ti.length * inline_size(l, ti.args[0], mut sizes)
+    } else if ti.tag == types.Tag.Struct {
+        for s in slots(l, t) {
+            n = n + slot_size(l, t, s, mut sizes)
+        }
+    } else if ti.tag == types.Tag.Enum {
+        for v in ti.variants {
+            let mut m = 0
+            for i in 0..len(v.payload) {
+                m = m + slot_size(l, t, Slot { name: v.name, index: i, ty: v.payload[i] }, mut sizes)
+            }
+            if m > n {
+                n = m
+            }
+        }
+        n = n + 8  // the tag
+    }
+    n = (n + 7) / 8 * 8
+    sizes[t] = n
+    return n
+}
+
+fn slot_size(l: Layout, t: Int, s: Slot, sizes: mut Map[Int, Int]) -> Int {
+    if is_boxed(l, t, s.name, s.index) || large_payload(l, t, s, mut sizes) {
+        return 8
+    }
+    return inline_size(l, s.ty, mut sizes)
 }
 
 pub fn is_boxed(l: Layout, t: Int, name: Str, index: Int) -> Bool {

@@ -1,6 +1,6 @@
 // The lexer reports every bad character, skipping each one and going on.
 // err: lexer_errors.vl:8:13: error: unexpected character '$' [E1017]
-// err: lexer_errors.vl:9:16: error: unknown escape '\q'; use \n \t \r \0 \\ or \" [E1007]
+// err: lexer_errors.vl:9:16: error: unknown escape '\q'; use \n \t \r \0 \\ or \", or a raw string r"..." for backslashes as written [E1007]
 // err: lexer_errors.vl:10:11: error: integer literal '007' has a leading zero [E1004]
 // err: lexer_errors.vl:11:13: error: unexpected byte 0xc3; non-ASCII text is only allowed in comments and strings [E1015]
 // err: lexer_errors.vl:12:11: error: string literal is not closed before the end of the line [E1006]

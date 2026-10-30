@@ -382,6 +382,8 @@ fn run(lx: mut Lexer) {
             push(mut lx.comments, c)
         } else if is_digit(c) {
             number(mut lx)
+        } else if c == int('r') && raw_ahead(lx) {
+            raw_string(mut lx)
         } else if is_ident_start(c) {
             identifier(mut lx)
         } else if c == int('"') {
@@ -519,7 +521,7 @@ fn string(lx: mut Lexer) {
                 if e != -1 && e != int('\n') {
                     shown = chars.chr(e)
                 }
-                error(mut lx, lx.pos - 1, "E1007", "unknown escape '\\" + shown + "'; use \\n \\t \\r \\0 \\\\ or \\\"")
+                error(mut lx, lx.pos - 1, "E1007", "unknown escape '\\" + shown + "'; use \\n \\t \\r \\0 \\\\ or \\\", or a raw string r\"...\" for backslashes as written")
                 continue  // keep scanning the string, so its end is found
             }
             strings.add_byte(mut value, byte(decoded))
@@ -536,6 +538,98 @@ fn string(lx: mut Lexer) {
         error(mut lx, start + 1 + bad, "E1009", "string literal is not valid UTF-8")
     }
     add(mut lx, Kind.Str, chars.replace_invalid(lx.src[start..lx.pos]), start, strings.build(value))
+}
+
+// Whether a raw string starts here: `r`, any number of `#`, then `"`.
+// Before raw strings these were an error, so no valid program changes.
+fn raw_ahead(lx: Lexer) -> Bool {
+    let mut k = 1
+    for peek(lx, k) == int('#') {
+        k = k + 1
+    }
+    return peek(lx, k) == int('"')
+}
+
+// `r"..."`, or `r#"..."#` to hold a quote: the bytes as written, without
+// escapes, up to a quote followed by as many `#` as the opening one has.
+fn raw_string(lx: mut Lexer) {
+    let start = lx.pos
+    lx.pos = lx.pos + 1  // the r
+    let mut hashes = 0
+    for peek(lx, 0) == int('#') {
+        hashes = hashes + 1
+        lx.pos = lx.pos + 1
+    }
+    lx.pos = lx.pos + 1  // the opening quote
+    let body = lx.pos
+    for {
+        let c = peek(lx, 0)
+        if c == -1 || c == int('\n') {
+            let mut close = "\""
+            for _ in 0..hashes {
+                close = close + "#"
+            }
+            error(mut lx, start, "E1006", "raw string literal is not closed before the end of the line; it ends with " + close)
+            return
+        }
+        if c == int('"') && closes(lx, hashes) {
+            break
+        }
+        if c < 32 && c != int('\t') {
+            error(mut lx, lx.pos, "E1008", "control byte " + chars.hex2(c) + " in raw string literal; use a string with an escape")
+        }
+        lx.pos = lx.pos + 1
+    }
+    let value = lx.src[body..lx.pos]
+    lx.pos = lx.pos + 1 + hashes
+    let bad = chars.first_invalid(value)
+    if bad >= 0 {
+        error(mut lx, body + bad, "E1009", "string literal is not valid UTF-8")
+    }
+    add(mut lx, Kind.Str, chars.replace_invalid(lx.src[start..lx.pos]), start, value)
+}
+
+// For the quote at `i` of `s`, if it opens a raw string (`r"`, `r#"`):
+// the index just after the string; the index of the newline before which
+// it is not closed; or len(s) + 1 if `s` ends inside it. -1 for any other
+// quote. For tools that scan text without lexing it.
+pub fn raw_end(s: Str, i: Int) -> Int {
+    let mut j = i - 1
+    let mut hashes = 0
+    for j >= 0 && s[j] == '#' {
+        hashes = hashes + 1
+        j = j - 1
+    }
+    if j < 0 || s[j] != 'r' || j > 0 && is_ident_char(int(s[j - 1])) {
+        return -1
+    }
+    let mut k = i + 1
+    for k < len(s) {
+        if s[k] == '\n' {
+            return k
+        }
+        if s[k] == '"' {
+            let mut n = 0
+            for n < hashes && k + 1 + n < len(s) && s[k + 1 + n] == '#' {
+                n = n + 1
+            }
+            if n == hashes {
+                return k + 1 + hashes
+            }
+        }
+        k = k + 1
+    }
+    return len(s) + 1
+}
+
+// Whether the quote here is followed by `hashes` of `#`.
+fn closes(lx: Lexer, hashes: Int) -> Bool {
+    for k in 1..hashes + 1 {
+        if peek(lx, k) != int('#') {
+            return false
+        }
+    }
+    return true
 }
 
 fn decode_escape(c: Int) -> Int {

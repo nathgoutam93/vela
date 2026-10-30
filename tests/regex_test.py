@@ -12,9 +12,10 @@ match kinds, byte-oriented search, Unicode-aware classes on non-ASCII text,
 syntax the package does not have. Then patterns such as (a+)+$ must finish
 on long texts within a limit a backtracking engine would miss by far.
 
---fuzz compares random patterns and texts with Python's re (with re.ASCII,
-whose \\w, \\d, \\s, \\b and case folding are the package's): the first
-match and its groups must be the same. Texts of 256 bytes or more take the
+--fuzz compares random patterns and texts with Python's re: in ASCII mode
+((?-u), against re.ASCII) and in Unicode mode, on characters whose classes
+and case folding Python and UTS #18 agree on. The first match and its
+groups must be the same. Texts of 256 bytes or more take the
 lazy DFA's way, shorter ones the Pike VM's.
 """
 import argparse
@@ -34,15 +35,33 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / 'tests' / 'fixtures' / 'regex-test'
 LIMIT = 10  # seconds for each stress search
 
-# Constructs the package does not have: \p classes, class set operations,
-# nested classes, octal.
+# Constructs the package does not have: class set operations, nested
+# classes, octal.
 UNSUPPORTED = [
-    (re.compile(r'\\[pP]'), 'Unicode property classes (\\p)'),
     (re.compile(r'&&|--|~~'), 'class set operations'),
     (re.compile(r'\[[^\]]*\[(?!:)'), 'nested classes'),
     (re.compile(r'\\[0-7]{2,3}'), 'octal escapes'),
 ]
-CLASSES = re.compile(r'\\[wWdDsSbB]|\(\?[a-zA-Z]*i|\[\[:')
+PROPERTY = re.compile(r'\\[pP](\{[^}]*\}|[A-Za-z])')
+# The Unicode properties \p and \P take: general categories and their
+# groups by short or long name, and a few binary properties, matched loosely.
+CATEGORIES = '''lu uppercaseletter ll lowercaseletter lt titlecaseletter lc casedletter lm modifierletter lo otherletter
+l letter mn nonspacingmark mc spacingmark me enclosingmark m mark combiningmark nd decimalnumber digit nl letternumber
+no othernumber n number pc connectorpunctuation pd dashpunctuation ps openpunctuation pe closepunctuation pi
+initialpunctuation pf finalpunctuation po otherpunctuation p punctuation punct sm mathsymbol sc currencysymbol sk
+modifiersymbol so othersymbol s symbol zs spaceseparator zl lineseparator zp paragraphseparator z separator cc control
+cntrl cf format cs surrogate co privateuse cn unassigned c other'''.split()
+PROPERTIES = set(CATEGORIES) | {'any', 'ascii', 'assigned', 'alphabetic', 'alpha', 'whitespace', 'wspace', 'space'}
+
+
+def supported_property(text):
+    name = text.strip('{}').lstrip('^')
+    name = ''.join(c for c in name.lower() if c not in ' _-')
+    for sep in '=:':
+        if sep in name:
+            key, value = name.split(sep, 1)
+            return key in ('gc', 'generalcategory') and value in CATEGORIES
+    return name in PROPERTIES
 
 STRESS = {
     '(a+)+$': 'a' * 100000 + 'b',
@@ -103,6 +122,8 @@ def skip_reason(t):
     for pattern, reason in UNSUPPORTED:
         if pattern.search(regex):
             return reason
+    if not all(supported_property(p) for p in PROPERTY.findall(regex)):
+        return 'Unicode properties the package does not have (scripts, emoji, breaks)'
     haystack = t['haystack']
     if t.get('unescape'):
         try:
@@ -110,9 +131,6 @@ def skip_reason(t):
         except UnicodeDecodeError:
             return 'byte-oriented search (invalid UTF-8 haystack)'
     ascii = all(ord(c) < 128 for c in regex + haystack)
-    if not ascii and (CLASSES.search(regex) or t.get('case-insensitive')):
-        if t.get('unicode', True):
-            return 'Unicode-aware classes and case folding (TL-106)'
     if (not t.get('unicode', True) or re.search(r'\(\?[a-zA-Z]*-[a-zA-Z]*u', regex)) and not ascii:
         return 'byte-oriented search ((?-u) or unicode = false on non-ASCII text)'
     return None
@@ -153,7 +171,12 @@ def conformance(exe, tmp, args):
         regex = t['regex']
         if t.get('case-insensitive'):
             regex = '(?i)' + regex
+        if not t.get('unicode', True) or name.startswith('regex-lite.toml:'):
+            # ASCII \\d \\w \\s \\b and case folding (regex-lite has only those)
+            regex = '(?-u)' + regex
         bounds = t.get('bounds', [0, len(haystack.encode())])
+        if isinstance(bounds, dict):
+            bounds = [bounds['start'], bounds['end']]
         cases.append({'regex': regex, 'haystack': haystack, 'start': bounds[0], 'end': bounds[1],
                       'anchored': t.get('anchored', False), 'limit': t.get('match-limit', -1)})
     results = batch(exe, tmp, cases)
@@ -261,15 +284,20 @@ def fuzz(exe, tmp, args):
         names = re.findall(r'\(\?P<(g\d+)>', body)
         if len(names) != len(set(names)):
             continue
-        pattern = (f'(?{flags})' if flags else '') + body
+        # ASCII mode against Python's re.ASCII, or Unicode mode against its
+        # Unicode re, on characters whose classes and case the two agree on
+        # (Python's \\w leaves out marks, which UTS #18 counts).
+        unicode_mode = rng.random() < 0.5
+        pattern = ('' if unicode_mode else '(?-u)') + (f'(?{flags})' if flags else '') + body
         # Texts of 256 bytes and more are searched by the lazy DFA, shorter
         # ones by the Pike VM alone.
         size = rng.randint(256, 400) if rng.random() < 0.3 else rng.randint(0, 16)
-        text = ''.join(rng.choice('abcx .-\n1Aé') for _ in range(size))
+        alphabet = 'abcx .-\n1AéÉΩω١\u00a0_' if unicode_mode else 'abcx .-\n1Aé'
+        text = ''.join(rng.choice(alphabet) for _ in range(size))
         if text == '' and '\\B' in pattern:
             continue  # Python's \B never matches the empty text; Rust's does
         try:
-            compiled = re.compile(python_pattern(pattern, flags), re.ASCII)
+            compiled = re.compile(python_pattern(pattern.removeprefix('(?-u)'), flags), 0 if unicode_mode else re.ASCII)
         except re.error:
             continue
         cases.append({'regex': pattern, 'haystack': text, 'limit': 1})

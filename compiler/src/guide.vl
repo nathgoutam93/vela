@@ -33,7 +33,7 @@ pub fn reference(root: Str) -> Str uses fs, os {
     strings.add(mut out, "\n")
     strings.add(mut out, "Files use `.vl`; entry is `fn main()` with no arguments/result. Libraries need no main. Comments use `//`. Newlines end statements except after an operator. Put `{` on the signature/final-contract line. Parenthesize struct literals in if/for/match conditions. Calls use `module.function(value)` or `value.method()`.\n")
     strings.add(mut out, "\n")
-    strings.add(mut out, "`i8 i16 i32 i64 u8 u16 u32 u64` are fixed-width integers; Int=i64, Byte=u8 (0..255). Arithmetic/indexing panic on overflow/invalid indexes. Decimal, 0x hex and 0b binary literals allow separators/suffixes (255u8, 0xffff_ffffu32); unsuffixed integers infer context or Int. Signed minima/full u64 are supported. Byte literals: 'a', '\\n'. Width changes require explicit checked i8(x)..u64(x); int/byte remain aliases. Float is binary64 (1.5); float(n)/int(x) convert. Bool: true/false. Str is bytes with UTF-8 source literals and escapes \\n \\t \\r \\0 \\\\ \\\". Unit: (). Import ints: checked_add/sub/mul/div/rem/neg return Option[T]; wrapping_* wrap modulo 2^width; saturating_* clamp. Division by zero panics except checked operations return None. ints.to_str covers all widths. &, |, ^, ~ preserve width. Left shifts discard high bits; signed right shifts sign-extend, unsigned zero-extend. Counts must be in 0..width or panic.\n")
+    strings.add(mut out, "`i8 i16 i32 i64 u8 u16 u32 u64` are fixed-width integers; Int=i64, Byte=u8 (0..255). Arithmetic/indexing panic on overflow/invalid indexes. Decimal, 0x hex and 0b binary literals allow separators/suffixes (255u8, 0xffff_ffffu32); unsuffixed integers infer context or Int. Signed minima/full u64 are supported. Byte literals: 'a', '\\n'. Width changes require explicit checked i8(x)..u64(x); int/byte remain aliases. Float is binary64 (1.5); float(n)/int(x) convert. Bool: true/false. Str is bytes with UTF-8 source literals and escapes \\n \\t \\r \\0 \\\\ \\\"; raw r\"\\d+\", r#\"..\"# skip escapes. Unit: (). Import ints: checked_add/sub/mul/div/rem/neg return Option[T]; wrapping_* wrap modulo 2^width; saturating_* clamp. Division by zero panics except checked operations return None. ints.to_str covers all widths. &, |, ^, ~ preserve width. Left shifts discard high bits; signed right shifts sign-extend, unsigned zero-extend. Counts must be in 0..width or panic.\n")
     strings.add(mut out, "\n")
     strings.add(mut out, "`+ - * / %` do arithmetic; `+` also joins two strings. `== != < <= > >=` compare; `&& || !` operate on Bool and short-circuit. Precedence, from tight to loose: calls/fields/index/`?`, unary `- ! ~`, `* / %`, `+ -`, `<< >>`, `&`, `^`, `|`, comparisons, `&&`, `||`. There is no truthiness, ternary operator, increment operator or compound assignment. Write `n = n + 1`.\n")
     strings.add(mut out, "\n")
@@ -107,8 +107,9 @@ pub fn reference(root: Str) -> Str uses fs, os {
         }
         strings.add(mut out, "```\n")
     }
+    strings.add(mut out, "\nEach `import NAME` below is std/NAME.vl.\n")
     for module in ["bytes", "lists", "text", "views", "buffers", "arenas", "time", "unicode", "net", "http", "processes", "paths", "io", "property"] {
-        strings.add(mut out, "\n## import " + module + " (from std/" + module + ".vl)\n\n```text\n")
+        strings.add(mut out, "\n## import " + module + "\n\n```text\n")
         let path = modules.join(modules.join(root, "std"), module + ".vl")
         match files.read(path) {
             Ok(source) => {

@@ -1,0 +1,160 @@
+// A large struct or enum payload of an enum lives in a box (TL-117), so
+// the enum's other values stay small. Values keep their semantics: copies
+// are independent, patterns reach into boxed payloads, generic instances
+// and recursive enums mix with large payloads.
+// out: 1 tiny|name|stamp 2026-10-31|wide 3
+// out: 2026 9 2026
+// out: big right 7
+// out: 45 [10]
+// out: 4 leaves, 4000 total
+// out: nested 5 6
+import strings
+
+type Stamp = struct {
+    year: Int
+    month: Int
+    day: Int
+    hour: Int
+    minute: Int
+    second: Int
+    nanos: Int
+    offset: Int
+    zone: Str
+}
+
+type Shape = enum {
+    Dot
+    Wide(Int, Int, Int, Int, Int, Int)
+    Boxed(Stamp)
+}
+
+type Value = enum {
+    Small(Int)
+    Name(Str)
+    Big(Stamp)
+    Nested(Shape)
+    Fixed([Int; 10])
+}
+
+type Either[A, B] = enum {
+    Left(A)
+    Right(B)
+}
+
+type Tree = enum {
+    Leaf(Stamp)
+    Node([Tree])
+}
+
+fn stamp(year: Int) -> Stamp {
+    return Stamp { year: year, month: 10, day: 31, hour: 1, minute: 2, second: 3, nanos: 4, offset: 0, zone: "UTC" }
+}
+
+fn describe(v: Value) -> Str {
+    return match v {
+        Value.Small(n) => strings.from_int(n) + " tiny"
+        Value.Name(_) => "name"
+        Value.Big(s) => "stamp " + strings.from_int(s.year) + "-" + strings.from_int(s.month) + "-" + strings.from_int(s.day)
+        Value.Nested(Shape.Wide(a, _, _, _, _, f)) => "wide " + strings.from_int(a + f)
+        Value.Nested(_) => "other shape"
+        Value.Fixed(xs) => "fixed " + strings.from_int(xs[9])
+    }
+}
+
+fn year_of(v: Value) -> Int {
+    match v {
+        Value.Big(s) => return s.year
+        _ => return -1
+    }
+}
+
+fn total(t: Tree) -> Int {
+    match t {
+        Tree.Leaf(s) => return s.year
+        Tree.Node(kids) => {
+            let mut n = 0
+            for k in kids {
+                n = n + total(k)
+            }
+            return n
+        }
+    }
+}
+
+fn leaves(t: Tree) -> Int {
+    match t {
+        Tree.Leaf(_) => return 1
+        Tree.Node(kids) => {
+            let mut n = 0
+            for k in kids {
+                n = n + leaves(k)
+            }
+            return n
+        }
+    }
+}
+
+fn main() {
+    let values = [Value.Small(1), Value.Name("x"), Value.Big(stamp(2026)), Value.Nested(Shape.Wide(1, 0, 0, 0, 0, 2))]
+    let mut parts: [Str] = []
+    for v in values {
+        push(mut parts, describe(v))
+    }
+    print(parts[0] + "|" + parts[1] + "|" + parts[2] + "|" + parts[3])
+
+    // A copy of a boxed payload is a value of its own.
+    let original = Value.Big(stamp(2026))
+    let mut copy = original
+    match copy {
+        Value.Big(s) => {
+            let mut changed = s
+            changed.month = 9
+            copy = Value.Big(changed)
+        }
+        _ => {}
+    }
+    let month = match copy {
+        Value.Big(s) => s.month
+        _ => 0
+    }
+    print(strings.from_int(year_of(original)) + " " + strings.from_int(month) + " " + strings.from_int(year_of(copy)))
+
+    let e: Either[Stamp, Int] = Either.Right(7)
+    let big: Either[Stamp, Int] = Either.Left(stamp(1))
+    let kinds = match big {
+        Either.Left(_) => "big"
+        Either.Right(_) => "small"
+    }
+    match e {
+        Either.Right(n) => print(kinds + " right " + strings.from_int(n))
+        Either.Left(_) => print("left")
+    }
+
+    let mut xs: [Int; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    let fixed = Value.Fixed(xs)
+    xs[9] = 10
+    let mut sum = 0
+    match fixed {
+        Value.Fixed(ys) => {
+            for y in ys {
+                sum = sum + y
+            }
+        }
+        _ => {}
+    }
+    print(strings.from_int(sum) + " [" + strings.from_int(xs[9]) + "]")
+
+    let tree = Tree.Node([Tree.Leaf(stamp(1000)), Tree.Node([Tree.Leaf(stamp(1000)), Tree.Leaf(stamp(1000))]), Tree.Leaf(stamp(1000))])
+    print(strings.from_int(leaves(tree)) + " leaves, " + strings.from_int(total(tree)) + " total")
+
+    let shapes = [Shape.Dot, Shape.Boxed(stamp(5)), Shape.Wide(6, 0, 0, 0, 0, 0)]
+    let mut found = ""
+    for s in shapes {
+        match s {
+            Shape.Boxed(st) => found = found + " " + strings.from_int(st.year)
+            Shape.Wide(a, _, _, _, _, _) => found = found + " " + strings.from_int(a)
+            Shape.Dot => {}
+        }
+    }
+    print("nested" + found)
+}
