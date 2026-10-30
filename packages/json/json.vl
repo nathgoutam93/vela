@@ -286,24 +286,30 @@ fn new_line(b: mut strings.Builder, indent: Int, depth: Int) {
 
 fn write_str(b: mut strings.Builder, s: Str) {
     strings.add_byte(mut b, '"')
-    for c in s {
-        if c == '"' || c == '\\' {
-            strings.add_byte(mut b, '\\')
-            strings.add_byte(mut b, c)
-        } else if c == '\n' {
-            strings.add(mut b, "\\n")
-        } else if c == '\r' {
-            strings.add(mut b, "\\r")
-        } else if c == '\t' {
-            strings.add(mut b, "\\t")
-        } else if c < 32 || c == 127 {
-            strings.add(mut b, "\\u00")
-            strings.add_byte(mut b, hex_digit(int(c) / 16))
-            strings.add_byte(mut b, hex_digit(int(c) % 16))
-        } else {
-            strings.add_byte(mut b, c)
+    // Runs of bytes that need no escape are added whole.
+    let mut run = 0
+    for i in 0..len(s) {
+        let c = s[i]
+        if c == '"' || c == '\\' || c < 32 || c == 127 {
+            strings.add(mut b, s[run..i])
+            if c == '"' || c == '\\' {
+                strings.add_byte(mut b, '\\')
+                strings.add_byte(mut b, c)
+            } else if c == '\n' {
+                strings.add(mut b, "\\n")
+            } else if c == '\r' {
+                strings.add(mut b, "\\r")
+            } else if c == '\t' {
+                strings.add(mut b, "\\t")
+            } else {
+                strings.add(mut b, "\\u00")
+                strings.add_byte(mut b, hex_digit(int(c) / 16))
+                strings.add_byte(mut b, hex_digit(int(c) % 16))
+            }
+            run = i + 1
         }
     }
+    strings.add(mut b, s[run..len(s)])
     strings.add_byte(mut b, '"')
 }
 

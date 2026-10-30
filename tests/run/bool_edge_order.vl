@@ -1,0 +1,75 @@
+// Reduced from differential seed 60353: opt.thread_bools copied m14 into m87's
+// register on an edge block placed after the function's last instruction.
+// Once the join's other way was dropped as dead, that was the register's only
+// def, after its reads in the text, and value numbering (reuse) dropped it.
+// Edge blocks now go just before the label they lead to.
+// out: s76-2147483646s793375332331256785413391750749263s84s85-18
+// out: 40
+// out: 6
+// out: 6
+// out: 6
+// out: 6
+// out: 6
+import ints
+type Rec = struct { a: Int, b: u8, c: i32 }
+type Sh = enum { Zero, One(Int), Two(i32, Rec) }
+type Pt = struct { x: Float, y: Float }
+fn bump(r: mut Rec) {
+}
+fn score(s: Sh) -> Int {
+    return match s {
+        Sh.Zero => -1,
+        Sh.One(x) => x & 0xffff,
+        Sh.Two(c, r) => int(c) + int(r.b) - (r.a & 15),
+    }
+}
+fn twiddle_i32(x: mut i32, y: i32) {
+}
+fn twiddle_u32(x: mut u32, y: u32) {
+}
+fn f1(p0: Int, p1: Int) -> i8 {
+    let mut m2: u32 = ints.wrapping_mul(2643672734u32, ints.wrapping_neg(ints.wrapping_add(8u32, 20u32)))
+    return ints.wrapping_sub(ints.wrapping_mul((match ints.checked_div((-90i8), (-12i8)) { Some(x) => x, None => 2i8 }), (match ints.checked_mul(3i8, (-127i8)) { Some(x) => x, None => 126i8 })), (match (((18446744073709551615u64 >> (18216920914695633256u64 & 63u64)) >= (9u64 ^ 11386059581304781035u64)) && (m2 >= m2)) { true => (-114i8), false => ints.wrapping_sub(90i8, 16i8) }))
+}
+fn main() {
+    let mut m14: i16 = 6i16
+    let v15: i16 = ints.saturating_mul(ints.wrapping_mul((m14 + m14), (-15525i16)), m14)
+    let mut m18: Int = 13i64
+    if ((match ints.checked_div((2697904371u32 | 3877005352u32), ints.wrapping_sub(503943104u32, 18u32)) { Some(x) => x, None => 4287797007u32 }) > (match (18446744073709551615u64 > ints.wrapping_neg(12384458623577661157u64)) { true => (match ints.checked_mul(3915759383u32, 1123016873u32) { Some(x) => x, None => 1u32 }), false => ints.wrapping_mul(1u32, 10u32) })) {
+        let mut fs19: [Pt] = [Pt { x: 7.5, y: 1e300 }, Pt { x: 7.5, y: 0.1 }]
+        for fk20 in 0..len(fs19) {
+        }
+        if (m18 < (~(m18 << 23i64))) {
+            if ((7948394938296707139u64 < ints.wrapping_sub(ints.wrapping_add(7599285624491972913u64, 7127466128189951991u64), (8643270856014959680u64 >> (6u64 & 63u64)))) && ((-14i8) < ints.wrapping_sub(100i8, (-8i8)))) {
+                m14 = v15
+                let mut arr23: [i32] = [((-1i32) ^ ((-1019818028i32) << 23i32)), ints.wrapping_add(387835681i32, ints.wrapping_div(1766155838i32, ((-1699342086i32) | 1i32))), (match ((m14 != ints.wrapping_neg(m14)) && (v15 == v15)) { true => ((-2147483648i32) << 3i32), false => (-1591924155i32) }), (ints.wrapping_div(2147483647i32, (66527285i32 | 1i32)) >> 18i32)]
+                let mut m24: i32 = 0i32
+                let mut arr26: [i8] = [i8(ints.wrapping_sub(1u64, 2u64) & 127u64), (match ints.checked_div(86i8, ((-26i8) >> ((-12i8) & 7i8))) { Some(x) => x, None => (-14i8) }), 17i8, 5i8, (~ints.wrapping_add((-38i8), 58i8))]
+                let mut arr29: [u8] = [(match ints.checked_sub(ints.wrapping_mul(184u8, 255u8), u8((-1i8) & 127i8)) { Some(x) => x, None => 0u8 }), ints.wrapping_sub(ints.wrapping_mul(242u8, 10u8), ints.wrapping_sub(1u8, 190u8)), ints.wrapping_add((0u8 >> (1u8 & 7u8)), u8(2u8 & 127u8)), (match ints.checked_sub((match 11u8 { 0u8 => 14u8, _ => 15u8 }), (64u8 | 15u8)) { Some(x) => x, None => 20u8 }), (ints.wrapping_mul(244u8, 1u8) >> 0u8)]
+                let mut m30: u8 = 0u8
+                let mut arr32: [u16] = [19u16, ints.wrapping_mul(ints.wrapping_div(1u16, (42660u16 | 1u16)), (65535u16 ^ 0u16)), ints.wrapping_add(0u16, (19u16 & 4u16))]
+            }
+            let mut arr38: [i32] = [i32(ints.wrapping_add(14u8, 16u8) & 127u8), ints.wrapping_add(((-1600167302i32) ^ (-16i32)), (1064077826i32 << 12i32))]
+            let mut m39: i32 = 0i32
+            for ix41 in 0..3 {
+                let mut arr42: [Int] = [m18]
+                let mut arr54: [i8] = [ints.wrapping_neg((match (42401u16 > 3u16) { true => 26i8, false => 12i8 })), ints.wrapping_mul(f1(m18, m18), (-1i8))]
+                let mut arr57: [Int] = [(ints.wrapping_neg(m18) & (match ints.checked_rem(m18, m18) { Some(x) => x, None => 0i64 }))]
+                let mut fs60: [Pt] = [Pt { x: 1e300, y: 0.0 }, Pt { x: 1.0, y: 1e300 }, Pt { x: 7.5, y: -1.0 }]
+                for fk61 in 0..len(fs60) {
+                }
+            }
+            m18 = 7928444002727380239i64
+        }
+    }
+    print("s76" + ints.to_str(ints.wrapping_neg(2147483646i32)) + "" + "s79" + "" + ints.to_str(((-3375332331256785414i64) ^ (-1i64))) + ints.to_str(ints.wrapping_mul(3319560130u32, 18u32)) + ints.to_str((255u8 >> (10u8 & 7u8))) + "s84" + "s85" + ints.to_str((~17i32)))
+    let mut m87: i16 = (match (3505867063u32 == (3535888455u32 & 3808814200u32)) { true => (match ints.checked_rem(ints.wrapping_neg(v15), (match ints.checked_add((-19483i16), v15) { Some(x) => x, None => (-7i16) })) { Some(x) => x, None => 5563i16 }), false => m14 })
+    print(f1(((match ((142u8 < 4u8) && ((229u8 > 8u8) && (4i64 <= m18))) { true => m18, false => m18 }) & ints.wrapping_add(m18, m18)), ints.wrapping_add(ints.wrapping_add(m18, m18), 1i64)))
+    for ix88 in 0..5 {
+        print(m87)
+    }
+    let mut w93 = 3
+    for w93 != 6 {
+        w93 = w93 + 1
+    }
+}

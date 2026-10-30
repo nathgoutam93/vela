@@ -3248,6 +3248,8 @@ the same entry. Close it with a commit or validation result; keep its history.
   suites pass, the native fixed point holds, the markdown test passes on
   both back ends, and differential seeds 7000-7999 and 12000-12999 agree
   (after TL-114, which seed 7648 found).
+- **Follow-up:** TL-119, a miscompile in how this pass placed its edge
+  blocks, found and fixed afterwards.
 - **Remaining:** the loop in `inlines.plain` still makes the signed test and
   then the bounds check. When the length is known not to be negative, testing `i <u n`
   first, and `i < n` only when that fails, would put one comparison on
@@ -3389,6 +3391,92 @@ the same entry. Close it with a commit or validation result; keep its history.
   and `asm`, which record the default output.
 - **Verification:** both snapshots pass with and without `VELA_OPT=0`, on
   both back ends.
+
+### TL-116: String literals cannot name a character by its code point
+
+- **Status:** open (proposal).
+- **Discovery:** post-M30 TOML port (`packages/toml`, its tests).
+- **Evidence (observed):** a Vela string literal has the escapes `\n \t
+  \r \0 \\ \"` only; `"\u{7f}"` is E1007 ("unknown escape"). A test of
+  how `toml.quote` escapes DEL (U+007F), or of a value holding U+0001,
+  cannot write the character in the literal.
+- **Impact:** tests of escaping and of control characters build such
+  strings byte by byte, or test only the characters that have escapes.
+- **Workaround:** `\0`, or compare `s[i] == byte(1)`.
+- **Proposed improvement:** `\u{...}` (a Unicode scalar value, written as
+  UTF-8) and perhaps `\x..` in string and Byte literals.
+- **Verify:** `"\u{7f}"` has the one byte 0x7F; `"\u{e9}"` is "é".
+
+### TL-117: An enum is as large as its largest payload
+
+- **Status:** open (proposal).
+- **Discovery:** post-M30 TOML port: peak memory of `bench/real/toml`.
+- **Evidence (observed):** `toml.Value` has a `Datetime(Datetime)` variant
+  whose struct holds ten Ints. `layout` boxes only payloads that lead back
+  to their own type, so every Value, including a string or an integer, takes
+  the Datetime's room: 88 bytes where 32 would hold a Str. Parsing a
+  10.8 MB lockfile-style document peaks at 130 MiB. Python's tomllib peaks
+  at 63 MiB, of which 10 MiB is the interpreter. A heap profile (massif) puts
+  most of it in arrays of Values and of table entries.
+- **Impact:** a data model with one large rare variant costs that much for
+  every value, in arrays and in the containers that hold them.
+- **Workaround:** keep large payloads out of enums stored in bulk (pack
+  them, or keep them in a side array and store an index). The toml package
+  keeps the public `Datetime` struct as it is.
+- **Proposed improvement:** box an enum payload larger than some size (for
+  example 32 bytes), as recursive payloads already are; values keep their
+  semantics, and a large variant then costs a pointer.
+- **Verify:** `bench/real/toml --check` on the same document peaks well
+  below 130 MiB with no change to the package.
+
+### TL-118: `vela fmt` failed on a file without a final newline
+
+- **Status:** resolved.
+- **Discovery:** post-M30 TOML port, formatting a delta-reduced test whose
+  last line had no newline.
+- **Evidence (observed):** `printf 'fn main() {\n    print(1)\n}' > a.vl;
+  vela fmt a.vl` reported E5001, "internal error: formatting would change
+  this file's meaning", at the end of the last line. The lexer's newline rule
+  inserts a `;` after a line ending in `}`, but not at the end of a file
+  with no final newline. The formatted file ends with one, so its token
+  stream had one `;` more, and the safety check refused it.
+- **Impact:** any file saved without a final newline (many editors allow
+  that) could not be formatted, and the error claimed a compiler bug.
+- **Resolution:** the check compares the token streams without a `;` that
+  the newline rule inserted just before the end
+  (`format.without_final_semi`).
+- **Verification:** `tests/cli/fmt_no_final_newline.vl` (a file without
+  its final newline) formats to the expected text, and fails with the
+  compiler before the fix. `tests/format_test.py` and the formatter's CLI
+  snapshots pass.
+
+### TL-119: Edge blocks of opt.thread_bools broke value numbering's order
+
+- **Status:** resolved; a regression in TL-111 (`4018011`, merged in PR #15).
+- **Discovery:** post-M30 TOML port validation: differential seed 60353
+  (`python3 tests/differential_test.py --start 60353 --count 1`): native
+  code with optimization printed 1 where C printed 32767; native without
+  optimization, and the compiler before TL-111, agreed with C.
+- **Evidence (observed):** a debug build that checks after every pass for
+  a register read but never set stopped in `reuse`. `thread_bools` had
+  copied `%643 = move %1` (m87 = m14) into an edge block appended after the
+  function's last instruction. When the join's other way was then dropped
+  as dead, that copy was `%643`'s only def, after the loop that reads it
+  in the text. `reuse` numbers values in one pass over the text: it found
+  the same `move %1` in `%593` just before, replaced `%643` with it from
+  there on, and dropped the def; the read earlier in the text kept `%643`.
+- **Impact:** wrong values from optimized native code, in a program where a
+  Bool chain's threaded way carried copies that later became the only defs
+  of their registers.
+- **Resolution:** an edge block goes just before the label it leads to,
+  where the moves it repeats would have run, with a jump around it for code
+  falling into that label. A way that needs moves is threaded only to a
+  label after its branch, after every def its moves read. A way without moves
+  is retargeted in either direction, as before.
+- **Verification:** `tests/run/bool_edge_order.vl` (the reduced program)
+  fails with the compiler before the fix and passes after it. Seed 60353
+  agrees, the classifier of `tests/run/bool_chains.vl` still threads,
+  and further differential seed ranges agree (see the TOML port report).
 
 ## Outstanding validation
 

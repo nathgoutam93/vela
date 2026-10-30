@@ -1,0 +1,1625 @@
+// TOML 1.0 (https://toml.io/en/v1.0.0): `parse` reads a document into a
+// Value, a table of its keys; `write` writes a table back as TOML.
+//
+// The parser keeps every table and array in one array of nodes while it
+// reads, linked by index, so a header can reopen a table defined earlier
+// and keys can be added to it in place. Each table records how it came to
+// be, which decides what may still be added to it: a [header] defines a
+// table once; dotted keys define the tables on their path, which later
+// headers may not define again; an inline table or an array written as a
+// value is complete, and nothing may be added to it afterwards.
+import maps
+import strings
+
+pub type Value = enum {
+    Str(Str)
+    Int(Int)
+    Float(Float)
+    Bool(Bool)
+    Datetime(Datetime)
+    Array([Value])
+    Table([Entry])
+}
+
+// A table's key and its value, in the order the document gives them.
+pub type Entry = struct {
+    key: Str
+    value: Value
+}
+
+pub type Kind = enum {
+    OffsetDateTime  // 1979-05-27T07:32:00Z
+    LocalDateTime  // 1979-05-27T07:32:00
+    LocalDate  // 1979-05-27
+    LocalTime  // 07:32:00
+}
+
+// A date, a time, or both. The fields a kind lacks are 0.
+pub type Datetime = struct {
+    kind: Kind
+    year: Int
+    month: Int
+    day: Int
+    hour: Int
+    minute: Int
+    second: Int
+    nanosecond: Int
+    digits: Int  // of the second's fraction as written, up to 9
+    offset: Int  // minutes east of UTC, for an OffsetDateTime
+}
+
+// ---- Reading values ----
+
+// The value of `key` in a table.
+pub fn get(v: Value, key: Str) -> Option[Value] {
+    match v {
+        Value.Table(entries) => {
+            for e in entries {
+                if e.key == key {
+                    return Some(e.value)
+                }
+            }
+        }
+        _ => {}
+    }
+    return None
+}
+
+// The value at a dotted path of bare keys: lookup(config, "server.port").
+pub fn lookup(v: Value, path: Str) -> Option[Value] {
+    let mut at = v
+    let mut start = 0
+    for i in 0..len(path) + 1 {
+        if i == len(path) || path[i] == '.' {
+            match get(at, path[start..i]) {
+                Some(x) => at = x
+                None => return None
+            }
+            start = i + 1
+        }
+    }
+    return Some(at)
+}
+
+pub fn keys(v: Value) -> [Str] {
+    let mut out: [Str] = []
+    match v {
+        Value.Table(entries) => {
+            for e in entries {
+                push(mut out, e.key)
+            }
+        }
+        _ => {}
+    }
+    return out
+}
+
+// An array's items, or a table's values.
+pub fn items(v: Value) -> [Value] {
+    match v {
+        Value.Array(xs) => return xs
+        Value.Table(entries) => {
+            let mut out: [Value] = []
+            for e in entries {
+                push(mut out, e.value)
+            }
+            return out
+        }
+        _ => return []
+    }
+}
+
+pub fn as_str(v: Value) -> Option[Str] {
+    match v {
+        Value.Str(s) => return Some(s)
+        _ => return None
+    }
+}
+
+pub fn as_int(v: Value) -> Option[Int] {
+    match v {
+        Value.Int(n) => return Some(n)
+        _ => return None
+    }
+}
+
+// A Float, or an Int as one.
+pub fn as_float(v: Value) -> Option[Float] {
+    match v {
+        Value.Float(x) => return Some(x)
+        Value.Int(n) => return Some(float(n))
+        _ => return None
+    }
+}
+
+pub fn as_bool(v: Value) -> Option[Bool] {
+    match v {
+        Value.Bool(b) => return Some(b)
+        _ => return None
+    }
+}
+
+pub fn as_datetime(v: Value) -> Option[Datetime] {
+    match v {
+        Value.Datetime(d) => return Some(d)
+        _ => return None
+    }
+}
+
+// The datetime in RFC 3339, as TOML writes it: 1979-05-27T07:32:00.5-07:00,
+// with the date or the time alone for a local date or time.
+pub fn datetime_text(d: Datetime) -> Str {
+    let mut b = strings.builder()
+    if d.kind != Kind.LocalTime {
+        strings.add(mut b, padded(d.year, 4) + "-" + padded(d.month, 2) + "-" + padded(d.day, 2))
+    }
+    if d.kind == Kind.LocalDate {
+        return strings.build(b)
+    }
+    if d.kind != Kind.LocalTime {
+        strings.add(mut b, "T")
+    }
+    strings.add(mut b, padded(d.hour, 2) + ":" + padded(d.minute, 2) + ":" + padded(d.second, 2))
+    if d.digits > 0 {
+        let mut fraction = padded(d.nanosecond, 9)
+        strings.add(mut b, "." + fraction[0..d.digits])
+    }
+    if d.kind == Kind.OffsetDateTime {
+        if d.offset == 0 {
+            strings.add(mut b, "Z")
+        } else {
+            let mut m = d.offset
+            if m < 0 {
+                strings.add(mut b, "-")
+                m = -m
+            } else {
+                strings.add(mut b, "+")
+            }
+            strings.add(mut b, padded(m / 60, 2) + ":" + padded(m % 60, 2))
+        }
+    }
+    return strings.build(b)
+}
+
+fn padded(n: Int, width: Int) -> Str {
+    let mut s = strings.from_int(n)
+    for len(s) < width {
+        s = "0" + s
+    }
+    return s
+}
+
+// ---- Parsing ----
+
+// Arrays and inline tables nested deeper than this are an error, not a
+// stack overflow: the parser calls itself once per level.
+fn max_depth() -> Int {
+    return 128
+}
+
+fn TABLE() -> Int {
+    return 0
+}
+
+fn ARRAY() -> Int {
+    return 1
+}
+
+fn SCALAR() -> Int {
+    return 2
+}
+
+type Node = struct {
+    kind: Int
+    explicit: Bool  // a table defined by a header, or inline
+    dotted: Bool  // a table defined by dotted keys
+    frozen: Bool  // an inline table, or an array written as a value: complete
+    tables: Bool  // an array of tables, made by [[headers]]
+    value: Int  // a scalar's, in Reader.values
+    keys: [Str]  // a table's, in order
+    items: [Int]  // a table's values, by key, or an array's
+}
+
+type Reader = struct {
+    text: Str
+    pos: Int
+    error: Str
+    nodes: [Node]
+    values: [Value]  // scalars, apart from the nodes, which are many and small
+    children: Map[Str, Int]  // "table:key": the node of the key's value, for tables of many keys
+    no_keys: [Str]  // empty arrays every new node shares until it grows its own
+    no_items: [Int]
+}
+
+// The document's root table, or the first error, as "line 3, column 5:
+// ...".
+pub fn parse(text: Str) -> Result[Value, Str] {
+    let mut r = Reader { text: text, pos: 0, error: "", nodes: [], values: [], children: [:], no_keys: [], no_items: [] }
+    check_utf8(mut r)
+    let root = node(mut r, TABLE())
+    r.nodes[root].explicit = true
+    let mut current = root
+    for r.error == "" {
+        skip_space(mut r)
+        if r.pos >= len(r.text) {
+            break
+        }
+        let c = r.text[r.pos]
+        if c == '[' {
+            current = header(mut r, root)
+        } else if c != '#' && c != '\n' && c != '\r' {
+            keyval(mut r, current, 0)
+        }
+        if r.error == "" {
+            end_of_line(mut r)
+        }
+    }
+    if r.error != "" {
+        return Err(r.error)
+    }
+    return Ok(build(r, root))
+}
+
+// Records the error at the reader's position, unless there is one already.
+fn fail(r: mut Reader, message: Str) {
+    if r.error != "" {
+        return
+    }
+    let mut line = 1
+    let mut col = 1
+    let end = min(r.pos, len(r.text))
+    for i in 0..end {
+        if r.text[i] == '\n' {
+            line = line + 1
+            col = 1
+        } else if int(r.text[i]) & 0xC0 != 0x80 {
+            col = col + 1  // columns count characters, not bytes
+        }
+    }
+    r.error = "line " + strings.from_int(line) + ", column " + strings.from_int(col) + ": " + message
+}
+
+fn min(a: Int, b: Int) -> Int {
+    if a < b {
+        return a
+    }
+    return b
+}
+
+fn node(r: mut Reader, kind: Int) -> Int {
+    push(mut r.nodes, Node { kind: kind, explicit: false, dotted: false, frozen: false, tables: false, value: -1, keys: r.no_keys, items: r.no_items })
+    return len(r.nodes) - 1
+}
+
+// Tables of a few keys are searched in turn, larger ones through a map:
+// most tables are small, and a key of the map costs an allocation.
+fn few_keys() -> Int {
+    return 8
+}
+
+fn child(r: Reader, table: Int, key: Str) -> Int {
+    let keys = r.nodes[table].keys
+    if len(keys) <= few_keys() {
+        for i in 0..len(keys) {
+            if keys[i] == key {
+                return r.nodes[table].items[i]
+            }
+        }
+        return -1
+    }
+    match maps.get(r.children, strings.from_int(table) + ":" + key) {
+        Some(c) => return c
+        None => return -1
+    }
+}
+
+fn add(r: mut Reader, table: Int, key: Str, c: Int) {
+    push(mut r.nodes[table].keys, key)
+    push(mut r.nodes[table].items, c)
+    let n = len(r.nodes[table].keys)
+    if n > few_keys() {
+        let prefix = strings.from_int(table) + ":"
+        let mut from = n - 1
+        if n == few_keys() + 1 {
+            from = 0  // the map starts with every key so far
+        }
+        for i in from..n {
+            r.children[prefix + r.nodes[table].keys[i]] = r.nodes[table].items[i]
+        }
+    }
+}
+
+// A table or array and everything in it can take nothing more.
+fn freeze(r: mut Reader, n: Int) {
+    r.nodes[n].frozen = true
+    for c in r.nodes[n].items {
+        if r.nodes[c].kind != SCALAR() && !r.nodes[c].frozen {
+            freeze(mut r, c)
+        }
+    }
+}
+
+fn build(r: Reader, n: Int) -> Value {
+    let x = r.nodes[n]
+    if x.kind == SCALAR() {
+        return r.values[x.value]
+    }
+    if x.kind == ARRAY() {
+        let mut out: [Value] = []
+        for c in x.items {
+            push(mut out, build(r, c))
+        }
+        return Value.Array(out)
+    }
+    let mut entries: [Entry] = []
+    for i in 0..len(x.keys) {
+        push(mut entries, Entry { key: x.keys[i], value: build(r, x.items[i]) })
+    }
+    return Value.Table(entries)
+}
+
+// ---- Characters ----
+
+fn peek(r: Reader) -> Byte {
+    if r.pos < len(r.text) {
+        return r.text[r.pos]
+    }
+    return byte(0)
+}
+
+fn next_is(r: Reader, word: Str) -> Bool {
+    return r.pos + len(word) <= len(r.text) && r.text[r.pos..r.pos + len(word)] == word
+}
+
+fn is_digit(c: Byte) -> Bool {
+    return c >= '0' && c <= '9'
+}
+
+fn is_hex(c: Byte) -> Bool {
+    return is_digit(c) || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F'
+}
+
+fn bare(c: Byte) -> Bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || is_digit(c) || c == '_' || c == '-'
+}
+
+// A control character other than tab, which TOML allows nowhere but as a
+// line ending.
+fn control(c: Byte) -> Bool {
+    return c < 0x20 && c != '\t' || c == 0x7F
+}
+
+// Spaces and tabs.
+fn skip_space(r: mut Reader) {
+    for r.pos < len(r.text) && (r.text[r.pos] == ' ' || r.text[r.pos] == '\t') {
+        r.pos = r.pos + 1
+    }
+}
+
+// A comment, from its #, up to the line's end.
+fn comment(r: mut Reader) {
+    r.pos = r.pos + 1
+    for r.pos < len(r.text) && r.text[r.pos] != '\n' {
+        let c = r.text[r.pos]
+        if c == '\r' && next_is(r, "\r\n") {
+            return
+        }
+        if control(c) {
+            fail(mut r, "a control character in a comment")
+            return
+        }
+        r.pos = r.pos + 1
+    }
+}
+
+// A line's end: spaces, perhaps a comment, then a newline or the end.
+fn end_of_line(r: mut Reader) {
+    skip_space(mut r)
+    if peek(r) == '#' {
+        comment(mut r)
+        if r.error != "" {
+            return
+        }
+    }
+    if r.pos >= len(r.text) {
+        return
+    }
+    if r.text[r.pos] == '\n' {
+        r.pos = r.pos + 1
+    } else if next_is(r, "\r\n") {
+        r.pos = r.pos + 2
+    } else if r.text[r.pos] == '\r' {
+        fail(mut r, "a carriage return not followed by a newline")
+    } else {
+        fail(mut r, "expected the end of the line")
+    }
+}
+
+// Spaces, newlines and comments, as arrays allow between values.
+fn skip_blank(r: mut Reader) {
+    for r.error == "" && r.pos < len(r.text) {
+        let c = r.text[r.pos]
+        if c == ' ' || c == '\t' || c == '\n' {
+            r.pos = r.pos + 1
+        } else if next_is(r, "\r\n") {
+            r.pos = r.pos + 2
+        } else if c == '#' {
+            comment(mut r)
+        } else {
+            return
+        }
+    }
+}
+
+// The document must be UTF-8: every sequence complete, as short as it can
+// be, and not a surrogate.
+fn check_utf8(r: mut Reader) {
+    let s = r.text
+    let mut i = 0
+    for i < len(s) {
+        let c = int(s[i])
+        if c < 0x80 {
+            i = i + 1
+            continue
+        }
+        let mut need = 0
+        let mut cp = 0
+        let mut least = 0
+        if c >= 0xC2 && c <= 0xDF {
+            need = 1
+            cp = c & 0x1F
+            least = 0x80
+        } else if c >= 0xE0 && c <= 0xEF {
+            need = 2
+            cp = c & 0x0F
+            least = 0x800
+        } else if c >= 0xF0 && c <= 0xF4 {
+            need = 3
+            cp = c & 0x07
+            least = 0x10000
+        } else {
+            r.pos = i
+            fail(mut r, "the document is not UTF-8")
+            return
+        }
+        if i + need >= len(s) {
+            r.pos = i
+            fail(mut r, "the document is not UTF-8")
+            return
+        }
+        for k in 1..need + 1 {
+            let x = int(s[i + k])
+            if x & 0xC0 != 0x80 {
+                r.pos = i
+                fail(mut r, "the document is not UTF-8")
+                return
+            }
+            cp = cp << 6 | x & 0x3F
+        }
+        if cp < least || cp > 0x10FFFF || cp >= 0xD800 && cp <= 0xDFFF {
+            r.pos = i
+            fail(mut r, "the document is not UTF-8")
+            return
+        }
+        i = i + need + 1
+    }
+}
+
+// ---- Keys and tables ----
+
+// A key: bare, or a quoted string, or such keys joined by dots.
+fn key_path(r: mut Reader) -> [Str] {
+    let mut keys: [Str] = []
+    for r.error == "" {
+        push(mut keys, simple_key(mut r))
+        skip_space(mut r)
+        if peek(r) != '.' {
+            break
+        }
+        r.pos = r.pos + 1
+        skip_space(mut r)
+    }
+    return keys
+}
+
+fn simple_key(r: mut Reader) -> Str {
+    let c = peek(r)
+    if c == '"' {
+        if next_is(r, "\"\"\"") {
+            fail(mut r, "a key cannot be a multi-line string")
+            return ""
+        }
+        return basic_string(mut r)
+    }
+    if c == '\'' {
+        if next_is(r, "'''") {
+            fail(mut r, "a key cannot be a multi-line string")
+            return ""
+        }
+        return literal_string(mut r)
+    }
+    let start = r.pos
+    for r.pos < len(r.text) && bare(r.text[r.pos]) {
+        r.pos = r.pos + 1
+    }
+    if r.pos == start {
+        fail(mut r, "expected a key")
+    }
+    return r.text[start..r.pos]
+}
+
+fn dotted_name(path: [Str], n: Int) -> Str {
+    let mut b = strings.builder()
+    for i in 0..n {
+        if i > 0 {
+            strings.add(mut b, ".")
+        }
+        strings.add(mut b, path[i])
+    }
+    return strings.build(b)
+}
+
+// `[a.b]` or `[[a.b]]`: the table that the keys after it go into.
+fn header(r: mut Reader, root: Int) -> Int {
+    let start = r.pos
+    r.pos = r.pos + 1
+    let array = peek(r) == '['
+    if array {
+        r.pos = r.pos + 1
+    }
+    skip_space(mut r)
+    let path = key_path(mut r)
+    if r.error != "" {
+        return root
+    }
+    if peek(r) != ']' || array && !next_is(r, "]]") {
+        if array {
+            fail(mut r, "expected ']]' after the key of an array of tables")
+        } else {
+            fail(mut r, "expected ']' after the key of a table")
+        }
+        return root
+    }
+    r.pos = r.pos + 1
+    if array {
+        r.pos = r.pos + 1
+    }
+    let name = dotted_name(path, len(path))
+    let after = r.pos
+    r.pos = start  // errors below are about the header as a whole
+    let mut t = root
+    for i in 0..len(path) - 1 {
+        let c = child(r, t, path[i])
+        if c < 0 {
+            let n = node(mut r, TABLE())
+            add(mut r, t, path[i], n)
+            t = n
+        } else if r.nodes[c].kind == ARRAY() && r.nodes[c].tables {
+            t = r.nodes[c].items[len(r.nodes[c].items) - 1]
+        } else if r.nodes[c].kind == TABLE() && !r.nodes[c].frozen {
+            t = c
+        } else {
+            fail(mut r, "cannot define [" + name + "]: " + dotted_name(path, i + 1) + " is not a table that can take more keys")
+            return root
+        }
+    }
+    let last = path[len(path) - 1]
+    let c = child(r, t, last)
+    let mut out = root
+    if array {
+        if c < 0 {
+            let list = node(mut r, ARRAY())
+            r.nodes[list].tables = true
+            add(mut r, t, last, list)
+            out = node(mut r, TABLE())
+            r.nodes[out].explicit = true
+            push(mut r.nodes[list].items, out)
+        } else if r.nodes[c].kind == ARRAY() && r.nodes[c].tables && !r.nodes[c].frozen {
+            out = node(mut r, TABLE())
+            r.nodes[out].explicit = true
+            push(mut r.nodes[c].items, out)
+        } else {
+            fail(mut r, "cannot define [[" + name + "]]: " + name + " is already defined and is not an array of tables")
+            return root
+        }
+    } else if c < 0 {
+        out = node(mut r, TABLE())
+        r.nodes[out].explicit = true
+        add(mut r, t, last, out)
+    } else if r.nodes[c].kind == TABLE() && !r.nodes[c].explicit && !r.nodes[c].dotted && !r.nodes[c].frozen {
+        r.nodes[c].explicit = true  // defined after a table inside it
+        out = c
+    } else {
+        fail(mut r, "the table [" + name + "] is defined twice")
+        return root
+    }
+    r.pos = after
+    return out
+}
+
+// `key = value`, into `table`.
+fn keyval(r: mut Reader, table: Int, depth: Int) {
+    let start = r.pos
+    let path = key_path(mut r)
+    if r.error != "" {
+        return
+    }
+    if peek(r) != '=' {
+        fail(mut r, "expected '=' after a key")
+        return
+    }
+    r.pos = r.pos + 1
+    skip_space(mut r)
+    let after = r.pos
+    r.pos = start
+    let mut t = table
+    for i in 0..len(path) - 1 {
+        let c = child(r, t, path[i])
+        if c < 0 {
+            let n = node(mut r, TABLE())
+            r.nodes[n].dotted = true
+            add(mut r, t, path[i], n)
+            t = n
+        } else if r.nodes[c].kind == TABLE() && r.nodes[c].dotted && !r.nodes[c].frozen {
+            t = c
+        } else {
+            fail(mut r, "cannot add the key " + dotted_name(path, len(path)) + ": " + dotted_name(path, i + 1) + " is already defined")
+            return
+        }
+    }
+    let last = path[len(path) - 1]
+    if child(r, t, last) >= 0 {
+        fail(mut r, "the key " + dotted_name(path, len(path)) + " is defined twice")
+        return
+    }
+    r.pos = after
+    let v = value(mut r, depth)
+    if r.error == "" {
+        add(mut r, t, last, v)
+    }
+}
+
+// ---- Values ----
+
+fn scalar(r: mut Reader, v: Value) -> Int {
+    let n = node(mut r, SCALAR())
+    push(mut r.values, v)
+    r.nodes[n].value = len(r.values) - 1
+    return n
+}
+
+fn value(r: mut Reader, depth: Int) -> Int {
+    if depth > max_depth() {
+        fail(mut r, "arrays and inline tables nested more than " + strings.from_int(max_depth()) + " deep")
+        return 0
+    }
+    let c = peek(r)
+    if c == '"' {
+        if next_is(r, "\"\"\"") {
+            return scalar(mut r, Value.Str(multiline_basic(mut r)))
+        }
+        return scalar(mut r, Value.Str(basic_string(mut r)))
+    }
+    if c == '\'' {
+        if next_is(r, "'''") {
+            return scalar(mut r, Value.Str(multiline_literal(mut r)))
+        }
+        return scalar(mut r, Value.Str(literal_string(mut r)))
+    }
+    if c == '[' {
+        return array(mut r, depth + 1)
+    }
+    if c == '{' {
+        return inline_table(mut r, depth + 1)
+    }
+    if next_is(r, "true") && !bare_after(r, 4) {
+        r.pos = r.pos + 4
+        return scalar(mut r, Value.Bool(true))
+    }
+    if next_is(r, "false") && !bare_after(r, 5) {
+        r.pos = r.pos + 5
+        return scalar(mut r, Value.Bool(false))
+    }
+    if is_digit(c) || c == '+' || c == '-' || c == 'i' || c == 'n' {
+        return scalar(mut r, number_or_datetime(mut r))
+    }
+    if r.pos >= len(r.text) || c == '\n' || c == '\r' || c == '#' {
+        fail(mut r, "expected a value")
+    } else {
+        fail(mut r, "expected a value: a string, number, boolean, datetime, array or inline table")
+    }
+    return 0
+}
+
+fn bare_after(r: Reader, n: Int) -> Bool {
+    return r.pos + n < len(r.text) && bare(r.text[r.pos + n])
+}
+
+fn array(r: mut Reader, depth: Int) -> Int {
+    r.pos = r.pos + 1
+    let n = node(mut r, ARRAY())
+    for r.error == "" {
+        skip_blank(mut r)
+        if peek(r) == ']' {
+            r.pos = r.pos + 1
+            break
+        }
+        let v = value(mut r, depth)
+        if r.error != "" {
+            break
+        }
+        push(mut r.nodes[n].items, v)
+        skip_blank(mut r)
+        if peek(r) == ',' {
+            r.pos = r.pos + 1
+        } else if peek(r) == ']' {
+            r.pos = r.pos + 1
+            break
+        } else if r.pos >= len(r.text) {
+            fail(mut r, "an array without its closing ']'")
+        } else {
+            fail(mut r, "expected ',' or ']' after an array's item")
+        }
+    }
+    freeze(mut r, n)
+    return n
+}
+
+// `{ a = 1, b.c = 2 }`, on one line, with no comma after the last pair.
+fn inline_table(r: mut Reader, depth: Int) -> Int {
+    r.pos = r.pos + 1
+    let n = node(mut r, TABLE())
+    r.nodes[n].explicit = true
+    skip_space(mut r)
+    if peek(r) == '}' {
+        r.pos = r.pos + 1
+        freeze(mut r, n)
+        return n
+    }
+    for r.error == "" {
+        keyval(mut r, n, depth)
+        if r.error != "" {
+            break
+        }
+        skip_space(mut r)
+        if peek(r) == ',' {
+            r.pos = r.pos + 1
+            skip_space(mut r)
+            if peek(r) == '}' {
+                fail(mut r, "a comma after an inline table's last pair")
+            }
+        } else if peek(r) == '}' {
+            r.pos = r.pos + 1
+            break
+        } else {
+            fail(mut r, "expected ',' or '}' after an inline table's pair (an inline table is on one line)")
+        }
+    }
+    freeze(mut r, n)
+    return n
+}
+
+// ---- Strings ----
+
+fn basic_string(r: mut Reader) -> Str {
+    r.pos = r.pos + 1
+    // Most strings have no escape: they are the document's bytes as they are.
+    let start = r.pos
+    let mut i = r.pos
+    for i < len(r.text) {
+        let c = r.text[i]
+        if c == '"' {
+            r.pos = i + 1
+            return r.text[start..i]
+        }
+        if c == '\\' || control(c) {
+            break
+        }
+        i = i + 1
+    }
+    let mut b = strings.builder()
+    let mut run = r.pos
+    for r.error == "" {
+        if r.pos >= len(r.text) {
+            fail(mut r, "a string without its closing quote")
+            break
+        }
+        let c = r.text[r.pos]
+        if c == '"' {
+            strings.add(mut b, r.text[run..r.pos])
+            r.pos = r.pos + 1
+            break
+        }
+        if c == '\\' {
+            strings.add(mut b, r.text[run..r.pos])
+            escape(mut r, mut b)
+            run = r.pos
+        } else if c == '\n' || c == '\r' {
+            fail(mut r, "a newline in a single-line string")
+        } else if control(c) {
+            fail(mut r, "a control character in a string")
+        } else {
+            r.pos = r.pos + 1
+        }
+    }
+    return strings.build(b)
+}
+
+// An escape, from its backslash, added to `b`.
+fn escape(r: mut Reader, b: mut strings.Builder) {
+    if r.pos + 1 >= len(r.text) {
+        fail(mut r, "a string without its closing quote")
+        return
+    }
+    let c = r.text[r.pos + 1]
+    let simple = match c {
+        'b' => 8
+        't' => 9
+        'n' => 10
+        'f' => 12
+        'r' => 13
+        '"' => 34
+        '\\' => 92
+        _ => -1
+    }
+    if simple >= 0 {
+        strings.add_byte(mut b, byte(simple))
+        r.pos = r.pos + 2
+        return
+    }
+    if c != 'u' && c != 'U' {
+        fail(mut r, "an escape TOML does not have: \\" + r.text[r.pos + 1..r.pos + 2])
+        return
+    }
+    let mut width = 4
+    if c == 'U' {
+        width = 8
+    }
+    let mut cp = 0
+    for k in 0..width {
+        let at = r.pos + 2 + k
+        if at >= len(r.text) || !is_hex(r.text[at]) {
+            r.pos = r.pos + 2
+            fail(mut r, "\\" + r.text[r.pos - 1..r.pos] + " needs " + strings.from_int(width) + " hexadecimal digits")
+            return
+        }
+        cp = cp * 16 + hex_value(r.text[at])
+    }
+    if cp > 0x10FFFF || cp >= 0xD800 && cp <= 0xDFFF {
+        fail(mut r, "an escape of a code point that is not a Unicode scalar value")
+        return
+    }
+    add_utf8(mut b, cp)
+    r.pos = r.pos + 2 + width
+}
+
+fn hex_value(c: Byte) -> Int {
+    if is_digit(c) {
+        return int(c) - int('0')
+    }
+    if c >= 'a' && c <= 'f' {
+        return int(c) - int('a') + 10
+    }
+    return int(c) - int('A') + 10
+}
+
+fn add_utf8(b: mut strings.Builder, cp: Int) {
+    if cp < 0x80 {
+        strings.add_byte(mut b, byte(cp))
+    } else if cp < 0x800 {
+        strings.add_byte(mut b, byte(0xC0 | cp >> 6))
+        strings.add_byte(mut b, byte(0x80 | cp & 0x3F))
+    } else if cp < 0x10000 {
+        strings.add_byte(mut b, byte(0xE0 | cp >> 12))
+        strings.add_byte(mut b, byte(0x80 | cp >> 6 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | cp & 0x3F))
+    } else {
+        strings.add_byte(mut b, byte(0xF0 | cp >> 18))
+        strings.add_byte(mut b, byte(0x80 | cp >> 12 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | cp >> 6 & 0x3F))
+        strings.add_byte(mut b, byte(0x80 | cp & 0x3F))
+    }
+}
+
+fn literal_string(r: mut Reader) -> Str {
+    r.pos = r.pos + 1
+    let start = r.pos
+    for r.error == "" {
+        if r.pos >= len(r.text) {
+            fail(mut r, "a string without its closing quote")
+            break
+        }
+        let c = r.text[r.pos]
+        if c == '\'' {
+            r.pos = r.pos + 1
+            return r.text[start..r.pos - 1]
+        }
+        if c == '\n' || c == '\r' {
+            fail(mut r, "a newline in a single-line string")
+        } else if control(c) {
+            fail(mut r, "a control character in a string")
+        } else {
+            r.pos = r.pos + 1
+        }
+    }
+    return ""
+}
+
+// After a multi-line string's opening quotes, a newline is not part of it.
+fn skip_first_newline(r: mut Reader) {
+    if peek(r) == '\n' {
+        r.pos = r.pos + 1
+    } else if next_is(r, "\r\n") {
+        r.pos = r.pos + 2
+    }
+}
+
+// The closing quotes of a multi-line string: three of `quote`, with up to
+// two more before them that belong to the string. The number in the
+// string, or -1 if these are not its end.
+fn closing(r: Reader, quote: Byte) -> Int {
+    let mut n = 0
+    for r.pos + n < len(r.text) && r.text[r.pos + n] == quote {
+        n = n + 1
+    }
+    if n < 3 {
+        return -1
+    }
+    return n - 3
+}
+
+fn multiline_basic(r: mut Reader) -> Str {
+    r.pos = r.pos + 3
+    skip_first_newline(mut r)
+    let mut b = strings.builder()
+    let mut run = r.pos
+    for r.error == "" {
+        if r.pos >= len(r.text) {
+            fail(mut r, "a multi-line string without its closing quotes")
+            break
+        }
+        let c = r.text[r.pos]
+        if c == '"' {
+            let extra = closing(r, '"')
+            if extra > 2 {
+                fail(mut r, "more than five quotes end a multi-line string")
+                break
+            }
+            if extra >= 0 {
+                strings.add(mut b, r.text[run..r.pos + extra])
+                r.pos = r.pos + extra + 3
+                break
+            }
+            r.pos = r.pos + 1
+        } else if c == '\\' {
+            strings.add(mut b, r.text[run..r.pos])
+            if line_ending_backslash(r) {
+                // The backslash, the rest of the line and the blank space
+                // after it are not part of the string.
+                r.pos = r.pos + 1
+                for r.pos < len(r.text) && (r.text[r.pos] == ' ' || r.text[r.pos] == '\t' || r.text[r.pos] == '\n' || next_is(r, "\r\n")) {
+                    if r.text[r.pos] == '\r' {
+                        r.pos = r.pos + 2
+                    } else {
+                        r.pos = r.pos + 1
+                    }
+                }
+            } else {
+                escape(mut r, mut b)
+            }
+            run = r.pos
+        } else if c == '\r' {
+            if !next_is(r, "\r\n") {
+                fail(mut r, "a carriage return not followed by a newline")
+            } else {
+                // A newline in the string is "\n", whatever ends the line.
+                strings.add(mut b, r.text[run..r.pos])
+                r.pos = r.pos + 1
+                run = r.pos
+            }
+        } else if c != '\n' && control(c) {
+            fail(mut r, "a control character in a string")
+        } else {
+            r.pos = r.pos + 1
+        }
+    }
+    return strings.build(b)
+}
+
+// Whether the backslash at the reader's position ends its line: only
+// spaces and tabs follow it before the newline.
+fn line_ending_backslash(r: Reader) -> Bool {
+    let mut i = r.pos + 1
+    for i < len(r.text) && (r.text[i] == ' ' || r.text[i] == '\t') {
+        i = i + 1
+    }
+    return i < len(r.text) && (r.text[i] == '\n' || r.text[i] == '\r' && i + 1 < len(r.text) && r.text[i + 1] == '\n')
+}
+
+fn multiline_literal(r: mut Reader) -> Str {
+    r.pos = r.pos + 3
+    skip_first_newline(mut r)
+    let mut b = strings.builder()
+    let mut run = r.pos
+    for r.error == "" {
+        if r.pos >= len(r.text) {
+            fail(mut r, "a multi-line string without its closing quotes")
+            break
+        }
+        let c = r.text[r.pos]
+        if c == '\'' {
+            let extra = closing(r, '\'')
+            if extra > 2 {
+                fail(mut r, "more than five quotes end a multi-line string")
+                break
+            }
+            if extra >= 0 {
+                strings.add(mut b, r.text[run..r.pos + extra])
+                r.pos = r.pos + extra + 3
+                break
+            }
+            r.pos = r.pos + 1
+        } else if c == '\r' {
+            if !next_is(r, "\r\n") {
+                fail(mut r, "a carriage return not followed by a newline")
+            } else {
+                strings.add(mut b, r.text[run..r.pos])
+                r.pos = r.pos + 1
+                run = r.pos
+            }
+        } else if c != '\n' && control(c) {
+            fail(mut r, "a control character in a string")
+        } else {
+            r.pos = r.pos + 1
+        }
+    }
+    return strings.build(b)
+}
+
+// ---- Numbers and datetimes ----
+
+// The characters a number or a datetime can hold; a space joins a date to
+// its time when a time follows it.
+fn token_end(r: Reader) -> Int {
+    let mut i = r.pos
+    for i < len(r.text) {
+        let c = r.text[i]
+        if bare(c) || c == '+' || c == '.' || c == ':' {
+            i = i + 1
+        } else if c == ' ' && i - r.pos == 10 && i + 3 < len(r.text) && is_digit(r.text[i + 1]) && is_digit(r.text[i + 2]) && r.text[i + 3] == ':' &&
+            r.text[r.pos + 4] == '-' {
+            i = i + 1
+        } else {
+            break
+        }
+    }
+    return i
+}
+
+fn number_or_datetime(r: mut Reader) -> Value {
+    let end = token_end(r)
+    let t = r.text[r.pos..end]
+    if len(t) >= 5 && is_digit(t[0]) && t[4] == '-' || len(t) >= 3 && is_digit(t[0]) && t[2] == ':' {
+        let d = datetime(mut r, t)
+        r.pos = end
+        return Value.Datetime(d)
+    }
+    let v = number(mut r, t)
+    if r.error == "" {
+        r.pos = end
+    }
+    return v
+}
+
+// Digits with single underscores between them: "1_000". The digits as
+// text without the underscores, or "" if they break that rule.
+fn digits(s: Str, hex: Bool) -> Str {
+    if len(s) == 0 {
+        return ""
+    }
+    let mut b = strings.builder()
+    for i in 0..len(s) {
+        let c = s[i]
+        if c == '_' {
+            if i == 0 || i == len(s) - 1 || s[i - 1] == '_' {
+                return ""
+            }
+        } else if is_digit(c) || hex && is_hex(c) {
+            strings.add_byte(mut b, c)
+        } else {
+            return ""
+        }
+    }
+    return strings.build(b)
+}
+
+fn number(r: mut Reader, t: Str) -> Value {
+    let mut sign = ""
+    let mut rest = t
+    if len(t) > 0 && (t[0] == '+' || t[0] == '-') {
+        sign = t[0..1]
+        rest = t[1..len(t)]
+    }
+    if rest == "inf" || rest == "nan" {
+        let zero = 0.0
+        let mut x = 1.0 / zero
+        if rest == "nan" {
+            x = zero / zero
+        }
+        if sign == "-" {
+            x = -x
+        }
+        return Value.Float(x)
+    }
+    if len(rest) > 2 && rest[0] == '0' && (rest[1] == 'x' || rest[1] == 'o' || rest[1] == 'b') {
+        if sign != "" {
+            fail(mut r, "a hexadecimal, octal or binary integer cannot have a sign")
+            return Value.Int(0)
+        }
+        let base = match rest[1] { 'x' => 16, 'o' => 8, _ => 2 }
+        let ds = digits(rest[2..len(rest)], base == 16)
+        if ds == "" {
+            fail(mut r, "a malformed integer")
+            return Value.Int(0)
+        }
+        let mut n = 0
+        for c in ds {
+            let d = hex_value(c)
+            if d >= base {
+                fail(mut r, "a digit too big for the integer's base")
+                return Value.Int(0)
+            }
+            if n > (9223372036854775807 - d) / base {
+                fail(mut r, "an integer too big for 64 bits")
+                return Value.Int(0)
+            }
+            n = n * base + d
+        }
+        return Value.Int(n)
+    }
+    let mut float_at = -1  // where the fraction or exponent starts
+    for i in 0..len(rest) {
+        if rest[i] == '.' || rest[i] == 'e' || rest[i] == 'E' {
+            float_at = i
+            break
+        }
+    }
+    let mut whole = rest
+    if float_at >= 0 {
+        whole = rest[0..float_at]
+    }
+    let int_digits = digits(whole, false)
+    if int_digits == "" {
+        fail(mut r, "a malformed number")
+        return Value.Int(0)
+    }
+    if len(int_digits) > 1 && int_digits[0] == '0' {
+        fail(mut r, "a number with a leading zero")
+        return Value.Int(0)
+    }
+    if float_at < 0 {
+        // Read as a negative number, so the most negative one fits.
+        let mut n = 0
+        for c in int_digits {
+            let d = int(c) - int('0')
+            if n < (-9223372036854775807 - 1 + d) / 10 {
+                fail(mut r, "an integer too big for 64 bits")
+                return Value.Int(0)
+            }
+            n = n * 10 - d
+        }
+        if sign != "-" {
+            if n == -9223372036854775807 - 1 {
+                fail(mut r, "an integer too big for 64 bits")
+                return Value.Int(0)
+            }
+            n = -n
+        }
+        return Value.Int(n)
+    }
+    let mut text = int_digits
+    let mut i = float_at
+    if rest[i] == '.' {
+        let mut j = i + 1
+        for j < len(rest) && rest[j] != 'e' && rest[j] != 'E' {
+            j = j + 1
+        }
+        let fraction = digits(rest[i + 1..j], false)
+        if fraction == "" {
+            fail(mut r, "a float needs digits after its decimal point")
+            return Value.Int(0)
+        }
+        text = text + "." + fraction
+        i = j
+    }
+    if i < len(rest) {
+        let mut j = i + 1
+        let mut exp_sign = ""
+        if j < len(rest) && (rest[j] == '+' || rest[j] == '-') {
+            exp_sign = rest[j..j + 1]
+            j = j + 1
+        }
+        let exponent = digits(rest[j..len(rest)], false)
+        if exponent == "" {
+            fail(mut r, "a float needs digits in its exponent")
+            return Value.Int(0)
+        }
+        text = text + "e" + exp_sign + exponent
+    }
+    if sign == "-" {
+        text = "-" + text
+    }
+    match strings.parse_float(text) {
+        Some(x) => return Value.Float(x)
+        None => {
+            fail(mut r, "a malformed float")
+            return Value.Int(0)
+        }
+    }
+}
+
+// The number at `t[at..at + n]`, all digits, or -1.
+fn fixed(t: Str, at: Int, n: Int) -> Int {
+    if at + n > len(t) {
+        return -1
+    }
+    let mut v = 0
+    for i in at..at + n {
+        if !is_digit(t[i]) {
+            return -1
+        }
+        v = v * 10 + int(t[i]) - int('0')
+    }
+    return v
+}
+
+fn days_in(year: Int, month: Int) -> Int {
+    if month == 2 {
+        if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+            return 29
+        }
+        return 28
+    }
+    if month == 4 || month == 6 || month == 9 || month == 11 {
+        return 30
+    }
+    return 31
+}
+
+// A datetime: 1979-05-27, 07:32:00, or both joined by T (or t, or a
+// space), with Z or an offset after the time for an offset datetime.
+fn datetime(r: mut Reader, t: Str) -> Datetime {
+    let mut d = Datetime { kind: Kind.LocalTime, year: 0, month: 0, day: 0, hour: 0, minute: 0, second: 0, nanosecond: 0, digits: 0, offset: 0 }
+    let mut i = 0
+    if len(t) >= 5 && t[4] == '-' {
+        d.kind = Kind.LocalDate
+        d.year = fixed(t, 0, 4)
+        d.month = fixed(t, 5, 2)
+        d.day = fixed(t, 8, 2)
+        if d.year < 0 || d.month < 0 || d.day < 0 || t[7] != '-' {
+            fail(mut r, "a malformed date: expected YYYY-MM-DD")
+            return d
+        }
+        if d.month < 1 || d.month > 12 || d.day < 1 || d.day > days_in(d.year, d.month) {
+            fail(mut r, "a date that does not exist")
+            return d
+        }
+        i = 10
+        if i == len(t) {
+            return d
+        }
+        if t[i] != 'T' && t[i] != 't' && t[i] != ' ' {
+            fail(mut r, "a malformed date: expected YYYY-MM-DD")
+            return d
+        }
+        d.kind = Kind.LocalDateTime
+        i = i + 1
+    }
+    d.hour = fixed(t, i, 2)
+    d.minute = fixed(t, i + 3, 2)
+    d.second = fixed(t, i + 6, 2)
+    if d.hour < 0 || d.minute < 0 || d.second < 0 || t[i + 2] != ':' || t[i + 5] != ':' {
+        fail(mut r, "a malformed time: expected HH:MM:SS")
+        return d
+    }
+    if d.hour > 23 || d.minute > 59 || d.second > 60 {
+        fail(mut r, "a time that does not exist")
+        return d
+    }
+    i = i + 8
+    if i < len(t) && t[i] == '.' {
+        i = i + 1
+        let start = i
+        for i < len(t) && is_digit(t[i]) {
+            // Nanoseconds; further digits are dropped, not rounded.
+            if i - start < 9 {
+                d.nanosecond = d.nanosecond * 10 + int(t[i]) - int('0')
+                d.digits = d.digits + 1
+            }
+            i = i + 1
+        }
+        if i == start {
+            fail(mut r, "a time with no digits after its decimal point")
+            return d
+        }
+        for k in d.digits..9 {
+            d.nanosecond = d.nanosecond * 10
+        }
+    }
+    if i < len(t) && d.kind == Kind.LocalDateTime {
+        if t[i] == 'Z' || t[i] == 'z' {
+            d.kind = Kind.OffsetDateTime
+            i = i + 1
+        } else if t[i] == '+' || t[i] == '-' {
+            let h = fixed(t, i + 1, 2)
+            let m = fixed(t, i + 4, 2)
+            if h < 0 || m < 0 || i + 3 >= len(t) || t[i + 3] != ':' {
+                fail(mut r, "a malformed offset: expected Z or +HH:MM")
+                return d
+            }
+            if h > 23 || m > 59 {
+                fail(mut r, "an offset that does not exist")
+                return d
+            }
+            d.offset = h * 60 + m
+            if t[i] == '-' {
+                d.offset = -d.offset
+            }
+            d.kind = Kind.OffsetDateTime
+            i = i + 6
+        }
+    }
+    if i != len(t) {
+        fail(mut r, "a malformed datetime")
+    }
+    return d
+}
+
+// ---- Writing ----
+
+// The table as a TOML document: its plain values first, then its tables
+// under [headers] and arrays of tables under [[headers]].
+pub fn write(v: Value) -> Str {
+    let mut b = strings.builder()
+    write_table(mut b, v, "")
+    return strings.build(b)
+}
+
+fn write_table(b: mut strings.Builder, v: Value, prefix: Str) {
+    let entries = match v {
+        Value.Table(es) => es
+        _ => []
+    }
+    for e in entries {
+        if !header_value(e.value) {
+            strings.add(mut b, key_text(e.key) + " = " + value_text(e.value) + "\n")
+        }
+    }
+    for e in entries {
+        if !header_value(e.value) {
+            continue
+        }
+        let name = prefix + key_text(e.key)
+        match e.value {
+            Value.Table(_) => {
+                strings.add(mut b, "\n[" + name + "]\n")
+                write_table(mut b, e.value, name + ".")
+            }
+            Value.Array(xs) => {
+                for x in xs {
+                    strings.add(mut b, "\n[[" + name + "]]\n")
+                    write_table(mut b, x, name + ".")
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+// Whether the value goes under a header: a table, or a non-empty array of
+// tables.
+fn header_value(v: Value) -> Bool {
+    match v {
+        Value.Table(_) => return true
+        Value.Array(xs) => {
+            if len(xs) == 0 {
+                return false
+            }
+            for x in xs {
+                match x {
+                    Value.Table(_) => {}
+                    _ => return false
+                }
+            }
+            return true
+        }
+        _ => return false
+    }
+}
+
+fn key_text(k: Str) -> Str {
+    if len(k) == 0 {
+        return "\"\""
+    }
+    for c in k {
+        if !bare(c) {
+            return quote(k)
+        }
+    }
+    return k
+}
+
+fn value_text(v: Value) -> Str {
+    match v {
+        Value.Str(s) => return quote(s)
+        Value.Int(n) => return strings.from_int(n)
+        Value.Float(x) => return strings.from_float(x)
+        Value.Bool(x) => {
+            if x {
+                return "true"
+            }
+            return "false"
+        }
+        Value.Datetime(d) => return datetime_text(d)
+        Value.Array(xs) => {
+            let mut b = strings.builder()
+            strings.add(mut b, "[")
+            for i in 0..len(xs) {
+                if i > 0 {
+                    strings.add(mut b, ", ")
+                }
+                strings.add(mut b, value_text(xs[i]))
+            }
+            strings.add(mut b, "]")
+            return strings.build(b)
+        }
+        Value.Table(entries) => {
+            let mut b = strings.builder()
+            strings.add(mut b, "{")
+            for i in 0..len(entries) {
+                if i > 0 {
+                    strings.add(mut b, ",")
+                }
+                strings.add(mut b, " " + key_text(entries[i].key) + " = " + value_text(entries[i].value))
+            }
+            if len(entries) > 0 {
+                strings.add(mut b, " ")
+            }
+            strings.add(mut b, "}")
+            return strings.build(b)
+        }
+    }
+}
+
+// A basic string: quotes, backslashes and control characters escaped.
+pub fn quote(s: Str) -> Str {
+    let mut b = strings.builder()
+    strings.add(mut b, "\"")
+    let mut run = 0
+    for i in 0..len(s) {
+        let c = s[i]
+        if c == '"' || c == '\\' || control(c) || c == '\t' {
+            strings.add(mut b, s[run..i])
+            let e = match c {
+                '"' => "\\\""
+                '\\' => "\\\\"
+                '\t' => "\\t"
+                '\n' => "\\n"
+                '\r' => "\\r"
+                _ => "\\u00" + hex_digit(int(c) >> 4) + hex_digit(int(c) & 15)
+            }
+            strings.add(mut b, e)
+            run = i + 1
+        }
+    }
+    strings.add(mut b, s[run..len(s)])
+    strings.add(mut b, "\"")
+    return strings.build(b)
+}
+
+fn hex_digit(n: Int) -> Str {
+    return "0123456789ABCDEF"[n..n + 1]
+}
+
+// ---- Tests ----
+
+fn parsed(text: Str) -> Value {
+    match parse(text) {
+        Ok(v) => return v
+        Err(e) => {
+            assert(e == "")
+            return Value.Table([])
+        }
+    }
+}
+
+fn error_of(text: Str) -> Str {
+    match parse(text) {
+        Ok(_) => return ""
+        Err(e) => return e
+    }
+}
+
+// The value at a path, as text for the assertions below: "missing" when
+// there is none.
+fn text_at(v: Value, path: Str) -> Str {
+    match lookup(v, path) {
+        Some(x) => {
+            match x {
+                Value.Str(s) => return s
+                Value.Datetime(d) => return datetime_text(d)
+                Value.Table(_) => return "table"
+                Value.Array(xs) => return "array of " + strings.from_int(len(xs))
+                _ => return value_text(x)
+            }
+        }
+        None => return "missing"
+    }
+}
+
+test "a configuration" {
+    let v = parsed("title = \"demo\"\n[server]\nhost = \"localhost\"\nport = 8080\nratio = 0.5\n" +
+        "[server.tls]\nenabled = true\n[[users]]\nname = \"a\"\n[[users]]\nname = \"b\"\n")
+    let names = keys(v)
+    assert(len(names) == 3 && names[0] == "title" && names[1] == "server" && names[2] == "users")
+    assert(text_at(v, "server.port") == "8080")
+    assert(text_at(v, "server.tls.enabled") == "true")
+    assert(text_at(v, "server.tls") == "table")
+    assert(text_at(v, "users") == "array of 2")
+    assert(text_at(v, "server.missing") == "missing")
+    match lookup(v, "server.ratio") {
+        Some(x) => {
+            match as_float(x) {
+                Some(f) => assert(f == 0.5)
+                None => assert(false)
+            }
+        }
+        None => assert(false)
+    }
+    match get(v, "users") {
+        Some(users) => assert(text_at(items(users)[1], "name") == "b")
+        None => assert(false)
+    }
+}
+
+test "datetimes" {
+    let v = parsed("a = 1979-05-27T07:32:00.123456789999-07:30\nb = 1979-05-27 07:32:00\nc = 1979-05-27\nd = 07:32:00.5\ne = 1979-05-27T07:32:00z\n")
+    assert(text_at(v, "a") == "1979-05-27T07:32:00.123456789-07:30")
+    assert(text_at(v, "b") == "1979-05-27T07:32:00")
+    assert(text_at(v, "c") == "1979-05-27")
+    assert(text_at(v, "d") == "07:32:00.5")
+    assert(text_at(v, "e") == "1979-05-27T07:32:00Z")
+}
+
+test "errors name the line and column" {
+    assert(error_of("a = 1\nb = 1_\n") == "line 2, column 5: a malformed number")
+    assert(error_of("[t]\nx = 1\n[t]\n") == "line 3, column 1: the table [t] is defined twice")
+    assert(error_of("a.b = 1\na.b = 2\n") == "line 2, column 1: the key a.b is defined twice")
+    assert(error_of("s = \"\\q\"\n") == "line 1, column 6: an escape TOML does not have: \\q")
+    assert(error_of("x = [1, 2\n") == "line 2, column 1: an array without its closing ']'")
+    assert(error_of("x = [1, 2 3]\n") == "line 1, column 11: expected ',' or ']' after an array's item")
+}
+
+test "newlines in multi-line strings are LF" {
+    let v = parsed("s = \"\"\"a\r\nb\"\"\"\r\nt = '''c\r\nd'''\r\n")
+    assert(text_at(v, "s") == "a\nb" && text_at(v, "t") == "c\nd")
+}
+
+test "nesting has a limit" {
+    let mut deep = "a = "
+    for _ in 0..200 {
+        deep = deep + "["
+    }
+    assert(error_of(deep) == "line 1, column 134: arrays and inline tables nested more than 128 deep")
+}
+
+test "written back, the same values" {
+    let v = parsed("a = \"x\\ty\\u0001\"\n\"key with space\" = [1, 2.5, true, 1979-05-27]\n" +
+        "inline = { p = { q = [] } }\n[t.u]\nv = -0.0\n[[aot]]\n[[aot]]\nw = nan\n")
+    let again = parsed(write(v))
+    assert(write(again) == write(v))
+    assert(text_at(again, "t.u.v") == "-0.0")
+    let a = text_at(again, "a")
+    assert(len(a) == 4 && a[0..3] == "x\ty" && a[3] == byte(1))
+    assert(quote("a\"b\\c\n\0") == "\"a\\\"b\\\\c\\n\\u0000\"")
+}

@@ -1,0 +1,9 @@
+// `vela fmt` on a file whose last line has no newline: it gets one, and
+// nothing else changes (TL-118).
+// command: fmt
+fn main() {
+    let mut w = 3
+    for w != 6 {
+        w = w + 1
+    }
+}
