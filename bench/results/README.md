@@ -25,6 +25,7 @@ Run tools from [bench/](../README.md) and put fresh scratch reports in `build/`.
 | [`2026-10-28-markdown-cmark-macos.md`](2026-10-28-markdown-cmark-macos.md), its JSON report, `2026-10-29-markdown-cmark-macos-after.json` and `2026-10-29-markdown-linux.json` | The markdown package against cmark 0.31.2 on the repository's Markdown and cmark's 25 feature samples, both Vela backends, before and after the follow-up; the same programs on Linux x86-64 without cmark |
 | [`2026-10-29-friction-fixes.md`](2026-10-29-friction-fixes.md) | TL-107, TL-110 and TL-111 before and after: callgrind counts, match tables, appends, memory |
 | `2026-10-29-linux-validation.json`, `2026-10-29-linux-release-parity.json`, `2026-10-29-linux-real-programs.json` | VAL-001 on Linux x86-64: fixed points, complete suites (optimized, unoptimized, ASan+UBSan, TSan), every milestone integration, emission parity and both performance gates |
+| [`2026-10-30-toml-port.md`](2026-10-30-toml-port.md) | The TOML 1.0 package: toml-test conformance, fuzzing against tomllib, throughput, memory and friction |
 | `*-validation.json` | Commands, environments, outcomes and validation limits |
 
 Reports retain their original bytes. Paths, commands, source digests and

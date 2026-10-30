@@ -5,3 +5,5 @@ tests/run/files_io/data.txt text eol=lf
 tests/run/crlf.vl -text
 # The 1.0 compatibility corpus pins exact bytes, including package manifests.
 tests/fixtures/m30/v1/** text eol=lf
+# toml-test cases are exact bytes: CRLF, bare CR and invalid UTF-8 included.
+tests/fixtures/toml-test/** -text

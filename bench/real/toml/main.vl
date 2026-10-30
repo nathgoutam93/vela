@@ -1,0 +1,103 @@
+// A TOML decoder as toml-test runs one: TOML on stdin (or in FILE), and
+// its values as toml-test's tagged JSON on stdout, each value an object of
+// its type and its text: {"type": "integer", "value": "42"}. An invalid
+// document is an error on stderr and exit status 1. With --write first,
+// the document is written back as TOML by toml.write instead; with
+// --check, only parsed (to time the parser alone).
+import files
+import json
+import os
+import strings
+import toml
+
+fn main() uses fs, os {
+    let mut args = os.args()
+    let mut writing = false
+    let mut checking = false
+    if len(args) >= 2 && (args[1] == "--write" || args[1] == "--check") {
+        writing = args[1] == "--write"
+        checking = args[1] == "--check"
+        let mut rest = [args[0]]
+        for i in 2..len(args) {
+            push(mut rest, args[i])
+        }
+        args = rest
+    }
+    let mut text = ""
+    if len(args) == 2 {
+        match files.read(args[1]) {
+            Ok(t) => text = t
+            Err(e) => {
+                os.eprint(e)
+                os.exit(2)
+            }
+        }
+    } else {
+        let mut b = strings.builder()
+        for {
+            let part = os.read(65536)
+            if part == "" {
+                break
+            }
+            strings.add(mut b, part)
+        }
+        text = strings.build(b)
+    }
+    match toml.parse(text) {
+        Ok(v) => {
+            if checking {
+                return
+            }
+            if writing {
+                os.write(toml.write(v))
+            } else {
+                os.write(json.show(tagged(v)) + "\n")
+            }
+        }
+        Err(e) => {
+            os.eprint(e)
+            os.exit(1)
+        }
+    }
+}
+
+fn tagged(v: toml.Value) -> json.Json {
+    match v {
+        toml.Value.Table(entries) => {
+            let mut members: [json.Member] = []
+            for e in entries {
+                push(mut members, json.member(e.key, tagged(e.value)))
+            }
+            return json.object(members)
+        }
+        toml.Value.Array(xs) => {
+            let mut items: [json.Json] = []
+            for x in xs {
+                push(mut items, tagged(x))
+            }
+            return json.array(items)
+        }
+        toml.Value.Str(s) => return tag("string", s)
+        toml.Value.Int(n) => return tag("integer", strings.from_int(n))
+        toml.Value.Float(x) => return tag("float", strings.from_float(x))
+        toml.Value.Bool(b) => {
+            if b {
+                return tag("bool", "true")
+            }
+            return tag("bool", "false")
+        }
+        toml.Value.Datetime(d) => {
+            let kind = match d.kind {
+                toml.Kind.OffsetDateTime => "datetime"
+                toml.Kind.LocalDateTime => "datetime-local"
+                toml.Kind.LocalDate => "date-local"
+                toml.Kind.LocalTime => "time-local"
+            }
+            return tag(kind, toml.datetime_text(d))
+        }
+    }
+}
+
+fn tag(kind: Str, text: Str) -> json.Json {
+    return json.object([json.member("type", json.string(kind)), json.member("value", json.string(text))])
+}
