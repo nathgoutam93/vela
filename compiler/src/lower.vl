@@ -22,6 +22,7 @@
 //   for each type, boxes, and the descriptors arrays and maps use.
 import cffi
 import ast
+import call_graph
 import checker
 import contract_checks
 import codegen
@@ -148,9 +149,16 @@ pub fn lower_coverage(checked: checker.Checked) -> Result[ir.Program, [errors.Co
 pub fn lower_observed(k: checker.Checked, tests: Bool, coverage: Bool, mode: Int, report: Str) -> Result[ir.Program, [errors.CompileError]] { return lower_mode(k, tests, coverage, mode, report) }
 fn lower_mode(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int, report: Str) -> Result[ir.Program, [errors.CompileError]] {
     let mut k = checker.erased(checked)
+    // A program's functions that `main` cannot reach are not written
+    // (TL-124); `vela test`, coverage and profiles keep them all.
+    let mut alive: [Bool] = []
+    let pruned = !for_tests && !coverage && mode == 0
+    if pruned {
+        alive = call_graph.live(k)
+    }
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
-        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && k.fns[id].decl.foreign == "" {
+        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) {
             push(mut roots, id)
         }
     }

@@ -133,3 +133,23 @@ s with ASCII `\s`, as it now excludes all of White_Space.
 | --- | --- |
 | TL-116 | (recurred) no `\u{...}` escape: tests write a no-break space and the Kelvin sign as themselves, which look like a space and a K |
 | TL-108 | (observed again) no constant tables: lookups are encoded in string literals, as array literals rebuild per call and compile per element |
+
+## Follow-up: only reachable functions are compiled (TL-124)
+
+The table work showed that every function of an imported module was
+compiled into a program, used or not. Both backends now write only the
+functions `main` can reach, by calls or by naming them as values, and every
+receiver method, which generated code calls for a map key's hash and eq.
+`vela test`, coverage and profile builds still compile everything.
+
+| Program (built through C / natively) | Before | After |
+| --- | ---: | ---: |
+| imports `unicode`, calls `valid`: build time | 0.41 / 0.13 s | 0.11 / 0.06 s |
+| the same: binary | 192 / 212 KB | 136 / 137 KB |
+| `bench/real/regex` binary | 385 / 464 KB | 346 / 417 KB |
+| `bench/real/toml` binary | 266 / 315 KB | 235 / 280 KB |
+| `bench/real/markdown` binary | 563 / 687 KB | 550 / 670 KB |
+| `bench/binarytrees` binary | 140 / 141 KB | 140 / 141 KB |
+
+The native compiler, built by itself, loses about 7,000 of its 1.82
+million lines of assembly.

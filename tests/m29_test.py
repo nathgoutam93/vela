@@ -22,7 +22,10 @@ def native_host():return (platform.system(),platform.machine()) in [('Darwin','a
 def cache_checks(c,w,base):
     root=w/'installed root';shutil.copytree(ROOT/'runtime',root/'runtime');shutil.copytree(ROOT/'std',root/'std')
     p=w/'program with spaces.vl'
-    original='\n'.join(f'fn f{i}(x:Int)->Int {{let n=x+1;return n+{i}}}' for i in range(256))+'\nfn main(){print(f0(1))}\n'
+    # main reaches every function (unreachable ones are not compiled, TL-124),
+    # while printing only f0's result.
+    rest='fn rest(x:Int)->Int {return '+'+'.join(f'f{i}(x)' for i in range(1,256))+'}'
+    original='\n'.join(f'fn f{i}(x:Int)->Int {{let n=x+1;return n+{i}}}' for i in range(256))+'\n'+rest+'\nfn main(){print(f0(1)+0*rest(0))}\n'
     for backend in ['c']+(['native'] if native_host() else []):
         p.write_text(original)
         env={**base,'VELA_ROOT':str(root),'VELA_CACHE':str(w/('cache-'+backend)),'VELA_INCREMENTAL':'1','VELA_BACKEND':backend,'VELA_THREADS':'4','VELA_CFLAGS':base.get('VELA_CFLAGS',STRICT)}

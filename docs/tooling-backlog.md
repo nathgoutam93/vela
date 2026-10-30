@@ -3631,9 +3631,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Verification:** a CLI snapshot running one of two tests and naming
   the one skipped.
 
-### TL-124: Every function of an imported module is compiled, used or not
+### TL-124: Every function of an imported module was compiled, used or not
 
-- **Status:** proposed.
+- **Status:** resolved.
 - **Discovery:** post-M30 TL-106, building a program that imports
   `std/unicode` and calls only `unicode.valid`.
 - **Evidence (observed):** the program's generated C has every function of
@@ -3652,6 +3652,20 @@ the same entry. Close it with a commit or validation result; keep its history.
   builds, function values included), on both backends.
 - **Verification:** the program above compiles no `f_7unicode_ranges`, and
   builds and runs as before; both bootstrap fixed points hold.
+- **Resolution:** both backends write only the functions a program can
+  reach (`call_graph.live`): those `main` reaches by calls or by naming them
+  as values (closures and indirect calls included), and every receiver
+  method, which generated code can call as a map key's hash and eq. The
+  generic copies follow from those. `vela test`, coverage and profile
+  builds keep every function, as does a program without `main`.
+  `tests/m29_test.py`'s cache fixture defined 256 functions that `main` did
+  not call; its `main` now reaches them, printing the same value.
+- **Verified:** the program above emits only `valid`'s functions and builds
+  in 0.11 s through C (0.16 s before the tables existed) to 136 KB. The
+  real programs' binaries shrink by 2% to 12% (regex 385 to 346 KB, toml
+  266 to 235 KB, through C). The native compiler itself loses about 7,000
+  lines of assembly. Both bootstrap fixed points hold, and the suites pass
+  (see `bench/results/2026-10-30-unicode-tables.md`).
 
 ### TL-125: No string interpolation
 

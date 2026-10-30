@@ -32,6 +32,33 @@ pub fn reach(g: Graph, seeds: [Int], backwards: Bool) -> [Bool] {
     let mut queue: [Int] = []; for seed in seeds { if seed >= 0 && seed < len(seen) && !seen[seed] { seen[seed] = true; push(mut queue, seed) } }
     let mut i = 0; for i < len(queue) { let at = queue[i]; i = i + 1; let mut next = g.edges[at]; if backwards { next = g.reverse[at] }; for n in next { if !seen[n] { seen[n] = true; push(mut queue, n) } } }; return seen
 }
+// The functions a program can call (TL-124): those `main` reaches by calls
+// or by naming them as values, and every receiver method (`Type.name`),
+// which generated code can call as a map key's hash and eq. All of them
+// when the program has no `main`.
+pub fn live(k: checker.Checked) -> [Bool] {
+    let mut roots: [Int] = []
+    let mut has_main = false
+    for i in 0..len(k.fns) {
+        let f = k.fns[i]
+        if f.decl.name == "main" && k.modules[f.module].name == "" {
+            push(mut roots, i)
+            has_main = true
+        }
+        for c in f.decl.name {
+            if c == '.' {
+                push(mut roots, i)
+                break
+            }
+        }
+    }
+    if !has_main {
+        let mut all: [Bool] = []
+        for _ in k.fns { push(mut all, true) }
+        return all
+    }
+    return reach(build(k), roots, false)
+}
 fn edge(g: mut Graph, owner: Int, target: Int) { if target < 0 || target >= len(g.edges) { return }; for old in g.edges[owner] { if old == target { return } }; push(mut g.edges[owner], target) }
 fn compatible(t: types.Table, a: Int, b: Int) -> Bool {
     if a == b { return true }; if a < 0 || b < 0 { return false }; if types.is_param(t, a) || types.is_param(t, b) { return true }
