@@ -1399,38 +1399,63 @@ fn thread_bools(f: ir.Func) -> ir.Func {
         }
     }
     if len(maps.keys(threads)) == 0 { return f }
-    if !ir.ends_block(f.insts[len(f.insts) - 1].op) { return f }
     let words = count / 62 + 1
     let live = live_at_labels(f, track, words)
     let mut out = f
     out.insts = []
-    let mut edges: [ir.Inst] = []
+    // Edge blocks go just before the label they lead to, where the moves
+    // they repeat would have run: later passes take code before a register's
+    // only def not to read it. So a way that needs moves is threaded only
+    // forwards, after every def its moves read.
+    let mut before: Map[Int, [ir.Inst]] = [:]
+    let mut retarget: Map[Int, [Int]] = [:]  // branch: its two labels
+    for k in maps.keys(threads) {
+        let i = f.insts[k]
+        let ways = threads[k]
+        let mut labels = [i.imm, i.imm2]
+        for way in 0..2 {
+            let t = ways[way]
+            if t.target < 0 || t.target == labels[way] { continue }
+            let kept = needed(t.moves, copies_at(f, k), live[t.target], track)
+            if len(kept) == 0 {
+                labels[way] = t.target
+            } else if label_at[t.target] > k {
+                let land = ir.label(mut out)
+                let mut code: [ir.Inst] = []
+                match maps.get(before, t.target) { Some(c) => code = c, None => {} }
+                push(mut code, ir.inst(ir.Op.Label, -1, -1, -1, land))
+                for m in kept { push(mut code, m) }
+                push(mut code, ir.inst(ir.Op.Jump, -1, -1, -1, t.target))
+                before[t.target] = code
+                labels[way] = land
+            }
+        }
+        retarget[k] = labels
+    }
     for k in 0..len(f.insts) {
         let i = f.insts[k]
         let mut o = i
-        match maps.get(threads, k) {
-            Some(ways) => {
-                for way in 0..2 {
-                    let t = ways[way]
-                    let mut from = i.imm
-                    if way == 1 { from = i.imm2 }
-                    if t.target < 0 || t.target == from { continue }
-                    let kept = needed(t.moves, copies_at(f, k), live[t.target], track)
-                    let mut land = t.target
-                    if len(kept) > 0 {
-                        land = ir.label(mut out)
-                        push(mut edges, ir.inst(ir.Op.Label, -1, -1, -1, land))
-                        for m in kept { push(mut edges, m) }
-                        push(mut edges, ir.inst(ir.Op.Jump, -1, -1, -1, t.target))
+        if i.op == ir.Op.Label {
+            match maps.get(before, i.imm) {
+                Some(code) => {
+                    // Code falling into the label goes round the edge blocks.
+                    if len(out.insts) > 0 && !ir.ends_block(out.insts[len(out.insts) - 1].op) {
+                        push(mut out.insts, ir.inst(ir.Op.Jump, -1, -1, -1, i.imm))
                     }
-                    if way == 0 { o.imm = land } else { o.imm2 = land }
+                    for e in code { push(mut out.insts, e) }
                 }
+                None => {}
+            }
+        }
+        match maps.get(retarget, k) {
+            Some(labels) => {
+                o.imm = labels[0]
+                o.imm2 = labels[1]
             }
             None => {}
         }
         push(mut out.insts, o)
     }
-    for e in edges { push(mut out.insts, e) }
     return dead_bools(drop_unreachable(out), track, words)
 }
 

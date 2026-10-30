@@ -46,7 +46,7 @@ pub fn format(src: Str) -> Result[Str, [errors.CompileError]] {
     let out = layout(pieces(lexed))
     // The safety net: the same tokens, the same comments.
     let again = lexer.tokenize(out)
-    let differs = first_difference(lexed.tokens, again.tokens)
+    let differs = first_difference(without_final_semi(lexed.tokens), without_final_semi(again.tokens))
     if len(again.errors) > 0 || differs >= 0 || !same_comments(lexed.comments, again.comments) {
         let mut at = lexed.tokens[0]
         if differs >= 0 && differs < len(lexed.tokens) {
@@ -56,6 +56,22 @@ pub fn format(src: Str) -> Result[Str, [errors.CompileError]] {
         return Err([e])
     }
     return Ok(out)
+}
+
+// The tokens without a `;` the newline rule inserted at the end: a file
+// whose last line has no newline gets none, and the formatted file, which
+// ends with one, does.
+fn without_final_semi(tokens: [lexer.Token]) -> [lexer.Token] {
+    let n = len(tokens)
+    if n >= 2 && tokens[n - 2].kind == lexer.Kind.Semi && tokens[n - 2].text != ";" && tokens[n - 1].kind == lexer.Kind.Eof {
+        let mut out: [lexer.Token] = []
+        for i in 0..n - 2 {
+            push(mut out, tokens[i])
+        }
+        push(mut out, tokens[n - 1])
+        return out
+    }
+    return tokens
 }
 
 // The index of the first token that differs, or -1.
