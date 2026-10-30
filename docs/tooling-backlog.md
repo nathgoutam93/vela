@@ -3431,9 +3431,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Verification:** both snapshots pass with and without `VELA_OPT=0`, on
   both back ends.
 
-### TL-116: String literals cannot name a character by its code point
+### TL-116: String literals could not name a character by its code point
 
-- **Status:** open (proposal).
+- **Status:** resolved: `\u{HEX}` in string literals.
 - **Discovery:** post-M30 TOML port (`packages/toml`, its tests).
 - **Evidence (observed):** a Vela string literal has the escapes `\n \t
   \r \0 \\ \"` only; `"\u{7f}"` is E1007 ("unknown escape"). A test of
@@ -3449,6 +3449,15 @@ the same entry. Close it with a commit or validation result; keep its history.
   tests: a no-break space (U+00A0) and the Kelvin sign (U+212A) are written
   as the characters themselves, which look like a space and a K in the
   source.
+- **Resolution:** `\u{HEX}` (1 to 6 hex digits, a Unicode scalar value) in
+  a string literal is that code point's UTF-8 bytes; a malformed one,
+  a surrogate or a value past U+10FFFF is E1007, and E1007's message for
+  an unknown escape now lists it. A compatible extension: `\u` was an
+  error. Byte literals keep their one-byte escapes (`\x..` stays a
+  proposal), and the editor grammars, specification and guide show it.
+- **Verification:** `tests/run/unicode_escapes.vl` (`"\u{e9}" == "é"`,
+  `"\u{7f}"` is the byte 0x7F, widths 1 to 4) and
+  `tests/fail/unicode_escape_errors.vl`, on both backends.
 
 ### TL-117: An enum is as large as its largest payload
 
@@ -3565,9 +3574,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   suites pass, also under `--sanitize`. The regex benchmark's
   `\w+ing\b` went from 1.76 s to 1.05 s (C) on that change alone.
 
-### TL-121: An unknown module function does not point at the module that has it
+### TL-121: An unknown module function did not point at the module that has it
 
-- **Status:** proposed.
+- **Status:** resolved.
 - **Discovery:** post-M30 regex port, writing `tests/run/mut_call_params.vl`.
 - **Evidence (observed):** `strings.join(parts, ",")` reports
   `module 'strings' has no function 'join' [E3049]`; `text.join` has that
@@ -3579,6 +3588,15 @@ the same entry. Close it with a commit or validation result; keep its history.
   modules that export it ("`text.join` has this name").
 - **Verification:** a CLI snapshot of the call above whose message names
   `text.join`.
+- **Resolution:** an E3049 error names the modules with a public function of
+  that name: built-in modules, the program's modules, and standard modules
+  it does not import, which are read only when there is such an error
+  (`modules.hinted`, applied to `vela check`, `check --json`, builds,
+  `vela test` and the language server). `strings.join` reports
+  "...; text.join and paths.join have that name".
+- **Verification:** `tests/fail/function_elsewhere.vl` (a standard module
+  not imported, an imported one, and a built-in one); E3049 tests of names
+  no module has are unchanged.
 
 ### TL-122: Without raw strings, a regular expression doubled its backslashes
 
@@ -3615,7 +3633,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-123: `vela test` cannot run one test of a file
 
-- **Status:** proposed.
+- **Status:** withdrawn: the feature exists; the observation was wrong.
 - **Discovery:** post-M30 regex lazy DFA, reproducing one failing case
   among `packages/regex/regex.vl`'s tests.
 - **Evidence (observed):** `vela test FILE` runs every `test` block of
@@ -3630,6 +3648,12 @@ the same entry. Close it with a commit or validation result; keep its history.
   the test's name), reporting how many tests it skipped.
 - **Verification:** a CLI snapshot running one of two tests and naming
   the one skipped.
+- **Correction:** `vela test FILE WORD...` already runs only the tests whose
+  names contain one of the words (`vela test packages/regex/regex.vl
+  errors` runs one test), as the specification ("`vela test FILE
+  [NAME_PARTS...]`") and `vela guide` say. The evidence above came from not
+  reading them; the bare `vela` usage line does not show it, which is where
+  it was looked for. No change was made.
 
 ### TL-124: Every function of an imported module was compiled, used or not
 

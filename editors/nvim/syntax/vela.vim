@@ -12,6 +12,7 @@ syn keyword velaVariant Some None Ok Err
 syn keyword velaBuiltin print len push int byte float assert
 syn match velaNumber "\<\d\+\(\.\d\+\)\=\([eE][+-]\=\d\+\)\=\>"
 syn match velaEscape contained "\\[nrt0\\\"']"
+syn match velaEscape contained "\\u{\x\{1,6}}"
 syn region velaString start=+"+ skip=+\\\\\|\\"+ end=+"+ contains=velaEscape
 syn region velaRawString start=+\<r\z(#*)"+ end=+"\z1+ oneline
 syn region velaRawString start=+\<r\z(#*)"+ end=+"\z1+ oneline

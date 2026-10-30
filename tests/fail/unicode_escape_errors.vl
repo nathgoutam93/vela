@@ -1,0 +1,13 @@
+// A \u escape is \u{HEX}: 1 to 6 hex digits naming a Unicode scalar value.
+// err: unicode_escape_errors.vl:8:12: error: a \u escape is written \u{HEX}, as in \u{e9} [E1007]
+// err: unicode_escape_errors.vl:9:12: error: a \u escape is written \u{HEX} with 1 to 6 hex digits, as in \u{e9} [E1007]
+// err: unicode_escape_errors.vl:10:12: error: a \u escape is written \u{HEX} with 1 to 6 hex digits, as in \u{e9} [E1007]
+// err: unicode_escape_errors.vl:11:12: error: \u{d800} is not a Unicode scalar value [E1007]
+// err: unicode_escape_errors.vl:12:12: error: \u{110000} is not a Unicode scalar value [E1007]
+fn main() {
+    print("\u41")
+    print("\u{}")
+    print("\u{1234567}")
+    print("\u{d800}")
+    print("\u{110000}")
+}

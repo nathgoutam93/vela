@@ -27,7 +27,7 @@
       "name": "string.quoted.double.vela",
       "begin": "\"",
       "end": "\"",
-      "patterns": [{ "name": "constant.character.escape.vela", "match": "\\\\[nrt0\\\\\"']" }]
+      "patterns": [{ "name": "constant.character.escape.vela", "match": "\\\\(u\\{[0-9a-fA-F]{1,6}\\}|[nrt0\\\\\"'])" }]
     },
     "byte": {
       "name": "string.quoted.single.vela",

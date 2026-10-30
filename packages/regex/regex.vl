@@ -2888,15 +2888,15 @@ test "Unicode classes, properties and case folding" {
     assert(spans(must(r"\w+"), "naïve café_1") == "[0,6)[7,14)")
     assert(spans(must(r"(?-u)\w+"), "naïve") == "[0,2)[4,6)")
     assert(spans(must(r"\d+"), "x٣٤5") == "[1,6)" && spans(must(r"(?-u)\d+"), "x٣٤5") == "[5,6)")
-    // A no-break space (U+00A0) is White_Space; ASCII \s leaves it out.
-    assert(spans(must(r"\s"), "a b") == "[1,3)" && spans(must(r"(?-u)\s"), "a b") == "")
+    // A no-break space is White_Space; ASCII \s leaves it out.
+    assert(spans(must(r"\s"), "a\u{a0}b") == "[1,3)" && spans(must(r"(?-u)\s"), "a\u{a0}b") == "")
     assert(spans(must(r"\bé"), "é xé") == "[0,2)" && spans(must(r"(?-u)\bx"), "éx") == "[2,3)")
     assert(spans(must(r"\pL+"), "ab12αβ") == "[0,2)[4,8)" && spans(must(r"\p{Nd}+"), "ab12αβ") == "[2,4)")
     assert(spans(must(r"\P{L}+"), "ab12αβ") == "[2,4)" && spans(must(r"\p{^Lu}+"), "AbC") == "[1,2)")
     assert(spans(must(r"\p{gc=Lowercase_Letter}+"), "AbcD") == "[1,3)" && spans(must(r"[\p{Lu}\d]+"), "aB1c") == "[1,3)")
-    // The Kelvin sign (U+212A) folds to k; ẞ (U+1E9E) to ß.
-    assert(spans(must("(?i)k+"), "kKK") == "[0,5)" && spans(must("(?-u)(?i)k+"), "kKK") == "[0,2)")
-    assert(spans(must("(?i)straße"), "STRAẞE") == "[0,8)" && spans(must("(?i)ω+"), "ΩωΩ") == "[0,6)")
+    // The Kelvin sign folds to k, and ẞ to ß.
+    assert(spans(must("(?i)k+"), "kK\u{212a}") == "[0,5)" && spans(must("(?-u)(?i)k+"), "kK\u{212a}") == "[0,2)")
+    assert(spans(must("(?i)straße"), "STRA\u{1e9e}E") == "[0,8)" && spans(must("(?i)ω+"), "ΩωΩ") == "[0,6)")
     assert(spans(must("(?i)(?-u)é"), "É") == "")
     assert(error_of(r"\p{Greek}") != "compiled" && error_of(r"(?-u)\pL") != "compiled" && error_of(r"\p{L") != "compiled")
 }
