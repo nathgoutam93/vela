@@ -174,6 +174,7 @@ pub type TypeParam = struct {
 }
 
 pub type FnDecl = struct {
+    constant: Bool  // a module const, normalized to a zero-argument initializer
     name: Str
     foreign: Str  // C symbol, or empty for a Vela function
     variadic: Bool
@@ -239,6 +240,27 @@ pub type Program = struct {
     types: [TypeDecl]
     fns: [FnDecl]
     tests: [TestDecl]
+}
+
+// Constants keep the source initializer as the sole return of their body.
+pub fn const_value(f: FnDecl) -> Expr {
+    match f.body.stmts[0].kind {
+        StmtKind.Return(value) => { match value { Some(e) => return e, None => {} } }
+        _ => {}
+    }
+    return Expr { kind: ExprKind.UnitLit, line: f.line, col: f.col, id: -1 }
+}
+
+// Flat literal arrays can be emitted as data instead of initialization code.
+pub fn literal_table(values: [Expr]) -> Bool {
+    for e in values {
+        match e.kind {
+            ExprKind.IntLit(_) => {}, ExprKind.FixedIntLit(_, _, _) => {}, ExprKind.FloatLit(_) => {},
+            ExprKind.ByteLit(_) => {}, ExprKind.BoolLit(_) => {}, ExprKind.StrLit(_) => {}, ExprKind.UnitLit => {},
+            _ => return false
+        }
+    }
+    return len(values) > 0
 }
 
 // Whether `e` has a `mut` argument in it, which may change variables.
@@ -344,7 +366,13 @@ pub fn dump(program: Program) -> Str {
         push(mut items, sx_type_decl(t))
     }
     for f in program.fns {
-        push(mut items, sx_fn(f))
+        if f.constant {
+            let mut parts = [atom("const"), atom(f.name)]
+            if f.public { parts = [atom("pub"), atom("const"), atom(f.name)] }
+            match f.result { Some(t) => push(mut parts, atom(type_text(t))), None => {} }
+            push(mut parts, sx_expr(const_value(f)))
+            push(mut items, list(parts))
+        } else { push(mut items, sx_fn(f)) }
     }
     for t in program.tests {
         push(mut items, list([atom("test"), atom(quote(t.name)), sx_block(t.body)]))

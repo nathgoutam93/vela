@@ -52,6 +52,7 @@
     "keyword": {
       "patterns": [
         { "name": "keyword.control.vela", "match": "\\b(if|else|match|for|in|return|break|continue|with)\\b" },
+        { "name": "keyword.other.vela", "match": "\\bconst\\b(?=\\s+[A-Za-z_][A-Za-z_0-9]*\\s*[:=])" },
         { "name": "keyword.other.vela", "match": "\\b(fn|let|mut|type|import|pub|test|uses|requires|ensures|struct|enum)\\b" },
         { "name": "constant.language.boolean.vela", "match": "\\b(true|false)\\b" },
         { "name": "support.function.builtin.vela", "match": "\\b(print|len|push|int|byte|float|assert)\\b(?=\\s*\\()" }

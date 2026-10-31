@@ -1,0 +1,4 @@
+pub const LIMIT = BASE + 1
+pub const NAME: Str = "answer"
+pub const ROWS = [[1, 2], [3, 4]]
+const BASE = 40

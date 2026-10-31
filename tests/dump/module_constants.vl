@@ -1,0 +1,9 @@
+// dump: ast
+// out: (pub const COUNT Int (+ 1 2))
+// out: (const NAMES (array "one" "two"))
+// out: (fn main ()
+// out:   (block
+// out:     (call print COUNT)))
+pub const COUNT: Int = 1 + 2
+const NAMES = ["one", "two"]
+fn main() { print(COUNT) }

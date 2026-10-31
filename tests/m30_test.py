@@ -89,7 +89,18 @@ def inventory(c):
     for enum in ('ExprKind', 'StmtKind', 'PatternKind', 'Else'):
         body = re.search(r'pub type '+enum+r' = enum \{(.*?)^\}', ast, re.S | re.M).group(1)
         actual.update(enum+'.'+name for name in re.findall(r'^    ([A-Za-z][A-Za-z0-9_]*)', body, re.M))
-    assert actual == set(manifest['constructs']), (actual-set(manifest['constructs']), set(manifest['constructs'])-actual)
+    # Keep the candidate corpus and its hashes frozen. Compatible additions
+    # have current executable fixtures in a separate, unfrozen inventory.
+    extensions = json.loads((ROOT/'tests/fixtures/language_extensions.json').read_text(encoding='utf-8'))
+    assert extensions['format'] == 'vela.language.extensions' and extensions['version'] == 1
+    assert not set(extensions['constructs']) & set(manifest['constructs'])
+    expected = set(manifest['constructs']) | set(extensions['constructs'])
+    assert actual == expected, (actual-expected, expected-actual)
+    for record in [*extensions['constructs'].values(), *extensions['features'].values()]:
+        assert record['section'] in anchors and (ROOT/record['program']).is_file(), record
+        c.run('check', ROOT/record['program'])
+    for word in extensions['contextual_words']:
+        assert word in spec, word
     for record in [*manifest['constructs'].values(), *manifest['features'].values()]:
         assert record['section'] in anchors and record['program'] in files, record
     lexer = (ROOT/'compiler/src/lexer.vl').read_text(encoding='utf-8')

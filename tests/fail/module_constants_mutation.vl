@@ -1,0 +1,10 @@
+// err: module_constants_mutation.vl:7:5: error: cannot assign to constant 'VALUES'; copy it into a 'let mut' first [E3232]
+// err: module_constants_mutation.vl:8:5: error: cannot assign to constant 'VALUES'; copy it into a 'let mut' first [E3232]
+// err: module_constants_mutation.vl:9:16: error: cannot change constant 'VALUES'; copy it into a 'let mut' first [E3232]
+const VALUES = [1, 2]
+fn change(xs: mut [Int]) { xs[0] = 9 }
+fn main() {
+    VALUES[0] = 3
+    VALUES = [3]
+    change(mut VALUES)
+}

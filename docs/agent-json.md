@@ -125,6 +125,10 @@ contract strings are display/source renderings, not a stable serialized AST.
 `query summary FILE` returns `query: "summary"`, string `file, module`,
 `functions: [Function]`, `types: [{name, signature, line, col}]`, and
 `imports: [string]`. Type names/signatures are strings and positions integers.
+When public module constants exist, summary also includes an optional
+`constants: [{name, signature, line, col}]` array. Constants have kind `constant`
+in navigation, completion and symbol queries; signatures include inferred types
+in checked queries. Constant references participate in impact dependencies.
 The API includes public non-test functions and main; functions additionally
 have `reachable_effects: [string]` and `unknown_target: Bool`. Reachable effects
 are conservative and include possible deferred/indirect paths. Summary is

@@ -1,0 +1,4 @@
+// err: module_constants_cycle.vl:2:7: error: constant 'A' depends on itself through its initializer [E3231]
+const A = B + 1
+const B = A + 1
+fn main() { print(A) }

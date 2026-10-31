@@ -1,0 +1,9 @@
+// err: module_constants_methods.vl:7:23: error: a constant initializer cannot call user-defined comparison methods [E3230]
+// err: module_constants_methods.vl:8:30: error: constant maps require intrinsic keys; user-defined Key methods are function calls [E3230]
+type Key = struct { n: Int }
+fn Key.eq(a: Key, b: Key) -> Bool { return a.n == b.n }
+fn Key.hash(a: Key) -> u64 { return u64(a.n) }
+const VALUE = Key { n: 1 }
+const COMPARE = VALUE == VALUE
+const TABLE: Map[Key, Int] = [VALUE: 1]
+fn main() {}

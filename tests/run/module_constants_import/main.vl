@@ -1,0 +1,10 @@
+// out: 42/answer
+// out: 1
+import values
+const NEXT = values.LIMIT + 1
+fn main() {
+    print(f"{NEXT}/{values.NAME}")
+    let mut copy = values.ROWS
+    copy[0][0] = 9
+    print(values.ROWS[0][0])
+}

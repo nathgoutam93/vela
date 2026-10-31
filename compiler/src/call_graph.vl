@@ -100,6 +100,8 @@ fn builtin(g: mut Graph, name: Str) {
 }
 fn expr(g: mut Graph, e: ast.Expr) {
     match g.k.refs[e.id] {
+        checker.Ref.Constant(id) => edge(mut g, g.owner, id)
+
         checker.Ref.Function(id) => { edge(mut g, g.owner, id); if types.is_func(g.k.table, g.k.ty[e.id]) { push(mut g.values, Candidate { ty: g.k.ty[e.id], owner: id }) } },
         checker.Ref.Method(t, name) => method(mut g, t, name), checker.Ref.Builtin(name) => builtin(mut g, name),
         checker.Ref.Indirect => { match e.kind { ast.ExprKind.Call(callee, _) => { let t = g.k.ty[callee.id]; push(mut g.indirect, Site { ty: t, owner: g.owner }); for e in types.effects_of(g.k.table, t) { effect(mut g, e) } }, _ => {} } }, _ => {}

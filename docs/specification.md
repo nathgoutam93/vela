@@ -30,7 +30,7 @@ fn let mut if else match for in return break continue type import pub test uses 
 ```
 
 `true` and `false` are Bool literals. `struct`, `enum`, `interface`, `extern`,
-`unsafe`, `requires` and `ensures` are contextual words recognized in the
+`unsafe`, `const`, `requires` and `ensures` are contextual words recognized in the
 corresponding declaration or statement positions. `Self` names an interface's
 receiver type; `result` names a postcondition's result. They do not introduce
 new runtime types. `_` is a pattern wildcard and an explicit discard binding.
@@ -70,15 +70,16 @@ same escapes as ordinary strings.
 
 ## Programs and declarations
 
-A file consists of imports followed by function, type and test declarations.
-There are no top-level value bindings or executable statements. Imports must
-precede declarations. A declaration may use names defined later in the same
-module. Duplicate declarations and cyclic module imports are errors.
+A file consists of imports followed by function, type, constant and test
+declarations. There are no mutable top-level bindings or executable statements.
+Imports must precede declarations. A declaration may use names defined later
+in the same module. Duplicate declarations and cyclic module imports are errors.
 
 ```text
 import NAME
 [pub] fn NAME[TYPE_PARAMETERS](PARAMETERS) [-> TYPE] [uses EFFECTS]
     [requires BOOL_EXPRESSION] [ensures BOOL_EXPRESSION] { STATEMENTS }
+[pub] const NAME [: TYPE] = INITIALIZER
 [pub] type NAME[TYPE_PARAMETERS] = struct { FIELDS }
 [pub] type NAME[TYPE_PARAMETERS] = enum { VARIANTS }
 [pub] type NAME = interface [: PARENTS] { METHOD_SIGNATURES }
@@ -94,10 +95,51 @@ entry `fn main()` without parameters or result. A library can be checked and
 tested without main. A function omitting `->` returns nothing, which is
 distinct from returning the explicit value `()` of type Unit.
 
-Declarations default to private. `pub fn` and `pub type` export declarations;
+Declarations default to private. `pub fn`, `pub type` and `pub const` export declarations;
 public signatures must not expose private types. Imported declarations are
 qualified as `module.name`; imports do not inject unqualified names. A
 module's own functions can shadow prelude function names in that module.
+
+### Module constants
+
+`const NAME = expression` declares an immutable module value. An optional
+annotation, `const LIMIT: Int = 64`, supplies the expected type; empty collections
+require one. `pub const` exports a value, read as `module.NAME` without
+parentheses. Names need not be uppercase. `const` is contextual at declaration
+positions and remains usable as an identifier elsewhere. Constants share the
+value namespace with functions; local bindings can shadow them.
+
+Initializers may contain scalar literals, array/map/struct literals, references
+to other constants, primitive operators, indexing, slicing and interpolation.
+Function calls, function values, closures, mutation, propagation with `?`, match
+expressions and user-defined comparison/hash methods are rejected. Map keys
+must have intrinsic Key implementations. Initializers are type-checked even
+when unused; references may point forward, but dependency cycles are errors.
+A public constant must not expose a private type.
+
+A constant initializes lazily on its first read, at most once per executable,
+including concurrent reads from tasks. Unused constants do not initialize.
+Ordinary checked arithmetic, indexing and allocation semantics apply; a failing
+initializer panics on its first read. Initialization is not general compile-time
+function evaluation. Flat literal growable arrays use static data and a single bulk array
+construction rather than one generated push per element.
+
+Constants, their fields and their elements cannot be assigned or passed with
+`mut`. Reading them copies the value logically. A `let mut` copy may be changed;
+ordinary reference counting and copy-on-write preserve the constant, including
+nested arrays/maps. Cached storage is shared safely across tasks and released
+on normal executable exit.
+
+```vela
+const NAMES = ["one", "two"]
+const LIMIT: Int = 32 * 2
+fn main() {
+    let mut names = NAMES
+    names[0] = "changed"
+    assert(NAMES[0] == "one")
+    assert(names[0] == "changed" && LIMIT == 64)
+}
+```
 
 ## Types and values
 

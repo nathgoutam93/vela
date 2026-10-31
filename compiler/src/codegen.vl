@@ -183,6 +183,11 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int,
             add_new(mut elements, t)
         }
     }
+    // Once cells retain/share complete values, even when a type never
+    // appears as an ordinary array element or map key/value.
+    for id in roots {
+        if k.fns[id].decl.constant { add_new(mut elements, k.fns[id].result) }
+    }
     let mut user_types: [Int] = []
     for t in k.decls {
         if !types.is_generic(k.table, t) && !types.is_interface(k.table, t) {
@@ -329,6 +334,9 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int,
             strings.add_byte(mut b, '\n')
         }
         strings.add(mut b, out[i])
+        if out[i] == "    vela_init(argc, argv);" && has_constants(k) {
+            strings.add(mut b, "\n    vela_constants_init(" + strings.from_int(len(k.fns)) + ");")
+        }
         if mode > 0 && out[i] == "    vela_init(argc, argv);" { strings.add(mut b, "\n    vela_observe_init(" + strings.from_int(mode) + ", " + c_string(report) + ");") }
     }
     return Ok(strings.build(b))
@@ -767,11 +775,25 @@ fn release_until(g: mut Gen, stop: Str) {
 
 // ---- Functions and statements ----
 
+pub fn has_constants(k: checker.Checked) -> Bool {
+    for f in k.fns { if f.decl.constant { return true } }
+    return false
+}
+
 fn function(g: mut Gen, id: Int, cname: Str) -> [Str] {
     let f = g.k.fns[id]
     observe_scope(mut g, display_name(g.k, id), f.decl.line, f.decl.col)
     if g.coverage { emit(mut g, "vela_coverage_hit(" + strings.from_int(id) + ");") }
     push_frame(mut g, "function")
+    if f.decl.constant {
+        let ct = c_type(g, f.result)
+        emit(mut g, ct + " *vc_cached = vela_constant_begin(" + strings.from_int(id) + ", sizeof(" + ct + "));")
+        emit(mut g, "if (vc_cached) {")
+        emit(mut g, "    " + ct + " vc_value = *vc_cached;")
+        emit(mut g, "    " + retain(mut g, f.result, "vc_value"))
+        emit(mut g, "    return vc_value;")
+        emit(mut g, "}")
+    }
     let mut names: [Str] = []
     for i in 0..len(f.decl.params) {
         // Parameters are borrowed (M11b): the caller keeps its references,
@@ -962,6 +984,9 @@ fn stmt_body(g: mut Gen, s: ast.Stmt) {
                     let c = consume(mut g, expr(mut g, e))
                     let result = new_temp(mut g)
                     emit(mut g, c_type(g, ty(g, e)) + " " + result + " = " + c + ";")
+                    if g.k.fns[g.current_fn].decl.constant && g.closure_result == -2 {
+                        emit(mut g, "vela_constant_end(" + strings.from_int(g.current_fn) + ", " + layout.descriptor(g.l, ty(g, e)) + ", &" + result + ");")
+                    }
                     ensures_code(mut g, result)
                     release_until(mut g, "")
                     emit(mut g, "return " + result + ";")
@@ -2014,6 +2039,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
         ast.ExprKind.UnitLit => return value("0", t)
         ast.ExprKind.Name(_) => {
             match g.k.refs[e.id] {
+                checker.Ref.Constant(id) => return store(mut g, t, fn_name(g.k, id) + "()")
                 checker.Ref.Local(id) => return value(local(mut g, id), t)
                 checker.Ref.Variant(enum, vi) => return enum_value(mut g, sub(g, enum), vi, [])  // `None`
                 checker.Ref.Function(id) => return function_value(mut g, id, e)  // a function as a value
@@ -2052,6 +2078,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
         }
         ast.ExprKind.Field(obj, name) => {
             match g.k.refs[e.id] {
+                checker.Ref.Constant(id) => return store(mut g, t, fn_name(g.k, id) + "()")
                 checker.Ref.Variant(enum, vi) => return enum_value(mut g, sub(g, enum), vi, [])
                 checker.Ref.Function(id) => return function_value(mut g, id, e)  // `module.f` as a value
                 _ => {}
@@ -2091,6 +2118,17 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
                 return store(mut g, t, "(" + c_type(g, t) + "){" + fields + "}")
             }
             let elem_t = types.get(g.k.table, t).args[0]
+            if g.k.fns[g.current_fn].decl.constant && ast.literal_table(elems) {
+                let table = new_temp(mut g)
+                let mut data = strings.builder()
+                for i in 0..len(elems) {
+                    if i > 0 { strings.add(mut data, ", ") }
+                    let v = expr(mut g, elems[i])
+                    if v.ty == types.STR() { strings.add(mut data, "VELA_STR_INIT(" + v.c[9..len(v.c)]) } else { strings.add(mut data, v.c) }
+                }
+                push(mut g.extra, "static const " + c_type(g, elem_t) + " " + g.literal_prefix + "_table" + table + "[] = {" + strings.build(data) + "};")
+                return store(mut g, t, "vela_array_from(" + layout.descriptor(g.l, elem_t) + ", " + g.literal_prefix + "_table" + table + ", " + strings.from_int(len(elems)) + ")")
+            }
             let array = store(mut g, t, "vela_array_new(" + layout.descriptor(g.l, elem_t) + ", " +
                 strings.from_int(len(elems)) + ")")
             let elem = c_type(g, elem_t)

@@ -3175,7 +3175,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-108: Tables cannot be module-level constants
 
-- **Status:** open (proposal for after 1.0).
+- **Status:** implemented; local acceptance passes.
 - **Discovery:** post-M30 CommonMark port.
 - **Evidence:** the HTML block names were an array literal built by
   `block_names()` on every line starting with `<`; a per-byte table of
@@ -3186,13 +3186,49 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Workaround:** `blocks.Parser.block_names`, built once per parse; the
   text loop tests character ranges before calling `special`.
 - **Proposed improvement:** immutable module-level `const` values (Str,
-  arrays, maps) initialized once. A language change: recorded, not
-  authorized.
+  arrays, maps) initialized once. Authorized by the user's explicit TL-108
+  implementation request after M30.
 - **Recurred:** post-M30 TL-106, `std/unicode`'s tables. An array literal
   of constants compiles to one push statement per element, and is built
   on every call: `ranges` with 16,000 Ints was 1.4 MB of C. The tables went
   into string literals (static data) with a decoder, which a `const` would
   have made unnecessary.
+
+- **Resolution:** contextual `const NAME[: Type] = initializer` and `pub const`
+  declare immutable module values without reserving `const` as an identifier.
+  Literal-based initializers support constant references and primitive operators;
+  forward references work and cycles are diagnosed. Calls, closures, mutation
+  and user-defined comparison/hash methods are rejected. Values initialize once
+  on first read with acquire/release publication, including concurrent tasks;
+  mutable copies preserve the cached value through normal copy-on-write.
+  Flat literal growable arrays emit static tables and one bulk construction.
+  Navigation, rename, completion, symbols and API summaries include constants.
+- **Implementation friction (observed and corrected):** native cache publication
+  initially passed a scalar instead of its address, crashing a scalar constant
+  read; C aggregate constants needed descriptors even when their types were
+  never collection elements. Both paths are corrected and exercised by
+  `tests/run/module_constants.vl`, including struct and fixed-array copies.
+  Compatibility acceptance also exposed TL-125's stale M30 construct inventory;
+  current additions now have a separate inventory, preserving frozen sources
+  and digests. See the follow-up under TL-125.
+- **Validation:** C and native fixed points pass (173,360 C lines and
+  2,256,925 assembly lines), with the refreshed seed. Broad golden checks,
+  compiler self-tests and formatting pass on C/native. M30 acceptance passes
+  the frozen corpus, specification/guide examples, diagnostics, queries,
+  evidence and properties. The guide is 31,998 bytes, within its estimate gate.
+  `tests/module_constants_test.py` passes with both the C-built and native-built
+  compilers, at four backend/optimization configurations. It covers cold
+  concurrent initialization/storage identity, copies, imports, visibility and
+  semantic tools. The 16,000-Int table emits 103,876 C bytes and no per-element
+  push statements. Focused scalar, array, map, struct, fixed-array and empty
+  enum/unit regressions pass at both settings, also with UBSan; the complete
+  constant integration passes UBSan too.
+  `python3 tests/differential_test.py build/vela-tl108-acceptance --count 500`
+  passes all 1,000 programs (500 scalar-oracle and 500 whole-program seeds)
+  across C/native with optimization on and off.
+- **Host limitations:** no ASan pass is claimed on this Mac (VAL-001's empty
+  probe hangs). An empty TSan executable built with `cc -x c -fsanitize=thread`
+  exits with SIGSEGV, so no TSan pass is claimed either.
 
 ### TL-109: Growable arrays have no pop in the safe language
 
@@ -3772,6 +3808,15 @@ the same entry. Close it with a commit or validation result; keep its history.
   The local ASan limitation from VAL-001 recurs: an empty C program built
   with `cc -x c -fsanitize=address,undefined` times out after 10 seconds.
   Use UBSan here; do not infer an ASan pass.
+- **Conformance recurrence during TL-108 (observed):**
+  `python3 tests/m30_test.py build/vela-tl108-acceptance` stopped in `inventory`
+  with `({'ExprKind.Interpolate'}, set())`: the interpolation AST addition was
+  absent from M30's frozen inventory. This predates constants. Workaround:
+  execute current golden regressions independently, without claiming M30
+  acceptance. Resolution: keep frozen source digests intact and validate
+  compatible additions through `tests/fixtures/language_extensions.json`.
+  M30 acceptance now passes both the frozen baseline and current extensions,
+  including its document, diagnostic, query, evidence and property checks.
 
 ## Outstanding validation
 

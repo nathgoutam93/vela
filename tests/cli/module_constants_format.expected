@@ -1,0 +1,4 @@
+// command: fmt
+pub const NAMES: [Str] = ["one", "two"]
+const ANSWER = 40 + 2
+fn main() { print(ANSWER) }

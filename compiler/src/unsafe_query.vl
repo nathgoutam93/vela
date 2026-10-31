@@ -144,6 +144,8 @@ fn method(g: mut Graph, receiver: Int, name: Str) {
 }
 fn expr(g: mut Graph, e: ast.Expr) {
     match g.k.refs[e.id] {
+        checker.Ref.Constant(id) => push(mut g.edges[g.owner], id)
+
         checker.Ref.Function(id) => {
             push(mut g.edges[g.owner], id)
             if e.id < len(g.k.ty) && types.is_func(g.k.table, g.k.ty[e.id]) { push(mut g.values, Candidate { ty: g.k.ty[e.id], owner: id }) }

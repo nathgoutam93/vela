@@ -371,6 +371,78 @@ bool vela_str_eq_ptr(const vela_str *a, const vela_str *b) {
 int vela_str_cmp_ptr(const vela_str *a, const vela_str *b) {
     VELA_PROFILE_SCOPE("strings"); return vela_str_cmp(*a, *b); }
 
+// ---- Module constants ----
+// Publication is acquire/release. The fast path never takes a lock; initialized
+// values are immutable and hold shared references, so callers can retain them
+// from any task. A mutable copy follows the normal copy-on-write path.
+typedef struct {
+    int state;  // 0 not started, 1 initializing, 2 published
+    void *value;
+    const vela_type *type;
+    const void *owner;
+} vela_constant;
+static _Thread_local int constant_thread;
+static vela_constant *constant_values;
+static int64_t constant_count;
+static pthread_mutex_t constant_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t constant_ready = PTHREAD_COND_INITIALIZER;
+
+static void constants_free(void) {
+    for (int64_t i = constant_count; i > 0; i--) {
+        vela_constant *c = &constant_values[i - 1];
+        if (c->state == 2) {
+            if (c->type->release) c->type->release(c->value);
+            free(c->value);
+        }
+    }
+    free(constant_values);
+    constant_values = NULL;
+    constant_count = 0;
+}
+
+void vela_constants_init(int64_t count) {
+    // Called before any user functions or tasks, also by a test executable.
+    if (count < 0 || constant_values) vela_panic("<constants>", "invalid constant registry initialization");
+    constant_values = vela_alloc(checked_bytes((uint64_t)count, sizeof(vela_constant), 0));
+    memset(constant_values, 0, (size_t)count * sizeof(vela_constant));
+    constant_count = count;
+    atexit(constants_free);
+}
+
+void *vela_constant_begin(int64_t id, int64_t size) {
+    if (id < 0 || id >= constant_count || size <= 0) vela_panic("<constants>", "invalid constant initializer");
+    vela_constant *c = &constant_values[id];
+    if (__atomic_load_n(&c->state, __ATOMIC_ACQUIRE) == 2) return c->value;
+    pthread_mutex_lock(&constant_lock);
+    while (__atomic_load_n(&c->state, __ATOMIC_ACQUIRE) == 1) {
+        if (c->owner == &constant_thread) vela_panic("<constants>", "cyclic constant initialization");
+        pthread_cond_wait(&constant_ready, &constant_lock);
+    }
+    if (__atomic_load_n(&c->state, __ATOMIC_ACQUIRE) == 2) {
+        void *value = c->value;
+        pthread_mutex_unlock(&constant_lock);
+        return value;
+    }
+    c->value = vela_alloc((size_t)size);
+    c->owner = &constant_thread;
+    __atomic_store_n(&c->state, 1, __ATOMIC_RELAXED);
+    pthread_mutex_unlock(&constant_lock);
+    return NULL;
+}
+
+void vela_constant_end(int64_t id, const vela_type *type, const void *value) {
+    vela_constant *c = &constant_values[id];
+    memcpy(c->value, value, type->size);
+    if (type->retain) type->retain(c->value);
+    if (type->share) type->share(c->value);
+    c->type = type;
+    pthread_mutex_lock(&constant_lock);
+    c->owner = NULL;
+    __atomic_store_n(&c->state, 2, __ATOMIC_RELEASE);
+    pthread_cond_broadcast(&constant_ready);
+    pthread_mutex_unlock(&constant_lock);
+}
+
 // ---- Arrays ----
 
 // An array starts as one allocation (M18): its elements right after it,
@@ -393,6 +465,15 @@ vela_array *vela_array_new(const vela_type *elem, int64_t cap) {
     a->cap = cap;
     a->elem = elem;
     a->data = inline_data(a);
+    return a;
+}
+
+// A literal table is data, not one generated push statement per element.
+vela_array *vela_array_from(const vela_type *elem, const void *data, int64_t count) {
+    vela_array *a = vela_array_new(elem, count);
+    if (count) memcpy(a->data, data, elem->size * (size_t)count);
+    a->len = count;
+    if (elem->retain) for (int64_t i = 0; i < count; i++) elem->retain(a->data + elem->size * (size_t)i);
     return a;
 }
 
