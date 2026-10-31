@@ -3734,6 +3734,44 @@ the same entry. Close it with a commit or validation result; keep its history.
   `tests/fail/interpolation_unclosed.vl` pass through C; the run fixture also
   passes natively. The formatter preserves the fixture and the compiler C
   bootstrap reaches a fixed point with the refreshed seed.
+- **Review follow-up (post-M30, observed):** successful numeric assertions
+  released failure-only conversions on the native success path; owned Str
+  holes were released twice through C; borrowed strings changed or became
+  invalid when a later hole mutated their source. Calls and mutations in holes
+  were absent from range inference/invalidation, loop-sharing, reachability,
+  monomorphization, mutation detection and semantic indexing. Nested quoted
+  expressions and brace-valued byte literals were rejected, and recovered
+  inner-parser diagnostics were discarded. Reproduce with the
+  `tests/run/interpolation_*.vl`, `tests/fail/interpolation_recovered.vl` and
+  `tests/cli/interpolation_*.vl` regressions. These caused crashes,
+  miscompilation, missing symbols, rejected valid expressions and broken
+  navigation/rename. Workaround: explicit conversions and ordinary calls.
+- **Additional traversal audit (observed):** a `mut Int` passed only inside a
+  hole crashed native execution (exit 139):
+  `fn bump(n: mut Int) -> Int { n = n + 1; return n }` with
+  `let mut n = 1; print(f"{bump(mut n)}"); print(n)` in main. Native
+  address-taking collection skipped the hole. Unsafe reachability queries
+  also omitted main when its only call to an unsafe wrapper was in a hole,
+  and stale-copy diagnostics missed nested mutations there. Explicit calls
+  outside interpolation avoid these gaps.
+- **Follow-up resolution:** isolate assertion failure temporaries, release
+  and unregister interpolation temporaries together, reuse string-join
+  snapshot rules, and traverse holes in the affected analyses (including
+  native address-taking, unsafe queries and stale-copy diagnostics). The
+  lexer and parser share boundary scanning that recognizes normal/raw strings,
+  nested interpolations and escaped byte literals; inner diagnostics propagate.
+  Validation: both bootstrap fixed points pass (171,382 C lines and
+  2,224,174 native assembly lines); the targeted C/native regressions pass at
+  both optimization settings, also with UBSan, and all 173 repository sources
+  pass formatting. All 320 C and 321 native golden tests (the native run also
+  includes the added formatter fixture), compiler self-tests on both backends,
+  and the stack-overflow integration (C/native, optimization on/off, including
+  deep compiler sources) pass. `python3 tests/differential_test.py --count 500`
+  passes all 1,000 programs (500 scalar-oracle and 500 whole-program seeds)
+  through C/native at both optimization settings.
+  The local ASan limitation from VAL-001 recurs: an empty C program built
+  with `cc -x c -fsanitize=address,undefined` times out after 10 seconds.
+  Use UBSan here; do not infer an ASan pass.
 
 ## Outstanding validation
 

@@ -1186,28 +1186,15 @@ fn interpolated(p: mut Parser, tok: lexer.Token) -> Result[ast.Expr, errors.Comp
         let open = at
         at = at + 1
         let start = at
-        let mut depth = 0
-        for at < len(tok.value) {
-            let x = tok.value[at]
-            if x == '"' {
-                at = skip_quoted(tok.value, at)
-            } else if x == '{' {
-                depth = depth + 1; at = at + 1
-            } else if x == '}' && depth > 0 {
-                depth = depth - 1; at = at + 1
-            } else if x == '}' {
-                break
-            } else {
-                at = at + 1
-            }
-        }
-        if at >= len(tok.value) { return Err(errors.at(tok.line, tok.col + 2 + open, "E2024", "interpolated string expression is missing '}'")) }
+        at = lexer.interpolation_hole_end(tok.value, start)
+        if at >= len(tok.value) || tok.value[at] != '}' { return Err(errors.at(tok.line, tok.col + 2 + open, "E2024", "interpolated string expression is missing '}'")) }
         let source = tok.value[start..at]
         let mut lexed = lexer.tokenize(source)
         if len(lexed.errors) > 0 { return Err(errors.at(tok.line, tok.col + 2 + start + lexed.errors[0].col - 1, lexed.errors[0].code, lexed.errors[0].message)) }
         for i in 0..len(lexed.tokens) { lexed.tokens[i].line = tok.line; lexed.tokens[i].col = lexed.tokens[i].col + tok.col + 2 + start - 1 }
         let mut inner = Parser { tokens: lexed.tokens, i: 0, errors: [], open_parens: 0, open_braces: 0, no_struct: false, next_id: p.next_id }
         let value = expression(mut inner, 0)?
+        for diagnostic in inner.errors { push(mut p.errors, diagnostic) }
         if peek(inner, 0).kind == lexer.Kind.Semi { advance(mut inner) }
         if peek(inner, 0).kind != lexer.Kind.Eof { return Err(error(peek(inner, 0), "E2025", "expected '}' after interpolated expression")) }
         p.next_id = inner.next_id
@@ -1223,20 +1210,6 @@ fn decoded_part(source: Str, tok: lexer.Token) -> Result[Str, errors.CompileErro
     let lexed = lexer.tokenize("\"" + source + "\"")
     if len(lexed.errors) > 0 { return Err(errors.at(tok.line, tok.col, lexed.errors[0].code, lexed.errors[0].message)) }
     return Ok(lexed.tokens[0].value)
-}
-
-fn skip_quoted(source: Str, start: Int) -> Int {
-    let mut i = start + 1
-    for i < len(source) {
-        if source[i] == '\\' {
-            i = i + 2
-        } else if source[i] == '"' {
-            return i + 1
-        } else {
-            i = i + 1
-        }
-    }
-    return i
 }
 
 // `fn(x: Int, y) -> Int { ... }` or `fn(x) => x + 1`, after the `fn`.

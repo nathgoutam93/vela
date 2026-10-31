@@ -252,12 +252,25 @@ pub fn has_mut(e: Expr) -> Bool {
         ExprKind.Index(a, b) => has_mut(a) || has_mut(b)
         ExprKind.Try(x) => has_mut(x)
         ExprKind.Slice(a, b, c) => has_mut(a) || has_mut(b) || has_mut(c)
+        ExprKind.Interpolate(parts) => any_mut(interpolation_holes(parts))
         ExprKind.ArrayLit(xs) => any_mut(xs)
         ExprKind.MapLit(entries) => entries_mut(entries)
         ExprKind.StructLit(_, _, fields) => fields_mut(fields)
         ExprKind.Match(x, arms) => has_mut(x) || arms_mut(arms)
         _ => false  // a closure's body does not run here
     }
+}
+
+// Hole expressions in evaluation order, shared by semantic traversals and joins.
+pub fn interpolation_holes(parts: [InterpolationPart]) -> [Expr] {
+    let mut holes: [Expr] = []
+    for part in parts {
+        match part {
+            InterpolationPart.Hole(e) => push(mut holes, e)
+            InterpolationPart.Text(_) => {}
+        }
+    }
+    return holes
 }
 
 fn any_mut(es: [Expr]) -> Bool {

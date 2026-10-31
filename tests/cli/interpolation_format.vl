@@ -1,0 +1,2 @@
+// command: fmt
+fn main(){print(f"{len("abc")}/{f"{'}'}"}")}

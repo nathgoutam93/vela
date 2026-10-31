@@ -1,0 +1,8 @@
+// command: check
+// err: interpolation_stale_copy.vl:7:10: warning: argument 1 is a copy of 'n' made before argument 2 changes 'n' through `mut`, so it has the old value; make the change in a statement before this call [E3139]
+fn change(n: mut Int) -> Int { n = n + 1; return n }
+fn show(n: Int, message: Str) { print(message) }
+fn main() {
+    let mut n = 1
+    show(n, f"{change(mut n)}")
+}

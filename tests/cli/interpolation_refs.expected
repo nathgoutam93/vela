@@ -1,0 +1,21 @@
+{
+  "name": "count",
+  "kind": "local",
+  "def": {
+    "file": "interpolation_refs.vl",
+    "line": 3,
+    "col": 9
+  },
+  "refs": [
+    {
+      "file": "interpolation_refs.vl",
+      "line": 3,
+      "col": 9
+    },
+    {
+      "file": "interpolation_refs.vl",
+      "line": 4,
+      "col": 14
+    }
+  ]
+}

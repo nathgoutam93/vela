@@ -284,6 +284,9 @@ fn expr(w: mut Walk, e: ast.Expr) {
         ast.ExprKind.Try(x) => expr(mut w, x)
         ast.ExprKind.MutArg(x) => expr(mut w, x)
         ast.ExprKind.Slice(obj, lo, hi) => exprs(mut w, [obj, lo, hi])
+        ast.ExprKind.Interpolate(parts) => {
+            for hole in ast.interpolation_holes(parts) { expr(mut w, hole) }
+        }
         ast.ExprKind.ArrayLit(xs) => exprs(mut w, xs)
         ast.ExprKind.MapLit(entries) => {
             for en in entries {

@@ -1,0 +1,27 @@
+{
+  "conservative": true,
+  "functions": [
+    {
+      "name": "hidden",
+      "module": "",
+      "file": "interpolation_unsafe.vl",
+      "line": 3,
+      "col": 4,
+      "extern": false,
+      "declared_unsafe": false,
+      "direct": true,
+      "unknown_target": false
+    },
+    {
+      "name": "main",
+      "module": "",
+      "file": "interpolation_unsafe.vl",
+      "line": 7,
+      "col": 4,
+      "extern": false,
+      "declared_unsafe": false,
+      "direct": false,
+      "unknown_target": false
+    }
+  ]
+}

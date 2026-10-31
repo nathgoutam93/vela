@@ -1,0 +1,22 @@
+{
+  "name": "count",
+  "new_name": "total",
+  "kind": "local",
+  "edits": [
+    {
+      "file": "interpolation_rename.vl",
+      "line": 3,
+      "col": 9,
+      "len": 5
+    },
+    {
+      "file": "interpolation_rename.vl",
+      "line": 4,
+      "col": 14,
+      "len": 5
+    }
+  ],
+  "files": [
+    "interpolation_rename.vl"
+  ]
+}

@@ -100,6 +100,9 @@ fn uses_expr(u: mut Uses, e: ast.Expr, in_closure: Bool) {
             uses_expr(mut u, a, in_closure)
             uses_expr(mut u, b, in_closure)
         }
+        ast.ExprKind.Interpolate(parts) => {
+            for hole in ast.interpolation_holes(parts) { uses_expr(mut u, hole, in_closure) }
+        }
         ast.ExprKind.ArrayLit(xs) => {
             for x in xs {
                 uses_expr(mut u, x, in_closure)

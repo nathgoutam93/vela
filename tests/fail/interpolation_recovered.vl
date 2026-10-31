@@ -1,0 +1,2 @@
+// err: interpolation_recovered.vl:2:41: error: expected a name after 'let', found '=' [E2002]
+fn main() { print(f"{(fn() -> Int { let = 1; return 7 })()}") }

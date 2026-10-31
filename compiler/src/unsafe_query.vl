@@ -173,6 +173,9 @@ fn expr(g: mut Graph, e: ast.Expr) {
         ast.ExprKind.Slice(a, b, c) => { expr(mut g, a); expr(mut g, b); expr(mut g, c) }
         ast.ExprKind.Try(e) => expr(mut g, e)
         ast.ExprKind.MutArg(e) => expr(mut g, e)
+        ast.ExprKind.Interpolate(parts) => {
+            for hole in ast.interpolation_holes(parts) { expr(mut g, hole) }
+        }
         ast.ExprKind.ArrayLit(es) => { for e in es { expr(mut g, e) } }
         ast.ExprKind.MapLit(es) => { for e in es { expr(mut g, e.key); expr(mut g, e.value) } }
         ast.ExprKind.StructLit(_, _, fields) => { for field in fields { expr(mut g, field.value) } }

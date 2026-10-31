@@ -3261,6 +3261,7 @@ fn accesses(c: Checker, e: ast.Expr, reads: mut [Path], changes: mut [Path]) {
         ast.ExprKind.Index(obj, _) => parts = [obj]
         ast.ExprKind.Try(x) => parts = [x]
         ast.ExprKind.Slice(obj, lo, hi) => parts = [obj, lo, hi]
+        ast.ExprKind.Interpolate(segments) => parts = ast.interpolation_holes(segments)
         ast.ExprKind.ArrayLit(xs) => parts = xs
         ast.ExprKind.MapLit(entries) => {
             for en in entries {

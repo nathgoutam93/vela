@@ -1489,6 +1489,9 @@ fn taken_in_expr(g: Low, e: ast.Expr, out: mut Map[Int, Bool]) {
             taken_in_expr(g, b, mut out)
             taken_in_expr(g, c, mut out)
         }
+        ast.ExprKind.Interpolate(parts) => {
+            for hole in ast.interpolation_holes(parts) { taken_in_expr(g, hole, mut out) }
+        }
         ast.ExprKind.ArrayLit(xs) => {
             for x in xs {
                 taken_in_expr(g, x, mut out)
@@ -2591,6 +2594,8 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
 }
 
 fn interpolate(g: mut Low, parts: [ast.InterpolationPart]) -> Val {
+    let snapshot = codegen.join_snapshots(g.k, ast.interpolation_holes(parts))
+    let mut hole_index = 0
     let mut vals: [Val] = []
     for part in parts {
         match part {
@@ -2602,7 +2607,12 @@ fn interpolate(g: mut Low, parts: [ast.InterpolationPart]) -> Val {
             ast.InterpolationPart.Hole(hole) => {
                 let value = expr(mut g, hole)
                 let mut shown_value = value
-                if value.ty != types.STR() { shown_value = shown(mut g, value.ty, value) }
+                if value.ty != types.STR() {
+                    shown_value = shown(mut g, value.ty, value)
+                } else if snapshot[hole_index] && !value.owned && !value.is_static {
+                    shown_value = own(mut g, consume(mut g, value))
+                }
+                hole_index = hole_index + 1
                 push(mut vals, shown_value)
             }
         }
@@ -3429,10 +3439,13 @@ fn assert_code(g: mut Low, e: ast.Expr, cond: ast.Expr, kind: Str) {
                 if t == types.STR() {
                     quote = 1
                 }
+                // These conversions exist only on the nonreturning failure path.
+                push_frame(mut g, "branch")
                 let a = shown(mut g, t, left)
                 let b = shown(mut g, t, right)
                 noreturn(mut g, "vela_assert_failed_values", [loc_of(mut g, e), what, text, address(mut g, a), address(mut g, b), konst(mut g, quote)],
                     [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_STR(), ir.KIND_STR(), ir.KIND_INT()])
+                g.fs.frames = g.fs.frames[0..len(g.fs.frames) - 1]
                 place_label(mut g, good)
                 return
             }

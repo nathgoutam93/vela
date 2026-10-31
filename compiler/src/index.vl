@@ -1058,6 +1058,9 @@ fn expr(b: mut Builder, e: ast.Expr) {
         ast.ExprKind.Try(x) => expr(mut b, x)
         ast.ExprKind.MutArg(x) => expr(mut b, x)
         ast.ExprKind.Slice(obj, lo, hi) => exprs(mut b, [obj, lo, hi])
+        ast.ExprKind.Interpolate(parts) => {
+            for hole in ast.interpolation_holes(parts) { expr(mut b, hole) }
+        }
         ast.ExprKind.ArrayLit(xs) => exprs(mut b, xs)
         ast.ExprKind.MapLit(entries) => {
             for en in entries {

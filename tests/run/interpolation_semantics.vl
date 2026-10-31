@@ -1,0 +1,54 @@
+// out: 1
+// out: 42
+// out: 111/0
+// out: 222
+// out: 1110
+// out: 111/111/0
+// out: answer=42
+// out: 2.5/7
+// out: 1
+// out: 2
+// out: 2
+import strings
+fn replace(s: mut Str) -> Int {
+    s = strings.from_int(222)
+    return 0
+}
+fn answer() -> Int { return nested_answer() }
+fn nested_answer() -> Int { return 42 }
+fn id[T](x: T) -> T { return x }
+fn save(saved: mut [Int], xs: [Int]) -> Int {
+    saved = xs
+    return 0
+}
+fn bump(n: mut Int) -> Int { n = n + 1; return n }
+fn main() {
+    let n = 1
+    assert(n == 1)
+    print(n)
+    let owned = f"{strings.from_int(42)}"
+    print(owned)
+    let mut s = strings.from_int(111)
+    print(f"{s}/{replace(mut s)}")
+    print(s)
+    s = strings.from_int(111)
+    print(s + f"{replace(mut s)}")
+    s = strings.from_int(111)
+    print(f"{s}/{s}/{replace(mut s)}")
+    print(f"answer={answer()}")
+    let unused = id(1)
+    print(f"{id(2.5)}/{id(7)}")
+    let mut xs = [0]
+    let mut saved: [Int] = []
+    // Keep save reachable independently, so this isolates loop sharing.
+    save(mut saved, xs)
+    for i in 0..1 {
+        xs[0] = i + 1
+        let shown = f"{save(mut saved, xs)}"
+        xs[0] = 99
+    }
+    print(saved[0])
+    let mut value = 1
+    print(f"{bump(mut value)}")
+    print(value)
+}

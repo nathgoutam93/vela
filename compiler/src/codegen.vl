@@ -2128,6 +2128,8 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
 }
 
 fn interpolate(g: mut Gen, parts: [ast.InterpolationPart]) -> Value {
+    let snapshot = join_snapshots(g.k, ast.interpolation_holes(parts))
+    let mut hole_index = 0
     let array = new_temp(mut g)
     emit(mut g, "vela_str " + array + "[" + strings.from_int(len(parts)) + "];")
     let mut release: [Str] = []
@@ -2136,21 +2138,27 @@ fn interpolate(g: mut Gen, parts: [ast.InterpolationPart]) -> Value {
         match parts[i] {
             ast.InterpolationPart.Text(s) => emit(mut g, slot + " = " + string_literal(mut g, s) + ";")
             ast.InterpolationPart.Hole(hole) => {
-                let v = expr(mut g, hole)
+                let mut v = expr(mut g, hole)
                 if v.ty == types.STR() {
+                    if snapshot[hole_index] && !v.owned && !v.is_static {
+                        v = store(mut g, types.STR(), consume(mut g, v))
+                    }
                     emit(mut g, slot + " = " + v.c + ";")
                     if v.owned && hand_over(mut g, v.c, slot) { push(mut release, slot) }
                 } else {
                     let converted = new_temp(mut g)
                     emit(mut g, "vela_str " + converted + " = " + shown(v.ty, v.c) + ";")
+                    own(mut g, converted, types.STR())
                     emit(mut g, slot + " = " + converted + ";")
-                    push(mut release, converted)
+                    hand_over(mut g, converted, slot)
+                    push(mut release, slot)
                 }
+                hole_index = hole_index + 1
             }
         }
     }
     let out = store(mut g, types.STR(), "vela_str_join(" + array + ", " + strings.from_int(len(parts)) + ")")
-    for value in release { emit(mut g, "vela_str_release(" + value + ");") }
+    for value in release { release_now(mut g, value, types.STR()) }
     return out
 }
 
