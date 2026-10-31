@@ -3693,7 +3693,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-125: No string interpolation
 
-- **Status:** proposed (a language extension; recorded, not authorized).
+- **Status:** implemented.
 - **Discovery:** post-M30, a user question after TL-106.
 - **Evidence (observed):** a message with values is a `+` chain with
   explicit conversions, `"user " + name + " has " + strings.from_int(n) +
@@ -3717,12 +3717,23 @@ the same entry. Close it with a commit or validation result; keep its history.
   - the specification, `vela guide` (within its budget: 47 bytes are
     left after TL-106), and the editor grammars.
 
-  Open questions: which types (a Show-like interface for user types?),
-  any expression or only paths inside the braces, and whether format
-  specs (`{x:08.2}`) belong there or stay in `std/text`.
+  Initial implementation scope: any expression accepted by the ordinary
+  expression grammar; Str, Bool, Float, and every integer width convert
+  directly, while unsupported types produce a type error at the hole.
+  User-defined Show-like formatting, format specs (`{x:08.2}`), and raw
+  interpolated strings remain deferred. `{{` and `}}` escape literal braces.
 - **Verification:** run, fail and dump tests of the literal (nested
   quotes, braces, errors inside `{...}` at their own columns), `vela fmt`
   keeping it, and both bootstrap fixed points.
+- **Resolution:** `f"..."` is parsed as an expression-preserving AST node;
+  the checker accepts Str, Bool, Float and all integer types in holes, and
+  both C and native lowering join converted parts. `{{` and `}}` produce
+  literal braces. Format specs, raw interpolated strings and user-defined
+  formatting remain deferred.
+- **Verified:** `tests/run/interpolation.vl` and
+  `tests/fail/interpolation_unclosed.vl` pass through C; the run fixture also
+  passes natively. The formatter preserves the fixture and the compiler C
+  bootstrap reaches a fixed point with the refreshed seed.
 
 ## Outstanding validation
 

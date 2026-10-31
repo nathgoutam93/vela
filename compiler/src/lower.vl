@@ -2469,6 +2469,7 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
             v.is_static = true
             return v
         }
+        ast.ExprKind.Interpolate(parts) => return interpolate(mut g, parts)
         ast.ExprKind.UnitLit => return reg_val(konst(mut g, 0), t)
         ast.ExprKind.Name(_) => {
             match g.k.refs[e.id] {
@@ -2587,6 +2588,34 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
         }
         ast.ExprKind.Closure(_, _, body, _) => return closure_value(mut g, e, body)
     }
+}
+
+fn interpolate(g: mut Low, parts: [ast.InterpolationPart]) -> Val {
+    let mut vals: [Val] = []
+    for part in parts {
+        match part {
+            ast.InterpolationPart.Text(s) => {
+                let mut v = mem_val(sym_addr(mut g, str_literal(mut g, s)), 0, types.STR())
+                v.is_static = true
+                push(mut vals, v)
+            }
+            ast.InterpolationPart.Hole(hole) => {
+                let value = expr(mut g, hole)
+                let mut shown_value = value
+                if value.ty != types.STR() { shown_value = shown(mut g, value.ty, value) }
+                push(mut vals, shown_value)
+            }
+        }
+    }
+    let s = shape(mut g, types.STR())
+    let slot = ir.slot(mut g.fs.f, s.size * len(vals), s.align)
+    let array = reg(mut g, ir.INT())
+    emit(mut g, ir.inst(ir.Op.SlotAddr, array, -1, -1, slot))
+    for i in 0..len(vals) { copy_mem(mut g, add_imm(mut g, array, i * s.size), address(mut g, vals[i]), s.size) }
+    let out = slot_val(mut g, types.STR())
+    ccall(mut g, "vela_str_join", [array, konst(mut g, len(vals))], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_STR(), out.reg)
+    for value in vals { release_now(mut g, value) }
+    return own(mut g, out)
 }
 
 fn float_const(g: mut Low, text: Str) -> Val {
@@ -3402,7 +3431,7 @@ fn assert_code(g: mut Low, e: ast.Expr, cond: ast.Expr, kind: Str) {
                 }
                 let a = shown(mut g, t, left)
                 let b = shown(mut g, t, right)
-                noreturn(mut g, "vela_assert_failed_values", [loc_of(mut g, e), what, text, a, b, konst(mut g, quote)],
+                noreturn(mut g, "vela_assert_failed_values", [loc_of(mut g, e), what, text, address(mut g, a), address(mut g, b), konst(mut g, quote)],
                     [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_STR(), ir.KIND_STR(), ir.KIND_INT()])
                 place_label(mut g, good)
                 return
@@ -3420,9 +3449,9 @@ fn assert_code(g: mut Low, e: ast.Expr, cond: ast.Expr, kind: Str) {
 }
 
 // A printable value as the address of a Str, for an assertion's message.
-fn shown(g: mut Low, t: Int, v: Val) -> Int {
+fn shown(g: mut Low, t: Int, v: Val) -> Val {
     if t == types.STR() {
-        return address(mut g, v)
+        return v
     }
     if t == types.BOOL() {
         let out = slot_val(mut g, types.STR())
@@ -3436,7 +3465,7 @@ fn shown(g: mut Low, t: Int, v: Val) -> Int {
         place_label(mut g, no)
         copy_mem(mut g, out.reg, sym_addr(mut g, str_literal(mut g, "false")), 24)
         place_label(mut g, done)
-        return out.reg
+        return out
     }
     let out = slot_val(mut g, types.STR())
     if t == 13 {
@@ -3446,7 +3475,7 @@ fn shown(g: mut Low, t: Int, v: Val) -> Int {
     } else {
         ccall(mut g, "vela_from_int", [scalar(mut g, v)], [ir.KIND_INT()], ir.RET_STR(), out.reg)
     }
-    return out.reg
+    return own(mut g, out)
 }
 
 // ---- Built-in functions ----

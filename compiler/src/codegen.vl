@@ -2010,6 +2010,7 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
             return Value { c: string_literal(mut g, s), ty: t, owned: false,
                 is_static: true }
         }
+        ast.ExprKind.Interpolate(parts) => return interpolate(mut g, parts)
         ast.ExprKind.UnitLit => return value("0", t)
         ast.ExprKind.Name(_) => {
             match g.k.refs[e.id] {
@@ -2124,6 +2125,33 @@ fn expr(g: mut Gen, e: ast.Expr) -> Value {
         }
         ast.ExprKind.Closure(_, _, body, _) => return closure_value(mut g, e, body)
     }
+}
+
+fn interpolate(g: mut Gen, parts: [ast.InterpolationPart]) -> Value {
+    let array = new_temp(mut g)
+    emit(mut g, "vela_str " + array + "[" + strings.from_int(len(parts)) + "];")
+    let mut release: [Str] = []
+    for i in 0..len(parts) {
+        let slot = array + "[" + strings.from_int(i) + "]"
+        match parts[i] {
+            ast.InterpolationPart.Text(s) => emit(mut g, slot + " = " + string_literal(mut g, s) + ";")
+            ast.InterpolationPart.Hole(hole) => {
+                let v = expr(mut g, hole)
+                if v.ty == types.STR() {
+                    emit(mut g, slot + " = " + v.c + ";")
+                    if v.owned && hand_over(mut g, v.c, slot) { push(mut release, slot) }
+                } else {
+                    let converted = new_temp(mut g)
+                    emit(mut g, "vela_str " + converted + " = " + shown(v.ty, v.c) + ";")
+                    emit(mut g, slot + " = " + converted + ";")
+                    push(mut release, converted)
+                }
+            }
+        }
+    }
+    let out = store(mut g, types.STR(), "vela_str_join(" + array + ", " + strings.from_int(len(parts)) + ")")
+    for value in release { emit(mut g, "vela_str_release(" + value + ");") }
+    return out
 }
 
 // What the function (or closure) being written returns.

@@ -2268,6 +2268,20 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
         ast.ExprKind.ByteLit(_) => return types.BYTE()
         ast.ExprKind.BoolLit(_) => return types.BOOL()
         ast.ExprKind.StrLit(_) => return types.STR()
+        ast.ExprKind.Interpolate(parts) => {
+            for part in parts {
+                match part {
+                    ast.InterpolationPart.Hole(hole) => {
+                        let t = value(mut c, hole)
+                        if t != types.STR() && t != types.BOOL() && t != types.FLOAT() && !types.is_integer(t) {
+                            report_at(mut c, hole, "E3101", "interpolated expressions must have type Str, Bool, Float, or an integer type")
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            return types.STR()
+        }
         ast.ExprKind.UnitLit => return types.UNIT()
         ast.ExprKind.Closure(params, result, body, _) => return closure(mut c, e, params, result, body, expected)
         ast.ExprKind.Name(name) => {

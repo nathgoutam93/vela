@@ -1,0 +1,14 @@
+// Interpolated strings preserve literal text, convert primitive values, and
+// use doubled braces for literal braces.
+// out: user Ada has 3 items; ready=true; ratio=1.5; braces={ok}
+// out: accent=é; math=4
+// out:
+fn main() {
+    let name = "Ada"
+    let count = 3
+    let ready = true
+    let ratio = 1.5
+    print(f"user {name} has {count} items; ready={ready}; ratio={ratio}; braces={{ok}}")
+    print(f"accent=\u{e9}; math={count + 1}")
+    print(f"")
+}

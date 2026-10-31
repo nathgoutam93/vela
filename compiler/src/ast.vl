@@ -39,6 +39,7 @@ pub type ExprKind = enum {
     ByteLit(Int)
     BoolLit(Bool)
     StrLit(Str)
+    Interpolate([InterpolationPart])
     UnitLit
     Name(Str)
     Unary(Str, Expr)  // "-" or "!"
@@ -57,6 +58,11 @@ pub type ExprKind = enum {
     // result type if written, the body (for `=>`, one return of the
     // expression), and whether it was written with `=>`
     Closure([ClosureParam], Option[TypeName], Block, Bool)
+}
+
+pub type InterpolationPart = enum {
+    Text(Str)
+    Hole(Expr)
 }
 
 pub type ClosureParam = struct {
@@ -625,6 +631,7 @@ fn sx_expr(e: Expr) -> Sx {
             return atom("false")
         }
         ExprKind.StrLit(s) => return atom(quote(s))
+        ExprKind.Interpolate(_) => return atom(expr_text(e))
         ExprKind.UnitLit => return atom("()")
         ExprKind.Name(name) => return atom(name)
         ExprKind.Unary(op, x) => return list([atom(op), sx_expr(x)])
@@ -868,6 +875,29 @@ pub fn expr_text(e: Expr) -> Str {
             return "false"
         }
         ExprKind.StrLit(s) => return quote(s)
+        ExprKind.Interpolate(parts) => {
+            let mut b = strings.builder()
+            strings.add(mut b, "f\"")
+            for part in parts {
+                match part {
+                    InterpolationPart.Text(s) => {
+                        for c in s {
+                            if c == '{' {
+                                strings.add(mut b, "{{")
+                            } else if c == '}' {
+                                strings.add(mut b, "}}")
+                            } else {
+                                let escaped = unescape(c)
+                                if escaped == "" { strings.add_byte(mut b, c) } else { strings.add(mut b, escaped) }
+                            }
+                        }
+                    }
+                    InterpolationPart.Hole(x) => strings.add(mut b, "{" + expr_text(x) + "}")
+                }
+            }
+            strings.add_byte(mut b, '"')
+            return strings.build(b)
+        }
         ExprKind.UnitLit => return "()"
         ExprKind.Name(name) => return name
         ExprKind.Unary(op, x) => return op + operand(x, 30)

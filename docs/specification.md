@@ -62,6 +62,12 @@ NUL and non-text bytes obtained through byte-oriented APIs. Escapes do not
 perform Unicode normalization. A leading minus may form a signed minimum
 integer literal; the positive magnitude need not fit the signed type first.
 
+An interpolated string begins with `f"`, such as `f"user {name}"`. Each
+brace-delimited hole is an ordinary expression and evaluates left to right.
+Str, Bool, Float, and every integer type convert to text; other types are
+rejected. Write `{{` or `}}` for a literal brace. Interpolated strings use the
+same escapes as ordinary strings.
+
 ## Programs and declarations
 
 A file consists of imports followed by function, type and test declarations.
