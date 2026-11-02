@@ -1,0 +1,7 @@
+// err: panic_slice_end.vl:6:12: panic: slice out of range
+// exit: 101
+fn main() {
+    let s = "abc"
+    let n = len(s)
+    print(s[1..n + 1])
+}
