@@ -1,0 +1,91 @@
+// Values a loop computes the same at every iteration are computed once
+// before it, an immutable array parameter's data and length are read once,
+// and a loop's copy-on-write check skips the call for an unshared array.
+// Each must stay right when the loop never runs, when loops nest, when the
+// parameter's copy changes and grows, and when the array is shared.
+// out: 3 3 0
+// out: 36 0
+// out: 10 1 2 3
+// out: 7 1 2 3 4
+// out: [9, 2, 3] [1, 2, 3]
+// out: [5, 6, 7] [5, 6, 7, 8]
+import strings
+import text
+
+// The index of the first cumulative weight above r: `m - 1` is invariant.
+fn pick(cum: [Int], r: Int) -> Int {
+    let m = len(cum)
+    let mut i = 0
+    for i < m - 1 && r >= cum[i] {
+        i = i + 1
+    }
+    return i
+}
+
+// Nested loops whose bounds and a product are invariant in both.
+fn grid(n: Int, k: Int) -> Int {
+    let mut total = 0
+    for _ in 0..n {
+        for _ in 0..n {
+            let scale = k * 3 + 1
+            total = total + scale - (k * 3)
+        }
+    }
+    return total + y_unused(n)
+}
+
+fn y_unused(n: Int) -> Int {
+    let mut s = 0
+    let mut i = 0
+    for i < n - n {  // never runs: its invariant still computes nothing wrong
+        s = s + (n << 2)
+        i = i + 1
+    }
+    return s
+}
+
+// The parameter is read in a loop while a copy of it changes and grows.
+fn total_after(xs: [Int]) -> Int {
+    let mut ys = xs
+    ys[0] = 4
+    push(mut ys, 100)
+    let mut s = 0
+    for i in 0..len(xs) {
+        s = s + xs[i]
+    }
+    return s + ys[0] - 4 + len(ys) - 4
+}
+
+fn join(xs: [Int]) -> Str {
+    let mut out: [Str] = []
+    for x in xs {
+        push(mut out, strings.from_int(x))
+    }
+    return "[" + text.join(out, ", ") + "]"
+}
+
+fn main() {
+    let cum = [10, 20, 30, 40]
+    print(strings.from_int(pick(cum, 35)) + " " + strings.from_int(pick(cum, 99)) + " " + strings.from_int(pick(cum, 5)))
+    print(strings.from_int(grid(6, 5)) + " " + strings.from_int(grid(0, 5)))
+    let xs = [1, 2, 3]
+    print(strings.from_int(total_after(xs) + 4) + " " + strings.from_int(xs[0]) + " " + strings.from_int(xs[1]) + " " + strings.from_int(xs[2]))
+    let mut grown = [1, 2, 3]
+    push(mut grown, 4)
+    print(strings.from_int(total_after(grown) - 4) + " " + strings.from_int(grown[0]) + " " + strings.from_int(grown[1]) + " " + strings.from_int(grown[2]) + " " + strings.from_int(grown[3]))
+    // Shared before the loop: the loop's writes copy it first.
+    let a = [1, 2, 3]
+    let mut b = a
+    for i in 0..1 {
+        b[i] = 9
+    }
+    print(join(b) + " " + join(a))
+    // Not shared: written in place, then copied and grown.
+    let mut c = [0, 0, 0]
+    for i in 0..3 {
+        c[i] = i + 5
+    }
+    let mut d = c
+    push(mut d, 8)
+    print(join(c) + " " + join(d))
+}

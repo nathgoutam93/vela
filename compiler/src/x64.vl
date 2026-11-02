@@ -32,6 +32,7 @@ import live
 import lists
 import maps
 import strings
+import text
 
 // Where an IR register's value is.
 type Loc = struct {
@@ -1731,6 +1732,17 @@ fn body(o: mut Out, f: ir.Func, seq: [Int], skips: Map[Int, Bool], reads: [Int],
             p = p + 2
             continue
         }
+        if i.op == ir.Op.RcDec && reads[i.dst] == 1 {
+            // Constants between them are written where they are used: no code.
+            let mut q = p + 1
+            for q < len(seq) && seq[q] == seq[q - 1] + 1 && f.insts[seq[q]].op == ir.Op.Const && o.locs[f.insts[seq[q]].dst].kind == 2 {
+                q = q + 1
+            }
+            if q < len(seq) && seq[q] == seq[q - 1] + 1 && !maps.has(skips, seq[q]) && rc_branch(mut o, i, f.insts[seq[q]]) {
+                p = q + 1
+                continue
+            }
+        }
         // A compare and branch, then a jump, then the branch's own target:
         // one jump on the opposite condition.
         if i.op == ir.Op.BranchCmp && p + 1 < len(seq) && seq[p + 1] == k + 1 && f.insts[k + 1].op == ir.Op.Jump &&
@@ -1743,6 +1755,49 @@ fn body(o: mut Out, f: ir.Func, seq: [Int], skips: Map[Int, Bool], reads: [Int],
         instruction(mut o, f, i, label_after(f, seq, p))
         p = p + 1
     }
+}
+
+// A release whose result only the branch right after it tests against 0
+// (`branch.cmp eq last, 0`: not the last reference): the branch reads the
+// flags `dec` leaves, with no byte set and tested again. The shared count's
+// atomic path goes after the function's code and comes back.
+fn rc_branch(o: mut Out, i: ir.Inst, b: ir.Inst) -> Bool {
+    if b.op != ir.Op.BranchCmp || b.a != i.dst || b.b == i.dst || (b.sym != "eq" && b.sym != "ne") {
+        return false
+    }
+    let z = o.locs[b.b]
+    if z.kind != 2 || z.off != 0 {
+        return false
+    }
+    let to = ir_label(o, target(o, b.imm))
+    // The flags say whether this was the last reference (ZF): `ne` jumps
+    // when it was, `eq` when it was not.
+    let mut jump = "je "
+    if b.sym == "eq" {
+        jump = "jne "
+    }
+    let r = in_reg(mut o, i.a, "r11")
+    let slow = local_label(mut o)
+    let back = local_label(mut o)
+    let done = local_label(mut o)
+    emit(mut o, "mov rax, qword ptr [" + r + "]")
+    emit(mut o, "test rax, rax")
+    // An immortal zero count stays unchanged and is not the last reference.
+    if b.sym == "eq" { emit(mut o, "je " + to) } else { emit(mut o, "je " + done) }
+    emit(mut o, "jl " + slow)
+    emit(mut o, "dec rax")
+    emit(mut o, "mov qword ptr [" + r + "], rax")
+    push(mut o.lines, back + ":")
+    emit(mut o, jump + to)
+    push(mut o.lines, done + ":")
+    // Shared between threads: atomically, one fewer (the count is -n); the
+    // last when it was -1. Back at `back`, the flags say so.
+    push(mut o.stubs, slow + ":")
+    push(mut o.stubs, "    mov rax, 1")
+    push(mut o.stubs, "    lock xadd qword ptr [" + r + "], rax")
+    push(mut o.stubs, "    cmp rax, -1")
+    push(mut o.stubs, "    jmp " + back)
+    return true
 }
 
 // A Float load only the arithmetic right after it reads: the arithmetic
@@ -2119,7 +2174,11 @@ fn call(o: mut Out, f: ir.Func, i: ir.Inst) {
         emit(mut o, "mov r11, " + src(mut o, i.a, "r11"))
         emit(mut o, "call r11")
     } else if ccall {
-        emit(mut o, "mov eax, " + num(nf))  // SysV variadic vector-register count
+        // SysV variadic vector-register count. The runtime's own functions
+        // are not variadic; a foreign function may be.
+        if !text.starts_with(i.sym, "vela_") {
+            emit(mut o, "mov eax, " + num(nf))
+        }
         emit(mut o, "call " + i.sym + "@PLT")
     } else {
         emit(mut o, "call " + i.sym)
