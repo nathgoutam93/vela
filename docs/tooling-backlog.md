@@ -4079,7 +4079,7 @@ No additional CI workflow run was requested or launched for reconciliation.
 
 ### TL-129: Native code's remaining 1.2-1.4x on binarytrees, fasta, mandelbrot, fannkuch and varints
 
-- **Status:** diagnosed; fixes not started.
+- **Status:** partly resolved: proposals 1-4 below; 5 (TL-098) and 6 deferred.
 - **Discovery:** post-M30, profiling pass after TL-128 on Linux x86-64. Each
   benchmark built with `VELA_BACKEND=native` and `VELA_BACKEND=c`
   (`build/vela build bench/NAME/main.vl`) and run under
@@ -4142,6 +4142,46 @@ No additional CI workflow run was requested or launched for reconciliation.
 - **Verification:** the callgrind counts above, per benchmark, and
   `bench/compare.py --backend native`; the native suites and differential
   tests for each change.
+- **Resolution (1-4):**
+  - `x64.vl` `rc_branch`: a release whose result only a branch against 0
+    reads branches on `dec`'s flags; the atomic path is after the
+    function's code. Runtime calls no longer set `eax` (a variadic call's
+    vector count); foreign calls still do.
+  - `opt.vl` `hoist_invariants`: loop-invariant code motion. A pure
+    instruction that cannot fault (no loads or divisions), set once, read
+    on the loop's own path, with operands set once before the loop, moves
+    before the outermost loop it is invariant in. The loop must be entered
+    only by falling into its header. Early-return and panic runs are left
+    alone: hoisting the slot addresses of varints' `Err` returns first took
+    the registers of its byte loop (+4.5% instructions).
+  - `opt.vl` `rotate_loops` also rotates a header `branch.cmp c, body;
+    jump exit` by copying both to the loop's end. With header constants
+    hoisted, fasta's and mandelbrot's loops rotate.
+  - `lower.vl`: an immutable array parameter's data and length are read
+    once at entry, as an immutable Str parameter's were. The copy-on-write
+    check before a loop (`hoist_unique`) tests for one reference inline,
+    as `writable` and the C backend do.
+- **Verified (1-4):**
+  - Instructions, native before / after (callgrind, the arguments above;
+    the same output): fasta 779M / 717M, binarytrees 593M / 556M,
+    mandelbrot 339M / 323M, fannkuch 211M / 199M, varints 133M / 132M,
+    crc32 (1048576 8) 211M / 194M, nbody (500000) 385M / 365M, sha256
+    (262144 8) 299M / 290M; spectralnorm and arena_trees unchanged. fasta's
+    search loop is 6 instructions an iteration, from 13.
+  - `tests/run/loop_invariants.vl` covers hoisting in nested loops and in a
+    loop that never runs, an array parameter read while its copy changes
+    and grows, and the loop's copy-on-write check on shared and unshared
+    arrays.
+  - Native, C, `VELA_OPT=0` native, ASan/UBSan on both backends and TSan
+    pass (387). Both bootstrap fixed points hold; the native compiler's
+    assembly went from 1.876M to 1.765M lines.
+  - arm64 shares the IR changes. Its output for six programs assembles
+    (`clang -target arm64-apple-macos13 -c`), but has not run here: run the
+    suite on macOS ARM64.
+  - fasta still spills its builder and counter in the per-byte loop: the
+    hoisted values take the five callee-saved registers its calls need.
+    That is TL-098 (live-range splitting), not a regression: fasta's total
+    fell.
 
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
