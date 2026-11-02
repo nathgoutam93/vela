@@ -4,6 +4,7 @@
 // some property of the elements takes a function that gives it:
 // `lists.sort_by(orders, orders.total)`.
 import maps
+import memory
 
 pub fn contains[T: Eq](xs: [T], x: T) -> Bool {
     for y in xs {
@@ -22,6 +23,19 @@ pub fn index_of[T: Eq](xs: [T], x: T) -> Option[Int] {
         }
     }
     return None
+}
+
+// Removes and returns the last element, or None when xs is empty. It takes
+// constant time: a stack is `push` and `pop`, not a slice copied each time.
+// (A prelude `pop` would make it a name programs cannot define.)
+pub fn pop[T](xs: mut [T]) -> Option[T] {
+    let n = len(xs)
+    if n == 0 {
+        return None
+    }
+    let last = xs[n - 1]
+    memory.truncate(mut xs, n - 1)
+    return Some(last)
 }
 
 pub fn reverse[T](xs: [T]) -> [T] {
@@ -311,4 +325,27 @@ test "map, filter, any, all, fold" {
 test "sort_by a key function" {
     let words = sort_by(["pear", "fig", "banana", "kiwi"], length)
     assert(words[0] == "fig" && words[1] == "pear" && words[2] == "kiwi" && words[3] == "banana")
+}
+
+test "pop takes the last element" {
+    let mut xs = [1, 2, 3]
+    let copy = xs
+    match pop(mut xs) {
+        Some(x) => assert(x == 3)
+        None => assert(false)
+    }
+    assert(len(xs) == 2 && xs[1] == 2 && len(copy) == 3 && copy[2] == 3)
+    let _ = pop(mut xs)
+    let _ = pop(mut xs)
+    match pop(mut xs) {
+        Some(_) => assert(false)
+        None => assert(len(xs) == 0)
+    }
+    let mut names = ["a", "b"]
+    match pop(mut names) {
+        Some(n) => assert(n == "b" && len(names) == 1)
+        None => assert(false)
+    }
+    push(mut names, "c")
+    assert(len(names) == 2 && names[1] == "c")
 }
