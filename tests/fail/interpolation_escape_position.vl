@@ -1,0 +1,8 @@
+// err: interpolation_escape_position.vl:6:19: error: unknown escape '\q'; use \n \t \r \0 \\ \" or \u{HEX}, or a raw string r"..." for backslashes as written [E1007]
+// err: interpolation_escape_position.vl:7:21: error: unknown escape '\q'; use \n \t \r \0 \\ \" or \u{HEX}, or a raw string r"..." for backslashes as written [E1007]
+// An escape error in an interpolated string is placed at the escape, after
+// holes and brace escapes too.
+fn main() {
+    print(f"a {1} \q b")
+    print(f"a {{ }} \q")
+}

@@ -2401,8 +2401,9 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
                 match part {
                     ast.InterpolationPart.Hole(hole) => {
                         let t = value(mut c, hole)
-                        if t != types.STR() && t != types.BOOL() && t != types.FLOAT() && !types.is_integer(t) {
-                            report_at(mut c, hole, "E3101", "interpolated expressions must have type Str, Bool, Float, or an integer type")
+                        // An error type was reported where it arose.
+                        if t != types.ERROR() && t != types.STR() && t != types.BOOL() && t != types.FLOAT() && !types.is_integer(t) {
+                            report_at(mut c, hole, "E3234", "interpolated expressions must have type Str, Bool, Float, or an integer type, found " + show(c, t))
                         }
                     }
                     _ => {}

@@ -64,9 +64,10 @@ integer literal; the positive magnitude need not fit the signed type first.
 
 An interpolated string begins with `f"`, such as `f"user {name}"`. Each
 brace-delimited hole is an ordinary expression and evaluates left to right.
-Str, Bool, Float, and every integer type convert to text; other types are
-rejected. Write `{{` or `}}` for a literal brace. Interpolated strings use the
-same escapes as ordinary strings.
+Str, Bool, Float, and every integer type convert to text (a Byte, being
+`u8`, as its number: `f"{'a'}"` is `"97"`); other types are rejected. Write
+`{{` or `}}` for a literal brace; a single `}` outside a hole is an error.
+Interpolated strings use the same escapes as ordinary strings.
 
 ## Programs and declarations
 
