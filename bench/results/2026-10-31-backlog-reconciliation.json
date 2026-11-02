@@ -1,0 +1,188 @@
+{
+  "contract": {
+    "command": [
+      "build/vela",
+      "verify",
+      "--json",
+      "build/backlog-reconciliation/contract.vl"
+    ],
+    "exit": 3,
+    "stderr": "",
+    "source": "fn bad() -> Int ensures result == 2 { return 1 }\nfn main() { print(bad()) }\n",
+    "observed": {
+      "status": "unknown",
+      "results": [
+        {
+          "status": "unknown",
+          "reason": "solver was not requested"
+        }
+      ]
+    }
+  },
+  "pop": {
+    "command": [
+      "build/vela",
+      "check",
+      "--json",
+      "build/backlog-reconciliation/pop.vl"
+    ],
+    "exit": 1,
+    "stderr": "",
+    "source": "fn main() {\n    let mut xs = [1, 2]\n    let value = pop(mut xs)\n    print(len(xs))\n}\n",
+    "observed": {
+      "diagnostics": [
+        {
+          "code": "E3155",
+          "message": "undefined function 'pop'"
+        },
+        {
+          "code": "E3096",
+          "message": "`mut` only goes before an argument for a mut parameter"
+        }
+      ]
+    }
+  },
+  "alias": {
+    "command": [
+      "build/vela",
+      "check",
+      "--json",
+      "build/backlog-reconciliation/alias.vl"
+    ],
+    "exit": 1,
+    "stderr": "",
+    "source": "import c\nfn main() { let n = c.ULong(1); print(n) }\n",
+    "observed": {
+      "diagnostics": [
+        {
+          "code": "E3049",
+          "message": "module 'c' has no function 'ULong'"
+        }
+      ]
+    }
+  },
+  "division": {
+    "command": [
+      "build/vela",
+      "asm",
+      "--target",
+      "aarch64-apple-darwin",
+      "build/backlog-reconciliation/division.vl"
+    ],
+    "exit": 0,
+    "stderr": "",
+    "source": "import os\nfn main() {\n    let n = len(os.args())\n    print(n / 3)\n    print(n % 10)\n}\n",
+    "observed": {
+      "sdiv_instructions": 4
+    }
+  },
+  "guide": {
+    "command": [
+      "build/vela",
+      "guide"
+    ],
+    "exit": 0,
+    "stderr": "",
+    "observed": {
+      "bytes": 31998,
+      "memory_truncate_documented": true
+    }
+  },
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
+  },
+  "commit": "f78b19f8a3690eccfe7793f4a47c00d12c6602b7",
+  "compiler_sha256": "0823a8c2421f326c66d9435240208436d1949ba19a9df688c124cdf0572074b6",
+  "induction": {
+    "c": {
+      "command": [
+        "build/vela",
+        "c",
+        "build/backlog-reconciliation/induction.vl"
+      ],
+      "exit": 0,
+      "retained_checks": [
+        "uint8_t _t21 = (uint8_t)(vela_fixed_inline((uint64_t)(_t20), (uint64_t)(127), 8, false, 6, 0, \"build/backlog-reconciliation/induction.vl:11:32\", NULL));",
+        "int64_t _t25 = vela_mul(_t24, 7, \"build/backlog-reconciliation/induction.vl:11:51\");",
+        "uint64_t _t26 = (uint64_t)(vela_fixed_inline((uint64_t)(_t23), (uint64_t)(_t25), 64, false, 10, 0, \"build/backlog-reconciliation/induction.vl:11:41\", NULL));",
+        "uint64_t _t27 = (uint64_t)(vela_fixed_inline((uint64_t)(_t19), (uint64_t)(_t26), 64, false, 7, 0, \"build/backlog-reconciliation/induction.vl:11:23\", NULL));",
+        "int64_t _t33 = vela_add(_t32, 1, \"build/backlog-reconciliation/induction.vl:13:23\");"
+      ]
+    },
+    "ir": {
+      "command": [
+        "build/vela",
+        "ir",
+        "build/backlog-reconciliation/induction.vl"
+      ],
+      "exit": 0,
+      "retained_checks": [
+        "%42 = mul.chk .Lc5 %5, %41",
+        "%5 = add.chk .Lc7 %5, %57",
+        "%70 = mul.chk .Lc5 %33, %69",
+        "%33 = add.chk .Lc7 %33, %85",
+        "%66 = mul.chk .Lc5 %29, %65",
+        "%29 = add.chk .Lc7 %29, %81"
+      ]
+    },
+    "source": "import os\nfn parse(data: Str) -> Result[u64, Str] {\n    let mut group = 0\n    let mut position = 0\n    let mut value = 0u64\n    for {\n        if position < 0 || position >= len(data) { return Err(\"truncated varint\") }\n        let b = data[position]\n        position = position + 1\n        if group == 9 && b > 1 { return Err(\"varint exceeds uint64\") }\n        value = value | (u64(b & 127u8) << (group * 7))\n        if b < 128u8 { return Ok(value) }\n        group = group + 1\n    }\n}\nfn main() { match parse(os.args()[0]) { Ok(n) => print(n), Err(e) => print(e) } }\n"
+  },
+  "format": "vela.backlog.reconciliation",
+  "version": 1,
+  "date": "2026-10-31",
+  "host_selection": {
+    "method": "mock platform.system and platform.machine in tests.hosts.native_supported",
+    "cases": [
+      {
+        "system": "Darwin",
+        "machine": "arm64",
+        "native_supported": true
+      },
+      {
+        "system": "Linux",
+        "machine": "x86_64",
+        "native_supported": true
+      },
+      {
+        "system": "Windows",
+        "machine": "AMD64",
+        "native_supported": false
+      },
+      {
+        "system": "Darwin",
+        "machine": "x86_64",
+        "native_supported": false
+      }
+    ]
+  },
+  "markdown": {
+    "report": "bench/results/2026-10-31-markdown-macos-recheck.json",
+    "command": [
+      "python3",
+      "bench/markdown_compare.py",
+      "--cmark",
+      "build/cmark-build/cmark",
+      "--samples",
+      "build/cmark-dl/cmark-0.31.2/bench/samples",
+      "--runs",
+      "3",
+      "--json",
+      "build/backlog-reconciliation/markdown-macos.json"
+    ],
+    "outputs_match_cmark": true,
+    "input_count": 26,
+    "ratio_method": "minimum elapsed time minus minimum empty-file startup time, as printed by the harness",
+    "repository_native_over_c": 1.264247831512886,
+    "sample_geometric_mean_native_over_c": 1.3639796367230597,
+    "block_code_native_over_c": 1.4937574145007484
+  },
+  "limits": [
+    "No compiler/runtime changes in this audit.",
+    "No new Linux or Windows execution or CI workflow run.",
+    "Historical Linux evidence is scoped to bc73a4f plus TL-115, not current-head release certification.",
+    "CPU model query was denied by the sandbox; benchmark reports cpu as arm.",
+    "Three benchmark rounds verify the remaining gap; no causative ARM64 optimization is claimed."
+  ]
+}

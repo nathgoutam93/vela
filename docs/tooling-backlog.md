@@ -7,18 +7,46 @@ plan. An entry here records work to consider; it does not expand the current
 milestone automatically.
 
 Use stable `TL-NNN` IDs for observed tooling issues and `VAL-NNN` IDs for
-outstanding validation. Statuses are open, deferred, in progress, and resolved.
+outstanding validation. Statuses are open, deferred, in progress, and resolved; validation can be
+partially validated when only specific acceptance cases remain.
 For each entry, record discovery milestone, evidence or reproduction, impact,
 workaround, proposed work, and an acceptance check. Add later occurrences to
 the same entry. Close it with a commit or validation result; keep its history.
+
+## Current reconciliation (2026-10-31)
+
+The [source and evidence audit](backlog-reconciliation.md) reconciles the
+entries at `f78b19f`. Later dated results supersede earlier pending/failing
+checkpoints; historical evidence below is retained with its original scope.
+
+- **Active measured performance gap:** TL-112, freshly reproduced on macOS ARM64.
+- **Windows diagnosis/acceptance:** TL-076 and VAL-005. TL-001, TL-054,
+  TL-061, TL-073 and TL-075 have implementation fixes; Windows execution
+  confirmation belongs to VAL-005.
+- **Deferred proposals:** TL-019, TL-042, the broader TL-050 API, TL-064,
+  TL-081, TL-088 hardening, TL-098 live-range work, further TL-103 profiling,
+  TL-104 ARM64 division, TL-109 and TL-111 comparison ordering. These are
+  not new authorizations to expand scope.
+- **Remaining release evidence:** VAL-002 agent trials, VAL-003 actual
+  tokenizer count, VAL-004 kernel edge cases, VAL-005 native Windows, and
+  VAL-006 remaining debugger/platform cases. VAL-004/VAL-006 are partially
+  validated; Linux execution is no longer wholly outstanding.
+- **Resolved historical validation:** VAL-001 and VAL-007 at the retained
+  Linux snapshot. This does not certify every later commit's release matrix.
+
+No additional CI workflow run was requested or launched for reconciliation.
 
 ## Observed tooling issues
 
 ### TL-001: Host-aware test selection
 
-- **Status:** in progress during M26; native-host selection is implemented,
-  while the complete Windows fixture inventory remains VAL-005. Discovered
-  during M17 on macOS ARM64.
+- **Status:** resolved host selection; discovered during M17. Complete Windows
+  execution confirmation is tracked separately in VAL-005.
+- **2026-10-31 reconciliation:** `tests/hosts.py` and the runner/nested scripts
+  implement supported-native-host selection. Fresh mocked Darwin ARM64/Linux x86-64
+  cases select native; Windows AMD64/Darwin x86-64 do not. The old workaround and
+  Linux-only emitter description below record discovery-time behavior.
+
 - **Evidence:** `python3 run_tests.py --backend c` still invokes native-only
   cases in `tests/native_test.py`, `tests/cache_test.py`, and
   `tests/bench_test.py`. The native backend emits Linux x86-64 assembly, which
@@ -527,6 +555,12 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-019: Implicit decoder loop limits retain arithmetic checks
 
 - **Status:** deferred; discovered in M22.
+- **2026-10-31 reconciliation:** A faithful unbounded protocol guard (`group == 9 && b >
+  1`, terminating on `b < 128`) still emits checked multiply/add in C and native IR.
+  Simple explicit `group >= 10` guards can already establish bounds; the deferred
+  proposal concerns protocol-derived limits. The maintained bounded-loop workaround
+  remains implemented.
+
 - **Evidence:** the first packed-varint benchmark produced matching output
   but measured 1.27 times C (three-run probe). Its unbounded loop increments
   group and rejects an overflowing tenth byte; generated C still uses checked
@@ -753,6 +787,10 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-028: An unavailable default cache leaks mkdir stderr
 
 - **Status:** resolved in the pre-M30 tooling follow-up; observed during the initial M26a intermediate build.
+- **2026-10-31 reconciliation:** The pre-M30 implementation and final validation
+  supersede the earlier M27/M28 deferred checkpoints. No unfinished cache-stderr fix
+  remains.
+
 - **Evidence:** build/vela build compiler/src/main.vl -o build/vela-m26a succeeded
   while printing mkdir: /Users/nathgoutam93/.cache/vela: Operation not permitted
   under the workspace sandbox. cached_runtime in compiler/src/main.vl attempts to
@@ -1185,6 +1223,9 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-042: LP64 example conversions do not follow target C aliases
 
 - **Status:** deferred improvement; the M26 example blocker is fixed.
+- **2026-10-31 reconciliation:** A fresh `c.ULong(1)` check still reports E3049. The
+  portable binding workaround is implemented; the conversion-call API remains deferred.
+
 - **Discovery:** M26 Windows C data-model inspection.
 - **Evidence:** examples/ffi/zlib.vl used explicit u64 conversions for C
   unsigned-long parameters. On Windows, c.ULong correctly resolves to u32, so
@@ -1352,6 +1393,10 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-050: Bounded property capture and capability launch use separate APIs
 
 - **Status:** resolved within M28’s bounded automatic domain; broader API deferred.
+- **2026-10-31 reconciliation:** `compiler/src/properties.vl` combines bounded capture
+  with the capability launcher inside the accepted automatic domain. Only a broader
+  public process API remains deferred.
+
 - **Observed source:** processes.communicate provides output/time limits;
   sysio.sandbox_run applies allow/deny policy before exec and inherits the
   current POSIX process group. Neither public operation combines both.
@@ -1427,7 +1472,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-054: Evaluation installation did not preserve the Windows executable suffix
 
-- **Status:** corrected during M28; actual Windows execution remains VAL-005.
+- **Status:** resolved harness correction during M28; Windows execution
+  confirmation remains VAL-005.
 - **Observed source:** evaluation/prepare.py installed every compiler as bin/vela
   and used that path for guide/counterexample subprocesses. M28 adds installed
   counterexample preparation to its acceptance script, including Windows CI.
@@ -1559,7 +1605,8 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-061: C benchmark streams need the Windows runtime’s binary mode
 
-- **Status:** corrected in the M29 C references; native Windows validation open.
+- **Status:** resolved in the M29 C references; Windows execution
+  confirmation remains VAL-005.
 - **Observed source:** runtime/vela_rt.c initializes standard streams with
   _setmode(...,_O_BINARY) on Windows. The new C references initially used CRT
   default text stdout while the oracle compares complete byte hashes.
@@ -1627,6 +1674,10 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-064: Some constant contract violations stay unknown without a solver
 
 - **Status:** deferred; observed during M30 conformance authoring.
+- **2026-10-31 reconciliation:** The reproduction still exits 3 with `unknown` and
+  “solver was not requested.” Constant-reduction improvement remains applicable and
+  deferred; this result is conservative.
+
 - **Reproduction:** `fn bad() -> Int ensures result == 2 { return 1 }`;
   `build/vela verify --json FILE` reports unknown (exit 3), with reason
   "solver was not requested". A literal ensures false is refuted without a
@@ -1863,8 +1914,12 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-073: Windows fixture output needs byte-exact UTF-8 and OS error expectations
 
-- **Status:** in progress after M30; local harness fix applied, Windows rerun
-  pending.
+- **Status:** resolved harness fixes; native Windows execution confirmation
+  remains VAL-005. Discovered after M30.
+- **2026-10-31 reconciliation:** The fixture is now exactly 18 LF bytes, pinned by
+  `.gitattributes`; UTF-8 stream handling and Windows expectations are implemented. This
+  source/byte audit closes the harness work, not native Windows execution (VAL-005).
+
 - **Evidence:** Windows [run 40213687036](https://github.com/nathgoutam93/vela/actions/runs/40213687036/job/121230142674)
   reports five fixture output differences and crashes while printing a `✓`
   diagnostic under Python's cp1252 console encoding. Its CRT reports
@@ -1911,8 +1966,12 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-075: M30 hash check uses an extensionless Windows compiler path
 
-- **Status:** in progress after M30; local fix applied, native Windows check
-  pending.
+- **Status:** resolved harness fix; native Windows execution confirmation
+  remains VAL-005. Discovered after M30.
+- **2026-10-31 reconciliation:** The `.exe` fallback is present at M30 harness startup
+  before hashing. Actual Windows execution remains part of VAL-005; the implementation
+  is no longer in progress.
+
 - **Evidence:** Windows [run 40215742923](https://github.com/nathgoutam93/vela/actions/runs/40215742923/job/121236368837)
   passes M30 corpus, guide, diagnostics and query checks, then fails while
   hashing `build/vela`: the actual compiler file is `build/vela.exe`.
@@ -1926,7 +1985,12 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-076: Windows M27 integration exceeds the outer timeout
 
-- **Status:** open after M30; native-host isolation pending.
+- **Status:** open Windows validation/diagnosis; phase logging is implemented,
+  but the original timeout has not been rechecked on native Windows.
+- **2026-10-31 reconciliation:** Flushed phase progress is present. No native Windows
+  rerun in the retained evidence identifies the original slow/stuck phase. Keep
+  diagnosis open under VAL-005; no new CI run was launched.
+
 - **Evidence:** Windows [run 40215742923](https://github.com/nathgoutam93/vela/actions/runs/40215742923/job/121236368837)
   reports `tests/m27_test.py` timed out after 600 seconds under four outer
   workers. Its script emitted no intermediate progress, so the stuck or slow
@@ -2067,6 +2131,10 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-081: Custom sanitizer flags replace the runner's warning policy
 
 - **Status:** workaround documented; an additive flag interface is deferred.
+- **2026-10-31 reconciliation:** The runner still uses `env.setdefault` for VELA_CFLAGS.
+  The documented STRICT_CFLAGS-plus-sanitizer workaround remains valid; an additive flag
+  interface is deferred.
+
 - **Evidence:** invoking the networking UBSan selection with VELA_CFLAGS set to
   fresh `-Wall -Wextra -Werror -Wshadow -pedantic` plus sanitizer flags yields
   95 passes and 27 generated-C compilation failures for unused variables and
@@ -2309,8 +2377,13 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-088: Stack overflow from program recursion is a silent segmentation fault
 
-- **Status:** resolved in a post-M30 fix on Linux; macOS was not rerun, and
-  Windows/WASI are unchanged. Discovered in the post-M30 review.
+- **Status:** resolved Linux/macOS overflow reporting; further signal-handler
+  hardening and Windows SEH are deferred. Discovered in the post-M30 review.
+- **2026-10-31 reconciliation:** The later macOS C/native opt=0/1
+  `tests/stack_overflow_test.py` success is recorded under TL-125 and supersedes “macOS
+  was not rerun.” Stdio from the signal handler and absent Windows SEH remain deferred
+  hardening; the historical VAL-007 failure below was later superseded.
+
 - **Evidence:** `fn down(n: Int) -> Int { if n == 0 { return 0 }; return 1 +
   down(n - 1) }` called with 10,000,000 exits 139 on both backends, including
   with `--debug` and `VELA_PANIC=json`. No message, Vela stack or JSON
@@ -2692,8 +2765,13 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-098: x86-64 kept rcx and rdx out of register allocation
 
-- **Status:** resolved for the allocation of rcx and rdx after the post-M30
-  review; sha256's remaining gap is open (below).
+- **Status:** resolved rcx/rdx allocation; additional register-pressure
+  optimizations are deferred proposals.
+- **2026-10-31 reconciliation:** The original allocation change and its regression fix
+  are resolved. Whole-interval allocation remains in use; live-range
+  splitting/frame-pointer proposals are deferred, with no fresh SHA-256 profile or spill
+  count claimed.
+
 - **Discovery:** profiling varints (1.44-1.75x C) and sha256 (1.35-1.78x C)
   natively on Linux x86-64 after TL-097.
 - **Evidence:** both were short of registers. The emitter reserved rax, rcx,
@@ -2864,8 +2942,13 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-103: Native code reloaded struct fields and repeated bounds checks
 
-- **Status:** partly resolved after the post-M30 review (real-program
-  measurement, step 4); see Remaining.
+- **Status:** resolved original field reload and repeated-check findings;
+  additional number-parser profiling/optimization is deferred.
+- **2026-10-31 reconciliation:** The original passes and regression coverage are
+  implemented, and later retained Linux real-program acceptance passes. The historical
+  instruction count is a profiling opportunity, not an unclosed acceptance threshold;
+  further optimization remains deferred.
+
 - **Discovery:** `bench/real_programs.py --gate --with-rust` on Linux x86-64:
   the JSON service took 0.385 s native, 0.332 s through C, 0.349 s for the
   C reference and 0.172 s in Rust. Under callgrind, `json.number_value` was
@@ -2988,12 +3071,17 @@ the same entry. Close it with a commit or validation result; keep its history.
   331/331; native run fixtures 133/133 at `VELA_OPT=0` and under
   `--sanitize`; 2,000 differential programs agree; the native fixed point
   holds.
-- **Remaining:** `number_value` still runs about 250 instructions per
-  number.
+- **Historical profiling follow-up:** `number_value` ran about 250
+  instructions per number at this snapshot; no current instruction target
+  or acceptance failure is established by that count.
 
 ### TL-104: x86-64 divided by constants with idiv
 
-- **Status:** resolved for x86-64; arm64 is open (below).
+- **Status:** resolved for x86-64; ARM64 reciprocal division is deferred.
+- **2026-10-31 reconciliation:** A fresh ARM64 `/ 3` and `% 10` assembly probe still
+  emits `sdiv`. The extension remains applicable but deferred; profile it alongside
+  TL-112 before choosing an optimization.
+
 - **Discovery:** TL-103's profile: `json.whole_number` divided by 10 for
   every digit (`(min + d) / 10`); fasta takes a remainder by a constant for
   every random number.
@@ -3014,8 +3102,9 @@ the same entry. Close it with a commit or validation result; keep its history.
   at both optimization settings; the generated code has no `idiv`. fasta
   went from 1.47x to 1.24x C.
 - **Remaining:** arm64 still uses `sdiv` for such constants. It is much
-  cheaper there than `idiv`, and this host cannot run arm64 code; change it
-  with the macOS validation.
+  cheaper there than `idiv`. The original x86-64 profiling host could not
+  execute ARM64; a later Mac probe confirms the instruction remains. Any
+  extension is deferred pending profiling and measurement.
 
 ### TL-105: The json package read every whole number twice
 
@@ -3232,12 +3321,16 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### TL-109: Growable arrays have no pop in the safe language
 
-- **Status:** open (proposal).
+- **Status:** deferred API proposal; no safe prelude pop is implemented.
+- **2026-10-31 reconciliation:** `pop(mut xs)` still fails with E3155 (and E3096).
+  `memory.truncate` is now documented in the generated guide. Only safe pop/prelude
+  convenience API work remains deferred; the port workaround remains in place.
+
 - **Discovery:** post-M30 CommonMark port.
 - **Evidence:** a stack popped as `xs = xs[0..len(xs) - 1]` copies the
   array, as slices of arrays copy, so a stack becomes quadratic.
-  `memory.truncate` exists but is undocumented and belongs to the memory
-  module.
+  At discovery, `memory.truncate` existed but was undocumented and belonged
+  to the memory module; its signature now appears in the generated guide.
 - **Workaround:** the port keeps a count of live entries and overwrites the
   rest (`inlines.Parser.open_brackets`, `blocks.process_inlines`).
 - **Proposed improvement:** `pop(mut xs) -> Option[T]` and a documented
@@ -3287,6 +3380,10 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-111: A short-circuit Bool used only by a branch is materialized
 
 - **Status:** resolved.
+- **2026-10-31 reconciliation:** Boolean threading and subsequent correctness fixes are
+  resolved. Comparison ordering remains a deferred proposal; the signed/negative-index
+  checks are not proven redundant.
+
 - **Discovery:** post-M30 CommonMark port: native code of
   `inlines.plain` (`vela asm bench/real/markdown/main.vl`).
 - **Evidence:** `special(c)`, a chain of `c == x || ...`, inlined into a
@@ -3333,6 +3430,16 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### TL-112: The native markdown program trails its C build on arm64
 
 - **Status:** open; one cause fixed, the rest observed.
+- **2026-10-31 reconciliation:** Fresh three-round ARM64 measurements at `f78b19f` match
+  cmark for all 26 inputs. Startup-adjusted best times give native/C **1.264×** on
+  repository Markdown (0.2314/0.1830 s), **1.364×** geometric mean across 25 feature
+  samples, and **1.494×** on block-code. See [raw
+  results](../bench/results/2026-10-31-markdown-macos-recheck.json) and
+  [method/limits](backlog-reconciliation.md#tl-112-remains-a-measured-arm64-performance-gap).
+  CPU-brand lookup was denied; this report establishes ARM64 execution, not a new
+  independent M2 identification. Different source/input snapshots prevent an A/B speedup
+  claim; vectorization remains a hypothesis. The performance gap remains open.
+
 - **Discovery:** post-M30 comparison of the markdown package with cmark
   ([report](../bench/results/2026-10-28-markdown-cmark-macos.md)).
 - **Evidence (observed):** on an Apple M2, `python3 bench/markdown_compare.py
@@ -3822,7 +3929,19 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
 
-- **Status:** open; observed in post-M30 CI log review.
+- **Status:** resolved historical gate incident by later retained Linux
+  validation; not a current-head CI certification. Observed after M30.
+- **2026-10-31 reconciliation:** Later [Linux
+  validation](../bench/results/2026-10-29-linux-validation.json) at `bc73a4f` plus the
+  TL-115 harness change records passing [release
+  parity](../bench/results/2026-10-29-linux-release-parity.json) (native/C geometric
+  mean 1.226, native compiler faster) and [real-program
+  acceptance](../bench/results/2026-10-29-linux-real-programs.json) (C/native means
+  1.007/0.833). Impact median is 0.777 s (best 0.712); check median 0.436 s (best
+  0.389). The macOS release-parity pass is already recorded under run 40211096749 below.
+  These supersede the historical failing checkpoints. This closes the recorded incident,
+  not complete release certification of later heads; no CI run was launched.
+
 - **Evidence:** Linux
   [run 40183666565](https://github.com/nathgoutam93/vela/actions/runs/40183666565/job/121139807985)
   measured M24 `query impact` samples of 1.2501, 1.1935, and 1.1719
@@ -3836,7 +3955,7 @@ the same entry. Close it with a commit or validation result; keep its history.
 - **Impact:** performance gates can fail after functional suites pass, and the
   current code has no host CI result.
 - **Workaround:** retain the failed measurements and run links; do not claim the gates pass from local results or change their thresholds based on one run.
-- **Required work:** manually rerun Platforms on the current commit after
+- **Historical CI handoff (superseded):** manually rerun Platforms on the current commit after
   TL-067 and TL-068, inspect uploaded timing JSON and job logs, and repeat
   the affected measurements on the same host if they fail again. Diagnose
   any repeatable slowdown before changing a gate.
@@ -3880,8 +3999,8 @@ the same entry. Close it with a commit or validation result; keep its history.
   1.283× C with a faster native-built compiler
   ([report](../bench/results/2026-10-26-x64-layout-release-parity.json)). Per
   TL-085, one run on this host is not a stable margin; the M24/M29 query budgets
-  above remain failing.
-- **Native Linux handoff:** after `sh compiler/bootstrap/bootstrap.sh --native`,
+  above were still failing at this checkpoint; later results supersede it.
+- **Historical native Linux handoff (completed by later evidence):** after `sh compiler/bootstrap/bootstrap.sh --native`,
   run `python3 -u bench/real_programs.py --compiler build/vela --gate --runs 3
   --json build/m29-real-programs-native-linux.json` on the intended host.
   Retain that report, source commit, CPU, kernel and C compiler version.
@@ -4085,6 +4204,10 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### VAL-002: Measure M17 with agents
 
 - **Status:** open; carried from M17.
+- **2026-10-31 reconciliation:** The evaluation inventory contains 21 tasks and
+  static/reference evidence, without retained model-driven graded trials or a selected
+  model/harness. This acceptance remains open.
+
 - **Evidence:** the twenty evaluation tasks pass their reference-solution
   self-test. Static checks find codes on 374 of 374 negative-test diagnostics,
   with edits on 21. No new model-driven agent runs were performed.
@@ -4134,6 +4257,10 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### VAL-003: Check the guide with the evaluation model's tokenizer
 
 - **Status:** open; carried from M17.
+- **2026-10-31 reconciliation:** Fresh guide output is 31,998 bytes, or 7,999.5 by
+  bytes/4. The model/tokenizer remains unselected, so this estimate does not close
+  actual tokenizer acceptance.
+
 - **Evidence:** `vela guide` is about 17 KB, or 4,200 tokens under M16's
   bytes/4 estimate. The current integration test gates that estimate rather
   than an actual model-specific token count.
@@ -4176,7 +4303,13 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### VAL-004: Execute M24 Linux kernel capability policies
 
-- **Status:** open; discovered in M24, separate from proposed tooling features.
+- **Status:** partially validated on native Linux; disabled/older Landlock
+  and explicit descriptor-closure acceptance remain open. Discovered in M24.
+- **2026-10-31 reconciliation:** Credit the native Linux ABI-7 execution recorded below.
+  Only disabled/older Landlock fail-closed behavior and a separately confirmed
+  descriptor-closure oracle remain unverified; the original macOS/Docker limitation no
+  longer describes all available evidence.
+
 - **Evidence:** this host is macOS ARM64 and Docker has no usable daemon.
   runtime/vela_rt.c cross-compiles to a Linux x86-64 object with strict C11,
   Wall/Wextra/Werror, pedantic and Wshadow using Debian bookworm libc/kernel
@@ -4222,6 +4355,11 @@ the same entry. Close it with a commit or validation result; keep its history.
 ### VAL-005: Complete native Windows platform acceptance
 
 - **Status:** open; discovered during M26.
+- **2026-10-31 reconciliation:** The retained native Windows runs are partial.
+  TL-001/TL-054/TL-061/TL-073/TL-075 implementation fixes do not establish full Windows
+  acceptance. Preserve the standalone handoff below and the request for no further CI
+  workflows.
+
 - **Evidence:** Windows x86-64 executables and the compiler cross-link with Zig
   0.17.0. Under Wine 8 with LANG=C.UTF-8, independent C ABI and full Windows
   systems oracles execute; the compiler checks itself and emits C identical
@@ -4263,8 +4401,17 @@ the same entry. Close it with a commit or validation result; keep its history.
 
 ### VAL-006: Native-host M27 debugging and observability acceptance
 
-- **Status:** open; discovered in M27. The user requested proceeding without
-  the native host; this does not close M26 VAL-001/VAL-004/VAL-005.
+- **Status:** partially validated; macOS LLDB and Linux GDB execution have
+  evidence. Remaining copied-compiler/cross-host and Windows checks are open.
+  Discovered in M27; the original decision to proceed did not waive acceptance.
+- **2026-10-31 reconciliation:** Explicit Linux GDB execution is recorded under
+  TL-071/TL-086/TL-088, alongside the macOS LLDB and copied-compiler evidence recorded
+  in this entry. The later Linux report’s generic “debugger passed” phase does not prove
+  every opt-in case: `tests/m27_test.py` gates GDB and copied-compiler panic separately.
+  Remaining Linux copied-compiler/cross-host and native Windows debugger acceptance is
+  unconfirmed. VAL-001 is resolved at its retained snapshot; keep VAL-004/VAL-005’s
+  narrower remaining scope separate.
+
 - **Evidence:** macOS ARM64 C/native LLDB breakpoint, backtrace and step-over
   acceptance passes, including a controlled panic deep in copied compiler
   sources. C Linux/Windows/WASI and native Linux cross-debug links pass

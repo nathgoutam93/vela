@@ -12,7 +12,7 @@ reference material.
 | Integrate an agent or editor | [Agent JSON contracts](agent-json.md) and [editor setup](../editors/README.md) |
 | Check compatibility and release promises | [Compatibility policy](compatibility.md) |
 | Choose milestone work | [Roadmap](roadmap-after-m18.md) and [accepted design baseline](design-baseline-to-m30.md) |
-| Check known issues or remaining acceptance | [Tooling backlog](tooling-backlog.md), especially [outstanding validation](tooling-backlog.md#outstanding-validation) |
+| Check known issues or remaining acceptance | [Current reconciliation](backlog-reconciliation.md) and [tooling backlog](tooling-backlog.md#outstanding-validation) |
 | Understand how a feature was implemented | [Milestone walkthrough index](history/README.md) |
 | Reproduce measurements | [Benchmarks](../bench/README.md) and [agent evaluation](../evaluation/README.md) |
 

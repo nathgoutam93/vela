@@ -23,6 +23,18 @@ The [tooling follow-up before M30](history/tooling-followup-before-m30.md) recor
 local diagnostic, guide, loader, cache and long-literal fixes, separately from
 the outstanding agent-model and native-host validation.
 
+## Current acceptance reconciliation
+
+The [2026-10-31 audit](backlog-reconciliation.md) supersedes stale pending
+labels in milestone-era walkthroughs. Retained native Linux suites,
+sanitizers and performance gates resolve VAL-001 and the historical VAL-007
+incident at their recorded snapshot. Remaining acceptance is specific:
+agent trials (VAL-002), actual tokenizer counting (VAL-003), kernel edge
+cases (VAL-004), native Windows (VAL-005), and remaining debugger/platform
+cases (VAL-006). TL-112 is freshly reproduced on macOS ARM64. Deferred
+backlog proposals are separate from these validation gates. No additional
+CI workflow run was launched.
+
 ## Design baseline through M30
 
 The [2026-10-25 scope decision](design-baseline-to-m30.md) accepts three
@@ -78,7 +90,8 @@ measurements and remaining platform validation.
 ## M19: Fixed-width integers and bit operations
 
 **Status:** implemented; C-backend acceptance passes. See [the walkthrough](history/m19-integers.md)
-for semantics, benchmark measurements, and outstanding Linux native/sanitizer validation.
+for semantics and benchmark measurements. Later retained Linux native and
+sanitizer validation resolves VAL-001 at its recorded snapshot.
 
 **Needs:** nothing before it.
 
@@ -104,7 +117,8 @@ dispatch, custom-key acceptance, and remaining platform validation.
 ## M21: Calling C under `uses unsafe`
 
 **Status:** implemented; see [the walkthrough](history/m21-c-interop.md) for the LP64
-ABI, zlib/SQLite examples, audit query, and remaining Linux native validation.
+ABI, zlib/SQLite examples and audit query. Later retained Linux native
+validation resolves VAL-001 at its recorded snapshot.
 
 **Needs:** M19 (C's integer types).
 
@@ -130,7 +144,8 @@ retained views, Bytes, inline fixed arrays, typed arenas and measured C parity.
 ## M23: A standard library for systems work
 
 **Status:** implemented; see [the walkthrough](history/m23-systems-library.md) for
-effect fakes, systems APIs and remaining Linux native/sanitizer validation.
+effect fakes and systems APIs. Later retained Linux native/sanitizer
+validation resolves VAL-001 at its recorded snapshot.
 
 **Needs:** M19, M20 (readers and writers as interfaces), M21 (the OS's calls) and M22 (byte buffers).
 
@@ -142,11 +157,11 @@ effect fakes, systems APIs and remaining Linux native/sanitizer validation.
 
 ## M24: Agent safety and queries
 
-**Status:** implemented for the supported macOS C/native profiles (native
-execution added in M26a), with fail-closed
-limits for unsafe policies. Linux seccomp/Landlock execution acceptance is
-still outstanding. See [the walkthrough](history/m24-agent-safety.md) and VAL-004 in
-[the tooling backlog](tooling-backlog.md).
+**Status:** implemented and validated on macOS and native Linux C/native
+profiles. Linux seccomp/Landlock ABI-7 execution passes; disabled/older
+Landlock fail-closed behavior and explicit descriptor-closure validation
+remain VAL-004. See [the walkthrough](history/m24-agent-safety.md) and
+[the reconciliation](backlog-reconciliation.md).
 
 **Needs:** M21 (unsafe, to allow or deny) and M23 (net and clock, to enforce).
 
@@ -161,8 +176,9 @@ still outstanding. See [the walkthrough](history/m24-agent-safety.md) and VAL-00
 **Status:** implemented and locally validated on macOS ARM64. Performance
 acceptance passes (1.460 times C; native compiler faster on checking and C
 emission), both bootstrap fixed points pass, and the C/native suites and
-available UBSan checks pass. Linux execution and ASan/TSan remain VAL-001;
-broader platform delivery stays in M26. See the
+available UBSan checks pass. Later retained Linux execution, ASan/UBSan,
+TSan and parity gates resolve VAL-001 at their recorded snapshot; broader
+platform delivery stays in M26. See the
 [walkthrough](history/m25-native-parity.md) and [experiments](history/m25-experiments.md).
 
 **Needs:** the existing IR; M26a enables measurements on the available Mac.
@@ -195,9 +211,9 @@ Windows, WASI, general cross-linking and Linux execution proofs remain separate.
 **Status:** in progress; [M26a](history/m26a-macos-arm64.md) supplies native macOS ARM64.
 [M26 platform work](history/m26-platforms.md) adds target/toolchain selection, Windows
 C and WASI runtime profiles, cross-linking and execution oracles. Native
-Windows full-suite and Linux kernel-policy acceptance remain open; see
-VAL-004/VAL-005 in the tooling backlog. Cross-linking and emulator evidence
-do not substitute for those execution gates.
+Windows full-suite acceptance and specific Linux kernel edge cases remain
+open under VAL-004/VAL-005. Native Linux ABI-7 policy execution is validated.
+Cross-linking and emulator evidence do not substitute for those execution gates.
 
 **Needs:** M23 (std on every OS) and M25 (the native backend to port).
 
@@ -209,10 +225,10 @@ do not substitute for those execution gates.
 
 ## M27: Debugging and observability
 
-**Status:** implemented and locally validated; native-host acceptance remains
-open. See [the walkthrough](history/m27-observability.md). Proceeding at the user's request while
-native hosts are unavailable; M26 acceptance gaps remain open. M27 foreign
-debugger execution is tracked separately as VAL-006.
+**Status:** implemented, with macOS LLDB and Linux GDB execution evidence.
+See [the walkthrough](history/m27-observability.md). Remaining Linux
+copied-compiler/cross-host and native Windows debugger acceptance is tracked
+as VAL-006; M26's narrower platform/kernel gaps remain separate.
 
 **Needs:** M25 and M26 (debug information for both backends, on every platform).
 
@@ -227,7 +243,9 @@ debugger execution is tracked separately as VAL-006.
 **Status:** implemented; local regression, bounded verification and release
 performance gates pass. See
 [the walkthrough](history/m28-verification.md). Actual counterexample-only agent
-repair trials and foreign native-host acceptance remain outstanding.
+repair trials and native Windows acceptance remain outstanding. Retained
+Linux M28 integration/solver evidence is credited in VAL-001; static task
+fixtures do not establish actual agent repair trials.
 
 **Needs:** M19 (exact integer semantics for the solver) and M20 (generators as interfaces).
 
@@ -257,7 +275,8 @@ Property-test success remains separate from formal proof.
 **Status:** implemented and locally validated: 100k-line check 0.303 s;
 real-program means 0.933× C through C and 1.026× C natively. Both fixed points
 and available correctness/sanitizer/release gates pass. See
-[the walkthrough](history/m29-scale.md). Foreign-host acceptance remains separate.
+[the walkthrough](history/m29-scale.md). Later retained Linux real-program
+and scale gates pass; native Windows acceptance remains separate.
 
 **Needs:** M21 and M23 (real programs call C and use std) and M25 (both backends measured).
 
@@ -278,8 +297,8 @@ toolchains. See the [baseline](design-baseline-to-m30.md#m29-measure-all-relevan
 specification, compatibility policy, agent JSON contracts, retained corpus,
 both bootstrap fixed points and local regression checks. See
 [M30](history/m30-specification.md). This does
-not close the inherited agent/tokenizer/native-host acceptance gaps or
-declare a final 1.0 release. Automatic push/PR workflows are temporarily
+not close the remaining agent/tokenizer, Windows, kernel-edge and debugger
+acceptance gaps or declare a final 1.0 release. Automatic push/PR workflows are temporarily
 paused at the user's request; platform jobs remain manually dispatchable.
 
 **Needs:** everything above.

@@ -30,6 +30,8 @@ Run tools from [bench/](../README.md) and put fresh scratch reports in `build/`.
 | [`2026-10-30-regex-lazy-dfa.md`](2026-10-30-regex-lazy-dfa.md) | The regex package's lazy DFA: design, differential testing against the Pike VM, a VM bug it found, speed on long and short texts |
 | [`2026-10-30-raw-strings-enum-payloads.md`](2026-10-30-raw-strings-enum-payloads.md) | Raw string literals (TL-122) and boxed large enum payloads (TL-117): design, compatibility, memory and time of the TOML decoder and the compiler |
 | [`2026-10-30-unicode-tables.md`](2026-10-30-unicode-tables.md) | Unicode properties and case folding in std/unicode (TL-106): table representation and compile time, exhaustive comparison with Python, markdown and Unicode regex |
+| [`2026-10-31-markdown-macos-recheck.json`](2026-10-31-markdown-macos-recheck.json) | Fresh TL-112 ARM64 recheck at f78b19f: 26 matching cmark outputs, startup-adjusted native/C repository ratio 1.264× and feature geometric mean 1.364× |
+| [`2026-10-31-backlog-reconciliation.json`](2026-10-31-backlog-reconciliation.json) | Source/behavior probes, diagnostic exits, host selection and measurement limits supporting the [backlog audit](../../docs/backlog-reconciliation.md) |
 | `*-validation.json` | Commands, environments, outcomes and validation limits |
 
 Reports retain their original bytes. Paths, commands, source digests and

@@ -1,5 +1,10 @@
 # M26: Platforms
 
+Later status: the [2026-10-31 reconciliation](../backlog-reconciliation.md)
+credits retained Linux execution and debugger evidence and narrows the
+remaining acceptance. Pending labels below describe milestone-era evidence;
+consult the reconciliation and current backlog for current status.
+
 Status: implementation and validation in progress. Target/toolchain selection,
 Windows C and WASI runtime profiles, and cross-linking are implemented. macOS
 ARM64 remains supported through both backends. Windows execution recorded here
