@@ -112,6 +112,11 @@ type Fn = struct {
     hoisted: Map[Int, Bool]
     cached: Map[Int, Cached]
     taken: Map[Int, Bool]  // locals whose address is taken: they live in memory
+    // `match maps.get(m, k)` whose arms only set m[k] (counting): the map's
+    // and the key's locals the lookup is for, then [slot, hash's address,
+    // map looked in, map local, key local] for the arms' writes.
+    fuse: [Int]
+    fused: [Int]
 }
 
 type Low = struct {
@@ -137,6 +142,7 @@ fn new_fn(name: Str, result: Int) -> Fn {
     return Fn {
         f: ir.new_func(name, result), filename: "", current_fn: -1, params: [], args: [], cname: name, locals: [:],
         captures: [:], closure_result: -2, closures: 0, frames: [], dead: false, observe: false, sret: -1, taken: [:], env: ranges.new_env([]), hoisted: [:], cached: [:],
+        fuse: [], fused: [],
     }
 }
 
@@ -1808,7 +1814,12 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
             }
             g.fs.dead = true
         }
-        ast.StmtKind.MatchStmt(scrutinee, arms) => match_code(mut g, scrutinee, arms, no_value())
+        ast.StmtKind.MatchStmt(scrutinee, arms) => {
+            g.fs.fuse = counting(g, scrutinee, arms)
+            match_code(mut g, scrutinee, arms, no_value())
+            g.fs.fuse = []
+            g.fs.fused = []
+        }
         ast.StmtKind.Unsafe(body) => block(mut g, body, "block")
         ast.StmtKind.With(items, body) => with_code(mut g, items, body)
         ast.StmtKind.Block(_) => {}  // handled in stmt
@@ -1976,6 +1987,30 @@ fn assign(g: mut Low, target: ast.Expr, v: ast.Expr) {
                 return
             }
             if types.is_map(g.k.table, ot) {
+                let f = g.fs.fused
+                if len(f) == 5 && local_of(g, obj.id) == f[3] && local_of(g, i.id) == f[4] {
+                    // The lookup's slot when the map is the one looked in,
+                    // else an insert with its hash: no second lookup. The
+                    // key is borrowed: the map retains it only if it keeps it.
+                    // A new value for a key already there, in the map looked
+                    // in, inline; anything else in the runtime.
+                    let m = scalar(mut g, container)
+                    let slow = label(mut g)
+                    let done = label(mut g)
+                    branch_cmp(mut g, "ne", m, f[2], slow)
+                    branch_cmp(mut g, "eq", f[0], konst(mut g, 0), slow)
+                    let vt = ty(g, target)
+                    release(mut g, vt, mem_val(f[0], 0, vt))
+                    put(mut g, f[0], 0, vt, c)
+                    jump(mut g, done)
+                    place_label(mut g, slow)
+                    let ka = element_copy(mut g, expr(mut g, i))
+                    let va = element_copy(mut g, c)
+                    ccall(mut g, "vela_map_set_found", [m, f[2], f[0], load(mut g, f[1], 0, 8), ka, va],
+                        [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_NONE(), -1)
+                    place_label(mut g, done)
+                    return
+                }
                 let key = consume(mut g, expr(mut g, i))
                 let ka = element_copy(mut g, key)
                 let va = element_copy(mut g, c)
@@ -2214,6 +2249,82 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
     place_label(mut g, end)
     // When every arm ends the function or the loop, nothing after the match runs.
     g.fs.dead = all_end
+}
+
+// For `match maps.get(m, k) { ... }` where m and k are locals and every arm
+// is `m[k] = value` with no call in the value, or empty: [m's local, k's
+// local], else []. Then nothing between the lookup and the write can change
+// the map, so the write may use the lookup's slot (TL-128).
+fn counting(g: Low, scrutinee: ast.Expr, arms: [ast.Arm]) -> [Int] {
+    let mut map = -1
+    let mut key = -1
+    match scrutinee.kind {
+        ast.ExprKind.Call(_, args) => {
+            match g.k.refs[scrutinee.id] {
+                checker.Ref.Builtin(name) => {
+                    if name != "maps.get" || len(args) != 2 {
+                        return []
+                    }
+                }
+                _ => return []
+            }
+            match args[0].kind {
+                ast.ExprKind.Name(_) => map = local_of(g, args[0].id)
+                _ => return []
+            }
+            if !unchanging(g, args[1]) {
+                return []
+            }
+            key = local_of(g, args[1].id)
+        }
+        _ => return []
+    }
+    if map < 0 || key < 0 || maps.has(g.k.escaped, map) {
+        return []
+    }
+    for a in arms {
+        match a.body {
+            ast.ArmBody.Do(st) => {
+                match st.kind {
+                    ast.StmtKind.Assign(target, value) => {
+                        match target.kind {
+                            ast.ExprKind.Index(obj, i) => {
+                                if local_of(g, obj.id) != map || local_of(g, i.id) != key || !call_free(value) {
+                                    return []
+                                }
+                            }
+                            _ => return []
+                        }
+                    }
+                    ast.StmtKind.Block(b) => {
+                        if len(b.stmts) > 0 {
+                            return []
+                        }
+                    }
+                    _ => return []
+                }
+            }
+            _ => return []
+        }
+    }
+    return [map, key]
+}
+
+// Whether an expression has no call, mut argument, closure or match in it:
+// nothing that could change a map.
+fn call_free(e: ast.Expr) -> Bool {
+    return match e.kind {
+        ast.ExprKind.IntLit(_) => true
+        ast.ExprKind.FloatLit(_) => true
+        ast.ExprKind.StrLit(_) => true
+        ast.ExprKind.BoolLit(_) => true
+        ast.ExprKind.ByteLit(_) => true
+        ast.ExprKind.Name(_) => true
+        ast.ExprKind.Unary(_, x) => call_free(x)
+        ast.ExprKind.Binary(_, a, b) => call_free(a) && call_free(b)
+        ast.ExprKind.Field(x, _) => call_free(x)
+        _ => false
+    }
 }
 
 fn unchanging(g: Low, e: ast.Expr) -> Bool {
@@ -2552,9 +2663,22 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
             let a = scalar(mut g, expr(mut g, lo))
             let b = scalar(mut g, expr(mut g, hi))
             if t == types.STR() {
+                // Inline, as generated C's vela_slice (M18): checked bounds,
+                // the parent's bytes and object, one more reference to it.
+                let parts = str_parts(mut g, o, obj)
+                let bad = label(mut g)
+                let ok = label(mut g)
+                branch_cmp(mut g, "ugt", b, parts.length, bad)  // also hi < 0
+                branch_cmp(mut g, "ugt", a, b, bad)  // also lo < 0
+                jump(mut g, ok)
+                place_label(mut g, bad)
+                noreturn(mut g, "vela_panic", [loc_of(mut g, e), sym_addr(mut g, cstring(mut g, "slice out of range"))], [ir.KIND_INT(), ir.KIND_INT()])
+                place_label(mut g, ok)
                 let out = slot_val(mut g, t)
-                ccall(mut g, "vela_str_slice", [address(mut g, o), a, b, loc_of(mut g, e)],
-                    [ir.KIND_STR(), ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_STR(), out.reg)
+                store(mut g, out.reg, 0, 8, object(mut g, o, 0))
+                store(mut g, out.reg, 8, 8, op2(mut g, ir.Op.Add, parts.data, a))
+                store(mut g, out.reg, 16, 8, op2(mut g, ir.Op.Sub, b, a))
+                retain(mut g, t, out)
                 return own(mut g, out)
             }
             let r = ccall(mut g, "vela_array_slice", [scalar(mut g, o), a, b, loc_of(mut g, e)],
@@ -3716,7 +3840,22 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     }
     let key = expr(mut g, args[1])
     let ka = element_copy(mut g, key)
-    let found = ccall(mut g, "vela_map_find", [m, ka], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    let mut found = -1
+    let request = g.fs.fuse
+    if name == "maps.get" && len(request) == 2 && local_of(g, args[0].id) == request[0] && local_of(g, args[1].id) == request[1] {
+        // Remembered for the arms' writes of the same key (as codegen.vl's
+        // Found): the slot, the key's hash and the map looked in.
+        let hash = slot_val(mut g, types.INT())
+        found = ccall(mut g, "vela_map_find_hashed", [m, ka, hash.reg], [ir.KIND_INT(), ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+        // The map's pointer now, not the variable's register: a
+        // copy-on-write before the write replaces the variable's map.
+        let looked_in = reg(mut g, ir.INT())
+        emit(mut g, ir.inst(ir.Op.Move, looked_in, m, -1, 0))
+        g.fs.fused = [found, hash.reg, looked_in, request[0], request[1]]
+        g.fs.fuse = []
+    } else {
+        found = ccall(mut g, "vela_map_find", [m, ka], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_INT(), -1)
+    }
     if name == "maps.has" {
         return reg_val(cmp_imm(mut g, 1, found, 0), types.BOOL())
     }

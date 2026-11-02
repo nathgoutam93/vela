@@ -57,6 +57,7 @@ type Out = struct {
     doubles: Map[Str, Str]  // the label of each Float constant, shared by the file
     files: Map[Str, Int]
     saved: [Str]  // callee-saved registers pushed
+    threads: Map[Int, Int]  // labels whose block only jumps: where it jumps to, in the end
 }
 
 pub fn program(p: ir.Program) -> Str {
@@ -718,6 +719,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
     let total = align_up(at + out_bytes, 16)
     let mut o = Out {
         lines: [], fid: fid, locs: locs, classes: f.classes, stubs: [], stub_count: 0, labels: 0, doubles: doubles, saved: saved, files: files,
+        threads: jump_threads(f),
     }
     push(mut o.lines, "")
     push(mut o.lines, "    .p2align 4")
@@ -844,8 +846,19 @@ fn branch_suffix(c: Str) -> Str {
 
 // `next` is the label right after this instruction, or -1: a jump there
 // is left out.
-fn instruction(o: mut Out, f: ir.Func, i: ir.Inst, next: Int) {
-    let op = i.op
+fn instruction(o: mut Out, f: ir.Func, i0: ir.Inst, next0: Int) {
+    let op = i0.op
+    let mut i = i0
+    let mut next = next0
+    if op == ir.Op.Jump || op == ir.Op.Branch || op == ir.Op.BranchCmp {
+        // A target whose block only jumps on is the label it jumps to; and
+        // falling into such a block reaches the same place.
+        i.imm = target(o, i.imm)
+        if op == ir.Op.Branch {
+            i.imm2 = target(o, i.imm2)
+        }
+        next = target(o, next0)
+    }
     if op == ir.Op.Source { emit(mut o, ".loc " + num(o.files[i.sym]) + " " + num(i.imm) + " " + num(i.imm2)); return }
     if op == ir.Op.Label {
         push(mut o.lines, ir_label(o, i.imm) + ":")
@@ -1677,6 +1690,11 @@ fn body(o: mut Out, f: ir.Func, seq: [Int], skips: Map[Int, Bool], reads: [Int],
             p = p + folded
             continue
         }
+        let scaled = scaled_add(mut o, f, seq, p, reads)
+        if scaled > 0 {
+            p = p + scaled
+            continue
+        }
         if i.op == ir.Op.Load && i.imm2 == 4 && reads[i.dst] == 1 && p + 1 < len(seq) && seq[p + 1] == k + 1 &&
             zero32(f.insts[k + 1], i.dst) {
             let e = f.insts[k + 1]
@@ -1716,9 +1734,9 @@ fn body(o: mut Out, f: ir.Func, seq: [Int], skips: Map[Int, Bool], reads: [Int],
         // A compare and branch, then a jump, then the branch's own target:
         // one jump on the opposite condition.
         if i.op == ir.Op.BranchCmp && p + 1 < len(seq) && seq[p + 1] == k + 1 && f.insts[k + 1].op == ir.Op.Jump &&
-            label_after(f, seq, p + 1) == i.imm && f.insts[k + 1].imm != i.imm {
+            target(o, label_after(f, seq, p + 1)) == target(o, i.imm) && target(o, f.insts[k + 1].imm) != target(o, i.imm) {
             compare(mut o, i)
-            emit(mut o, "j" + negated(branch_suffix(i.sym)) + " " + ir_label(o, f.insts[k + 1].imm))
+            emit(mut o, "j" + negated(branch_suffix(i.sym)) + " " + ir_label(o, target(o, f.insts[k + 1].imm)))
             p = p + 2
             continue
         }
@@ -1769,6 +1787,31 @@ fn zero32(e: ir.Inst, v: Int) -> Bool {
 // base + index * scale, then a load or store through it, with the product
 // and the address read nowhere else: one scaled-index memory operand.
 // Returns how many positions of seq it covers, or 0.
+// A multiplication by 1, 2, 4 or 8 that only an addition right after it
+// reads: one lea (an element's address used more than once, as a swap's).
+fn scaled_add(o: mut Out, f: ir.Func, seq: [Int], p: Int, reads: [Int]) -> Int {
+    let k = seq[p]
+    if p + 1 >= len(seq) || seq[p + 1] != k + 1 {
+        return 0
+    }
+    let m = f.insts[k]
+    let a = f.insts[k + 1]
+    if m.op != ir.Op.MulImm || !(m.imm == 1 || m.imm == 2 || m.imm == 4 || m.imm == 8) || reads[m.dst] != 1 {
+        return 0
+    }
+    if a.op != ir.Op.Add || a.a == a.b || !(a.a == m.dst || a.b == m.dst) || o.classes[a.dst] == ir.FLOAT() {
+        return 0
+    }
+    let mut base = a.a
+    if base == m.dst {
+        base = a.b
+    }
+    let d = result_reg(o, a.dst)
+    emit(mut o, "lea " + d + ", [" + in_reg(mut o, base, "r11") + " + " + in_reg(mut o, m.a, "rax") + "*" + num(m.imm) + "]")
+    set(mut o, a.dst, d)
+    return 2
+}
+
 fn indexed(o: mut Out, f: ir.Func, seq: [Int], p: Int, reads: [Int]) -> Int {
     let k = seq[p]
     if p + 2 >= len(seq) || seq[p + 1] != k + 1 || seq[p + 2] != k + 2 {
@@ -1864,6 +1907,45 @@ fn fusable(i: ir.Inst) -> Bool {
     return i.op == ir.Op.FCmp && i.imm >= 2
 }
 
+// By label: where a block that only jumps (after any labels) leads in the
+// end, so branches to it go there directly (jump threading).
+fn jump_threads(f: ir.Func) -> Map[Int, Int] {
+    let mut direct: Map[Int, Int] = [:]
+    let n = len(f.insts)
+    for k in 0..n {
+        if f.insts[k].op != ir.Op.Label {
+            continue
+        }
+        let mut j = k + 1
+        for j < n && (f.insts[j].op == ir.Op.Label || f.insts[j].op == ir.Op.Source) {
+            j = j + 1
+        }
+        if j < n && f.insts[j].op == ir.Op.Jump && f.insts[j].imm != f.insts[k].imm {
+            direct[f.insts[k].imm] = f.insts[j].imm
+        }
+    }
+    let mut out: Map[Int, Int] = [:]
+    for l in maps.keys(direct) {
+        let mut t = direct[l]
+        let mut hops = 0
+        for maps.has(direct, t) && hops < 16 {
+            t = direct[t]
+            hops = hops + 1
+        }
+        if hops < 16 {
+            out[l] = t  // a cycle of jumps keeps its first one
+        }
+    }
+    return out
+}
+
+fn target(o: Out, l: Int) -> Int {
+    match maps.get(o.threads, l) {
+        Some(t) => return t
+        None => return l
+    }
+}
+
 fn negated(cc: Str) -> Str {
     return match cc {
         "e" => "ne"
@@ -1880,7 +1962,11 @@ fn negated(cc: Str) -> Str {
 }
 
 // The comparison c and the branch b on it, as a compare and a jump.
-fn fused(o: mut Out, c: ir.Inst, b: ir.Inst, next: Int) {
+fn fused(o: mut Out, c: ir.Inst, b0: ir.Inst, next0: Int) {
+    let mut b = b0
+    b.imm = target(o, b0.imm)
+    b.imm2 = target(o, b0.imm2)
+    let next = target(o, next0)
     let mut cc = ""
     if c.op == ir.Op.FCmp {
         if c.imm >= 4 {

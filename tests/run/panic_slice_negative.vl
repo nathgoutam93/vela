@@ -1,0 +1,8 @@
+// err: panic_slice_negative.vl:7:12: panic: slice out of range
+// exit: 101
+// A negative start is out of range, as is an end past the string.
+fn main() {
+    let s = "abc"
+    let lo = 1 - 2
+    print(s[lo..2])
+}

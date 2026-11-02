@@ -1,0 +1,24 @@
+// String slices at the edges: empty ones, the whole string, slices of
+// slices and of literals (which have no object to share).
+// out: [] [] [abc] [b]
+// out: [bc] [c] 2
+// out: [held]
+import strings
+
+fn part(s: Str, a: Int, b: Int) -> Str {
+    return s[a..b]
+}
+
+fn main() {
+    let s = "abc"
+    let n = len(s)
+    print("[" + s[0..0] + "] [" + s[n..n] + "] [" + s[0..n] + "] [" + s[1..2] + "]")
+    let t = s[1..n]
+    let u = t[1..len(t)]
+    print("[" + t + "] [" + u + "] " + strings.from_int(len(t)))
+    let mut b = strings.builder()
+    strings.add(mut b, "x held y")
+    let built = strings.build(b)
+    let kept = part(built, 2, 6)
+    print("[" + kept + "]")
+}

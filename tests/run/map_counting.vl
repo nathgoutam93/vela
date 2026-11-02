@@ -1,0 +1,69 @@
+// `match maps.get(m, k)` whose arms only write m[k]: the write may use the
+// lookup's slot. It must still be right when the key is new (and the map
+// grows), when the value is a Str (the old one released), and when the map
+// was copied in between, so the write copies it first.
+// out: 3 2 1
+// out: 120
+// out: a,b,c
+// out: 1 2
+// out: 0
+import maps
+import strings
+
+fn main() {
+    let mut counts: Map[Str, Int] = [:]
+    for w in ["x", "y", "x", "z", "x", "y"] {
+        match maps.get(counts, w) {
+            Some(c) => counts[w] = c + 1
+            None => counts[w] = 1
+        }
+    }
+    print(strings.from_int(counts["x"]) + " " + strings.from_int(counts["y"]) + " " + strings.from_int(counts["z"]))
+
+    let mut many: Map[Int, Int] = [:]
+    for round in 0..3 {
+        for k in 0..40 {
+            match maps.get(many, k) {
+                Some(c) => many[k] = c + 1
+                None => many[k] = 1
+            }
+        }
+    }
+    let mut total = 0
+    for k in maps.keys(many) {
+        total = total + many[k]
+    }
+    print(strings.from_int(total))
+
+    let mut joined: Map[Str, Str] = [:]
+    for w in ["k", "k", "k"] {
+        match maps.get(joined, w) {
+            Some(old) => joined[w] = old + "," + next_letter(old)
+            None => joined[w] = "a"
+        }
+    }
+    print(joined["k"])
+
+    let mut m: Map[Str, Int] = ["n": 1]
+    let before = m
+    let key = "n"
+    match maps.get(m, key) {
+        Some(c) => m[key] = c + 1
+        None => {}
+    }
+    print(strings.from_int(before["n"]) + " " + strings.from_int(m["n"]))
+
+    let mut empty: Map[Str, Int] = [:]
+    match maps.get(empty, "q") {
+        Some(_) => {}
+        None => {}
+    }
+    print(strings.from_int(len(maps.keys(empty))))
+}
+
+fn next_letter(s: Str) -> Str {
+    if len(s) == 1 {
+        return "b"
+    }
+    return "c"
+}
