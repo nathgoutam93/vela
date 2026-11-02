@@ -555,7 +555,7 @@ fn interpolated_string(lx: mut Lexer) {
     let start = lx.pos
     let end = interpolation_end(lx.src, start + 1)
     if end >= len(lx.src) || lx.src[end] == '\n' {
-        error(mut lx, start, "E1010", "interpolated string literal is not closed before the end of the line")
+        error(mut lx, start, "E1006", "interpolated string literal is not closed before the end of the line")
         lx.pos = end
         return
     }

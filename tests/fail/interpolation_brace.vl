@@ -1,0 +1,6 @@
+// err: interpolation_brace.vl:5:15: error: a '}' in an interpolated string is written '}}' [E2028]
+// A single '}' outside a hole is an error; '}}' is a literal brace.
+fn main() {
+    print(f"a }} b")
+    print(f"a } b")
+}

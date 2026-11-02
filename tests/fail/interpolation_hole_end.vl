@@ -1,0 +1,4 @@
+// err: interpolation_hole_end.vl:3:20: error: expected expression, found '}' [E2020]
+fn main() {
+    print(f"a {x + } b")
+}

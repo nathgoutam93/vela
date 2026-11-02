@@ -1,2 +1,2 @@
-// err: interpolation_unclosed.vl:2:27: error: interpolated string expression is missing '}' [E2024]
+// err: interpolation_unclosed.vl:2:27: error: interpolated string expression is missing '}' [E2026]
 fn main() { print(f"value {1") }

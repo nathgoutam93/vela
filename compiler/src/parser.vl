@@ -1172,6 +1172,7 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
 fn interpolated(p: mut Parser, tok: lexer.Token) -> Result[ast.Expr, errors.CompileError] {
     let mut parts: [ast.InterpolationPart] = []
     let mut text = ""
+    let mut seg_start = 0  // where `text` starts in the literal's source
     let mut at = 0
     for at < len(tok.value) {
         let c = tok.value[at]
@@ -1192,37 +1193,70 @@ fn interpolated(p: mut Parser, tok: lexer.Token) -> Result[ast.Expr, errors.Comp
         if c == '}' && at + 1 < len(tok.value) && tok.value[at + 1] == '}' {
             text = text + "}"; at = at + 2; continue
         }
+        if c == '}' {
+            return Err(errors.at(tok.line, tok.col + 2 + at, "E2028", "a '}' in an interpolated string is written '}}'"))
+        }
         if c != '{' {
             text = text + tok.value[at..at + 1]; at = at + 1; continue
         }
-        if text != "" { push(mut parts, ast.InterpolationPart.Text(decoded_part(text, tok)?)); text = "" }
+        if text != "" { push(mut parts, ast.InterpolationPart.Text(decoded_part(text, tok.value[seg_start..at], seg_start, tok)?)); text = "" }
         let open = at
         at = at + 1
         let start = at
         at = lexer.interpolation_hole_end(tok.value, start)
-        if at >= len(tok.value) || tok.value[at] != '}' { return Err(errors.at(tok.line, tok.col + 2 + open, "E2024", "interpolated string expression is missing '}'")) }
+        if at >= len(tok.value) || tok.value[at] != '}' { return Err(errors.at(tok.line, tok.col + 2 + open, "E2026", "interpolated string expression is missing '}'")) }
         let source = tok.value[start..at]
         let mut lexed = lexer.tokenize(source)
         if len(lexed.errors) > 0 { return Err(errors.at(tok.line, tok.col + 2 + start + lexed.errors[0].col - 1, lexed.errors[0].code, lexed.errors[0].message)) }
         for i in 0..len(lexed.tokens) { lexed.tokens[i].line = tok.line; lexed.tokens[i].col = lexed.tokens[i].col + tok.col + 2 + start - 1 }
         let mut inner = Parser { tokens: lexed.tokens, i: 0, errors: [], open_parens: 0, open_braces: 0, no_struct: false, next_id: p.next_id }
-        let value = expression(mut inner, 0)?
-        for diagnostic in inner.errors { push(mut p.errors, diagnostic) }
+        let parsed = expression(mut inner, 0)
+        for diagnostic in inner.errors { push(mut p.errors, at_hole_end(diagnostic)) }
+        let mut value = ast.Expr { id: 0, kind: ast.ExprKind.UnitLit, line: 0, col: 0 }
+        match parsed {
+            Ok(v) => value = v
+            Err(e) => return Err(at_hole_end(e))
+        }
         if peek(inner, 0).kind == lexer.Kind.Semi { advance(mut inner) }
-        if peek(inner, 0).kind != lexer.Kind.Eof { return Err(error(peek(inner, 0), "E2025", "expected '}' after interpolated expression")) }
+        if peek(inner, 0).kind != lexer.Kind.Eof { return Err(error(peek(inner, 0), "E2027", "expected '}' after interpolated expression")) }
         p.next_id = inner.next_id
         push(mut parts, ast.InterpolationPart.Hole(value))
         at = at + 1
+        seg_start = at
     }
-    if text != "" { push(mut parts, ast.InterpolationPart.Text(decoded_part(text, tok)?)) }
+    if text != "" { push(mut parts, ast.InterpolationPart.Text(decoded_part(text, tok.value[seg_start..len(tok.value)], seg_start, tok)?)) }
     if len(parts) == 0 { push(mut parts, ast.InterpolationPart.Text("")) }
     return Ok(expr(mut p, ast.ExprKind.Interpolate(parts), tok.line, tok.col))
 }
 
-fn decoded_part(source: Str, tok: lexer.Token) -> Result[Str, errors.CompileError] {
+// The text of a literal segment: `source` with `{{` and `}}` already made
+// single braces, decoded as a string's body. An escape error is placed where
+// it is in `raw`, the segment as written, which starts `raw_start` bytes into
+// the literal's body: braces do not move escapes, so the raw text's error
+// column is the right one.
+fn decoded_part(source: Str, raw: Str, raw_start: Int, tok: lexer.Token) -> Result[Str, errors.CompileError] {
     let lexed = lexer.tokenize("\"" + source + "\"")
-    if len(lexed.errors) > 0 { return Err(errors.at(tok.line, tok.col, lexed.errors[0].code, lexed.errors[0].message)) }
+    if len(lexed.errors) > 0 {
+        let mut col = tok.col
+        let again = lexer.tokenize("\"" + raw + "\"")
+        if len(again.errors) > 0 {
+            col = tok.col + 2 + raw_start + again.errors[0].col - 2
+        }
+        return Err(errors.at(tok.line, col, lexed.errors[0].code, lexed.errors[0].message))
+    }
     return Ok(lexed.tokens[0].value)
+}
+
+// A hole is parsed on its own tokens: its end is the '}' closing it, not
+// the end of a file.
+fn at_hole_end(e: errors.CompileError) -> errors.CompileError {
+    let mut out = e
+    let tail = "found end of file"
+    let n = len(tail)
+    if len(out.message) >= n && out.message[len(out.message) - n..len(out.message)] == tail {
+        out.message = out.message[0..len(out.message) - n] + "found '}'"
+    }
+    return out
 }
 
 // `fn(x: Int, y) -> Int { ... }` or `fn(x) => x + 1`, after the `fn`.

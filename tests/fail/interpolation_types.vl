@@ -1,0 +1,6 @@
+// err: interpolation_types.vl:4:16: error: interpolated expressions must have type Str, Bool, Float, or an integer type, found [Int] [E3234]
+// err: interpolation_types.vl:5:16: error: undefined name 'nope' [E3087]
+fn main() {
+    print(f"a {[1, 2]} b")
+    print(f"a {nope} b")
+}

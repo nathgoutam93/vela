@@ -3926,6 +3926,30 @@ No additional CI workflow run was requested or launched for reconciliation.
   including its document, diagnostic, query, evidence and property checks.
 
 ## Outstanding validation
+- **Diagnostics review (post-M30, observed on Linux x86-64):**
+  - `f"a } b"` printed `a } b` although `}}` is the brace escape;
+  - `f"{nope}"` reported E3087 and also the hole type error;
+  - an escape error in a literal segment pointed at the literal's start
+    (`f"a {1} \q"` at the `f`);
+  - an error at a hole's end said "found end of file".
+  The literal also used E1010 (byte literal not closed), E2024 and E2025
+  (list and argument-list syntax) and E3101 (`+` on Strs), codes whose
+  catalog entries mean something else.
+- **Diagnostics resolution:**
+  - a single `}` outside a hole is E2028 ("a '}' in an interpolated string
+    is written '}}'");
+  - the hole type check skips an error type, and is E3234, naming the
+    type found;
+  - escape errors are placed by re-lexing the segment as written, since
+    braces do not move escapes;
+  - hole errors say "found '}'";
+  - an unclosed literal is E1006, a hole without `}` E2026, and extra
+    tokens in a hole E2027.
+  The specification states the lone-`}` rule and that a Byte converts as
+  its number. Verified by `tests/fail/interpolation_{brace,types,hole_end,
+  escape_position}.vl` and the updated `interpolation_escape` (column 13)
+  and `interpolation_unclosed` (E2026) fixtures.
+
 
 ### VAL-007: Recheck CI performance gates after deterministic failures
 

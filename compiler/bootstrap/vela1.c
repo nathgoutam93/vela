@@ -7299,7 +7299,8 @@ Result_3ast_Expr_6errors_CompileError f_6parser_nested_expression(t_6parser_Pars
 Result_3ast_Expr_6errors_CompileError f_6parser_expression(t_6parser_Parser *, int64_t);
 Result_3ast_Expr_6errors_CompileError f_6parser_prefix(t_6parser_Parser *);
 Result_3ast_Expr_6errors_CompileError f_6parser_interpolated(t_6parser_Parser *, t_5lexer_Token);
-Result_Str_6errors_CompileError f_6parser_decoded_part(vela_str, t_5lexer_Token);
+Result_Str_6errors_CompileError f_6parser_decoded_part(vela_str, vela_str, int64_t, t_5lexer_Token);
+t_6errors_CompileError f_6parser_at_hole_end(t_6errors_CompileError);
 Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser *, t_5lexer_Token);
 Result_3ast_Expr_6errors_CompileError f_6parser_index(t_6parser_Parser *, t_3ast_Expr);
 Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser *, t_5lexer_Token);
@@ -16403,9 +16404,9 @@ void f_5lexer_interpolated_string(t_5lexer_Lexer * v_lx) {
     }
     if (_t7) {
         // line 558
-        f_5lexer_error(&(*v_lx), v_start, VELA_STR("E1010", 5), VELA_STR("interpolated string literal is not closed before the end of the line", 68));
+        f_5lexer_error(&(*v_lx), v_start, VELA_STR("E1006", 5), VELA_STR("interpolated string literal is not closed before the end of the line", 68));
         vela_str_release(VELA_STR("interpolated string literal is not closed before the end of the line", 68));
-        vela_str_release(VELA_STR("E1010", 5));
+        vela_str_release(VELA_STR("E1006", 5));
         // line 559
         (*v_lx).m_pos = v_end;
         // line 560
@@ -28690,8 +28691,10 @@ Result_3ast_Expr_6errors_CompileError f_6parser_interpolated(t_6parser_Parser * 
     // line 1174
     vela_str v_text = VELA_STR("", 0);
     // line 1175
-    int64_t v_at = 0;
+    int64_t v_seg_start = 0;
     // line 1176
+    int64_t v_at = 0;
+    // line 1177
     vela_unique(&v_parts);
     for (;;) {
         int64_t _t2 = v_at;
@@ -28699,10 +28702,10 @@ Result_3ast_Expr_6errors_CompileError f_6parser_interpolated(t_6parser_Parser * 
         bool _t4 = _t2 < _t3;
         bool _t5 = _t4;
         if (!_t5) break;
-        // line 1177
-        uint8_t _t6 = vela_byte_at(v_tok.m_value, v_at, "compiler/src/parser.vl:1177:26");
-        uint8_t v_c = _t6;
         // line 1178
+        uint8_t _t6 = vela_byte_at(v_tok.m_value, v_at, "compiler/src/parser.vl:1178:26");
+        uint8_t v_c = _t6;
+        // line 1179
         uint8_t _t7 = v_c;
         bool _t8 = _t7 == 92;
         bool _t9 = _t8;
@@ -28715,14 +28718,14 @@ Result_3ast_Expr_6errors_CompileError f_6parser_interpolated(t_6parser_Parser * 
             _t9 = _t14;
         }
         if (_t9) {
-            // line 1179
+            // line 1180
             int64_t _t15 = v_at;
             int64_t _t16 = (_t15 + 2);
             int64_t v_end = _t16;
-            // line 1180
+            // line 1181
             int64_t _t17 = v_at;
             int64_t _t18 = (_t17 + 1);
-            uint8_t _t19 = vela_byte_at(v_tok.m_value, _t18, "compiler/src/parser.vl:1180:25");
+            uint8_t _t19 = vela_byte_at(v_tok.m_value, _t18, "compiler/src/parser.vl:1181:25");
             uint8_t _t20 = _t19;
             bool _t21 = _t20 == 117;
             bool _t22 = _t21;
@@ -28734,58 +28737,58 @@ Result_3ast_Expr_6errors_CompileError f_6parser_interpolated(t_6parser_Parser * 
             }
             bool _t26 = _t22;
             if (_t26) {
-                uint8_t _t27 = vela_byte_at(v_tok.m_value, v_end, "compiler/src/parser.vl:1180:77");
+                uint8_t _t27 = vela_byte_at(v_tok.m_value, v_end, "compiler/src/parser.vl:1181:77");
                 uint8_t _t28 = _t27;
                 bool _t29 = _t28 == 123;
                 _t26 = _t29;
             }
             if (_t26) {
-                // line 1181
+                // line 1182
                 int64_t _t30 = v_end;
                 int64_t _t31 = (_t30 + 1);
                 v_end = _t31;
-                // line 1182
+                // line 1183
                 for (;;) {
                     int64_t _t32 = v_end;
                     int64_t _t33 = v_tok.m_value.len;
                     bool _t34 = _t32 < _t33;
                     bool _t35 = _t34;
                     if (_t35) {
-                        uint8_t _t36 = vela_byte_at(v_tok.m_value, v_end, "compiler/src/parser.vl:1182:54");
+                        uint8_t _t36 = vela_byte_at(v_tok.m_value, v_end, "compiler/src/parser.vl:1183:54");
                         uint8_t _t37 = _t36;
                         bool _t38 = _t37 != 125;
                         _t35 = _t38;
                     }
                     bool _t39 = _t35;
                     if (!_t39) break;
-                    // line 1182
+                    // line 1183
                     int64_t _t40 = v_end;
                     int64_t _t41 = (_t40 + 1);
                     v_end = _t41;
                 }
-                // line 1183
+                // line 1184
                 int64_t _t42 = v_end;
                 int64_t _t43 = v_tok.m_value.len;
                 bool _t44 = _t42 < _t43;
                 if (_t44) {
-                    // line 1183
+                    // line 1184
                     int64_t _t45 = v_end;
                     int64_t _t46 = (_t45 + 1);
                     v_end = _t46;
                 }
             }
-            // line 1185
-            vela_str _t47 = vela_slice(v_tok.m_value, v_at, v_end, "compiler/src/parser.vl:1185:36");
+            // line 1186
+            vela_str _t47 = vela_slice(v_tok.m_value, v_at, v_end, "compiler/src/parser.vl:1186:36");
             vela_str _t48 = vela_str_concat(v_text, _t47);
             vela_str_release(_t47);
             vela_str_release(v_text);
             v_text = _t48;
-            // line 1186
-            v_at = v_end;
             // line 1187
+            v_at = v_end;
+            // line 1188
             continue;
         }
-        // line 1189
+        // line 1190
         uint8_t _t49 = v_c;
         bool _t50 = _t49 == 123;
         bool _t51 = _t50;
@@ -28801,24 +28804,24 @@ Result_3ast_Expr_6errors_CompileError f_6parser_interpolated(t_6parser_Parser * 
         if (_t57) {
             int64_t _t58 = v_at;
             int64_t _t59 = (_t58 + 1);
-            uint8_t _t60 = vela_byte_at(v_tok.m_value, _t59, "compiler/src/parser.vl:1189:60");
+            uint8_t _t60 = vela_byte_at(v_tok.m_value, _t59, "compiler/src/parser.vl:1190:60");
             uint8_t _t61 = _t60;
             bool _t62 = _t61 == 123;
             _t57 = _t62;
         }
         if (_t57) {
-            // line 1190
+            // line 1191
             vela_str _t63 = vela_str_concat(v_text, VELA_STR("{", 1));
             vela_str_release(v_text);
             v_text = _t63;
-            // line 1190
+            // line 1191
             int64_t _t64 = v_at;
             int64_t _t65 = (_t64 + 2);
             v_at = _t65;
-            // line 1190
+            // line 1191
             continue;
         }
-        // line 1192
+        // line 1193
         uint8_t _t66 = v_c;
         bool _t67 = _t66 == 125;
         bool _t68 = _t67;
@@ -28834,286 +28837,325 @@ Result_3ast_Expr_6errors_CompileError f_6parser_interpolated(t_6parser_Parser * 
         if (_t74) {
             int64_t _t75 = v_at;
             int64_t _t76 = (_t75 + 1);
-            uint8_t _t77 = vela_byte_at(v_tok.m_value, _t76, "compiler/src/parser.vl:1192:60");
+            uint8_t _t77 = vela_byte_at(v_tok.m_value, _t76, "compiler/src/parser.vl:1193:60");
             uint8_t _t78 = _t77;
             bool _t79 = _t78 == 125;
             _t74 = _t79;
         }
         if (_t74) {
-            // line 1193
+            // line 1194
             vela_str _t80 = vela_str_concat(v_text, VELA_STR("}", 1));
             vela_str_release(v_text);
             v_text = _t80;
-            // line 1193
+            // line 1194
             int64_t _t81 = v_at;
             int64_t _t82 = (_t81 + 2);
             v_at = _t82;
-            // line 1193
+            // line 1194
             continue;
         }
-        // line 1195
+        // line 1196
         uint8_t _t83 = v_c;
-        bool _t84 = _t83 != 123;
+        bool _t84 = _t83 == 125;
         if (_t84) {
-            // line 1196
-            int64_t _t85 = v_at;
-            int64_t _t86 = (_t85 + 1);
-            vela_str _t87 = vela_slice(v_tok.m_value, v_at, _t86, "compiler/src/parser.vl:1196:36");
-            vela_str _t88 = vela_str_concat(v_text, _t87);
-            vela_str_release(_t87);
+            // line 1197
+            int64_t _t85 = v_tok.m_col;
+            int64_t _t86 = vela_add(_t85, 2, "compiler/src/parser.vl:1197:52");
+            int64_t _t87 = _t86;
+            int64_t _t88 = vela_add(_t87, v_at, "compiler/src/parser.vl:1197:56");
+            t_6errors_CompileError _t89 = f_6errors_at(v_tok.m_line, _t88, VELA_STR("E2028", 5), VELA_STR("a '}' in an interpolated string is written '}}'", 47));
+            Result_3ast_Expr_6errors_CompileError _t90 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t89 } };
+            Result_3ast_Expr_6errors_CompileError _t91 = _t90;
             vela_str_release(v_text);
-            v_text = _t88;
-            // line 1196
-            int64_t _t89 = v_at;
-            int64_t _t90 = (_t89 + 1);
-            v_at = _t90;
-            // line 1196
+            vela_array_release(v_parts);
+            return _t91;
+        }
+        // line 1199
+        uint8_t _t92 = v_c;
+        bool _t93 = _t92 != 123;
+        if (_t93) {
+            // line 1200
+            int64_t _t94 = v_at;
+            int64_t _t95 = (_t94 + 1);
+            vela_str _t96 = vela_slice(v_tok.m_value, v_at, _t95, "compiler/src/parser.vl:1200:36");
+            vela_str _t97 = vela_str_concat(v_text, _t96);
+            vela_str_release(_t96);
+            vela_str_release(v_text);
+            v_text = _t97;
+            // line 1200
+            int64_t _t98 = v_at;
+            int64_t _t99 = (_t98 + 1);
+            v_at = _t99;
+            // line 1200
             continue;
         }
-        // line 1198
-        bool _t91 = !vela_str_eq(v_text, VELA_STR("", 0));
-        if (_t91) {
-            // line 1198
-            Result_Str_6errors_CompileError _t92 = f_6parser_decoded_part(v_text, v_tok);
-            if (_t92.tag == Result_Str_6errors_CompileError_Err) {
-                rc_retain_t_6errors_CompileError(_t92.as.m_Err._0);
-                Result_3ast_Expr_6errors_CompileError _t93 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t92.as.m_Err._0 } };
-                rc_release_Result_Str_6errors_CompileError(_t92);
+        // line 1202
+        bool _t100 = !vela_str_eq(v_text, VELA_STR("", 0));
+        if (_t100) {
+            // line 1202
+            vela_str _t101 = vela_slice(v_tok.m_value, v_seg_start, v_at, "compiler/src/parser.vl:1202:96");
+            Result_Str_6errors_CompileError _t102 = f_6parser_decoded_part(v_text, _t101, v_seg_start, v_tok);
+            if (_t102.tag == Result_Str_6errors_CompileError_Err) {
+                rc_retain_t_6errors_CompileError(_t102.as.m_Err._0);
+                Result_3ast_Expr_6errors_CompileError _t103 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t102.as.m_Err._0 } };
+                rc_release_Result_Str_6errors_CompileError(_t102);
+                vela_str_release(_t101);
                 vela_str_release(v_text);
                 vela_array_release(v_parts);
-                return _t93;
+                return _t103;
             }
-            vela_str _t94 = _t92.as.m_Ok._0;
-            vela_str_retain(_t94);
-            t_3ast_InterpolationPart _t95 = (t_3ast_InterpolationPart){ .tag = t_3ast_InterpolationPart_Text, .as.m_Text = { ._0 = _t94 } };
-            t_3ast_InterpolationPart _t96 = _t95;
-            vela_push(v_parts, &_t96, sizeof(t_3ast_InterpolationPart));
-            rc_release_Result_Str_6errors_CompileError(_t92);
-            // line 1198
+            vela_str _t104 = _t102.as.m_Ok._0;
+            vela_str_retain(_t104);
+            t_3ast_InterpolationPart _t105 = (t_3ast_InterpolationPart){ .tag = t_3ast_InterpolationPart_Text, .as.m_Text = { ._0 = _t104 } };
+            t_3ast_InterpolationPart _t106 = _t105;
+            vela_push(v_parts, &_t106, sizeof(t_3ast_InterpolationPart));
+            rc_release_Result_Str_6errors_CompileError(_t102);
+            vela_str_release(_t101);
+            // line 1202
             vela_str_release(v_text);
             v_text = VELA_STR("", 0);
         }
-        // line 1199
-        int64_t v_open = v_at;
-        // line 1200
-        int64_t _t97 = v_at;
-        int64_t _t98 = (_t97 + 1);
-        v_at = _t98;
-        // line 1201
-        int64_t v_start = v_at;
-        // line 1202
-        int64_t _t99 = f_5lexer_interpolation_hole_end(v_tok.m_value, v_start);
-        v_at = _t99;
         // line 1203
-        int64_t _t100 = v_at;
-        int64_t _t101 = v_tok.m_value.len;
-        bool _t102 = _t100 >= _t101;
-        bool _t103 = _t102;
-        if (!_t103) {
-            uint8_t _t104 = vela_byte_at(v_tok.m_value, v_at, "compiler/src/parser.vl:1203:45");
-            uint8_t _t105 = _t104;
-            bool _t106 = _t105 != 125;
-            _t103 = _t106;
-        }
-        if (_t103) {
-            // line 1203
-            int64_t _t107 = v_tok.m_col;
-            int64_t _t108 = vela_add(_t107, 2, "compiler/src/parser.vl:1203:98");
-            int64_t _t109 = _t108;
-            int64_t _t110 = vela_add(_t109, v_open, "compiler/src/parser.vl:1203:102");
-            t_6errors_CompileError _t111 = f_6errors_at(v_tok.m_line, _t110, VELA_STR("E2024", 5), VELA_STR("interpolated string expression is missing '}'", 45));
-            Result_3ast_Expr_6errors_CompileError _t112 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t111 } };
-            Result_3ast_Expr_6errors_CompileError _t113 = _t112;
-            vela_str_release(v_text);
-            vela_array_release(v_parts);
-            return _t113;
-        }
+        int64_t v_open = v_at;
         // line 1204
-        vela_str _t114 = vela_slice(v_tok.m_value, v_start, v_at, "compiler/src/parser.vl:1204:31");
-        vela_str v_source = _t114;
+        int64_t _t107 = v_at;
+        int64_t _t108 = (_t107 + 1);
+        v_at = _t108;
         // line 1205
-        t_5lexer_Lexed _t115 = f_5lexer_tokenize(v_source);
-        t_5lexer_Lexed v_lexed = _t115;
+        int64_t v_start = v_at;
         // line 1206
-        int64_t _t116 = v_lexed.m_errors->len;
-        int64_t _t117 = _t116;
-        bool _t118 = _t117 > 0;
-        if (_t118) {
-            // line 1206
-            int64_t _t119 = v_tok.m_col;
-            int64_t _t120 = vela_add(_t119, 2, "compiler/src/parser.vl:1206:75");
-            int64_t _t121 = _t120;
-            int64_t _t122 = vela_add(_t121, v_start, "compiler/src/parser.vl:1206:79");
-            int64_t _t123 = _t122;
-            t_6errors_CompileError _t124 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1206:101");
-            int64_t _t125 = vela_add(_t123, _t124.m_col, "compiler/src/parser.vl:1206:87");
-            int64_t _t126 = _t125;
-            int64_t _t127 = vela_sub(_t126, 1, "compiler/src/parser.vl:1206:109");
-            t_6errors_CompileError _t128 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1206:126");
-            t_6errors_CompileError _t129 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1206:148");
-            t_6errors_CompileError _t130 = f_6errors_at(v_tok.m_line, _t127, _t128.m_code, _t129.m_message);
-            Result_3ast_Expr_6errors_CompileError _t131 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t130 } };
-            Result_3ast_Expr_6errors_CompileError _t132 = _t131;
-            rc_release_t_5lexer_Lexed(v_lexed);
-            vela_str_release(v_source);
+        int64_t _t109 = f_5lexer_interpolation_hole_end(v_tok.m_value, v_start);
+        v_at = _t109;
+        // line 1207
+        int64_t _t110 = v_at;
+        int64_t _t111 = v_tok.m_value.len;
+        bool _t112 = _t110 >= _t111;
+        bool _t113 = _t112;
+        if (!_t113) {
+            uint8_t _t114 = vela_byte_at(v_tok.m_value, v_at, "compiler/src/parser.vl:1207:45");
+            uint8_t _t115 = _t114;
+            bool _t116 = _t115 != 125;
+            _t113 = _t116;
+        }
+        if (_t113) {
+            // line 1207
+            int64_t _t117 = v_tok.m_col;
+            int64_t _t118 = vela_add(_t117, 2, "compiler/src/parser.vl:1207:98");
+            int64_t _t119 = _t118;
+            int64_t _t120 = vela_add(_t119, v_open, "compiler/src/parser.vl:1207:102");
+            t_6errors_CompileError _t121 = f_6errors_at(v_tok.m_line, _t120, VELA_STR("E2026", 5), VELA_STR("interpolated string expression is missing '}'", 45));
+            Result_3ast_Expr_6errors_CompileError _t122 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t121 } };
+            Result_3ast_Expr_6errors_CompileError _t123 = _t122;
             vela_str_release(v_text);
             vela_array_release(v_parts);
-            return _t132;
-        }
-        // line 1207
-        int64_t _t133 = v_lexed.m_tokens->len;
-        int64_t _t134 = _t133;
-        for (int64_t _t135 = 0; _t135 < _t134; _t135++) {
-            int64_t v_i = _t135;
-            // line 1207
-            vela_unique(&v_lexed.m_tokens);
-            (*(t_5lexer_Token *)vela_at(v_lexed.m_tokens, v_i, sizeof(t_5lexer_Token), "compiler/src/parser.vl:1207:53")).m_line = v_tok.m_line;
-            // line 1207
-            t_5lexer_Token _t136 = *(t_5lexer_Token *)vela_at(v_lexed.m_tokens, v_i, sizeof(t_5lexer_Token), "compiler/src/parser.vl:1207:108");
-            int64_t _t137 = _t136.m_col;
-            int64_t _t138 = vela_add(_t137, v_tok.m_col, "compiler/src/parser.vl:1207:116");
-            int64_t _t139 = _t138;
-            int64_t _t140 = vela_add(_t139, 2, "compiler/src/parser.vl:1207:126");
-            int64_t _t141 = _t140;
-            int64_t _t142 = vela_add(_t141, v_start, "compiler/src/parser.vl:1207:130");
-            int64_t _t143 = _t142;
-            int64_t _t144 = (_t143 - 1);
-            vela_unique(&v_lexed.m_tokens);
-            (*(t_5lexer_Token *)vela_at(v_lexed.m_tokens, v_i, sizeof(t_5lexer_Token), "compiler/src/parser.vl:1207:86")).m_col = _t144;
+            return _t123;
         }
         // line 1208
-        vela_array * _t145 = v_lexed.m_tokens;
-        vela_array_retain(_t145);
-        vela_array * _t146 = vela_array_new(vt_t_6errors_CompileError(), 0);
-        t_6parser_Parser _t147 = (t_6parser_Parser){ .m_tokens = _t145, .m_i = 0, .m_errors = _t146, .m_open_parens = 0, .m_open_braces = 0, .m_no_struct = false, .m_next_id = (*v_p).m_next_id };
-        t_6parser_Parser v_inner = _t147;
+        vela_str _t124 = vela_slice(v_tok.m_value, v_start, v_at, "compiler/src/parser.vl:1208:31");
+        vela_str v_source = _t124;
         // line 1209
-        Result_3ast_Expr_6errors_CompileError _t148 = f_6parser_expression(&v_inner, 0);
-        if (_t148.tag == Result_3ast_Expr_6errors_CompileError_Err) {
-            rc_retain_t_6errors_CompileError(_t148.as.m_Err._0);
-            Result_3ast_Expr_6errors_CompileError _t149 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t148.as.m_Err._0 } };
-            rc_release_Result_3ast_Expr_6errors_CompileError(_t148);
-            rc_release_t_6parser_Parser(v_inner);
-            rc_release_t_5lexer_Lexed(v_lexed);
-            vela_str_release(v_source);
-            vela_str_release(v_text);
-            vela_array_release(v_parts);
-            return _t149;
-        }
-        t_3ast_Expr _t150 = _t148.as.m_Ok._0;
-        rc_retain_t_3ast_Expr(_t150);
-        t_3ast_Expr v_value = _t150;
-        rc_release_Result_3ast_Expr_6errors_CompileError(_t148);
+        t_5lexer_Lexed _t125 = f_5lexer_tokenize(v_source);
+        t_5lexer_Lexed v_lexed = _t125;
         // line 1210
-        vela_array * _t152 = v_inner.m_errors;
-        vela_array_retain(_t152);
-        vela_array * _t151 = _t152;
-        for (int64_t _t153 = 0; _t153 < _t151->len; _t153++) {
-            t_6errors_CompileError v_diagnostic = ((t_6errors_CompileError *)_t151->data)[_t153];
+        int64_t _t126 = v_lexed.m_errors->len;
+        int64_t _t127 = _t126;
+        bool _t128 = _t127 > 0;
+        if (_t128) {
             // line 1210
-            t_6errors_CompileError _t154 = v_diagnostic;
-            rc_retain_t_6errors_CompileError(_t154);
-            vela_unique(&(*v_p).m_errors);
-            t_6errors_CompileError _t155 = _t154;
-            vela_push((*v_p).m_errors, &_t155, sizeof(t_6errors_CompileError));
+            int64_t _t129 = v_tok.m_col;
+            int64_t _t130 = vela_add(_t129, 2, "compiler/src/parser.vl:1210:75");
+            int64_t _t131 = _t130;
+            int64_t _t132 = vela_add(_t131, v_start, "compiler/src/parser.vl:1210:79");
+            int64_t _t133 = _t132;
+            t_6errors_CompileError _t134 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1210:101");
+            int64_t _t135 = vela_add(_t133, _t134.m_col, "compiler/src/parser.vl:1210:87");
+            int64_t _t136 = _t135;
+            int64_t _t137 = vela_sub(_t136, 1, "compiler/src/parser.vl:1210:109");
+            t_6errors_CompileError _t138 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1210:126");
+            t_6errors_CompileError _t139 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1210:148");
+            t_6errors_CompileError _t140 = f_6errors_at(v_tok.m_line, _t137, _t138.m_code, _t139.m_message);
+            Result_3ast_Expr_6errors_CompileError _t141 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t140 } };
+            Result_3ast_Expr_6errors_CompileError _t142 = _t141;
+            rc_release_t_5lexer_Lexed(v_lexed);
+            vela_str_release(v_source);
+            vela_str_release(v_text);
+            vela_array_release(v_parts);
+            return _t142;
         }
-        vela_array_release(_t151);
         // line 1211
-        t_5lexer_Token _t156 = f_6parser_peek(v_inner, 0);
-        t_5lexer_Kind _t157 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Semi };
-        bool _t158 = _t156.m_kind.tag == _t157.tag;
-        if (_t158) {
+        int64_t _t143 = v_lexed.m_tokens->len;
+        int64_t _t144 = _t143;
+        for (int64_t _t145 = 0; _t145 < _t144; _t145++) {
+            int64_t v_i = _t145;
             // line 1211
-            t_5lexer_Token _t159 = f_6parser_advance(&v_inner);
-            rc_release_t_5lexer_Token(_t159);
+            vela_unique(&v_lexed.m_tokens);
+            (*(t_5lexer_Token *)vela_at(v_lexed.m_tokens, v_i, sizeof(t_5lexer_Token), "compiler/src/parser.vl:1211:53")).m_line = v_tok.m_line;
+            // line 1211
+            t_5lexer_Token _t146 = *(t_5lexer_Token *)vela_at(v_lexed.m_tokens, v_i, sizeof(t_5lexer_Token), "compiler/src/parser.vl:1211:108");
+            int64_t _t147 = _t146.m_col;
+            int64_t _t148 = vela_add(_t147, v_tok.m_col, "compiler/src/parser.vl:1211:116");
+            int64_t _t149 = _t148;
+            int64_t _t150 = vela_add(_t149, 2, "compiler/src/parser.vl:1211:126");
+            int64_t _t151 = _t150;
+            int64_t _t152 = vela_add(_t151, v_start, "compiler/src/parser.vl:1211:130");
+            int64_t _t153 = _t152;
+            int64_t _t154 = (_t153 - 1);
+            vela_unique(&v_lexed.m_tokens);
+            (*(t_5lexer_Token *)vela_at(v_lexed.m_tokens, v_i, sizeof(t_5lexer_Token), "compiler/src/parser.vl:1211:86")).m_col = _t154;
         }
-        rc_release_t_5lexer_Token(_t156);
         // line 1212
-        t_5lexer_Token _t160 = f_6parser_peek(v_inner, 0);
-        t_5lexer_Kind _t161 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Eof };
-        bool _t162 = _t160.m_kind.tag != _t161.tag;
-        if (_t162) {
-            // line 1212
-            t_5lexer_Token _t163 = f_6parser_peek(v_inner, 0);
-            t_6errors_CompileError _t164 = f_6parser_error(_t163, VELA_STR("E2025", 5), VELA_STR("expected '}' after interpolated expression", 42));
-            Result_3ast_Expr_6errors_CompileError _t165 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t164 } };
-            Result_3ast_Expr_6errors_CompileError _t166 = _t165;
-            rc_release_t_5lexer_Token(_t163);
-            rc_release_t_5lexer_Token(_t160);
+        vela_array * _t155 = v_lexed.m_tokens;
+        vela_array_retain(_t155);
+        vela_array * _t156 = vela_array_new(vt_t_6errors_CompileError(), 0);
+        t_6parser_Parser _t157 = (t_6parser_Parser){ .m_tokens = _t155, .m_i = 0, .m_errors = _t156, .m_open_parens = 0, .m_open_braces = 0, .m_no_struct = false, .m_next_id = (*v_p).m_next_id };
+        t_6parser_Parser v_inner = _t157;
+        // line 1213
+        Result_3ast_Expr_6errors_CompileError _t158 = f_6parser_expression(&v_inner, 0);
+        Result_3ast_Expr_6errors_CompileError v_parsed = _t158;
+        // line 1214
+        vela_array * _t160 = v_inner.m_errors;
+        vela_array_retain(_t160);
+        vela_array * _t159 = _t160;
+        for (int64_t _t161 = 0; _t161 < _t159->len; _t161++) {
+            t_6errors_CompileError v_diagnostic = ((t_6errors_CompileError *)_t159->data)[_t161];
+            // line 1214
+            t_6errors_CompileError _t162 = f_6parser_at_hole_end(v_diagnostic);
+            vela_unique(&(*v_p).m_errors);
+            t_6errors_CompileError _t163 = _t162;
+            vela_push((*v_p).m_errors, &_t163, sizeof(t_6errors_CompileError));
+        }
+        vela_array_release(_t159);
+        // line 1215
+        t_3ast_ExprKind _t164 = (t_3ast_ExprKind){ .tag = t_3ast_ExprKind_UnitLit };
+        t_3ast_Expr _t165 = (t_3ast_Expr){ .m_kind = box_t_3ast_ExprKind_new(_t164), .m_line = 0, .m_col = 0, .m_id = 0 };
+        t_3ast_Expr v_value = _t165;
+        // line 1216
+        if (v_parsed.tag == Result_3ast_Expr_6errors_CompileError_Ok) {
+            t_3ast_Expr v_v = v_parsed.as.m_Ok._0;
+            // line 1217
+            t_3ast_Expr _t166 = v_v;
+            rc_retain_t_3ast_Expr(_t166);
             rc_release_t_3ast_Expr(v_value);
+            v_value = _t166;
+        } else {
+            t_6errors_CompileError v_e = v_parsed.as.m_Err._0;
+            // line 1218
+            t_6errors_CompileError _t167 = f_6parser_at_hole_end(v_e);
+            Result_3ast_Expr_6errors_CompileError _t168 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t167 } };
+            Result_3ast_Expr_6errors_CompileError _t169 = _t168;
+            rc_release_t_3ast_Expr(v_value);
+            rc_release_Result_3ast_Expr_6errors_CompileError(v_parsed);
             rc_release_t_6parser_Parser(v_inner);
             rc_release_t_5lexer_Lexed(v_lexed);
             vela_str_release(v_source);
             vela_str_release(v_text);
             vela_array_release(v_parts);
-            return _t166;
+            return _t169;
         }
-        rc_release_t_5lexer_Token(_t160);
-        // line 1213
+        // line 1220
+        t_5lexer_Token _t170 = f_6parser_peek(v_inner, 0);
+        t_5lexer_Kind _t171 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Semi };
+        bool _t172 = _t170.m_kind.tag == _t171.tag;
+        if (_t172) {
+            // line 1220
+            t_5lexer_Token _t173 = f_6parser_advance(&v_inner);
+            rc_release_t_5lexer_Token(_t173);
+        }
+        rc_release_t_5lexer_Token(_t170);
+        // line 1221
+        t_5lexer_Token _t174 = f_6parser_peek(v_inner, 0);
+        t_5lexer_Kind _t175 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Eof };
+        bool _t176 = _t174.m_kind.tag != _t175.tag;
+        if (_t176) {
+            // line 1221
+            t_5lexer_Token _t177 = f_6parser_peek(v_inner, 0);
+            t_6errors_CompileError _t178 = f_6parser_error(_t177, VELA_STR("E2027", 5), VELA_STR("expected '}' after interpolated expression", 42));
+            Result_3ast_Expr_6errors_CompileError _t179 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t178 } };
+            Result_3ast_Expr_6errors_CompileError _t180 = _t179;
+            rc_release_t_5lexer_Token(_t177);
+            rc_release_t_5lexer_Token(_t174);
+            rc_release_t_3ast_Expr(v_value);
+            rc_release_Result_3ast_Expr_6errors_CompileError(v_parsed);
+            rc_release_t_6parser_Parser(v_inner);
+            rc_release_t_5lexer_Lexed(v_lexed);
+            vela_str_release(v_source);
+            vela_str_release(v_text);
+            vela_array_release(v_parts);
+            return _t180;
+        }
+        rc_release_t_5lexer_Token(_t174);
+        // line 1222
         (*v_p).m_next_id = v_inner.m_next_id;
-        // line 1214
-        t_3ast_Expr _t167 = v_value;
-        rc_retain_t_3ast_Expr(_t167);
-        t_3ast_InterpolationPart _t168 = (t_3ast_InterpolationPart){ .tag = t_3ast_InterpolationPart_Hole, .as.m_Hole = { ._0 = _t167 } };
-        t_3ast_InterpolationPart _t169 = _t168;
-        vela_push(v_parts, &_t169, sizeof(t_3ast_InterpolationPart));
-        // line 1215
-        int64_t _t170 = v_at;
-        int64_t _t171 = (_t170 + 1);
-        v_at = _t171;
+        // line 1223
+        t_3ast_Expr _t181 = v_value;
+        rc_retain_t_3ast_Expr(_t181);
+        t_3ast_InterpolationPart _t182 = (t_3ast_InterpolationPart){ .tag = t_3ast_InterpolationPart_Hole, .as.m_Hole = { ._0 = _t181 } };
+        t_3ast_InterpolationPart _t183 = _t182;
+        vela_push(v_parts, &_t183, sizeof(t_3ast_InterpolationPart));
+        // line 1224
+        int64_t _t184 = v_at;
+        int64_t _t185 = (_t184 + 1);
+        v_at = _t185;
+        // line 1225
+        v_seg_start = v_at;
         rc_release_t_3ast_Expr(v_value);
+        rc_release_Result_3ast_Expr_6errors_CompileError(v_parsed);
         rc_release_t_6parser_Parser(v_inner);
         rc_release_t_5lexer_Lexed(v_lexed);
         vela_str_release(v_source);
     }
-    // line 1217
-    bool _t172 = !vela_str_eq(v_text, VELA_STR("", 0));
-    if (_t172) {
-        // line 1217
-        Result_Str_6errors_CompileError _t173 = f_6parser_decoded_part(v_text, v_tok);
-        if (_t173.tag == Result_Str_6errors_CompileError_Err) {
-            rc_retain_t_6errors_CompileError(_t173.as.m_Err._0);
-            Result_3ast_Expr_6errors_CompileError _t174 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t173.as.m_Err._0 } };
-            rc_release_Result_Str_6errors_CompileError(_t173);
+    // line 1227
+    bool _t186 = !vela_str_eq(v_text, VELA_STR("", 0));
+    if (_t186) {
+        // line 1227
+        int64_t _t187 = v_tok.m_value.len;
+        vela_str _t188 = vela_slice(v_tok.m_value, v_seg_start, _t187, "compiler/src/parser.vl:1227:92");
+        Result_Str_6errors_CompileError _t189 = f_6parser_decoded_part(v_text, _t188, v_seg_start, v_tok);
+        if (_t189.tag == Result_Str_6errors_CompileError_Err) {
+            rc_retain_t_6errors_CompileError(_t189.as.m_Err._0);
+            Result_3ast_Expr_6errors_CompileError _t190 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t189.as.m_Err._0 } };
+            rc_release_Result_Str_6errors_CompileError(_t189);
+            vela_str_release(_t188);
             vela_str_release(v_text);
             vela_array_release(v_parts);
-            return _t174;
+            return _t190;
         }
-        vela_str _t175 = _t173.as.m_Ok._0;
-        vela_str_retain(_t175);
-        t_3ast_InterpolationPart _t176 = (t_3ast_InterpolationPart){ .tag = t_3ast_InterpolationPart_Text, .as.m_Text = { ._0 = _t175 } };
+        vela_str _t191 = _t189.as.m_Ok._0;
+        vela_str_retain(_t191);
+        t_3ast_InterpolationPart _t192 = (t_3ast_InterpolationPart){ .tag = t_3ast_InterpolationPart_Text, .as.m_Text = { ._0 = _t191 } };
         vela_unique(&v_parts);
-        t_3ast_InterpolationPart _t177 = _t176;
-        vela_push(v_parts, &_t177, sizeof(t_3ast_InterpolationPart));
-        rc_release_Result_Str_6errors_CompileError(_t173);
+        t_3ast_InterpolationPart _t193 = _t192;
+        vela_push(v_parts, &_t193, sizeof(t_3ast_InterpolationPart));
+        rc_release_Result_Str_6errors_CompileError(_t189);
+        vela_str_release(_t188);
     }
-    // line 1218
-    int64_t _t178 = v_parts->len;
-    int64_t _t179 = _t178;
-    bool _t180 = _t179 == 0;
-    if (_t180) {
-        // line 1218
-        t_3ast_InterpolationPart _t181 = (t_3ast_InterpolationPart){ .tag = t_3ast_InterpolationPart_Text, .as.m_Text = { ._0 = VELA_STR("", 0) } };
+    // line 1228
+    int64_t _t194 = v_parts->len;
+    int64_t _t195 = _t194;
+    bool _t196 = _t195 == 0;
+    if (_t196) {
+        // line 1228
+        t_3ast_InterpolationPart _t197 = (t_3ast_InterpolationPart){ .tag = t_3ast_InterpolationPart_Text, .as.m_Text = { ._0 = VELA_STR("", 0) } };
         vela_unique(&v_parts);
-        t_3ast_InterpolationPart _t182 = _t181;
-        vela_push(v_parts, &_t182, sizeof(t_3ast_InterpolationPart));
+        t_3ast_InterpolationPart _t198 = _t197;
+        vela_push(v_parts, &_t198, sizeof(t_3ast_InterpolationPart));
     }
-    // line 1219
-    vela_array * _t183 = v_parts;
-    vela_array_retain(_t183);
-    t_3ast_ExprKind _t184 = (t_3ast_ExprKind){ .tag = t_3ast_ExprKind_Interpolate, .as.m_Interpolate = { ._0 = _t183 } };
-    t_3ast_Expr _t185 = f_6parser_expr(&(*v_p), _t184, v_tok.m_line, v_tok.m_col);
-    Result_3ast_Expr_6errors_CompileError _t186 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Ok, .as.m_Ok = { ._0 = _t185 } };
-    Result_3ast_Expr_6errors_CompileError _t187 = _t186;
-    rc_release_t_3ast_ExprKind(_t184);
+    // line 1229
+    vela_array * _t199 = v_parts;
+    vela_array_retain(_t199);
+    t_3ast_ExprKind _t200 = (t_3ast_ExprKind){ .tag = t_3ast_ExprKind_Interpolate, .as.m_Interpolate = { ._0 = _t199 } };
+    t_3ast_Expr _t201 = f_6parser_expr(&(*v_p), _t200, v_tok.m_line, v_tok.m_col);
+    Result_3ast_Expr_6errors_CompileError _t202 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Ok, .as.m_Ok = { ._0 = _t201 } };
+    Result_3ast_Expr_6errors_CompileError _t203 = _t202;
+    rc_release_t_3ast_ExprKind(_t200);
     vela_str_release(v_text);
     vela_array_release(v_parts);
-    return _t187;
+    return _t203;
 }
 /* vela: part */
 
-Result_Str_6errors_CompileError f_6parser_decoded_part(vela_str v_source, t_5lexer_Token v_tok) {
-    // line 1223
+Result_Str_6errors_CompileError f_6parser_decoded_part(vela_str v_source, vela_str v_raw, int64_t v_raw_start, t_5lexer_Token v_tok) {
+    // line 1238
     static const vela_str _t1[] = {VELA_STR_INIT("\"", 1), {NULL, NULL, 0}, VELA_STR_INIT("\"", 1)};
     vela_str _t2[3];
     memcpy(_t2, _t1, sizeof _t2);
@@ -29122,33 +29164,108 @@ Result_Str_6errors_CompileError f_6parser_decoded_part(vela_str v_source, t_5lex
     t_5lexer_Lexed _t4 = f_5lexer_tokenize(_t3);
     t_5lexer_Lexed v_lexed = _t4;
     vela_str_release(_t3);
-    // line 1224
+    // line 1239
     int64_t _t5 = v_lexed.m_errors->len;
     int64_t _t6 = _t5;
     bool _t7 = _t6 > 0;
     if (_t7) {
-        // line 1224
-        t_6errors_CompileError _t8 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1224:84");
-        t_6errors_CompileError _t9 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1224:106");
-        t_6errors_CompileError _t10 = f_6errors_at(v_tok.m_line, v_tok.m_col, _t8.m_code, _t9.m_message);
-        Result_Str_6errors_CompileError _t11 = (Result_Str_6errors_CompileError){ .tag = Result_Str_6errors_CompileError_Err, .as.m_Err = { ._0 = _t10 } };
-        Result_Str_6errors_CompileError _t12 = _t11;
+        // line 1240
+        int64_t v_col = v_tok.m_col;
+        // line 1241
+        static const vela_str _t8[] = {VELA_STR_INIT("\"", 1), {NULL, NULL, 0}, VELA_STR_INIT("\"", 1)};
+        vela_str _t9[3];
+        memcpy(_t9, _t8, sizeof _t9);
+        _t9[1] = v_raw;
+        vela_str _t10 = vela_str_join(_t9, 3);
+        t_5lexer_Lexed _t11 = f_5lexer_tokenize(_t10);
+        t_5lexer_Lexed v_again = _t11;
+        vela_str_release(_t10);
+        // line 1242
+        int64_t _t12 = v_again.m_errors->len;
+        int64_t _t13 = _t12;
+        bool _t14 = _t13 > 0;
+        if (_t14) {
+            // line 1243
+            int64_t _t15 = v_tok.m_col;
+            int64_t _t16 = vela_add(_t15, 2, "compiler/src/parser.vl:1243:27");
+            int64_t _t17 = _t16;
+            int64_t _t18 = vela_add(_t17, v_raw_start, "compiler/src/parser.vl:1243:31");
+            int64_t _t19 = _t18;
+            t_6errors_CompileError _t20 = *(t_6errors_CompileError *)vela_at(v_again.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1243:57");
+            int64_t _t21 = vela_add(_t19, _t20.m_col, "compiler/src/parser.vl:1243:43");
+            int64_t _t22 = _t21;
+            int64_t _t23 = vela_sub(_t22, 2, "compiler/src/parser.vl:1243:65");
+            v_col = _t23;
+        }
+        // line 1245
+        t_6errors_CompileError _t24 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1245:57");
+        t_6errors_CompileError _t25 = *(t_6errors_CompileError *)vela_at(v_lexed.m_errors, 0, sizeof(t_6errors_CompileError), "compiler/src/parser.vl:1245:79");
+        t_6errors_CompileError _t26 = f_6errors_at(v_tok.m_line, v_col, _t24.m_code, _t25.m_message);
+        Result_Str_6errors_CompileError _t27 = (Result_Str_6errors_CompileError){ .tag = Result_Str_6errors_CompileError_Err, .as.m_Err = { ._0 = _t26 } };
+        Result_Str_6errors_CompileError _t28 = _t27;
+        rc_release_t_5lexer_Lexed(v_again);
         rc_release_t_5lexer_Lexed(v_lexed);
-        return _t12;
+        return _t28;
     }
-    // line 1225
-    t_5lexer_Token _t13 = *(t_5lexer_Token *)vela_at(v_lexed.m_tokens, 0, sizeof(t_5lexer_Token), "compiler/src/parser.vl:1225:27");
-    vela_str _t14 = _t13.m_value;
-    vela_str_retain(_t14);
-    Result_Str_6errors_CompileError _t15 = (Result_Str_6errors_CompileError){ .tag = Result_Str_6errors_CompileError_Ok, .as.m_Ok = { ._0 = _t14 } };
-    Result_Str_6errors_CompileError _t16 = _t15;
+    // line 1247
+    t_5lexer_Token _t29 = *(t_5lexer_Token *)vela_at(v_lexed.m_tokens, 0, sizeof(t_5lexer_Token), "compiler/src/parser.vl:1247:27");
+    vela_str _t30 = _t29.m_value;
+    vela_str_retain(_t30);
+    Result_Str_6errors_CompileError _t31 = (Result_Str_6errors_CompileError){ .tag = Result_Str_6errors_CompileError_Ok, .as.m_Ok = { ._0 = _t30 } };
+    Result_Str_6errors_CompileError _t32 = _t31;
     rc_release_t_5lexer_Lexed(v_lexed);
-    return _t16;
+    return _t32;
+}
+/* vela: part */
+
+t_6errors_CompileError f_6parser_at_hole_end(t_6errors_CompileError v_e) {
+    // line 1253
+    t_6errors_CompileError _t1 = v_e;
+    rc_retain_t_6errors_CompileError(_t1);
+    t_6errors_CompileError v_out = _t1;
+    // line 1254
+    vela_str v_tail = VELA_STR("found end of file", 17);
+    // line 1255
+    int64_t _t2 = v_tail.len;
+    int64_t v_n = _t2;
+    // line 1256
+    int64_t _t3 = v_out.m_message.len;
+    int64_t _t4 = _t3;
+    bool _t5 = _t4 >= v_n;
+    bool _t6 = _t5;
+    if (_t6) {
+        int64_t _t7 = v_out.m_message.len;
+        int64_t _t8 = _t7;
+        int64_t _t9 = (_t8 - v_n);
+        int64_t _t10 = v_out.m_message.len;
+        vela_str _t11 = vela_slice(v_out.m_message, _t9, _t10, "compiler/src/parser.vl:1256:44");
+        bool _t12 = vela_str_eq(_t11, v_tail);
+        _t6 = _t12;
+        vela_str_release(_t11);
+    }
+    if (_t6) {
+        // line 1257
+        int64_t _t13 = v_out.m_message.len;
+        int64_t _t14 = _t13;
+        int64_t _t15 = (_t14 - v_n);
+        vela_str _t16 = vela_slice(v_out.m_message, 0, _t15, "compiler/src/parser.vl:1257:34");
+        vela_str _t17 = vela_str_concat(_t16, VELA_STR("found '}'", 9));
+        vela_str_release(_t16);
+        vela_str_release(v_out.m_message);
+        v_out.m_message = _t17;
+    }
+    // line 1259
+    t_6errors_CompileError _t18 = v_out;
+    rc_retain_t_6errors_CompileError(_t18);
+    t_6errors_CompileError _t19 = _t18;
+    vela_str_release(v_tail);
+    rc_release_t_6errors_CompileError(v_out);
+    return _t19;
 }
 /* vela: part */
 
 Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, t_5lexer_Token v_start) {
-    // line 1230
+    // line 1264
     t_5lexer_Kind _t1 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_LParen };
     Result_5lexer_Token_6errors_CompileError _t2 = f_6parser_expect(&(*v_p), _t1, VELA_STR("after 'fn' in a function value", 30));
     if (_t2.tag == Result_5lexer_Token_6errors_CompileError_Err) {
@@ -29160,10 +29277,10 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
     }
     vela_str_release(VELA_STR("after 'fn' in a function value", 30));
     rc_release_Result_5lexer_Token_6errors_CompileError(_t2);
-    // line 1231
+    // line 1265
     vela_array * _t4 = vela_array_new(vt_t_3ast_ClosureParam(), 0);
     vela_array * v_params = _t4;
-    // line 1232
+    // line 1266
     vela_unique(&v_params);
     for (;;) {
         t_5lexer_Token _t5 = f_6parser_peek((*v_p), 0);
@@ -29172,7 +29289,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
         bool _t8 = _t7;
         rc_release_t_5lexer_Token(_t5);
         if (!_t8) break;
-        // line 1233
+        // line 1267
         Result_5lexer_Token_6errors_CompileError _t9 = f_6parser_expect_name(&(*v_p), VELA_STR("for a parameter", 15));
         if (_t9.tag == Result_5lexer_Token_6errors_CompileError_Err) {
             rc_retain_t_6errors_CompileError(_t9.as.m_Err._0);
@@ -29187,18 +29304,18 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
         t_5lexer_Token v_name = _t11;
         vela_str_release(VELA_STR("for a parameter", 15));
         rc_release_Result_5lexer_Token_6errors_CompileError(_t9);
-        // line 1234
+        // line 1268
         Option_3ast_TypeName _t12 = (Option_3ast_TypeName){ .tag = Option_3ast_TypeName_None };
         Option_3ast_TypeName v_ty = _t12;
-        // line 1235
+        // line 1269
         t_5lexer_Token _t13 = f_6parser_peek((*v_p), 0);
         t_5lexer_Kind _t14 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Colon };
         bool _t15 = _t13.m_kind.tag == _t14.tag;
         if (_t15) {
-            // line 1236
+            // line 1270
             t_5lexer_Token _t16 = f_6parser_advance(&(*v_p));
             rc_release_t_5lexer_Token(_t16);
-            // line 1237
+            // line 1271
             Result_3ast_TypeName_6errors_CompileError _t17 = f_6parser_type_name(&(*v_p));
             if (_t17.tag == Result_3ast_TypeName_6errors_CompileError_Err) {
                 rc_retain_t_6errors_CompileError(_t17.as.m_Err._0);
@@ -29218,7 +29335,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
             rc_release_Result_3ast_TypeName_6errors_CompileError(_t17);
         }
         rc_release_t_5lexer_Token(_t13);
-        // line 1239
+        // line 1273
         vela_str _t21 = v_name.m_text;
         vela_str_retain(_t21);
         Option_3ast_TypeName _t22 = v_ty;
@@ -29226,25 +29343,25 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
         t_3ast_ClosureParam _t23 = (t_3ast_ClosureParam){ .m_name = _t21, .m_ty = _t22, .m_line = v_name.m_line, .m_col = v_name.m_col };
         t_3ast_ClosureParam _t24 = _t23;
         vela_push(v_params, &_t24, sizeof(t_3ast_ClosureParam));
-        // line 1240
+        // line 1274
         t_5lexer_Token _t25 = f_6parser_peek((*v_p), 0);
         t_5lexer_Kind _t26 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Comma };
         bool _t27 = _t25.m_kind.tag != _t26.tag;
         if (_t27) {
-            // line 1241
+            // line 1275
             rc_release_t_5lexer_Token(_t25);
             rc_release_Option_3ast_TypeName(v_ty);
             rc_release_t_5lexer_Token(v_name);
             break;
         }
         rc_release_t_5lexer_Token(_t25);
-        // line 1243
+        // line 1277
         t_5lexer_Token _t28 = f_6parser_advance(&(*v_p));
         rc_release_t_5lexer_Token(_t28);
         rc_release_Option_3ast_TypeName(v_ty);
         rc_release_t_5lexer_Token(v_name);
     }
-    // line 1245
+    // line 1279
     t_5lexer_Kind _t29 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_RParen };
     Result_5lexer_Token_6errors_CompileError _t30 = f_6parser_expect(&(*v_p), _t29, VELA_STR("after the parameters of a function value", 40));
     if (_t30.tag == Result_5lexer_Token_6errors_CompileError_Err) {
@@ -29257,18 +29374,18 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
     }
     vela_str_release(VELA_STR("after the parameters of a function value", 40));
     rc_release_Result_5lexer_Token_6errors_CompileError(_t30);
-    // line 1246
+    // line 1280
     Option_3ast_TypeName _t32 = (Option_3ast_TypeName){ .tag = Option_3ast_TypeName_None };
     Option_3ast_TypeName v_result = _t32;
-    // line 1247
+    // line 1281
     t_5lexer_Token _t33 = f_6parser_peek((*v_p), 0);
     t_5lexer_Kind _t34 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Arrow };
     bool _t35 = _t33.m_kind.tag == _t34.tag;
     if (_t35) {
-        // line 1248
+        // line 1282
         t_5lexer_Token _t36 = f_6parser_advance(&(*v_p));
         rc_release_t_5lexer_Token(_t36);
-        // line 1249
+        // line 1283
         Result_3ast_TypeName_6errors_CompileError _t37 = f_6parser_type_name(&(*v_p));
         if (_t37.tag == Result_3ast_TypeName_6errors_CompileError_Err) {
             rc_retain_t_6errors_CompileError(_t37.as.m_Err._0);
@@ -29287,15 +29404,15 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
         rc_release_Result_3ast_TypeName_6errors_CompileError(_t37);
     }
     rc_release_t_5lexer_Token(_t33);
-    // line 1251
+    // line 1285
     t_5lexer_Token _t41 = f_6parser_peek((*v_p), 0);
     t_5lexer_Kind _t42 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_FatArrow };
     bool _t43 = _t41.m_kind.tag == _t42.tag;
     if (_t43) {
-        // line 1252
+        // line 1286
         t_5lexer_Token _t44 = f_6parser_advance(&(*v_p));
         t_5lexer_Token v_arrow = _t44;
-        // line 1253
+        // line 1287
         Result_3ast_Expr_6errors_CompileError _t45 = f_6parser_nested_expression(&(*v_p));
         if (_t45.tag == Result_3ast_Expr_6errors_CompileError_Err) {
             rc_retain_t_6errors_CompileError(_t45.as.m_Err._0);
@@ -29311,7 +29428,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
         rc_retain_t_3ast_Expr(_t47);
         t_3ast_Expr v_value = _t47;
         rc_release_Result_3ast_Expr_6errors_CompileError(_t45);
-        // line 1254
+        // line 1288
         t_3ast_Expr _t48 = v_value;
         rc_retain_t_3ast_Expr(_t48);
         Option_3ast_Expr _t49 = (Option_3ast_Expr){ .tag = Option_3ast_Expr_Some, .as.m_Some = { ._0 = _t48 } };
@@ -29319,7 +29436,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
         t_3ast_Stmt _t51 = f_6parser_stmt(&(*v_p), _t50, v_arrow.m_line, v_arrow.m_col);
         t_3ast_Stmt v_ret = _t51;
         rc_release_t_3ast_StmtKind(_t50);
-        // line 1255
+        // line 1289
         vela_array * _t52 = vela_array_new(vt_t_3ast_Stmt(), 1);
         t_3ast_Stmt _t53 = v_ret;
         rc_retain_t_3ast_Stmt(_t53);
@@ -29327,7 +29444,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
         vela_push(_t52, &_t54, sizeof(t_3ast_Stmt));
         t_3ast_Block _t55 = (t_3ast_Block){ .m_stmts = _t52, .m_end_line = v_arrow.m_line, .m_end_col = v_arrow.m_col };
         t_3ast_Block v_body = _t55;
-        // line 1256
+        // line 1290
         vela_array * _t56 = v_params;
         vela_array_retain(_t56);
         Option_3ast_TypeName _t57 = v_result;
@@ -29349,17 +29466,17 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
         return _t62;
     }
     rc_release_t_5lexer_Token(_t41);
-    // line 1258
+    // line 1292
     bool v_saved = (*v_p).m_no_struct;
-    // line 1259
+    // line 1293
     (*v_p).m_no_struct = false;
-    // line 1260
+    // line 1294
     Result_3ast_Block_6errors_CompileError _t63 = f_6parser_block(&(*v_p), VELA_STR("or '=>' to start the body of a function value", 45));
     Result_3ast_Block_6errors_CompileError v_body_2 = _t63;
     vela_str_release(VELA_STR("or '=>' to start the body of a function value", 45));
-    // line 1261
+    // line 1295
     (*v_p).m_no_struct = v_saved;
-    // line 1262
+    // line 1296
     vela_array * _t64 = v_params;
     vela_array_retain(_t64);
     Option_3ast_TypeName _t65 = v_result;
@@ -29387,10 +29504,10 @@ Result_3ast_Expr_6errors_CompileError f_6parser_closure(t_6parser_Parser * v_p, 
 /* vela: part */
 
 Result_3ast_Expr_6errors_CompileError f_6parser_index(t_6parser_Parser * v_p, t_3ast_Expr v_obj) {
-    // line 1267
+    // line 1301
     t_5lexer_Token _t1 = f_6parser_advance(&(*v_p));
     t_5lexer_Token v_open = _t1;
-    // line 1268
+    // line 1302
     Result_3ast_Expr_6errors_CompileError _t2 = f_6parser_nested_expression(&(*v_p));
     if (_t2.tag == Result_3ast_Expr_6errors_CompileError_Err) {
         rc_retain_t_6errors_CompileError(_t2.as.m_Err._0);
@@ -29403,15 +29520,15 @@ Result_3ast_Expr_6errors_CompileError f_6parser_index(t_6parser_Parser * v_p, t_
     rc_retain_t_3ast_Expr(_t4);
     t_3ast_Expr v_first = _t4;
     rc_release_Result_3ast_Expr_6errors_CompileError(_t2);
-    // line 1269
+    // line 1303
     t_5lexer_Token _t5 = f_6parser_peek((*v_p), 0);
     t_5lexer_Kind _t6 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_DotDot };
     bool _t7 = _t5.m_kind.tag == _t6.tag;
     if (_t7) {
-        // line 1270
+        // line 1304
         t_5lexer_Token _t8 = f_6parser_advance(&(*v_p));
         rc_release_t_5lexer_Token(_t8);
-        // line 1271
+        // line 1305
         Result_3ast_Expr_6errors_CompileError _t9 = f_6parser_nested_expression(&(*v_p));
         if (_t9.tag == Result_3ast_Expr_6errors_CompileError_Err) {
             rc_retain_t_6errors_CompileError(_t9.as.m_Err._0);
@@ -29426,7 +29543,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_index(t_6parser_Parser * v_p, t_
         rc_retain_t_3ast_Expr(_t11);
         t_3ast_Expr v_end = _t11;
         rc_release_Result_3ast_Expr_6errors_CompileError(_t9);
-        // line 1272
+        // line 1306
         t_5lexer_Kind _t12 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_RBracket };
         Result_5lexer_Token_6errors_CompileError _t13 = f_6parser_expect(&(*v_p), _t12, VELA_STR("after the slice", 15));
         if (_t13.tag == Result_5lexer_Token_6errors_CompileError_Err) {
@@ -29442,7 +29559,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_index(t_6parser_Parser * v_p, t_
         }
         vela_str_release(VELA_STR("after the slice", 15));
         rc_release_Result_5lexer_Token_6errors_CompileError(_t13);
-        // line 1273
+        // line 1307
         t_3ast_Expr _t15 = v_obj;
         rc_retain_t_3ast_Expr(_t15);
         t_3ast_Expr _t16 = v_first;
@@ -29461,7 +29578,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_index(t_6parser_Parser * v_p, t_
         return _t21;
     }
     rc_release_t_5lexer_Token(_t5);
-    // line 1275
+    // line 1309
     t_5lexer_Kind _t22 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_RBracket };
     Result_5lexer_Token_6errors_CompileError _t23 = f_6parser_expect(&(*v_p), _t22, VELA_STR("after the index", 15));
     if (_t23.tag == Result_5lexer_Token_6errors_CompileError_Err) {
@@ -29475,7 +29592,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_index(t_6parser_Parser * v_p, t_
     }
     vela_str_release(VELA_STR("after the index", 15));
     rc_release_Result_5lexer_Token_6errors_CompileError(_t23);
-    // line 1276
+    // line 1310
     t_3ast_Expr _t25 = v_obj;
     rc_retain_t_3ast_Expr(_t25);
     t_3ast_Expr _t26 = v_first;
@@ -29492,7 +29609,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_index(t_6parser_Parser * v_p, t_
 /* vela: part */
 
 Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser * v_p, t_5lexer_Token v_open) {
-    // line 1281
+    // line 1315
     t_5lexer_Token _t1 = f_6parser_peek((*v_p), 0);
     t_5lexer_Kind _t2 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Colon };
     bool _t3 = _t1.m_kind.tag == _t2.tag;
@@ -29505,13 +29622,13 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
         rc_release_t_5lexer_Token(_t5);
     }
     if (_t4) {
-        // line 1282
+        // line 1316
         t_5lexer_Token _t8 = f_6parser_advance(&(*v_p));
         rc_release_t_5lexer_Token(_t8);
-        // line 1283
+        // line 1317
         t_5lexer_Token _t9 = f_6parser_advance(&(*v_p));
         rc_release_t_5lexer_Token(_t9);
-        // line 1284
+        // line 1318
         vela_array * _t10 = vela_array_new(vt_t_3ast_MapEntry(), 0);
         t_3ast_ExprKind _t11 = (t_3ast_ExprKind){ .tag = t_3ast_ExprKind_MapLit, .as.m_MapLit = { ._0 = _t10 } };
         t_3ast_Expr _t12 = f_6parser_expr(&(*v_p), _t11, v_open.m_line, v_open.m_col);
@@ -29522,13 +29639,13 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
         return _t14;
     }
     rc_release_t_5lexer_Token(_t1);
-    // line 1286
+    // line 1320
     vela_array * _t15 = vela_array_new(vt_t_3ast_Expr(), 0);
     vela_array * v_elems = _t15;
-    // line 1287
+    // line 1321
     vela_array * _t16 = vela_array_new(vt_t_3ast_MapEntry(), 0);
     vela_array * v_entries = _t16;
-    // line 1288
+    // line 1322
     vela_unique(&v_entries);
     vela_unique(&v_elems);
     for (;;) {
@@ -29538,12 +29655,12 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
         bool _t20 = _t19;
         rc_release_t_5lexer_Token(_t17);
         if (!_t20) break;
-        // line 1289
+        // line 1323
         t_5lexer_Token _t21 = f_6parser_peek((*v_p), 0);
         t_5lexer_Kind _t22 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Eof };
         bool _t23 = _t21.m_kind.tag == _t22.tag;
         if (_t23) {
-            // line 1290
+            // line 1324
             t_5lexer_Token _t24 = f_6parser_peek((*v_p), 0);
             t_6errors_CompileError _t25 = f_6parser_error(_t24, VELA_STR("E2022", 5), VELA_STR("expected ']' to close the list, found end of file", 49));
             Result_3ast_Expr_6errors_CompileError _t26 = (Result_3ast_Expr_6errors_CompileError){ .tag = Result_3ast_Expr_6errors_CompileError_Err, .as.m_Err = { ._0 = _t25 } };
@@ -29555,7 +29672,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
             return _t27;
         }
         rc_release_t_5lexer_Token(_t21);
-        // line 1292
+        // line 1326
         Result_3ast_Expr_6errors_CompileError _t28 = f_6parser_nested_expression(&(*v_p));
         if (_t28.tag == Result_3ast_Expr_6errors_CompileError_Err) {
             rc_retain_t_6errors_CompileError(_t28.as.m_Err._0);
@@ -29569,7 +29686,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
         rc_retain_t_3ast_Expr(_t30);
         t_3ast_Expr v_item = _t30;
         rc_release_Result_3ast_Expr_6errors_CompileError(_t28);
-        // line 1293
+        // line 1327
         t_5lexer_Token _t31 = f_6parser_peek((*v_p), 0);
         t_5lexer_Kind _t32 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Colon };
         bool _t33 = _t31.m_kind.tag == _t32.tag;
@@ -29581,10 +29698,10 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
             _t34 = _t37;
         }
         if (_t34) {
-            // line 1294
+            // line 1328
             t_5lexer_Token _t38 = f_6parser_advance(&(*v_p));
             rc_release_t_5lexer_Token(_t38);
-            // line 1295
+            // line 1329
             Result_3ast_Expr_6errors_CompileError _t39 = f_6parser_nested_expression(&(*v_p));
             if (_t39.tag == Result_3ast_Expr_6errors_CompileError_Err) {
                 rc_retain_t_6errors_CompileError(_t39.as.m_Err._0);
@@ -29600,7 +29717,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
             rc_retain_t_3ast_Expr(_t41);
             t_3ast_Expr v_value = _t41;
             rc_release_Result_3ast_Expr_6errors_CompileError(_t39);
-            // line 1296
+            // line 1330
             t_3ast_Expr _t42 = v_item;
             rc_retain_t_3ast_Expr(_t42);
             t_3ast_Expr _t43 = v_value;
@@ -29614,7 +29731,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
             int64_t _t47 = _t46;
             bool _t48 = _t47 > 0;
             if (_t48) {
-                // line 1298
+                // line 1332
                 t_5lexer_Token _t49 = f_6parser_peek((*v_p), 0);
                 t_5lexer_Token _t50 = f_6parser_peek((*v_p), 0);
                 vela_str _t51 = f_6parser_found(_t50);
@@ -29632,7 +29749,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
                 vela_array_release(v_elems);
                 return _t55;
             } else {
-                // line 1300
+                // line 1334
                 t_3ast_Expr _t56 = v_item;
                 rc_retain_t_3ast_Expr(_t56);
                 t_3ast_Expr _t57 = _t56;
@@ -29640,10 +29757,10 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
             }
         }
         rc_release_t_5lexer_Token(_t31);
-        // line 1302
+        // line 1336
         t_5lexer_Token _t58 = f_6parser_peek((*v_p), 0);
         t_5lexer_Token v_tok = _t58;
-        // line 1303
+        // line 1337
         t_5lexer_Kind _t59 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Comma };
         bool _t60 = v_tok.m_kind.tag == _t59.tag;
         bool _t61 = _t60;
@@ -29653,14 +29770,14 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
             _t61 = _t63;
         }
         if (_t61) {
-            // line 1304
+            // line 1338
             t_5lexer_Token _t64 = f_6parser_advance(&(*v_p));
             rc_release_t_5lexer_Token(_t64);
         } else {
             t_5lexer_Kind _t65 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_RBracket };
             bool _t66 = v_tok.m_kind.tag != _t65.tag;
             if (_t66) {
-                // line 1306
+                // line 1340
                 vela_str _t67 = f_6parser_found(v_tok);
                 vela_str _t68 = vela_str_concat(VELA_STR("expected ',' or ']' in the list", 31), _t67);
                 vela_str_release(_t67);
@@ -29678,15 +29795,15 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
         rc_release_t_5lexer_Token(v_tok);
         rc_release_t_3ast_Expr(v_item);
     }
-    // line 1309
+    // line 1343
     t_5lexer_Token _t72 = f_6parser_advance(&(*v_p));
     rc_release_t_5lexer_Token(_t72);
-    // line 1310
+    // line 1344
     int64_t _t73 = v_entries->len;
     int64_t _t74 = _t73;
     bool _t75 = _t74 > 0;
     if (_t75) {
-        // line 1311
+        // line 1345
         vela_array * _t76 = v_entries;
         vela_array_retain(_t76);
         t_3ast_ExprKind _t77 = (t_3ast_ExprKind){ .tag = t_3ast_ExprKind_MapLit, .as.m_MapLit = { ._0 = _t76 } };
@@ -29698,7 +29815,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
         vela_array_release(v_elems);
         return _t80;
     }
-    // line 1313
+    // line 1347
     vela_array * _t81 = v_elems;
     vela_array_retain(_t81);
     t_3ast_ExprKind _t82 = (t_3ast_ExprKind){ .tag = t_3ast_ExprKind_ArrayLit, .as.m_ArrayLit = { ._0 = _t81 } };
@@ -29713,17 +29830,17 @@ Result_3ast_Expr_6errors_CompileError f_6parser_collection_lit(t_6parser_Parser 
 /* vela: part */
 
 Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_p, t_5lexer_Token v_start, vela_str v_module, t_5lexer_Token v_name) {
-    // line 1321
+    // line 1355
     t_5lexer_Token _t1 = f_6parser_advance(&(*v_p));
     rc_release_t_5lexer_Token(_t1);
-    // line 1322
+    // line 1356
     vela_str _t2 = v_name.m_text;
     vela_str_retain(_t2);
     vela_str v_written = _t2;
-    // line 1323
+    // line 1357
     bool _t3 = !vela_str_eq(v_module, VELA_STR("", 0));
     if (_t3) {
-        // line 1324
+        // line 1358
         static const vela_str _t4[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
         vela_str _t5[3];
         memcpy(_t5, _t4, sizeof _t5);
@@ -29733,17 +29850,17 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
         vela_str_release(v_written);
         v_written = _t6;
     }
-    // line 1326
+    // line 1360
     static const vela_str _t7[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' value", 7)};
     vela_str _t8[3];
     memcpy(_t8, _t7, sizeof _t8);
     _t8[1] = v_written;
     vela_str _t9 = vela_str_join(_t8, 3);
     vela_str v_what = _t9;
-    // line 1327
+    // line 1361
     vela_array * _t10 = vela_array_new(vt_t_3ast_FieldInit(), 0);
     vela_array * v_fields = _t10;
-    // line 1328
+    // line 1362
     vela_unique(&v_fields);
     for (;;) {
         t_5lexer_Token _t11 = f_6parser_peek((*v_p), 0);
@@ -29752,7 +29869,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
         bool _t14 = _t13;
         rc_release_t_5lexer_Token(_t11);
         if (!_t14) break;
-        // line 1329
+        // line 1363
         Result_Unit_6errors_CompileError _t15 = f_6parser_list_not_ended((*v_p), v_what);
         if (_t15.tag == Result_Unit_6errors_CompileError_Err) {
             rc_retain_t_6errors_CompileError(_t15.as.m_Err._0);
@@ -29764,7 +29881,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
             return _t16;
         }
         rc_release_Result_Unit_6errors_CompileError(_t15);
-        // line 1330
+        // line 1364
         Result_5lexer_Token_6errors_CompileError _t17 = f_6parser_expect_name(&(*v_p), VELA_STR("for a field", 11));
         if (_t17.tag == Result_5lexer_Token_6errors_CompileError_Err) {
             rc_retain_t_6errors_CompileError(_t17.as.m_Err._0);
@@ -29781,7 +29898,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
         t_5lexer_Token v_fname = _t19;
         vela_str_release(VELA_STR("for a field", 11));
         rc_release_Result_5lexer_Token_6errors_CompileError(_t17);
-        // line 1331
+        // line 1365
         t_5lexer_Kind _t20 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Colon };
         static const vela_str _t21[] = {VELA_STR_INIT("after field '", 13), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
         vela_str _t22[3];
@@ -29802,7 +29919,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
         }
         vela_str_release(_t23);
         rc_release_Result_5lexer_Token_6errors_CompileError(_t24);
-        // line 1332
+        // line 1366
         Result_3ast_Expr_6errors_CompileError _t26 = f_6parser_nested_expression(&(*v_p));
         if (_t26.tag == Result_3ast_Expr_6errors_CompileError_Err) {
             rc_retain_t_6errors_CompileError(_t26.as.m_Err._0);
@@ -29818,7 +29935,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
         rc_retain_t_3ast_Expr(_t28);
         t_3ast_Expr v_value = _t28;
         rc_release_Result_3ast_Expr_6errors_CompileError(_t26);
-        // line 1333
+        // line 1367
         vela_str _t29 = v_fname.m_text;
         vela_str_retain(_t29);
         t_3ast_Expr _t30 = v_value;
@@ -29826,7 +29943,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
         t_3ast_FieldInit _t31 = (t_3ast_FieldInit){ .m_name = _t29, .m_value = _t30, .m_line = v_fname.m_line, .m_col = v_fname.m_col };
         t_3ast_FieldInit _t32 = _t31;
         vela_push(v_fields, &_t32, sizeof(t_3ast_FieldInit));
-        // line 1334
+        // line 1368
         vela_str _t33 = v_what;
         vela_str_retain(_t33);
         Result_Unit_6errors_CompileError _t34 = f_6parser_list_separator(&(*v_p), _t33);
@@ -29847,10 +29964,10 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
         rc_release_t_3ast_Expr(v_value);
         rc_release_t_5lexer_Token(v_fname);
     }
-    // line 1336
+    // line 1370
     t_5lexer_Token _t36 = f_6parser_advance(&(*v_p));
     rc_release_t_5lexer_Token(_t36);
-    // line 1337
+    // line 1371
     vela_str _t37 = v_module;
     vela_str_retain(_t37);
     vela_str _t38 = v_name.m_text;
@@ -29870,13 +29987,13 @@ Result_3ast_Expr_6errors_CompileError f_6parser_struct_lit(t_6parser_Parser * v_
 /* vela: part */
 
 Result_3ast_Expr_6errors_CompileError f_6parser_call(t_6parser_Parser * v_p, t_3ast_Expr v_callee) {
-    // line 1341
+    // line 1375
     t_5lexer_Token _t1 = f_6parser_advance(&(*v_p));
     rc_release_t_5lexer_Token(_t1);
-    // line 1342
+    // line 1376
     vela_array * _t2 = vela_array_new(vt_t_3ast_Expr(), 0);
     vela_array * v_args = _t2;
-    // line 1343
+    // line 1377
     vela_unique(&v_args);
     for (;;) {
         t_5lexer_Token _t3 = f_6parser_peek((*v_p), 0);
@@ -29885,15 +30002,15 @@ Result_3ast_Expr_6errors_CompileError f_6parser_call(t_6parser_Parser * v_p, t_3
         bool _t6 = _t5;
         rc_release_t_5lexer_Token(_t3);
         if (!_t6) break;
-        // line 1344
+        // line 1378
         t_5lexer_Token _t7 = f_6parser_peek((*v_p), 0);
         t_5lexer_Kind _t8 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Mut };
         bool _t9 = _t7.m_kind.tag == _t8.tag;
         if (_t9) {
-            // line 1345
+            // line 1379
             t_5lexer_Token _t10 = f_6parser_advance(&(*v_p));
             t_5lexer_Token v_m = _t10;
-            // line 1346
+            // line 1380
             Result_3ast_Expr_6errors_CompileError _t11 = f_6parser_nested_expression(&(*v_p));
             if (_t11.tag == Result_3ast_Expr_6errors_CompileError_Err) {
                 rc_retain_t_6errors_CompileError(_t11.as.m_Err._0);
@@ -29908,7 +30025,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_call(t_6parser_Parser * v_p, t_3
             rc_retain_t_3ast_Expr(_t13);
             t_3ast_Expr v_place = _t13;
             rc_release_Result_3ast_Expr_6errors_CompileError(_t11);
-            // line 1347
+            // line 1381
             t_3ast_Expr _t14 = v_place;
             rc_retain_t_3ast_Expr(_t14);
             t_3ast_ExprKind _t15 = (t_3ast_ExprKind){ .tag = t_3ast_ExprKind_MutArg, .as.m_MutArg = { ._0 = box_t_3ast_Expr_new(_t14) } };
@@ -29919,7 +30036,7 @@ Result_3ast_Expr_6errors_CompileError f_6parser_call(t_6parser_Parser * v_p, t_3
             rc_release_t_3ast_Expr(v_place);
             rc_release_t_5lexer_Token(v_m);
         } else {
-            // line 1349
+            // line 1383
             Result_3ast_Expr_6errors_CompileError _t18 = f_6parser_nested_expression(&(*v_p));
             if (_t18.tag == Result_3ast_Expr_6errors_CompileError_Err) {
                 rc_retain_t_6errors_CompileError(_t18.as.m_Err._0);
@@ -29936,28 +30053,28 @@ Result_3ast_Expr_6errors_CompileError f_6parser_call(t_6parser_Parser * v_p, t_3
             rc_release_Result_3ast_Expr_6errors_CompileError(_t18);
         }
         rc_release_t_5lexer_Token(_t7);
-        // line 1351
+        // line 1385
         t_5lexer_Token _t22 = f_6parser_peek((*v_p), 0);
         t_5lexer_Kind _t23 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_Comma };
         bool _t24 = _t22.m_kind.tag != _t23.tag;
         if (_t24) {
-            // line 1352
+            // line 1386
             rc_release_t_5lexer_Token(_t22);
             break;
         }
         rc_release_t_5lexer_Token(_t22);
-        // line 1354
+        // line 1388
         t_5lexer_Token _t25 = f_6parser_advance(&(*v_p));
         rc_release_t_5lexer_Token(_t25);
     }
-    // line 1356
+    // line 1390
     t_5lexer_Token _t26 = f_6parser_peek((*v_p), 0);
     t_5lexer_Token v_tok = _t26;
-    // line 1357
+    // line 1391
     t_5lexer_Kind _t27 = (t_5lexer_Kind){ .tag = t_5lexer_Kind_RParen };
     bool _t28 = v_tok.m_kind.tag != _t27.tag;
     if (_t28) {
-        // line 1358
+        // line 1392
         vela_str _t29 = f_6parser_found(v_tok);
         vela_str _t30 = vela_str_concat(VELA_STR("expected ',' or ')' in argument list", 36), _t29);
         vela_str_release(_t29);
@@ -29969,10 +30086,10 @@ Result_3ast_Expr_6errors_CompileError f_6parser_call(t_6parser_Parser * v_p, t_3
         vela_array_release(v_args);
         return _t33;
     }
-    // line 1360
+    // line 1394
     t_5lexer_Token _t34 = f_6parser_advance(&(*v_p));
     rc_release_t_5lexer_Token(_t34);
-    // line 1361
+    // line 1395
     t_3ast_Expr _t35 = v_callee;
     rc_retain_t_3ast_Expr(_t35);
     vela_array * _t36 = v_args;
@@ -42011,53 +42128,63 @@ int64_t f_7checker_infer_type(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
                 int64_t _t54 = f_7checker_value(&(*v_c), _t53);
                 int64_t v_t_2 = _t54;
                 rc_release_t_3ast_Expr(_t53);
-                // line 2404
+                // line 2405
                 int64_t _t55 = v_t_2;
-                int64_t _t56 = f_5types_STR();
+                int64_t _t56 = f_5types_ERROR();
                 bool _t57 = _t55 != _t56;
                 bool _t58 = _t57;
                 if (_t58) {
                     int64_t _t59 = v_t_2;
-                    int64_t _t60 = f_5types_BOOL();
+                    int64_t _t60 = f_5types_STR();
                     bool _t61 = _t59 != _t60;
                     _t58 = _t61;
                 }
                 bool _t62 = _t58;
                 if (_t62) {
                     int64_t _t63 = v_t_2;
-                    int64_t _t64 = f_5types_FLOAT();
+                    int64_t _t64 = f_5types_BOOL();
                     bool _t65 = _t63 != _t64;
                     _t62 = _t65;
                 }
                 bool _t66 = _t62;
                 if (_t66) {
-                    bool _t67 = f_5types_is_integer(v_t_2);
-                    bool _t68 = !_t67;
-                    _t66 = _t68;
+                    int64_t _t67 = v_t_2;
+                    int64_t _t68 = f_5types_FLOAT();
+                    bool _t69 = _t67 != _t68;
+                    _t66 = _t69;
                 }
-                if (_t66) {
-                    // line 2405
-                    t_3ast_Expr _t69 = v_hole;
-                    rc_retain_t_3ast_Expr(_t69);
-                    f_7checker_report_at(&(*v_c), _t69, VELA_STR("E3101", 5), VELA_STR("interpolated expressions must have type Str, Bool, Float, or an integer type", 76));
-                    vela_str_release(VELA_STR("interpolated expressions must have type Str, Bool, Float, or an integer type", 76));
-                    vela_str_release(VELA_STR("E3101", 5));
-                    rc_release_t_3ast_Expr(_t69);
+                bool _t70 = _t66;
+                if (_t70) {
+                    bool _t71 = f_5types_is_integer(v_t_2);
+                    bool _t72 = !_t71;
+                    _t70 = _t72;
+                }
+                if (_t70) {
+                    // line 2406
+                    t_3ast_Expr _t73 = v_hole;
+                    rc_retain_t_3ast_Expr(_t73);
+                    vela_str _t74 = f_7checker_show((*v_c), v_t_2);
+                    vela_str _t75 = vela_str_concat(VELA_STR("interpolated expressions must have type Str, Bool, Float, or an integer type, found ", 84), _t74);
+                    vela_str_release(_t74);
+                    f_7checker_report_at(&(*v_c), _t73, VELA_STR("E3234", 5), _t75);
+                    vela_str_release(_t75);
+                    vela_str_release(VELA_STR("E3234", 5));
+                    rc_release_t_3ast_Expr(_t73);
                 }
             } else {
             }
         }
         vela_array_release(_t50);
-        // line 2411
-        int64_t _t70 = f_5types_STR();
-        int64_t _t71 = _t70;
+        // line 2412
+        int64_t _t76 = f_5types_STR();
+        int64_t _t77 = _t76;
         vela_array_release(v_parts);
-        return _t71;
+        return _t77;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_UnitLit) {
-        // line 2413
-        int64_t _t72 = f_5types_UNIT();
-        int64_t _t73 = _t72;
-        return _t73;
+        // line 2414
+        int64_t _t78 = f_5types_UNIT();
+        int64_t _t79 = _t78;
+        return _t79;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Closure) {
         vela_array * v_params = v_e.m_kind->value.as.m_Closure._0;
         vela_array_retain(v_params);
@@ -42065,191 +42192,191 @@ int64_t f_7checker_infer_type(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
         rc_retain_Option_3ast_TypeName(v_result);
         t_3ast_Block v_body = v_e.m_kind->value.as.m_Closure._2;
         rc_retain_t_3ast_Block(v_body);
-        // line 2414
-        vela_array * _t74 = v_params;
-        vela_array_retain(_t74);
-        Option_3ast_TypeName _t75 = v_result;
-        rc_retain_Option_3ast_TypeName(_t75);
-        t_3ast_Block _t76 = v_body;
-        rc_retain_t_3ast_Block(_t76);
-        int64_t _t77 = f_7checker_closure(&(*v_c), v_e, _t74, _t75, _t76, v_expected);
-        int64_t _t78 = _t77;
-        rc_release_t_3ast_Block(_t76);
-        rc_release_Option_3ast_TypeName(_t75);
-        vela_array_release(_t74);
+        // line 2415
+        vela_array * _t80 = v_params;
+        vela_array_retain(_t80);
+        Option_3ast_TypeName _t81 = v_result;
+        rc_retain_Option_3ast_TypeName(_t81);
+        t_3ast_Block _t82 = v_body;
+        rc_retain_t_3ast_Block(_t82);
+        int64_t _t83 = f_7checker_closure(&(*v_c), v_e, _t80, _t81, _t82, v_expected);
+        int64_t _t84 = _t83;
+        rc_release_t_3ast_Block(_t82);
+        rc_release_Option_3ast_TypeName(_t81);
+        vela_array_release(_t80);
         rc_release_t_3ast_Block(v_body);
         rc_release_Option_3ast_TypeName(v_result);
         vela_array_release(v_params);
-        return _t78;
+        return _t84;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Name) {
         vela_str v_name_2 = v_e.m_kind->value.as.m_Name._0;
         vela_str_retain(v_name_2);
-        // line 2416
-        vela_str _t79 = v_name_2;
-        vela_str_retain(_t79);
-        t_7checker_Ref _t80 = f_7checker_resolve(&(*v_c), v_e, _t79);
-        if (_t80.tag == t_7checker_Ref_Local) {
-            int64_t v_id = _t80.as.m_Local._0;
-            // line 2418
-            t_7checker_Ref _t81 = (t_7checker_Ref){ .tag = t_7checker_Ref_Local, .as.m_Local = { ._0 = v_id } };
-            vela_unique(&(*v_c).m_refs);
-            t_7checker_Ref *_t82 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2418:27");
-            rc_release_t_7checker_Ref(*_t82);
-            *_t82 = _t81;
+        // line 2417
+        vela_str _t85 = v_name_2;
+        vela_str_retain(_t85);
+        t_7checker_Ref _t86 = f_7checker_resolve(&(*v_c), v_e, _t85);
+        if (_t86.tag == t_7checker_Ref_Local) {
+            int64_t v_id = _t86.as.m_Local._0;
             // line 2419
-            f_7checker_capture(&(*v_c), v_id);
-            // line 2420
-            t_7checker_Local _t83 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_id, sizeof(t_7checker_Local), "compiler/src/checker.vl:2420:36");
-            int64_t _t84 = _t83.m_ty;
-            vela_str_release(_t79);
-            rc_release_t_7checker_Ref(_t80);
-            vela_str_release(v_name_2);
-            return _t84;
-        } else if (_t80.tag == t_7checker_Ref_Constant) {
-            int64_t v_id_2 = _t80.as.m_Constant._0;
-            // line 2422
-            t_7checker_Ref _t85 = (t_7checker_Ref){ .tag = t_7checker_Ref_Constant, .as.m_Constant = { ._0 = v_id_2 } };
+            t_7checker_Ref _t87 = (t_7checker_Ref){ .tag = t_7checker_Ref_Local, .as.m_Local = { ._0 = v_id } };
             vela_unique(&(*v_c).m_refs);
-            t_7checker_Ref *_t86 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2422:45");
-            rc_release_t_7checker_Ref(*_t86);
-            *_t86 = _t85;
-            // line 2422
-            int64_t _t87 = f_7checker_check_constant(&(*v_c), v_id_2);
-            int64_t _t88 = _t87;
-            vela_str_release(_t79);
-            rc_release_t_7checker_Ref(_t80);
+            t_7checker_Ref *_t88 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2419:27");
+            rc_release_t_7checker_Ref(*_t88);
+            *_t88 = _t87;
+            // line 2420
+            f_7checker_capture(&(*v_c), v_id);
+            // line 2421
+            t_7checker_Local _t89 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_id, sizeof(t_7checker_Local), "compiler/src/checker.vl:2421:36");
+            int64_t _t90 = _t89.m_ty;
+            vela_str_release(_t85);
+            rc_release_t_7checker_Ref(_t86);
             vela_str_release(v_name_2);
-            return _t88;
-        } else if (_t80.tag == t_7checker_Ref_Function) {
-            int64_t v_id_3 = _t80.as.m_Function._0;
+            return _t90;
+        } else if (_t86.tag == t_7checker_Ref_Constant) {
+            int64_t v_id_2 = _t86.as.m_Constant._0;
             // line 2423
-            vela_str _t89 = v_name_2;
-            vela_str_retain(_t89);
-            int64_t _t90 = f_7checker_fn_value(&(*v_c), v_e, v_id_3, _t89, v_expected);
-            int64_t _t91 = _t90;
-            vela_str_release(_t89);
-            vela_str_release(_t79);
-            rc_release_t_7checker_Ref(_t80);
+            t_7checker_Ref _t91 = (t_7checker_Ref){ .tag = t_7checker_Ref_Constant, .as.m_Constant = { ._0 = v_id_2 } };
+            vela_unique(&(*v_c).m_refs);
+            t_7checker_Ref *_t92 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2423:45");
+            rc_release_t_7checker_Ref(*_t92);
+            *_t92 = _t91;
+            // line 2423
+            int64_t _t93 = f_7checker_check_constant(&(*v_c), v_id_2);
+            int64_t _t94 = _t93;
+            vela_str_release(_t85);
+            rc_release_t_7checker_Ref(_t86);
             vela_str_release(v_name_2);
-            return _t91;
-        } else {
+            return _t94;
+        } else if (_t86.tag == t_7checker_Ref_Function) {
+            int64_t v_id_3 = _t86.as.m_Function._0;
             // line 2424
-            int64_t _t92 = f_5types_ERROR();
-            int64_t _t93 = _t92;
-            vela_str_release(_t79);
-            rc_release_t_7checker_Ref(_t80);
+            vela_str _t95 = v_name_2;
+            vela_str_retain(_t95);
+            int64_t _t96 = f_7checker_fn_value(&(*v_c), v_e, v_id_3, _t95, v_expected);
+            int64_t _t97 = _t96;
+            vela_str_release(_t95);
+            vela_str_release(_t85);
+            rc_release_t_7checker_Ref(_t86);
             vela_str_release(v_name_2);
-            return _t93;
+            return _t97;
+        } else {
+            // line 2425
+            int64_t _t98 = f_5types_ERROR();
+            int64_t _t99 = _t98;
+            vela_str_release(_t85);
+            rc_release_t_7checker_Ref(_t86);
+            vela_str_release(v_name_2);
+            return _t99;
         }
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Unary) {
         vela_str v_op = v_e.m_kind->value.as.m_Unary._0;
         vela_str_retain(v_op);
         t_3ast_Expr v_operand = v_e.m_kind->value.as.m_Unary._1->value;
         rc_retain_t_3ast_Expr(v_operand);
-        // line 2428
-        bool _t94 = vela_str_eq(v_op, VELA_STR("-", 1));
-        bool _t95 = _t94;
-        if (!_t95) {
-            bool _t96 = vela_str_eq(v_op, VELA_STR("~", 1));
-            _t95 = _t96;
+        // line 2429
+        bool _t100 = vela_str_eq(v_op, VELA_STR("-", 1));
+        bool _t101 = _t100;
+        if (!_t101) {
+            bool _t102 = vela_str_eq(v_op, VELA_STR("~", 1));
+            _t101 = _t102;
         }
-        bool _t97 = _t95;
-        if (_t97) {
-            bool _t98 = f_5types_is_integer(v_expected);
-            _t97 = _t98;
+        bool _t103 = _t101;
+        if (_t103) {
+            bool _t104 = f_5types_is_integer(v_expected);
+            _t103 = _t104;
         }
-        if (_t97) {
-            // line 2428
+        if (_t103) {
+            // line 2429
             (*v_c).m_expected = v_expected;
         }
-        // line 2429
-        t_3ast_Expr _t99 = v_operand;
-        rc_retain_t_3ast_Expr(_t99);
-        int64_t _t100 = f_7checker_value(&(*v_c), _t99);
-        int64_t v_ty = _t100;
-        rc_release_t_3ast_Expr(_t99);
         // line 2430
-        bool _t101 = vela_str_eq(v_op, VELA_STR("-", 1));
-        bool _t102 = _t101;
-        if (_t102) {
-            bool _t103 = f_5types_is_integer(v_ty);
-            bool _t104 = _t103;
-            if (!_t104) {
-                int64_t _t105 = v_ty;
-                int64_t _t106 = f_5types_FLOAT();
-                bool _t107 = _t105 == _t106;
-                _t104 = _t107;
-            }
-            _t102 = _t104;
-        }
-        if (_t102) {
-            // line 2430
-            int64_t _t108 = v_ty;
-            rc_release_t_3ast_Expr(v_operand);
-            vela_str_release(v_op);
-            return _t108;
-        }
+        t_3ast_Expr _t105 = v_operand;
+        rc_retain_t_3ast_Expr(_t105);
+        int64_t _t106 = f_7checker_value(&(*v_c), _t105);
+        int64_t v_ty = _t106;
+        rc_release_t_3ast_Expr(_t105);
         // line 2431
-        bool _t109 = vela_str_eq(v_op, VELA_STR("~", 1));
-        bool _t110 = _t109;
-        if (_t110) {
-            bool _t111 = f_5types_is_integer(v_ty);
-            _t110 = _t111;
+        bool _t107 = vela_str_eq(v_op, VELA_STR("-", 1));
+        bool _t108 = _t107;
+        if (_t108) {
+            bool _t109 = f_5types_is_integer(v_ty);
+            bool _t110 = _t109;
+            if (!_t110) {
+                int64_t _t111 = v_ty;
+                int64_t _t112 = f_5types_FLOAT();
+                bool _t113 = _t111 == _t112;
+                _t110 = _t113;
+            }
+            _t108 = _t110;
         }
-        if (_t110) {
+        if (_t108) {
             // line 2431
-            int64_t _t112 = v_ty;
+            int64_t _t114 = v_ty;
             rc_release_t_3ast_Expr(v_operand);
             vela_str_release(v_op);
-            return _t112;
+            return _t114;
         }
         // line 2432
-        int64_t _t113 = f_5types_BOOL();
-        int64_t v_want = _t113;
+        bool _t115 = vela_str_eq(v_op, VELA_STR("~", 1));
+        bool _t116 = _t115;
+        if (_t116) {
+            bool _t117 = f_5types_is_integer(v_ty);
+            _t116 = _t117;
+        }
+        if (_t116) {
+            // line 2432
+            int64_t _t118 = v_ty;
+            rc_release_t_3ast_Expr(v_operand);
+            vela_str_release(v_op);
+            return _t118;
+        }
         // line 2433
-        bool _t114 = vela_str_eq(v_op, VELA_STR("-", 1));
-        bool _t115 = _t114;
-        if (!_t115) {
-            bool _t116 = vela_str_eq(v_op, VELA_STR("~", 1));
-            _t115 = _t116;
-        }
-        if (_t115) {
-            // line 2433
-            int64_t _t117 = f_5types_INT();
-            v_want = _t117;
-        }
+        int64_t _t119 = f_5types_BOOL();
+        int64_t v_want = _t119;
         // line 2434
-        int64_t _t118 = v_ty;
-        bool _t119 = _t118 != v_want;
-        bool _t120 = _t119;
-        if (_t120) {
-            int64_t _t121 = v_ty;
-            int64_t _t122 = f_5types_ERROR();
-            bool _t123 = _t121 != _t122;
-            _t120 = _t123;
+        bool _t120 = vela_str_eq(v_op, VELA_STR("-", 1));
+        bool _t121 = _t120;
+        if (!_t121) {
+            bool _t122 = vela_str_eq(v_op, VELA_STR("~", 1));
+            _t121 = _t122;
         }
-        if (_t120) {
-            // line 2435
-            static const vela_str _t124[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' needs ", 8), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8), {NULL, NULL, 0}};
-            vela_str _t125[6];
-            memcpy(_t125, _t124, sizeof _t125);
-            _t125[1] = v_op;
-            vela_str _t126 = f_7checker_show((*v_c), v_want);
-            _t125[3] = _t126;
-            vela_str _t127 = f_7checker_show((*v_c), v_ty);
-            _t125[5] = _t127;
-            vela_str _t128 = vela_str_join(_t125, 6);
-            vela_str_release(_t125[3]);
-            vela_str_release(_t125[5]);
-            f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3095", 5), _t128);
-            vela_str_release(_t128);
+        if (_t121) {
+            // line 2434
+            int64_t _t123 = f_5types_INT();
+            v_want = _t123;
+        }
+        // line 2435
+        int64_t _t124 = v_ty;
+        bool _t125 = _t124 != v_want;
+        bool _t126 = _t125;
+        if (_t126) {
+            int64_t _t127 = v_ty;
+            int64_t _t128 = f_5types_ERROR();
+            bool _t129 = _t127 != _t128;
+            _t126 = _t129;
+        }
+        if (_t126) {
+            // line 2436
+            static const vela_str _t130[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' needs ", 8), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8), {NULL, NULL, 0}};
+            vela_str _t131[6];
+            memcpy(_t131, _t130, sizeof _t131);
+            _t131[1] = v_op;
+            vela_str _t132 = f_7checker_show((*v_c), v_want);
+            _t131[3] = _t132;
+            vela_str _t133 = f_7checker_show((*v_c), v_ty);
+            _t131[5] = _t133;
+            vela_str _t134 = vela_str_join(_t131, 6);
+            vela_str_release(_t131[3]);
+            vela_str_release(_t131[5]);
+            f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3095", 5), _t134);
+            vela_str_release(_t134);
             vela_str_release(VELA_STR("E3095", 5));
         }
-        // line 2437
-        int64_t _t129 = v_want;
+        // line 2438
+        int64_t _t135 = v_want;
         rc_release_t_3ast_Expr(v_operand);
         vela_str_release(v_op);
-        return _t129;
+        return _t135;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Binary) {
         vela_str v_op_2 = v_e.m_kind->value.as.m_Binary._0;
         vela_str_retain(v_op_2);
@@ -42257,63 +42384,63 @@ int64_t f_7checker_infer_type(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
         rc_retain_t_3ast_Expr(v_l);
         t_3ast_Expr v_r = v_e.m_kind->value.as.m_Binary._2->value;
         rc_retain_t_3ast_Expr(v_r);
-        // line 2439
-        vela_str _t130 = v_op_2;
-        vela_str_retain(_t130);
-        t_3ast_Expr _t131 = v_l;
-        rc_retain_t_3ast_Expr(_t131);
-        t_3ast_Expr _t132 = v_r;
-        rc_retain_t_3ast_Expr(_t132);
-        int64_t _t133 = f_7checker_binary(&(*v_c), v_e, _t130, _t131, _t132, v_expected);
-        int64_t _t134 = _t133;
-        rc_release_t_3ast_Expr(_t132);
-        rc_release_t_3ast_Expr(_t131);
-        vela_str_release(_t130);
+        // line 2440
+        vela_str _t136 = v_op_2;
+        vela_str_retain(_t136);
+        t_3ast_Expr _t137 = v_l;
+        rc_retain_t_3ast_Expr(_t137);
+        t_3ast_Expr _t138 = v_r;
+        rc_retain_t_3ast_Expr(_t138);
+        int64_t _t139 = f_7checker_binary(&(*v_c), v_e, _t136, _t137, _t138, v_expected);
+        int64_t _t140 = _t139;
+        rc_release_t_3ast_Expr(_t138);
+        rc_release_t_3ast_Expr(_t137);
+        vela_str_release(_t136);
         rc_release_t_3ast_Expr(v_r);
         rc_release_t_3ast_Expr(v_l);
         vela_str_release(v_op_2);
-        return _t134;
+        return _t140;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Call) {
         t_3ast_Expr v_callee = v_e.m_kind->value.as.m_Call._0->value;
         rc_retain_t_3ast_Expr(v_callee);
         vela_array * v_args = v_e.m_kind->value.as.m_Call._1;
         vela_array_retain(v_args);
-        // line 2441
-        t_3ast_Expr _t135 = v_callee;
-        rc_retain_t_3ast_Expr(_t135);
-        vela_array * _t136 = v_args;
-        vela_array_retain(_t136);
-        int64_t _t137 = f_7checker_call(&(*v_c), v_e, _t135, _t136, v_expected);
-        int64_t v_t_3 = _t137;
-        vela_array_release(_t136);
-        rc_release_t_3ast_Expr(_t135);
         // line 2442
-        vela_array * _t138 = v_args;
-        vela_array_retain(_t138);
-        f_7checker_stale_copies(&(*v_c), _t138);
-        vela_array_release(_t138);
+        t_3ast_Expr _t141 = v_callee;
+        rc_retain_t_3ast_Expr(_t141);
+        vela_array * _t142 = v_args;
+        vela_array_retain(_t142);
+        int64_t _t143 = f_7checker_call(&(*v_c), v_e, _t141, _t142, v_expected);
+        int64_t v_t_3 = _t143;
+        vela_array_release(_t142);
+        rc_release_t_3ast_Expr(_t141);
         // line 2443
-        int64_t _t139 = v_t_3;
+        vela_array * _t144 = v_args;
+        vela_array_retain(_t144);
+        f_7checker_stale_copies(&(*v_c), _t144);
+        vela_array_release(_t144);
+        // line 2444
+        int64_t _t145 = v_t_3;
         vela_array_release(v_args);
         rc_release_t_3ast_Expr(v_callee);
-        return _t139;
+        return _t145;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Field) {
         t_3ast_Expr v_obj = v_e.m_kind->value.as.m_Field._0->value;
         rc_retain_t_3ast_Expr(v_obj);
         vela_str v_name_3 = v_e.m_kind->value.as.m_Field._1;
         vela_str_retain(v_name_3);
-        // line 2445
-        t_3ast_Expr _t140 = v_obj;
-        rc_retain_t_3ast_Expr(_t140);
-        vela_str _t141 = v_name_3;
-        vela_str_retain(_t141);
-        int64_t _t142 = f_7checker_field(&(*v_c), v_e, _t140, _t141, v_expected);
-        int64_t _t143 = _t142;
-        vela_str_release(_t141);
-        rc_release_t_3ast_Expr(_t140);
+        // line 2446
+        t_3ast_Expr _t146 = v_obj;
+        rc_retain_t_3ast_Expr(_t146);
+        vela_str _t147 = v_name_3;
+        vela_str_retain(_t147);
+        int64_t _t148 = f_7checker_field(&(*v_c), v_e, _t146, _t147, v_expected);
+        int64_t _t149 = _t148;
+        vela_str_release(_t147);
+        rc_release_t_3ast_Expr(_t146);
         vela_str_release(v_name_3);
         rc_release_t_3ast_Expr(v_obj);
-        return _t143;
+        return _t149;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_StructLit) {
         vela_str v_module = v_e.m_kind->value.as.m_StructLit._0;
         vela_str_retain(v_module);
@@ -42321,84 +42448,84 @@ int64_t f_7checker_infer_type(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
         vela_str_retain(v_name_4);
         vela_array * v_fields = v_e.m_kind->value.as.m_StructLit._2;
         vela_array_retain(v_fields);
-        // line 2446
-        vela_str _t144 = v_module;
-        vela_str_retain(_t144);
-        vela_str _t145 = v_name_4;
-        vela_str_retain(_t145);
-        vela_array * _t146 = v_fields;
-        vela_array_retain(_t146);
-        int64_t _t147 = f_7checker_struct_lit(&(*v_c), v_e, _t144, _t145, _t146, v_expected);
-        int64_t _t148 = _t147;
-        vela_array_release(_t146);
-        vela_str_release(_t145);
-        vela_str_release(_t144);
+        // line 2447
+        vela_str _t150 = v_module;
+        vela_str_retain(_t150);
+        vela_str _t151 = v_name_4;
+        vela_str_retain(_t151);
+        vela_array * _t152 = v_fields;
+        vela_array_retain(_t152);
+        int64_t _t153 = f_7checker_struct_lit(&(*v_c), v_e, _t150, _t151, _t152, v_expected);
+        int64_t _t154 = _t153;
+        vela_array_release(_t152);
+        vela_str_release(_t151);
+        vela_str_release(_t150);
         vela_array_release(v_fields);
         vela_str_release(v_name_4);
         vela_str_release(v_module);
-        return _t148;
+        return _t154;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Match) {
         t_3ast_Expr v_scrutinee = v_e.m_kind->value.as.m_Match._0->value;
         rc_retain_t_3ast_Expr(v_scrutinee);
         vela_array * v_arms = v_e.m_kind->value.as.m_Match._1;
         vela_array_retain(v_arms);
-        // line 2447
-        t_3ast_Expr _t149 = v_scrutinee;
-        rc_retain_t_3ast_Expr(_t149);
-        vela_array * _t150 = v_arms;
-        vela_array_retain(_t150);
-        t_7checker_MatchBody _t151 = (t_7checker_MatchBody){ .tag = t_7checker_MatchBody_Infer };
-        int64_t _t152 = f_7checker_match_arms(&(*v_c), _t149, _t150, v_e.m_line, v_e.m_col, _t151);
-        int64_t _t153 = _t152;
-        rc_release_t_7checker_MatchBody(_t151);
-        vela_array_release(_t150);
-        rc_release_t_3ast_Expr(_t149);
+        // line 2448
+        t_3ast_Expr _t155 = v_scrutinee;
+        rc_retain_t_3ast_Expr(_t155);
+        vela_array * _t156 = v_arms;
+        vela_array_retain(_t156);
+        t_7checker_MatchBody _t157 = (t_7checker_MatchBody){ .tag = t_7checker_MatchBody_Infer };
+        int64_t _t158 = f_7checker_match_arms(&(*v_c), _t155, _t156, v_e.m_line, v_e.m_col, _t157);
+        int64_t _t159 = _t158;
+        rc_release_t_7checker_MatchBody(_t157);
+        vela_array_release(_t156);
+        rc_release_t_3ast_Expr(_t155);
         vela_array_release(v_arms);
         rc_release_t_3ast_Expr(v_scrutinee);
-        return _t153;
+        return _t159;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Index) {
         t_3ast_Expr v_obj_2 = v_e.m_kind->value.as.m_Index._0->value;
         rc_retain_t_3ast_Expr(v_obj_2);
         t_3ast_Expr v_i = v_e.m_kind->value.as.m_Index._1->value;
         rc_retain_t_3ast_Expr(v_i);
-        // line 2448
-        t_3ast_Expr _t154 = v_obj_2;
-        rc_retain_t_3ast_Expr(_t154);
-        t_3ast_Expr _t155 = v_i;
-        rc_retain_t_3ast_Expr(_t155);
-        int64_t _t156 = f_7checker_index(&(*v_c), v_e, _t154, _t155);
-        int64_t _t157 = _t156;
-        rc_release_t_3ast_Expr(_t155);
-        rc_release_t_3ast_Expr(_t154);
+        // line 2449
+        t_3ast_Expr _t160 = v_obj_2;
+        rc_retain_t_3ast_Expr(_t160);
+        t_3ast_Expr _t161 = v_i;
+        rc_retain_t_3ast_Expr(_t161);
+        int64_t _t162 = f_7checker_index(&(*v_c), v_e, _t160, _t161);
+        int64_t _t163 = _t162;
+        rc_release_t_3ast_Expr(_t161);
+        rc_release_t_3ast_Expr(_t160);
         rc_release_t_3ast_Expr(v_i);
         rc_release_t_3ast_Expr(v_obj_2);
-        return _t157;
+        return _t163;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Try) {
         t_3ast_Expr v_inner = v_e.m_kind->value.as.m_Try._0->value;
         rc_retain_t_3ast_Expr(v_inner);
-        // line 2449
-        t_3ast_Expr _t158 = v_inner;
-        rc_retain_t_3ast_Expr(_t158);
-        int64_t _t159 = f_7checker_try_expr(&(*v_c), v_e, _t158);
-        int64_t _t160 = _t159;
-        rc_release_t_3ast_Expr(_t158);
+        // line 2450
+        t_3ast_Expr _t164 = v_inner;
+        rc_retain_t_3ast_Expr(_t164);
+        int64_t _t165 = f_7checker_try_expr(&(*v_c), v_e, _t164);
+        int64_t _t166 = _t165;
+        rc_release_t_3ast_Expr(_t164);
         rc_release_t_3ast_Expr(v_inner);
-        return _t160;
+        return _t166;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
         t_3ast_Expr v_p = v_e.m_kind->value.as.m_MutArg._0->value;
         rc_retain_t_3ast_Expr(v_p);
-        // line 2451
+        // line 2452
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3096", 5), VELA_STR("`mut` only goes before an argument for a mut parameter", 54));
         vela_str_release(VELA_STR("`mut` only goes before an argument for a mut parameter", 54));
         vela_str_release(VELA_STR("E3096", 5));
-        // line 2452
-        t_3ast_Expr _t161 = v_p;
-        rc_retain_t_3ast_Expr(_t161);
-        int64_t _t162 = f_7checker_infer(&(*v_c), _t161);
-        int64_t _t163 = _t162;
-        rc_release_t_3ast_Expr(_t161);
+        // line 2453
+        t_3ast_Expr _t167 = v_p;
+        rc_retain_t_3ast_Expr(_t167);
+        int64_t _t168 = f_7checker_infer(&(*v_c), _t167);
+        int64_t _t169 = _t168;
+        rc_release_t_3ast_Expr(_t167);
         rc_release_t_3ast_Expr(v_p);
-        return _t163;
+        return _t169;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Slice) {
         t_3ast_Expr v_obj_3 = v_e.m_kind->value.as.m_Slice._0->value;
         rc_retain_t_3ast_Expr(v_obj_3);
@@ -42406,62 +42533,62 @@ int64_t f_7checker_infer_type(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
         rc_retain_t_3ast_Expr(v_lo);
         t_3ast_Expr v_hi = v_e.m_kind->value.as.m_Slice._2->value;
         rc_retain_t_3ast_Expr(v_hi);
-        // line 2454
-        t_3ast_Expr _t164 = v_obj_3;
-        rc_retain_t_3ast_Expr(_t164);
-        t_3ast_Expr _t165 = v_lo;
-        rc_retain_t_3ast_Expr(_t165);
-        t_3ast_Expr _t166 = v_hi;
-        rc_retain_t_3ast_Expr(_t166);
-        int64_t _t167 = f_7checker_slice(&(*v_c), v_e, _t164, _t165, _t166);
-        int64_t _t168 = _t167;
-        rc_release_t_3ast_Expr(_t166);
-        rc_release_t_3ast_Expr(_t165);
-        rc_release_t_3ast_Expr(_t164);
+        // line 2455
+        t_3ast_Expr _t170 = v_obj_3;
+        rc_retain_t_3ast_Expr(_t170);
+        t_3ast_Expr _t171 = v_lo;
+        rc_retain_t_3ast_Expr(_t171);
+        t_3ast_Expr _t172 = v_hi;
+        rc_retain_t_3ast_Expr(_t172);
+        int64_t _t173 = f_7checker_slice(&(*v_c), v_e, _t170, _t171, _t172);
+        int64_t _t174 = _t173;
+        rc_release_t_3ast_Expr(_t172);
+        rc_release_t_3ast_Expr(_t171);
+        rc_release_t_3ast_Expr(_t170);
         rc_release_t_3ast_Expr(v_hi);
         rc_release_t_3ast_Expr(v_lo);
         rc_release_t_3ast_Expr(v_obj_3);
-        return _t168;
+        return _t174;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_ArrayLit) {
         vela_array * v_elems = v_e.m_kind->value.as.m_ArrayLit._0;
         vela_array_retain(v_elems);
-        // line 2455
-        vela_array * _t169 = v_elems;
-        vela_array_retain(_t169);
-        int64_t _t170 = f_7checker_array_lit(&(*v_c), v_e, _t169);
-        int64_t _t171 = _t170;
-        vela_array_release(_t169);
+        // line 2456
+        vela_array * _t175 = v_elems;
+        vela_array_retain(_t175);
+        int64_t _t176 = f_7checker_array_lit(&(*v_c), v_e, _t175);
+        int64_t _t177 = _t176;
+        vela_array_release(_t175);
         vela_array_release(v_elems);
-        return _t171;
+        return _t177;
     } else {
         vela_array * v_entries = v_e.m_kind->value.as.m_MapLit._0;
         vela_array_retain(v_entries);
-        // line 2456
-        vela_array * _t172 = v_entries;
-        vela_array_retain(_t172);
-        int64_t _t173 = f_7checker_map_lit(&(*v_c), v_e, _t172);
-        int64_t _t174 = _t173;
-        vela_array_release(_t172);
+        // line 2457
+        vela_array * _t178 = v_entries;
+        vela_array_retain(_t178);
+        int64_t _t179 = f_7checker_map_lit(&(*v_c), v_e, _t178);
+        int64_t _t180 = _t179;
+        vela_array_release(_t178);
         vela_array_release(v_entries);
-        return _t174;
+        return _t180;
     }
 }
 /* vela: part */
 
 bool f_7checker_is_int_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
-    // line 2464
-    int64_t _t1 = *(int64_t *)vela_at((*v_c).m_literal, v_e.m_id, sizeof(int64_t), "compiler/src/checker.vl:2464:17");
+    // line 2465
+    int64_t _t1 = *(int64_t *)vela_at((*v_c).m_literal, v_e.m_id, sizeof(int64_t), "compiler/src/checker.vl:2465:17");
     int64_t _t2 = _t1;
     bool _t3 = _t2 != 0;
     if (_t3) {
-        // line 2465
-        int64_t _t4 = *(int64_t *)vela_at((*v_c).m_literal, v_e.m_id, sizeof(int64_t), "compiler/src/checker.vl:2465:25");
+        // line 2466
+        int64_t _t4 = *(int64_t *)vela_at((*v_c).m_literal, v_e.m_id, sizeof(int64_t), "compiler/src/checker.vl:2466:25");
         int64_t _t5 = _t4;
         bool _t6 = _t5 == 1;
         bool _t7 = _t6;
         return _t7;
     }
-    // line 2467
+    // line 2468
     bool _t8;
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_IntLit) {
         _t8 = true;
@@ -42530,123 +42657,123 @@ bool f_7checker_is_int_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
         _t8 = false;
     }
     bool v_yes = _t8;
-    // line 2474
-    vela_unique(&(*v_c).m_literal);
-    int64_t *_t25 = (int64_t *)vela_at((*v_c).m_literal, v_e.m_id, sizeof(int64_t), "compiler/src/checker.vl:2474:14");
-    *_t25 = 2;
     // line 2475
+    vela_unique(&(*v_c).m_literal);
+    int64_t *_t25 = (int64_t *)vela_at((*v_c).m_literal, v_e.m_id, sizeof(int64_t), "compiler/src/checker.vl:2475:14");
+    *_t25 = 2;
+    // line 2476
     if (v_yes) {
-        // line 2476
+        // line 2477
         vela_unique(&(*v_c).m_literal);
-        int64_t *_t26 = (int64_t *)vela_at((*v_c).m_literal, v_e.m_id, sizeof(int64_t), "compiler/src/checker.vl:2476:18");
+        int64_t *_t26 = (int64_t *)vela_at((*v_c).m_literal, v_e.m_id, sizeof(int64_t), "compiler/src/checker.vl:2477:18");
         *_t26 = 1;
     }
-    // line 2478
+    // line 2479
     bool _t27 = v_yes;
     return _t27;
 }
 /* vela: part */
 
 void f_7checker_chain(t_7checker_Checker * v_c, t_3ast_Expr v_l) {
-    // line 2489
+    // line 2490
     vela_array * _t1 = vela_array_new(vt_t_3ast_Expr(), 0);
     vela_array * v_spine = _t1;
-    // line 2490
+    // line 2491
     t_3ast_Expr _t2 = v_l;
     rc_retain_t_3ast_Expr(_t2);
     t_3ast_Expr v_x = _t2;
-    // line 2491
+    // line 2492
     vela_unique(&v_spine);
     for (;;) {
-        // line 2492
+        // line 2493
         if (v_x.m_kind->value.tag == t_3ast_ExprKind_Binary) {
             t_3ast_Expr v_inner = v_x.m_kind->value.as.m_Binary._1->value;
             rc_retain_t_3ast_Expr(v_inner);
-            // line 2494
-            bool _t3 = *(bool *)vela_at((*v_c).m_chained, v_x.m_id, sizeof(bool), "compiler/src/checker.vl:2494:29");
+            // line 2495
+            bool _t3 = *(bool *)vela_at((*v_c).m_chained, v_x.m_id, sizeof(bool), "compiler/src/checker.vl:2495:29");
             if (_t3) {
-                // line 2495
+                // line 2496
                 rc_release_t_3ast_Expr(v_inner);
                 break;
             }
-            // line 2497
+            // line 2498
             t_3ast_Expr _t4 = v_x;
             rc_retain_t_3ast_Expr(_t4);
             t_3ast_Expr _t5 = _t4;
             vela_push(v_spine, &_t5, sizeof(t_3ast_Expr));
-            // line 2498
+            // line 2499
             t_3ast_Expr _t6 = v_inner;
             rc_retain_t_3ast_Expr(_t6);
             rc_release_t_3ast_Expr(v_x);
             v_x = _t6;
             rc_release_t_3ast_Expr(v_inner);
         } else {
-            // line 2500
+            // line 2501
             break;
         }
     }
-    // line 2503
+    // line 2504
     int64_t _t7 = v_spine->len;
     int64_t _t8 = _t7;
     bool _t9 = _t8 < 2;
     if (_t9) {
-        // line 2504
+        // line 2505
         rc_release_t_3ast_Expr(v_x);
         vela_array_release(v_spine);
         return;
     }
-    // line 2509
+    // line 2510
     int64_t _t10 = v_spine->len;
     int64_t v_top = _t10;
-    // line 2510
+    // line 2511
     int64_t _t11 = v_spine->len;
     int64_t _t12 = _t11;
     for (int64_t _t13 = 0; _t13 < _t12; _t13++) {
         int64_t v_k = _t13;
-        // line 2511
+        // line 2512
         int64_t _t14 = v_spine->len;
         int64_t _t15 = _t14;
         int64_t _t16 = (_t15 - 1);
         int64_t _t17 = _t16;
         int64_t _t18 = (_t17 - v_k);
         int64_t v_i = _t18;
-        // line 2512
-        t_3ast_Expr _t19 = *(t_3ast_Expr *)vela_at(v_spine, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:2512:35");
+        // line 2513
+        t_3ast_Expr _t19 = *(t_3ast_Expr *)vela_at(v_spine, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:2513:35");
         rc_retain_t_3ast_Expr(_t19);
         bool _t20 = f_7checker_is_int_lit(&(*v_c), _t19);
         if (_t20) {
-            // line 2513
+            // line 2514
             v_top = v_i;
         }
         rc_release_t_3ast_Expr(_t19);
     }
-    // line 2516
-    int64_t v_saved = (*v_c).m_expected;
     // line 2517
+    int64_t v_saved = (*v_c).m_expected;
+    // line 2518
     int64_t _t21 = v_top;
     for (int64_t _t22 = 0; _t22 < _t21; _t22++) {
         int64_t v_k_2 = _t22;
-        // line 2518
+        // line 2519
         int64_t _t23 = v_top;
         int64_t _t24 = (_t23 - 1);
         int64_t _t25 = _t24;
         int64_t _t26 = (_t25 - v_k_2);
         int64_t v_i_2 = _t26;
-        // line 2519
-        (*v_c).m_expected = -2;
         // line 2520
-        t_3ast_Expr _t27 = *(t_3ast_Expr *)vela_at(v_spine, v_i_2, sizeof(t_3ast_Expr), "compiler/src/checker.vl:2520:35");
+        (*v_c).m_expected = -2;
+        // line 2521
+        t_3ast_Expr _t27 = *(t_3ast_Expr *)vela_at(v_spine, v_i_2, sizeof(t_3ast_Expr), "compiler/src/checker.vl:2521:35");
         rc_retain_t_3ast_Expr(_t27);
         int64_t _t28 = f_7checker_value(&(*v_c), _t27);
         int64_t v__ = _t28;
         rc_release_t_3ast_Expr(_t27);
-        // line 2521
+        // line 2522
         vela_unique(&(*v_c).m_chained);
         t_3ast_Expr _t29 = *((t_3ast_Expr *)v_spine->data + v_i_2);
-        bool *_t30 = (bool *)vela_at((*v_c).m_chained, _t29.m_id, sizeof(bool), "compiler/src/checker.vl:2521:18");
+        bool *_t30 = (bool *)vela_at((*v_c).m_chained, _t29.m_id, sizeof(bool), "compiler/src/checker.vl:2522:18");
         *_t30 = true;
     }
-    // line 2523
+    // line 2524
     (*v_c).m_expected = v_saved;
     rc_release_t_3ast_Expr(v_x);
     vela_array_release(v_spine);
@@ -42654,7 +42781,7 @@ void f_7checker_chain(t_7checker_Checker * v_c, t_3ast_Expr v_l) {
 /* vela: part */
 
 vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3ast_Expr v_r, int64_t v_expected) {
-    // line 2528
+    // line 2529
     bool _t1 = f_5types_is_integer(v_expected);
     bool _t2 = _t1;
     if (!_t2) {
@@ -42674,7 +42801,7 @@ vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3a
         _t8 = _t9;
     }
     if (_t8) {
-        // line 2529
+        // line 2530
         static const vela_str _t10[] = {VELA_STR_INIT("expected ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8)};
         vela_str _t11[3];
         memcpy(_t11, _t10, sizeof _t11);
@@ -42686,7 +42813,7 @@ vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3a
         f_7checker_check_expr(&(*v_c), v_l, v_expected, _t14);
         rc_release_t_7checker_Msg(_t14);
         vela_str_release(_t13);
-        // line 2530
+        // line 2531
         static const vela_str _t15[] = {VELA_STR_INIT("expected ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8)};
         vela_str _t16[3];
         memcpy(_t16, _t15, sizeof _t16);
@@ -42698,7 +42825,7 @@ vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3a
         f_7checker_check_expr(&(*v_c), v_r, v_expected, _t19);
         rc_release_t_7checker_Msg(_t19);
         vela_str_release(_t18);
-        // line 2531
+        // line 2532
         vela_array * _t20 = vela_array_new(&vela_type_int, 2);
         int64_t _t21 = v_expected;
         vela_push(_t20, &_t21, sizeof(int64_t));
@@ -42707,7 +42834,7 @@ vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3a
         vela_array * _t23 = _t20;
         return _t23;
     }
-    // line 2533
+    // line 2534
     bool _t24 = f_7checker_is_int_lit(&(*v_c), v_l);
     bool _t25 = _t24;
     if (_t25) {
@@ -42716,10 +42843,10 @@ vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3a
         _t25 = _t27;
     }
     if (_t25) {
-        // line 2534
+        // line 2535
         int64_t _t28 = f_7checker_value(&(*v_c), v_r);
         int64_t v_right = _t28;
-        // line 2535
+        // line 2536
         vela_array * _t29 = vela_array_new(&vela_type_int, 2);
         int64_t _t30 = f_7checker_literal_like(&(*v_c), v_l, v_right);
         int64_t _t31 = _t30;
@@ -42729,13 +42856,13 @@ vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3a
         vela_array * _t33 = _t29;
         return _t33;
     }
-    // line 2537
+    // line 2538
     int64_t _t34 = f_7checker_value(&(*v_c), v_l);
     int64_t v_left = _t34;
-    // line 2538
+    // line 2539
     bool _t35 = f_7checker_is_int_lit(&(*v_c), v_r);
     if (_t35) {
-        // line 2539
+        // line 2540
         vela_array * _t36 = vela_array_new(&vela_type_int, 2);
         int64_t _t37 = v_left;
         vela_push(_t36, &_t37, sizeof(int64_t));
@@ -42745,7 +42872,7 @@ vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3a
         vela_array * _t40 = _t36;
         return _t40;
     }
-    // line 2541
+    // line 2542
     vela_array * _t41 = vela_array_new(&vela_type_int, 2);
     int64_t _t42 = v_left;
     vela_push(_t41, &_t42, sizeof(int64_t));
@@ -42758,33 +42885,33 @@ vela_array * f_7checker_operands(t_7checker_Checker * v_c, t_3ast_Expr v_l, t_3a
 /* vela: part */
 
 int64_t f_7checker_literal_like(t_7checker_Checker * v_c, t_3ast_Expr v_lit, int64_t v_other) {
-    // line 2545
+    // line 2546
     int64_t _t1 = v_other;
     int64_t _t2 = f_5types_FLOAT();
     bool _t3 = _t1 == _t2;
     if (_t3) {
-        // line 2546
+        // line 2547
         int64_t _t4 = f_5types_FLOAT();
         t_7checker_Msg _t5 = f_7checker_msg(VELA_STR("expected Float, found ", 22), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), v_lit, _t4, _t5);
         rc_release_t_7checker_Msg(_t5);
-        // line 2547
+        // line 2548
         int64_t _t6 = f_5types_FLOAT();
         int64_t _t7 = _t6;
         return _t7;
     }
-    // line 2549
+    // line 2550
     bool _t8 = f_5types_is_integer(v_other);
     if (_t8) {
-        // line 2550
+        // line 2551
         t_7checker_Msg _t9 = f_7checker_msg(VELA_STR("", 0), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), v_lit, v_other, _t9);
         rc_release_t_7checker_Msg(_t9);
-        // line 2551
+        // line 2552
         int64_t _t10 = v_other;
         return _t10;
     }
-    // line 2553
+    // line 2554
     int64_t _t11 = f_7checker_value(&(*v_c), v_lit);
     int64_t _t12 = _t11;
     return _t12;
@@ -42792,7 +42919,7 @@ int64_t f_7checker_literal_like(t_7checker_Checker * v_c, t_3ast_Expr v_lit, int
 /* vela: part */
 
 bool f_7checker_is_arithmetic(vela_str v_op) {
-    // line 2557
+    // line 2558
     bool _t1 = vela_str_eq(v_op, VELA_STR("+", 1));
     bool _t2 = _t1;
     if (!_t2) {
@@ -42820,7 +42947,7 @@ bool f_7checker_is_arithmetic(vela_str v_op) {
 /* vela: part */
 
 bool f_7checker_is_ordering(vela_str v_op) {
-    // line 2561
+    // line 2562
     bool _t1 = vela_str_eq(v_op, VELA_STR("<", 1));
     bool _t2 = _t1;
     if (!_t2) {
@@ -42843,10 +42970,10 @@ bool f_7checker_is_ordering(vela_str v_op) {
 /* vela: part */
 
 bool f_7checker_comparable(t_7checker_Checker v_c, int64_t v_t) {
-    // line 2566
+    // line 2567
     t_5types_TypeInfo _t1 = f_5types_get(v_c.m_table, v_t);
     t_5types_TypeInfo v_ti = _t1;
-    // line 2567
+    // line 2568
     t_5types_Tag _t2 = (t_5types_Tag){ .tag = t_5types_Tag_Prim };
     bool _t3 = v_ti.m_tag.tag == _t2.tag;
     bool _t4 = _t3;
@@ -42855,12 +42982,12 @@ bool f_7checker_comparable(t_7checker_Checker v_c, int64_t v_t) {
         _t4 = _t5;
     }
     if (_t4) {
-        // line 2568
+        // line 2569
         bool _t6 = true;
         rc_release_t_5types_TypeInfo(v_ti);
         return _t6;
     }
-    // line 2570
+    // line 2571
     bool _t7 = f_7checker_satisfies_depth(v_c, v_t, VELA_STR("Eq", 2), 0);
     bool _t8 = _t7;
     rc_release_t_5types_TypeInfo(v_ti);
@@ -42869,7 +42996,7 @@ bool f_7checker_comparable(t_7checker_Checker v_c, int64_t v_t) {
 /* vela: part */
 
 bool f_7checker_is_bitwise(vela_str v_op) {
-    // line 2573
+    // line 2574
     bool _t1 = vela_str_eq(v_op, VELA_STR("&", 1));
     bool _t2 = _t1;
     if (!_t2) {
@@ -42897,9 +43024,9 @@ bool f_7checker_is_bitwise(vela_str v_op) {
 /* vela: part */
 
 int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_op, t_3ast_Expr v_l, t_3ast_Expr v_r, int64_t v_expected) {
-    // line 2576
-    f_7checker_chain(&(*v_c), v_l);
     // line 2577
+    f_7checker_chain(&(*v_c), v_l);
+    // line 2578
     bool _t1 = vela_str_eq(v_op, VELA_STR("<<", 2));
     bool _t2 = _t1;
     if (!_t2) {
@@ -42907,7 +43034,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
         _t2 = _t3;
     }
     if (_t2) {
-        // line 2578
+        // line 2579
         bool _t4 = f_5types_is_integer(v_expected);
         bool _t5 = _t4;
         if (_t5) {
@@ -42915,16 +43042,16 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
             _t5 = _t6;
         }
         if (_t5) {
-            // line 2578
+            // line 2579
             (*v_c).m_expected = v_expected;
         }
-        // line 2579
+        // line 2580
         int64_t _t7 = f_7checker_value(&(*v_c), v_l);
         int64_t v_left = _t7;
-        // line 2580
+        // line 2581
         int64_t _t8 = f_7checker_value(&(*v_c), v_r);
         int64_t v_right = _t8;
-        // line 2581
+        // line 2582
         bool _t9 = f_5types_is_integer(v_left);
         bool _t10 = !_t9;
         bool _t11 = _t10;
@@ -42948,28 +43075,28 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
             _t18 = _t21;
         }
         if (_t18) {
-            // line 2582
+            // line 2583
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3183", 5), VELA_STR("bit operations need integer operands", 36));
             vela_str_release(VELA_STR("bit operations need integer operands", 36));
             vela_str_release(VELA_STR("E3183", 5));
         }
-        // line 2584
+        // line 2585
         int64_t _t22 = v_left;
         return _t22;
     }
-    // line 2586
+    // line 2587
     vela_array * _t23 = f_7checker_operands(&(*v_c), v_l, v_r, v_expected);
     vela_array * v_ops = _t23;
-    // line 2587
-    int64_t _t24 = *(int64_t *)vela_at(v_ops, 0, sizeof(int64_t), "compiler/src/checker.vl:2587:19");
-    int64_t v_left_2 = _t24;
     // line 2588
-    int64_t _t25 = *(int64_t *)vela_at(v_ops, 1, sizeof(int64_t), "compiler/src/checker.vl:2588:20");
-    int64_t v_right_2 = _t25;
+    int64_t _t24 = *(int64_t *)vela_at(v_ops, 0, sizeof(int64_t), "compiler/src/checker.vl:2588:19");
+    int64_t v_left_2 = _t24;
     // line 2589
+    int64_t _t25 = *(int64_t *)vela_at(v_ops, 1, sizeof(int64_t), "compiler/src/checker.vl:2589:20");
+    int64_t v_right_2 = _t25;
+    // line 2590
     int64_t _t26 = f_5types_BOOL();
     int64_t v_result = _t26;
-    // line 2590
+    // line 2591
     bool _t27 = f_7checker_is_arithmetic(v_op);
     bool _t28 = _t27;
     if (!_t28) {
@@ -42977,10 +43104,10 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
         _t28 = _t29;
     }
     if (_t28) {
-        // line 2591
+        // line 2592
         int64_t _t30 = f_5types_INT();
         v_result = _t30;
-        // line 2592
+        // line 2593
         bool _t31 = f_5types_is_integer(v_left_2);
         bool _t32 = _t31;
         if (!_t32) {
@@ -43002,11 +43129,11 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
             _t36 = _t40;
         }
         if (_t36) {
-            // line 2593
+            // line 2594
             v_result = v_left_2;
         }
     }
-    // line 2596
+    // line 2597
     int64_t _t42 = v_left_2;
     int64_t _t43 = f_5types_ERROR();
     bool _t44 = _t42 == _t43;
@@ -43018,21 +43145,21 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
         _t45 = _t48;
     }
     if (_t45) {
-        // line 2597
+        // line 2598
         int64_t _t49 = v_result;
         vela_array_release(v_ops);
         return _t49;
     }
-    // line 2599
+    // line 2600
     int64_t _t50 = f_5types_INT();
     int64_t v_int = _t50;
-    // line 2600
+    // line 2601
     int64_t _t51 = f_5types_BYTE();
     int64_t v_byte = _t51;
-    // line 2601
+    // line 2602
     bool _t52 = f_7checker_is_bitwise(v_op);
     if (_t52) {
-        // line 2602
+        // line 2603
         bool _t53 = f_5types_is_integer(v_left_2);
         bool _t54 = !_t53;
         bool _t55 = _t54;
@@ -43042,7 +43169,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
             _t55 = _t57;
         }
         if (_t55) {
-            // line 2602
+            // line 2603
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3183", 5), VELA_STR("bit operations need integers of the same type", 45));
             vela_str_release(VELA_STR("bit operations need integers of the same type", 45));
             vela_str_release(VELA_STR("E3183", 5));
@@ -43055,11 +43182,11 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
             _t59 = _t60;
         }
         if (_t59) {
-            // line 2604
+            // line 2605
             int64_t _t61 = v_left_2;
             bool _t62 = _t61 != v_right_2;
             if (_t62) {
-                // line 2605
+                // line 2606
                 static const vela_str _t63[] = {VELA_STR_INIT("cannot compare ", 15), {NULL, NULL, 0}, VELA_STR_INIT(" with ", 6), {NULL, NULL, 0}};
                 vela_str _t64[4];
                 memcpy(_t64, _t63, sizeof _t64);
@@ -43082,7 +43209,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                     _t70 = _t71;
                 }
                 if (_t70) {
-                    // line 2607
+                    // line 2608
                     static const vela_str _t72[] = {{NULL, NULL, 0}, VELA_STR_INIT(" values cannot be compared with '", 33), {NULL, NULL, 0}, VELA_STR_INIT("'; declare the type parameter as `", 34), {NULL, NULL, 0}, VELA_STR_INIT(": Eq`", 5)};
                     vela_str _t73[6];
                     memcpy(_t73, _t72, sizeof _t73);
@@ -43101,7 +43228,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                     bool _t77 = f_7checker_comparable((*v_c), v_left_2);
                     bool _t78 = !_t77;
                     if (_t78) {
-                        // line 2610
+                        // line 2611
                         static const vela_str _t79[] = {{NULL, NULL, 0}, VELA_STR_INIT(" values cannot be compared with '", 33), {NULL, NULL, 0}, VELA_STR_INIT("'; use match, or compare their fields", 37)};
                         vela_str _t80[4];
                         memcpy(_t80, _t79, sizeof _t80);
@@ -43124,7 +43251,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                 _t84 = _t85;
             }
             if (_t84) {
-                // line 2614
+                // line 2615
                 int64_t _t86 = v_left_2;
                 int64_t _t87 = f_5types_BOOL();
                 bool _t88 = _t86 != _t87;
@@ -43136,7 +43263,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                     _t89 = _t92;
                 }
                 if (_t89) {
-                    // line 2615
+                    // line 2616
                     static const vela_str _t93[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' needs Bool operands, found ", 29), {NULL, NULL, 0}, VELA_STR_INIT(" and ", 5), {NULL, NULL, 0}};
                     vela_str _t94[6];
                     memcpy(_t94, _t93, sizeof _t94);
@@ -43169,11 +43296,11 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                     _t99 = _t103;
                 }
                 if (_t99) {
-                    // line 2618
+                    // line 2619
                     int64_t _t107 = v_left_2;
                     bool _t108 = _t107 != v_right_2;
                     if (_t108) {
-                        // line 2619
+                        // line 2620
                         static const vela_str _t109[] = {VELA_STR_INIT("operator '+' joins two Strs, found ", 35), {NULL, NULL, 0}, VELA_STR_INIT(" and ", 5), {NULL, NULL, 0}};
                         vela_str _t110[4];
                         memcpy(_t110, _t109, sizeof _t110);
@@ -43231,10 +43358,10 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                 _t132 = _t135;
                             }
                             if (_t132) {
-                                // line 2626
+                                // line 2627
                                 bool _t136 = vela_str_eq(v_op, VELA_STR("%", 1));
                                 if (_t136) {
-                                    // line 2627
+                                    // line 2628
                                     f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3102", 5), VELA_STR("operator '%' needs Int operands; a Float has no remainder", 57));
                                     vela_str_release(VELA_STR("operator '%' needs Int operands; a Float has no remainder", 57));
                                     vela_str_release(VELA_STR("E3102", 5));
@@ -43275,7 +43402,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                     _t150 = _t152;
                                 }
                                 if (_t150) {
-                                    // line 2631
+                                    // line 2632
                                     static const vela_str _t156[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' needs two Floats or two Ints, found ", 38), {NULL, NULL, 0}, VELA_STR_INIT(" and ", 5), {NULL, NULL, 0}, VELA_STR_INIT("; convert with float() or int()", 31)};
                                     vela_str _t157[7];
                                     memcpy(_t157, _t156, sizeof _t157);
@@ -43300,7 +43427,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                         _t163 = _t165;
                                     }
                                     if (_t163) {
-                                        // line 2634
+                                        // line 2635
                                         bool _t166 = f_5types_is_integer(v_left_2);
                                         bool _t167 = _t166;
                                         if (_t167) {
@@ -43339,7 +43466,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                             _t172 = _t184;
                                         }
                                         if (_t172) {
-                                            // line 2636
+                                            // line 2637
                                             static const vela_str _t185[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' requires matching integer types; convert explicitly", 53)};
                                             vela_str _t186[3];
                                             memcpy(_t186, _t185, sizeof _t186);
@@ -43348,12 +43475,12 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3185", 5), _t187);
                                             vela_str_release(_t187);
                                             vela_str_release(VELA_STR("E3185", 5));
-                                            // line 2637
+                                            // line 2638
                                             int64_t _t188 = v_result;
                                             vela_array_release(v_ops);
                                             return _t188;
                                         }
-                                        // line 2639
+                                        // line 2640
                                         int64_t _t189 = v_left_2;
                                         bool _t190 = _t189 == v_int;
                                         bool _t191 = _t190;
@@ -43375,7 +43502,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                             _t194 = _t197;
                                         }
                                         bool v_both_numbers = _t194;
-                                        // line 2640
+                                        // line 2641
                                         int64_t _t200 = v_left_2;
                                         bool _t201 = _t200 == v_byte;
                                         bool _t202 = _t201;
@@ -43389,7 +43516,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                             _t205 = v_both_numbers;
                                         }
                                         if (_t205) {
-                                            // line 2641
+                                            // line 2642
                                             static const vela_str _t206[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' needs two Bytes or two Ints, found ", 37), {NULL, NULL, 0}, VELA_STR_INIT(" and ", 5), {NULL, NULL, 0}, VELA_STR_INIT("; convert with int() or byte()", 30)};
                                             vela_str _t207[7];
                                             memcpy(_t207, _t206, sizeof _t207);
@@ -43418,7 +43545,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                                 _t215 = _t216;
                                             }
                                             if (_t215) {
-                                                // line 2644
+                                                // line 2645
                                                 static const vela_str _t217[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' needs values that can be ordered; declare the type parameter as `", 67), {NULL, NULL, 0}, VELA_STR_INIT(": Ord`", 6)};
                                                 vela_str _t218[5];
                                                 memcpy(_t218, _t217, sizeof _t218);
@@ -43433,7 +43560,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                             } else {
                                                 bool _t221 = f_7checker_is_ordering(v_op);
                                                 if (_t221) {
-                                                    // line 2647
+                                                    // line 2648
                                                     static const vela_str _t222[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' needs matching integers, Floats or Strs, found ", 49), {NULL, NULL, 0}, VELA_STR_INIT(" and ", 5), {NULL, NULL, 0}};
                                                     vela_str _t223[6];
                                                     memcpy(_t223, _t222, sizeof _t223);
@@ -43449,7 +43576,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
                                                     vela_str_release(_t226);
                                                     vela_str_release(VELA_STR("E3106", 5));
                                                 } else {
-                                                    // line 2650
+                                                    // line 2651
                                                     static const vela_str _t227[] = {VELA_STR_INIT("operator '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' needs Int operands, found ", 28), {NULL, NULL, 0}, VELA_STR_INIT(" and ", 5), {NULL, NULL, 0}};
                                                     vela_str _t228[6];
                                                     memcpy(_t228, _t227, sizeof _t228);
@@ -43476,7 +43603,7 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
             }
         }
     }
-    // line 2653
+    // line 2654
     int64_t _t232 = v_left_2;
     bool _t233 = _t232 == v_right_2;
     bool _t234 = _t233;
@@ -43495,21 +43622,21 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
         _t234 = _t238;
     }
     if (_t234) {
-        // line 2654
-        vela_str v_bound = VELA_STR("Eq", 2);
         // line 2655
-        vela_str v_method_name = VELA_STR("eq", 2);
+        vela_str v_bound = VELA_STR("Eq", 2);
         // line 2656
+        vela_str v_method_name = VELA_STR("eq", 2);
+        // line 2657
         bool _t240 = f_7checker_is_ordering(v_op);
         if (_t240) {
-            // line 2656
+            // line 2657
             vela_str_release(v_bound);
             v_bound = VELA_STR("Ord", 3);
-            // line 2656
+            // line 2657
             vela_str_release(v_method_name);
             v_method_name = VELA_STR("compare", 7);
         }
-        // line 2657
+        // line 2658
         bool _t241 = f_7checker_intrinsic((*v_c).m_table, v_left_2, v_bound);
         bool _t242 = !_t241;
         bool _t243 = _t242;
@@ -43518,19 +43645,19 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
             _t243 = _t244;
         }
         if (_t243) {
-            // line 2658
+            // line 2659
             vela_str _t245 = v_method_name;
             vela_str_retain(_t245);
             t_7checker_Ref _t246 = (t_7checker_Ref){ .tag = t_7checker_Ref_Method, .as.m_Method = { ._0 = v_left_2, ._1 = _t245 } };
             vela_unique(&(*v_c).m_refs);
-            t_7checker_Ref *_t247 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2658:19");
+            t_7checker_Ref *_t247 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2659:19");
             rc_release_t_7checker_Ref(*_t247);
             *_t247 = _t246;
         }
         vela_str_release(v_method_name);
         vela_str_release(v_bound);
     }
-    // line 2662
+    // line 2663
     int64_t _t248 = v_result;
     vela_array_release(v_ops);
     return _t248;
@@ -43538,10 +43665,10 @@ int64_t f_7checker_binary(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_
 /* vela: part */
 
 int64_t f_7checker_index(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v_obj, t_3ast_Expr v_i) {
-    // line 2666
+    // line 2667
     int64_t _t1 = f_7checker_value(&(*v_c), v_obj);
     int64_t v_t = _t1;
-    // line 2667
+    // line 2668
     bool _t2 = f_5types_sequence((*v_c).m_table, v_t);
     bool _t3 = _t2;
     if (!_t3) {
@@ -43551,37 +43678,37 @@ int64_t f_7checker_index(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
         _t3 = _t6;
     }
     if (_t3) {
-        // line 2668
+        // line 2669
         int64_t _t7 = f_5types_INT();
         t_7checker_Msg _t8 = f_7checker_msg(VELA_STR("an index must be Int, found ", 28), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), v_i, _t7, _t8);
         rc_release_t_7checker_Msg(_t8);
-        // line 2669
+        // line 2670
         int64_t _t9 = v_t;
         int64_t _t10 = f_5types_STR();
         bool _t11 = _t9 == _t10;
         if (_t11) {
-            // line 2670
+            // line 2671
             int64_t _t12 = f_5types_BYTE();
             int64_t _t13 = _t12;
             return _t13;
         }
-        // line 2672
+        // line 2673
         t_5types_TypeInfo _t14 = f_5types_get((*v_c).m_table, v_t);
-        int64_t _t15 = *(int64_t *)vela_at(_t14.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:2672:42");
+        int64_t _t15 = *(int64_t *)vela_at(_t14.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:2673:42");
         int64_t _t16 = _t15;
         rc_release_t_5types_TypeInfo(_t14);
         return _t16;
     }
-    // line 2674
+    // line 2675
     bool _t17 = f_5types_is_map((*v_c).m_table, v_t);
     if (_t17) {
-        // line 2675
+        // line 2676
         t_5types_TypeInfo _t18 = f_5types_get((*v_c).m_table, v_t);
-        int64_t _t19 = *(int64_t *)vela_at(_t18.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:2675:43");
+        int64_t _t19 = *(int64_t *)vela_at(_t18.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:2676:43");
         int64_t v_k = _t19;
         rc_release_t_5types_TypeInfo(_t18);
-        // line 2676
+        // line 2677
         static const vela_str _t20[] = {VELA_STR_INIT("the keys of ", 12), {NULL, NULL, 0}, VELA_STR_INIT(" are ", 5), {NULL, NULL, 0}, VELA_STR_INIT(", but this is ", 14)};
         vela_str _t21[5];
         memcpy(_t21, _t20, sizeof _t21);
@@ -43596,19 +43723,19 @@ int64_t f_7checker_index(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
         f_7checker_check_expr(&(*v_c), v_i, v_k, _t25);
         rc_release_t_7checker_Msg(_t25);
         vela_str_release(_t24);
-        // line 2677
+        // line 2678
         t_5types_TypeInfo _t26 = f_5types_get((*v_c).m_table, v_t);
-        int64_t _t27 = *(int64_t *)vela_at(_t26.m_args, 1, sizeof(int64_t), "compiler/src/checker.vl:2677:42");
+        int64_t _t27 = *(int64_t *)vela_at(_t26.m_args, 1, sizeof(int64_t), "compiler/src/checker.vl:2678:42");
         int64_t _t28 = _t27;
         rc_release_t_5types_TypeInfo(_t26);
         return _t28;
     }
-    // line 2679
+    // line 2680
     int64_t _t29 = v_t;
     int64_t _t30 = f_5types_ERROR();
     bool _t31 = _t29 != _t30;
     if (_t31) {
-        // line 2680
+        // line 2681
         vela_str _t32 = f_7checker_show((*v_c), v_t);
         vela_str _t33 = vela_str_concat(_t32, VELA_STR(" cannot be indexed; only arrays, Strs and maps can", 50));
         vela_str_release(_t32);
@@ -43616,9 +43743,9 @@ int64_t f_7checker_index(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
         vela_str_release(_t33);
         vela_str_release(VELA_STR("E3108", 5));
     }
-    // line 2682
-    int64_t _t34 = f_7checker_infer(&(*v_c), v_i);
     // line 2683
+    int64_t _t34 = f_7checker_infer(&(*v_c), v_i);
+    // line 2684
     int64_t _t35 = f_5types_ERROR();
     int64_t _t36 = _t35;
     return _t36;
@@ -43626,95 +43753,95 @@ int64_t f_7checker_index(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
 /* vela: part */
 
 int64_t f_7checker_try_expr(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v_inner) {
-    // line 2689
+    // line 2690
     int64_t _t1 = f_7checker_value(&(*v_c), v_inner);
     int64_t v_t = _t1;
-    // line 2690
+    // line 2691
     int64_t _t2 = v_t;
     int64_t _t3 = f_5types_ERROR();
     bool _t4 = _t2 == _t3;
     if (_t4) {
-        // line 2691
+        // line 2692
         int64_t _t5 = f_5types_ERROR();
         int64_t _t6 = _t5;
         return _t6;
     }
-    // line 2693
+    // line 2694
     bool _t7 = f_5types_is_builtin_enum((*v_c).m_table, v_t);
     bool _t8 = !_t7;
     if (_t8) {
-        // line 2694
+        // line 2695
         vela_str _t9 = f_7checker_show((*v_c), v_t);
         vela_str _t10 = vela_str_concat(VELA_STR("'\?' needs a Result or an Option, found ", 39), _t9);
         vela_str_release(_t9);
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3109", 5), _t10);
         vela_str_release(_t10);
         vela_str_release(VELA_STR("E3109", 5));
-        // line 2695
+        // line 2696
         int64_t _t11 = f_5types_ERROR();
         int64_t _t12 = _t11;
         return _t12;
     }
-    // line 2697
-    t_7checker_FnInfo _t13 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, (*v_c).m_current_fn, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:2697:18");
+    // line 2698
+    t_7checker_FnInfo _t13 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, (*v_c).m_current_fn, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:2698:18");
     rc_retain_t_7checker_FnInfo(_t13);
     t_7checker_FnInfo v_f = _t13;
-    // line 2698
-    int64_t v_result = v_f.m_result;
     // line 2699
+    int64_t v_result = v_f.m_result;
+    // line 2700
     vela_str _t14 = v_f.m_decl.m_name;
     vela_str_retain(_t14);
     vela_str v_name = _t14;
-    // line 2700
+    // line 2701
     int64_t _t15 = (*v_c).m_in_closures->len;
     int64_t v_n = _t15;
-    // line 2701
+    // line 2702
     int64_t _t16 = v_n;
     bool _t17 = _t16 > 0;
     if (_t17) {
-        // line 2702
+        // line 2703
         int64_t _t19 = v_n;
         int64_t _t20 = (_t19 - 1);
-        t_7checker_ClosureCtx _t18 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t20, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:2702:31");
+        t_7checker_ClosureCtx _t18 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t20, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:2703:31");
         v_result = _t18.m_result;
-        // line 2703
+        // line 2704
         vela_str_release(v_name);
         v_name = VELA_STR("this function value", 19);
-        // line 2704
+        // line 2705
         int64_t _t21 = v_result;
         bool _t22 = _t21 == -3;
         if (_t22) {
-            // line 2705
+            // line 2706
             int64_t _t23 = f_5types_ERROR();
             v_result = _t23;
-            // line 2706
+            // line 2707
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3110", 5), VELA_STR("'\?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... }", 99));
             vela_str_release(VELA_STR("'\?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... }", 99));
             vela_str_release(VELA_STR("E3110", 5));
         }
     }
-    // line 2709
-    vela_str v_returns = VELA_STR("returns nothing", 15);
     // line 2710
+    vela_str v_returns = VELA_STR("returns nothing", 15);
+    // line 2711
     int64_t _t24 = v_result;
     int64_t _t25 = f_5types_NOTHING();
     bool _t26 = _t24 != _t25;
     if (_t26) {
-        // line 2711
+        // line 2712
         vela_str _t27 = f_7checker_show((*v_c), v_result);
         vela_str _t28 = vela_str_concat(VELA_STR("returns ", 8), _t27);
         vela_str_release(_t27);
         vela_str_release(v_returns);
         v_returns = _t28;
     }
-    // line 2713
+    // line 2714
     t_5types_TypeInfo _t29 = f_5types_get((*v_c).m_table, v_t);
     t_5types_TypeInfo v_ti = _t29;
-    // line 2714
+    // line 2715
     vela_str _t30 = v_ti.m_name;
     vela_str_retain(_t30);
     vela_str v_kind = _t30;
-    // line 2715
+    // line 2716
     int64_t _t31 = v_result;
     int64_t _t32 = f_5types_ERROR();
     bool _t33 = _t31 == _t32;
@@ -43730,21 +43857,21 @@ int64_t f_7checker_try_expr(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Ex
         }
         bool _t38 = !_t35;
         if (_t38) {
-            // line 2718
-            vela_str v_passes = VELA_STR("None", 4);
             // line 2719
-            vela_str v_must = VELA_STR("an Option", 9);
+            vela_str v_passes = VELA_STR("None", 4);
             // line 2720
+            vela_str v_must = VELA_STR("an Option", 9);
+            // line 2721
             bool _t39 = vela_str_eq(v_kind, VELA_STR("Result", 6));
             if (_t39) {
-                // line 2721
+                // line 2722
                 vela_str_release(v_passes);
                 v_passes = VELA_STR("an Err", 6);
-                // line 2722
+                // line 2723
                 vela_str_release(v_must);
                 v_must = VELA_STR("a Result", 8);
             }
-            // line 2724
+            // line 2725
             static const vela_str _t40[] = {VELA_STR_INIT("'\?' returns ", 12), {NULL, NULL, 0}, VELA_STR_INIT(" from '", 7), {NULL, NULL, 0}, VELA_STR_INIT("', so '", 7), {NULL, NULL, 0}, VELA_STR_INIT("' must return ", 14), {NULL, NULL, 0}, VELA_STR_INIT(", but it ", 9), {NULL, NULL, 0}};
             vela_str _t41[10];
             memcpy(_t41, _t40, sizeof _t41);
@@ -43762,15 +43889,15 @@ int64_t f_7checker_try_expr(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Ex
         } else {
             bool _t43 = vela_str_eq(v_kind, VELA_STR("Result", 6));
             if (_t43) {
-                // line 2727
+                // line 2728
                 t_5types_TypeInfo _t44 = f_5types_get((*v_c).m_table, v_result);
-                int64_t _t45 = *(int64_t *)vela_at(_t44.m_args, 1, sizeof(int64_t), "compiler/src/checker.vl:2727:53");
+                int64_t _t45 = *(int64_t *)vela_at(_t44.m_args, 1, sizeof(int64_t), "compiler/src/checker.vl:2728:53");
                 int64_t v_theirs = _t45;
                 rc_release_t_5types_TypeInfo(_t44);
-                // line 2728
-                int64_t _t46 = *(int64_t *)vela_at(v_ti.m_args, 1, sizeof(int64_t), "compiler/src/checker.vl:2728:27");
-                int64_t v_ours = _t46;
                 // line 2729
+                int64_t _t46 = *(int64_t *)vela_at(v_ti.m_args, 1, sizeof(int64_t), "compiler/src/checker.vl:2729:27");
+                int64_t v_ours = _t46;
+                // line 2730
                 int64_t _t47 = v_theirs;
                 bool _t48 = _t47 != v_ours;
                 bool _t49 = _t48;
@@ -43788,7 +43915,7 @@ int64_t f_7checker_try_expr(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Ex
                     _t53 = _t56;
                 }
                 if (_t53) {
-                    // line 2730
+                    // line 2731
                     static const vela_str _t57[] = {VELA_STR_INIT("'\?' would return this ", 22), {NULL, NULL, 0}, VELA_STR_INIT("'s error, which is ", 19), {NULL, NULL, 0}, VELA_STR_INIT(", but '", 7), {NULL, NULL, 0}, VELA_STR_INIT("' returns ", 10), {NULL, NULL, 0}};
                     vela_str _t58[8];
                     memcpy(_t58, _t57, sizeof _t58);
@@ -43810,8 +43937,8 @@ int64_t f_7checker_try_expr(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Ex
             }
         }
     }
-    // line 2734
-    int64_t _t63 = *(int64_t *)vela_at(v_ti.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:2734:19");
+    // line 2735
+    int64_t _t63 = *(int64_t *)vela_at(v_ti.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:2735:19");
     int64_t _t64 = _t63;
     vela_str_release(v_kind);
     rc_release_t_5types_TypeInfo(v_ti);
@@ -43823,10 +43950,10 @@ int64_t f_7checker_try_expr(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Ex
 /* vela: part */
 
 int64_t f_7checker_slice(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v_obj, t_3ast_Expr v_lo, t_3ast_Expr v_hi) {
-    // line 2738
+    // line 2739
     int64_t _t1 = f_7checker_value(&(*v_c), v_obj);
     int64_t v_t = _t1;
-    // line 2739
+    // line 2740
     vela_array * _t3 = vela_array_new(vt_t_3ast_Expr(), 2);
     t_3ast_Expr _t4 = v_lo;
     rc_retain_t_3ast_Expr(_t4);
@@ -43839,7 +43966,7 @@ int64_t f_7checker_slice(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
     vela_array * _t2 = _t3;
     for (int64_t _t8 = 0; _t8 < _t2->len; _t8++) {
         t_3ast_Expr v_bound = ((t_3ast_Expr *)_t2->data)[_t8];
-        // line 2740
+        // line 2741
         t_3ast_Expr _t9 = v_bound;
         rc_retain_t_3ast_Expr(_t9);
         int64_t _t10 = f_5types_INT();
@@ -43849,7 +43976,7 @@ int64_t f_7checker_slice(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
         rc_release_t_3ast_Expr(_t9);
     }
     vela_array_release(_t2);
-    // line 2742
+    // line 2743
     bool _t12 = f_5types_is_array((*v_c).m_table, v_t);
     bool _t13 = _t12;
     if (!_t13) {
@@ -43866,18 +43993,18 @@ int64_t f_7checker_slice(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
         _t17 = _t20;
     }
     if (_t17) {
-        // line 2743
+        // line 2744
         int64_t _t21 = v_t;
         return _t21;
     }
-    // line 2745
+    // line 2746
     vela_str _t22 = f_7checker_show((*v_c), v_t);
     vela_str _t23 = vela_str_concat(_t22, VELA_STR(" cannot be sliced; only arrays and Strs can", 43));
     vela_str_release(_t22);
     f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3113", 5), _t23);
     vela_str_release(_t23);
     vela_str_release(VELA_STR("E3113", 5));
-    // line 2746
+    // line 2747
     int64_t _t24 = f_5types_ERROR();
     int64_t _t25 = _t24;
     return _t25;
@@ -43885,33 +44012,33 @@ int64_t f_7checker_slice(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
 /* vela: part */
 
 int64_t f_7checker_array_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array * v_elems) {
-    // line 2750
+    // line 2751
     int64_t _t1 = v_elems->len;
     int64_t _t2 = _t1;
     bool _t3 = _t2 == 0;
     if (_t3) {
-        // line 2751
+        // line 2752
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3114", 5), VELA_STR("cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`", 74));
         vela_str_release(VELA_STR("cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`", 74));
         vela_str_release(VELA_STR("E3114", 5));
-        // line 2752
+        // line 2753
         int64_t _t4 = f_5types_ERROR();
         int64_t _t5 = _t4;
         return _t5;
     }
-    // line 2754
-    t_3ast_Expr _t6 = *(t_3ast_Expr *)vela_at(v_elems, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:2754:35");
+    // line 2755
+    t_3ast_Expr _t6 = *(t_3ast_Expr *)vela_at(v_elems, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:2755:35");
     rc_retain_t_3ast_Expr(_t6);
     int64_t _t7 = f_7checker_value(&(*v_c), _t6);
     int64_t v_first = _t7;
     rc_release_t_3ast_Expr(_t6);
-    // line 2755
+    // line 2756
     int64_t _t9 = v_elems->len;
-    vela_array * _t10 = vela_array_slice(v_elems, 1, _t9, "compiler/src/checker.vl:2755:19");
+    vela_array * _t10 = vela_array_slice(v_elems, 1, _t9, "compiler/src/checker.vl:2756:19");
     vela_array * _t8 = _t10;
     for (int64_t _t11 = 0; _t11 < _t8->len; _t11++) {
         t_3ast_Expr v_x = ((t_3ast_Expr *)_t8->data)[_t11];
-        // line 2756
+        // line 2757
         t_3ast_Expr _t12 = v_x;
         rc_retain_t_3ast_Expr(_t12);
         static const vela_str _t13[] = {VELA_STR_INIT("the elements of an array must all be ", 37), {NULL, NULL, 0}, VELA_STR_INIT(", but this is ", 14)};
@@ -43928,7 +44055,7 @@ int64_t f_7checker_array_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_arr
         vela_str_release(_t16);
     }
     vela_array_release(_t8);
-    // line 2758
+    // line 2759
     int64_t _t18 = f_5types_array(&(*v_c).m_table, v_first);
     int64_t _t19 = _t18;
     return _t19;
@@ -43936,35 +44063,35 @@ int64_t f_7checker_array_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_arr
 /* vela: part */
 
 int64_t f_7checker_map_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array * v_entries) {
-    // line 2762
+    // line 2763
     int64_t _t1 = v_entries->len;
     int64_t _t2 = _t1;
     bool _t3 = _t2 == 0;
     if (_t3) {
-        // line 2763
+        // line 2764
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3115", 5), VELA_STR("cannot tell what this [:] holds; give it a type, as in `let m: Map[Str, Int] = [:]`", 83));
         vela_str_release(VELA_STR("cannot tell what this [:] holds; give it a type, as in `let m: Map[Str, Int] = [:]`", 83));
         vela_str_release(VELA_STR("E3115", 5));
-        // line 2764
+        // line 2765
         int64_t _t4 = f_5types_ERROR();
         int64_t _t5 = _t4;
         return _t5;
     }
-    // line 2766
-    t_3ast_MapEntry _t6 = *(t_3ast_MapEntry *)vela_at(v_entries, 0, sizeof(t_3ast_MapEntry), "compiler/src/checker.vl:2766:37");
+    // line 2767
+    t_3ast_MapEntry _t6 = *(t_3ast_MapEntry *)vela_at(v_entries, 0, sizeof(t_3ast_MapEntry), "compiler/src/checker.vl:2767:37");
     t_3ast_Expr _t7 = _t6.m_key;
     rc_retain_t_3ast_Expr(_t7);
     int64_t _t8 = f_7checker_value(&(*v_c), _t7);
     int64_t v_k = _t8;
     rc_release_t_3ast_Expr(_t7);
-    // line 2767
-    t_3ast_MapEntry _t9 = *(t_3ast_MapEntry *)vela_at(v_entries, 0, sizeof(t_3ast_MapEntry), "compiler/src/checker.vl:2767:33");
+    // line 2768
+    t_3ast_MapEntry _t9 = *(t_3ast_MapEntry *)vela_at(v_entries, 0, sizeof(t_3ast_MapEntry), "compiler/src/checker.vl:2768:33");
     t_3ast_Expr _t10 = _t9.m_value;
     rc_retain_t_3ast_Expr(_t10);
     int64_t _t11 = f_7checker_value(&(*v_c), _t10);
     int64_t v_v = _t11;
     rc_release_t_3ast_Expr(_t10);
-    // line 2768
+    // line 2769
     bool _t12 = f_7checker_key_type((*v_c), v_k);
     bool _t13 = !_t12;
     bool _t14 = _t13;
@@ -43975,8 +44102,8 @@ int64_t f_7checker_map_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
         _t14 = _t17;
     }
     if (_t14) {
-        // line 2769
-        t_3ast_MapEntry _t18 = *(t_3ast_MapEntry *)vela_at(v_entries, 0, sizeof(t_3ast_MapEntry), "compiler/src/checker.vl:2769:33");
+        // line 2770
+        t_3ast_MapEntry _t18 = *(t_3ast_MapEntry *)vela_at(v_entries, 0, sizeof(t_3ast_MapEntry), "compiler/src/checker.vl:2770:33");
         t_3ast_Expr _t19 = _t18.m_key;
         rc_retain_t_3ast_Expr(_t19);
         vela_str _t20 = f_7checker_key_failure((*v_c), v_k);
@@ -43984,17 +44111,17 @@ int64_t f_7checker_map_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
         vela_str_release(_t20);
         vela_str_release(VELA_STR("E3116", 5));
         rc_release_t_3ast_Expr(_t19);
-        // line 2770
+        // line 2771
         int64_t _t21 = f_5types_ERROR();
         v_k = _t21;
     }
-    // line 2772
+    // line 2773
     int64_t _t23 = v_entries->len;
-    vela_array * _t24 = vela_array_slice(v_entries, 1, _t23, "compiler/src/checker.vl:2772:22");
+    vela_array * _t24 = vela_array_slice(v_entries, 1, _t23, "compiler/src/checker.vl:2773:22");
     vela_array * _t22 = _t24;
     for (int64_t _t25 = 0; _t25 < _t22->len; _t25++) {
         t_3ast_MapEntry v_en = ((t_3ast_MapEntry *)_t22->data)[_t25];
-        // line 2773
+        // line 2774
         t_3ast_Expr _t26 = v_en.m_key;
         rc_retain_t_3ast_Expr(_t26);
         static const vela_str _t27[] = {VELA_STR_INIT("the keys of this map are ", 25), {NULL, NULL, 0}, VELA_STR_INIT(", but this is ", 14)};
@@ -44009,7 +44136,7 @@ int64_t f_7checker_map_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
         rc_release_t_7checker_Msg(_t31);
         rc_release_t_3ast_Expr(_t26);
         vela_str_release(_t30);
-        // line 2774
+        // line 2775
         t_3ast_Expr _t32 = v_en.m_value;
         rc_retain_t_3ast_Expr(_t32);
         static const vela_str _t33[] = {VELA_STR_INIT("the values of this map are ", 27), {NULL, NULL, 0}, VELA_STR_INIT(", but this is ", 14)};
@@ -44026,7 +44153,7 @@ int64_t f_7checker_map_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
         vela_str_release(_t36);
     }
     vela_array_release(_t22);
-    // line 2776
+    // line 2777
     int64_t _t38 = f_5types_map(&(*v_c).m_table, v_k, v_v);
     int64_t _t39 = _t38;
     return _t39;
@@ -44034,16 +44161,16 @@ int64_t f_7checker_map_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
 /* vela: part */
 
 int64_t f_7checker_enum_named(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
-    // line 2783
+    // line 2784
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_Name) {
         vela_str v_name = v_e.m_kind->value.as.m_Name._0;
         vela_str_retain(v_name);
-        // line 2785
+        // line 2786
         int64_t _t1 = f_7checker_lookup_local((*v_c), v_name);
         int64_t _t2 = _t1;
         bool _t3 = _t2 < 0;
         if (_t3) {
-            // line 2786
+            // line 2787
             vela_map * _t4 = f_7checker_module_types((*v_c));
             vela_str _t6 = v_name;
             int64_t *_t5 = vela_map_find(_t4, &_t6);
@@ -44055,10 +44182,10 @@ int64_t f_7checker_enum_named(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
             }
             if (_t7.tag == Option_Int_Some) {
                 int64_t v_t = _t7.as.m_Some._0;
-                // line 2788
+                // line 2789
                 bool _t8 = f_5types_is_enum((*v_c).m_table, v_t);
                 if (_t8) {
-                    // line 2789
+                    // line 2790
                     int64_t _t9 = v_t;
                     vela_map_release(_t4);
                     vela_str_release(v_name);
@@ -44074,34 +44201,34 @@ int64_t f_7checker_enum_named(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
         rc_retain_t_3ast_Expr(v_obj);
         vela_str v_name_2 = v_e.m_kind->value.as.m_Field._1;
         vela_str_retain(v_name_2);
-        // line 2797
+        // line 2798
         int64_t _t10 = f_7checker_module_named((*v_c), v_obj);
         int64_t v_module = _t10;
-        // line 2798
+        // line 2799
         int64_t _t11 = v_module;
         bool _t12 = _t11 >= 0;
         if (_t12) {
-            // line 2799
+            // line 2800
             vela_str _t13 = v_name_2;
             vela_str_retain(_t13);
             int64_t _t14 = f_7checker_module_type(&(*v_c), v_e.m_line, v_e.m_col, v_module, _t13);
             int64_t v_t_2 = _t14;
             vela_str_release(_t13);
-            // line 2800
+            // line 2801
             int64_t _t15 = v_t_2;
             bool _t16 = _t15 < 0;
             if (_t16) {
-                // line 2801
+                // line 2802
                 int64_t _t17 = f_5types_ERROR();
                 int64_t _t18 = _t17;
                 vela_str_release(v_name_2);
                 rc_release_t_3ast_Expr(v_obj);
                 return _t18;
             }
-            // line 2803
+            // line 2804
             bool _t19 = f_5types_is_enum((*v_c).m_table, v_t_2);
             if (_t19) {
-                // line 2804
+                // line 2805
                 int64_t _t20 = v_t_2;
                 vela_str_release(v_name_2);
                 rc_release_t_3ast_Expr(v_obj);
@@ -44112,14 +44239,14 @@ int64_t f_7checker_enum_named(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
         rc_release_t_3ast_Expr(v_obj);
     } else {
     }
-    // line 2810
+    // line 2811
     int64_t _t21 = -1;
     return _t21;
 }
 /* vela: part */
 
 int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v_obj, vela_str v_name, int64_t v_expected) {
-    // line 2814
+    // line 2815
     vela_array * _t1 = vela_array_new(vt_t_3ast_Expr(), 1);
     t_3ast_Expr _t2 = v_obj;
     rc_retain_t_3ast_Expr(_t2);
@@ -44127,23 +44254,23 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
     vela_push(_t1, &_t3, sizeof(t_3ast_Expr));
     f_7checker_completing(&(*v_c), v_name, _t1);
     vela_array_release(_t1);
-    // line 2815
+    // line 2816
     int64_t _t4 = f_7checker_module_named((*v_c), v_obj);
     int64_t v_module = _t4;
-    // line 2816
+    // line 2817
     int64_t _t5 = v_module;
     bool _t6 = _t5 >= 0;
     if (_t6) {
-        // line 2818
-        t_7modules_Module _t7 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:2818:26");
+        // line 2819
+        t_7modules_Module _t7 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:2819:26");
         rc_retain_t_7modules_Module(_t7);
         t_7modules_Module v_m = _t7;
-        // line 2819
+        // line 2820
         vela_str _t9 = v_name;
         int64_t *_t8 = vela_map_find(v_m.m_types, &_t9);
         bool _t10 = _t8 != NULL;
         if (_t10) {
-            // line 2820
+            // line 2821
             static const vela_str _t11[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}, VELA_STR_INIT("' is a type, not a value", 24)};
             vela_str _t12[5];
             memcpy(_t12, _t11, sizeof _t12);
@@ -44156,7 +44283,7 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
         } else {
             bool _t14 = f_7checker_has_std(v_m, v_name);
             if (_t14) {
-                // line 2822
+                // line 2823
                 static const vela_str _t15[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}, VELA_STR_INIT("' is a built-in function, which cannot be used as a value; ", 59), VELA_STR_INIT("wrap it in a function of your own", 33)};
                 vela_str _t16[6];
                 memcpy(_t16, _t15, sizeof _t16);
@@ -44171,17 +44298,17 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
                 int64_t *_t18 = vela_map_find(v_m.m_fns, &_t19);
                 bool _t20 = _t18 != NULL;
                 if (_t20) {
-                    // line 2825
+                    // line 2826
                     t_7checker_Ref _t21 = f_7checker_module_fn(&(*v_c), v_e.m_line, v_e.m_col, v_module, v_name);
                     if (_t21.tag == t_7checker_Ref_Constant) {
                         int64_t v_id = _t21.as.m_Constant._0;
-                        // line 2826
+                        // line 2827
                         t_7checker_Ref _t22 = (t_7checker_Ref){ .tag = t_7checker_Ref_Constant, .as.m_Constant = { ._0 = v_id } };
                         vela_unique(&(*v_c).m_refs);
-                        t_7checker_Ref *_t23 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2826:45");
+                        t_7checker_Ref *_t23 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2827:45");
                         rc_release_t_7checker_Ref(*_t23);
                         *_t23 = _t22;
-                        // line 2826
+                        // line 2827
                         int64_t _t24 = f_7checker_check_constant(&(*v_c), v_id);
                         int64_t _t25 = _t24;
                         rc_release_t_7checker_Ref(_t21);
@@ -44189,7 +44316,7 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
                         return _t25;
                     } else if (_t21.tag == t_7checker_Ref_Function) {
                         int64_t v_id_2 = _t21.as.m_Function._0;
-                        // line 2827
+                        // line 2828
                         static const vela_str _t26[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
                         vela_str _t27[3];
                         memcpy(_t27, _t26, sizeof _t27);
@@ -44203,7 +44330,7 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
                         rc_release_t_7modules_Module(v_m);
                         return _t30;
                     } else {
-                        // line 2828
+                        // line 2829
                         int64_t _t31 = f_5types_ERROR();
                         int64_t _t32 = _t31;
                         rc_release_t_7checker_Ref(_t21);
@@ -44211,7 +44338,7 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
                         return _t32;
                     }
                 } else {
-                    // line 2831
+                    // line 2832
                     static const vela_str _t33[] = {VELA_STR_INIT("module '", 8), {NULL, NULL, 0}, VELA_STR_INIT("' has no '", 10), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
                     vela_str _t34[5];
                     memcpy(_t34, _t33, sizeof _t34);
@@ -44224,37 +44351,37 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
                 }
             }
         }
-        // line 2833
+        // line 2834
         int64_t _t36 = f_5types_ERROR();
         int64_t _t37 = _t36;
         rc_release_t_7modules_Module(v_m);
         return _t37;
     }
-    // line 2835
+    // line 2836
     int64_t _t38 = f_7checker_enum_named(&(*v_c), v_obj);
     int64_t v_enum = _t38;
-    // line 2836
+    // line 2837
     int64_t _t39 = v_enum;
     int64_t _t40 = f_5types_ERROR();
     bool _t41 = _t39 == _t40;
     if (_t41) {
-        // line 2837
+        // line 2838
         int64_t _t42 = f_5types_ERROR();
         int64_t _t43 = _t42;
         return _t43;
     }
-    // line 2839
+    // line 2840
     int64_t _t44 = v_enum;
     bool _t45 = _t44 >= 0;
     if (_t45) {
-        // line 2840
+        // line 2841
         int64_t _t46 = f_5types_variant_index((*v_c).m_table, v_enum, v_name);
         int64_t v_vi = _t46;
-        // line 2841
+        // line 2842
         int64_t _t47 = v_vi;
         bool _t48 = _t47 < 0;
         if (_t48) {
-            // line 2842
+            // line 2843
             static const vela_str _t49[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' has no variant '", 18), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t50[5];
             memcpy(_t50, _t49, sizeof _t50);
@@ -44266,22 +44393,22 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3120", 5), _t52);
             vela_str_release(_t52);
             vela_str_release(VELA_STR("E3120", 5));
-            // line 2843
+            // line 2844
             int64_t _t53 = f_5types_ERROR();
             int64_t _t54 = _t53;
             return _t54;
         }
-        // line 2845
+        // line 2846
         t_5types_TypeInfo _t55 = f_5types_get((*v_c).m_table, v_enum);
-        t_5types_Variant _t56 = *(t_5types_Variant *)vela_at(_t55.m_variants, v_vi, sizeof(t_5types_Variant), "compiler/src/checker.vl:2845:54");
+        t_5types_Variant _t56 = *(t_5types_Variant *)vela_at(_t55.m_variants, v_vi, sizeof(t_5types_Variant), "compiler/src/checker.vl:2846:54");
         int64_t _t57 = _t56.m_payload->len;
         int64_t v_n = _t57;
         rc_release_t_5types_TypeInfo(_t55);
-        // line 2846
+        // line 2847
         int64_t _t58 = v_n;
         bool _t59 = _t58 > 0;
         if (_t59) {
-            // line 2847
+            // line 2848
             static const vela_str _t60[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}, VELA_STR_INIT(" carries ", 9), {NULL, NULL, 0}, VELA_STR_INIT("; write ", 8), {NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}, VELA_STR_INIT("(...)", 5)};
             vela_str _t61[10];
             memcpy(_t61, _t60, sizeof _t61);
@@ -44300,15 +44427,15 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3121", 5), _t65);
             vela_str_release(_t65);
             vela_str_release(VELA_STR("E3121", 5));
-            // line 2849
+            // line 2850
             int64_t _t66 = f_5types_ERROR();
             int64_t _t67 = _t66;
             return _t67;
         }
-        // line 2851
+        // line 2852
         bool _t68 = f_5types_is_generic((*v_c).m_table, v_enum);
         if (_t68) {
-            // line 2853
+            // line 2854
             int64_t _t69 = v_expected;
             bool _t70 = _t69 >= 0;
             bool _t71 = _t70;
@@ -44325,17 +44452,17 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
                 _t75 = _t76;
             }
             if (_t75) {
-                // line 2854
+                // line 2855
                 t_7checker_Ref _t77 = (t_7checker_Ref){ .tag = t_7checker_Ref_Variant, .as.m_Variant = { ._0 = v_expected, ._1 = v_vi } };
                 vela_unique(&(*v_c).m_refs);
-                t_7checker_Ref *_t78 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2854:23");
+                t_7checker_Ref *_t78 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2855:23");
                 rc_release_t_7checker_Ref(*_t78);
                 *_t78 = _t77;
-                // line 2855
+                // line 2856
                 int64_t _t79 = v_expected;
                 return _t79;
             }
-            // line 2857
+            // line 2858
             static const vela_str _t80[] = {VELA_STR_INIT("cannot tell which ", 18), {NULL, NULL, 0}, VELA_STR_INIT(" this ", 6), {NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}, VELA_STR_INIT(" is; give it a type, as in `let x: ", 35), {NULL, NULL, 0}, VELA_STR_INIT("[", 1), {NULL, NULL, 0}, VELA_STR_INIT("] = ", 4), {NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}, VELA_STR_INIT("`", 1)};
             vela_str _t81[15];
             memcpy(_t81, _t80, sizeof _t81);
@@ -44363,60 +44490,60 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
             vela_str_release(_t89);
             vela_str_release(VELA_STR("E3122", 5));
             rc_release_t_5types_TypeInfo(_t85);
-            // line 2860
+            // line 2861
             int64_t _t90 = f_5types_ERROR();
             int64_t _t91 = _t90;
             return _t91;
         }
-        // line 2862
+        // line 2863
         t_7checker_Ref _t92 = (t_7checker_Ref){ .tag = t_7checker_Ref_Variant, .as.m_Variant = { ._0 = v_enum, ._1 = v_vi } };
         vela_unique(&(*v_c).m_refs);
-        t_7checker_Ref *_t93 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2862:15");
+        t_7checker_Ref *_t93 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:2863:15");
         rc_release_t_7checker_Ref(*_t93);
         *_t93 = _t92;
-        // line 2863
+        // line 2864
         int64_t _t94 = v_enum;
         return _t94;
     }
-    // line 2865
+    // line 2866
     int64_t _t95 = f_7checker_value(&(*v_c), v_obj);
     int64_t v_t = _t95;
-    // line 2866
+    // line 2867
     int64_t _t96 = v_t;
     int64_t _t97 = f_5types_ERROR();
     bool _t98 = _t96 == _t97;
     if (_t98) {
-        // line 2867
+        // line 2868
         int64_t _t99 = f_5types_ERROR();
         int64_t _t100 = _t99;
         return _t100;
     }
-    // line 2869
+    // line 2870
     bool _t101 = f_5types_is_fixed((*v_c).m_table, v_t);
     if (_t101) {
-        // line 2869
+        // line 2870
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3212", 5), VELA_STR("fixed arrays expose elements through indexing", 45));
         vela_str_release(VELA_STR("fixed arrays expose elements through indexing", 45));
         vela_str_release(VELA_STR("E3212", 5));
-        // line 2869
+        // line 2870
         int64_t _t102 = f_5types_ERROR();
         int64_t _t103 = _t102;
         return _t103;
     }
-    // line 2870
+    // line 2871
     bool _t104 = f_5types_is_struct((*v_c).m_table, v_t);
     bool _t105 = !_t104;
     if (_t105) {
-        // line 2871
-        vela_str v_hint = VELA_STR("", 0);
         // line 2872
+        vela_str v_hint = VELA_STR("", 0);
+        // line 2873
         bool _t106 = f_5types_is_enum((*v_c).m_table, v_t);
         if (_t106) {
-            // line 2873
+            // line 2874
             vela_str_release(v_hint);
             v_hint = VELA_STR("; use match to look inside it", 29);
         }
-        // line 2875
+        // line 2876
         static const vela_str _t107[] = {{NULL, NULL, 0}, VELA_STR_INIT(" has no fields", 14), {NULL, NULL, 0}};
         vela_str _t108[3];
         memcpy(_t108, _t107, sizeof _t108);
@@ -44428,20 +44555,20 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3123", 5), _t110);
         vela_str_release(_t110);
         vela_str_release(VELA_STR("E3123", 5));
-        // line 2876
+        // line 2877
         int64_t _t111 = f_5types_ERROR();
         int64_t _t112 = _t111;
         vela_str_release(v_hint);
         return _t112;
     }
-    // line 2878
+    // line 2879
     int64_t _t113 = f_5types_field_index((*v_c).m_table, v_t, v_name);
     int64_t v_fi = _t113;
-    // line 2879
+    // line 2880
     int64_t _t114 = v_fi;
     bool _t115 = _t114 < 0;
     if (_t115) {
-        // line 2880
+        // line 2881
         static const vela_str _t116[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' has no field '", 16), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
         vela_str _t117[5];
         memcpy(_t117, _t116, sizeof _t117);
@@ -44453,14 +44580,14 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3124", 5), _t119);
         vela_str_release(_t119);
         vela_str_release(VELA_STR("E3124", 5));
-        // line 2881
+        // line 2882
         int64_t _t120 = f_5types_ERROR();
         int64_t _t121 = _t120;
         return _t121;
     }
-    // line 2883
+    // line 2884
     t_5types_TypeInfo _t122 = f_5types_get((*v_c).m_table, v_t);
-    t_5types_FieldInfo _t123 = *(t_5types_FieldInfo *)vela_at(_t122.m_fields, v_fi, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:2883:40");
+    t_5types_FieldInfo _t123 = *(t_5types_FieldInfo *)vela_at(_t122.m_fields, v_fi, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:2884:40");
     int64_t _t124 = _t123.m_ty;
     rc_release_t_5types_TypeInfo(_t122);
     return _t124;
@@ -44468,14 +44595,14 @@ int64_t f_7checker_field(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr 
 /* vela: part */
 
 int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_module, vela_str v_name, vela_array * v_fields, int64_t v_expected) {
-    // line 2887
+    // line 2888
     vela_str _t1 = v_name;
     vela_str_retain(_t1);
     vela_str v_written = _t1;
-    // line 2888
+    // line 2889
     bool _t2 = !vela_str_eq(v_module, VELA_STR("", 0));
     if (_t2) {
-        // line 2889
+        // line 2890
         static const vela_str _t3[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
         vela_str _t4[3];
         memcpy(_t4, _t3, sizeof _t4);
@@ -44485,32 +44612,32 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         vela_str_release(v_written);
         v_written = _t5;
     }
-    // line 2891
-    int64_t v_t = -1;
     // line 2892
+    int64_t v_t = -1;
+    // line 2893
     bool _t6 = !vela_str_eq(v_module, VELA_STR("", 0));
     if (_t6) {
-        // line 2893
+        // line 2894
         int64_t _t7 = f_7checker_module_in_type(&(*v_c), v_e.m_line, v_e.m_col, v_module);
         int64_t v_m = _t7;
-        // line 2894
+        // line 2895
         int64_t _t8 = v_m;
         bool _t9 = _t8 >= 0;
         if (_t9) {
-            // line 2895
+            // line 2896
             int64_t _t10 = f_7checker_module_type(&(*v_c), v_e.m_line, v_e.m_col, v_m, v_name);
             v_t = _t10;
         }
-        // line 2897
+        // line 2898
         int64_t _t11 = v_t;
         bool _t12 = _t11 < 0;
         if (_t12) {
-            // line 2898
+            // line 2899
             int64_t _t13 = f_5types_ERROR();
             v_t = _t13;
         }
     } else {
-        // line 2901
+        // line 2902
         vela_map * _t14 = f_7checker_module_types((*v_c));
         vela_str _t16 = v_name;
         int64_t *_t15 = vela_map_find(_t14, &_t16);
@@ -44522,13 +44649,13 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         }
         if (_t17.tag == Option_Int_Some) {
             int64_t v_id = _t17.as.m_Some._0;
-            // line 2902
+            // line 2903
             v_t = v_id;
         } else {
         }
         vela_map_release(_t14);
     }
-    // line 2906
+    // line 2907
     int64_t _t18 = v_t;
     bool _t19 = _t18 < 0;
     bool _t20 = _t19;
@@ -44538,11 +44665,11 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         _t20 = _t22;
     }
     if (_t20) {
-        // line 2907
+        // line 2908
         int64_t _t23 = v_t;
         bool _t24 = _t23 < 0;
         if (_t24) {
-            // line 2908
+            // line 2909
             static const vela_str _t25[] = {VELA_STR_INIT("unknown type '", 14), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t26[3];
             memcpy(_t26, _t25, sizeof _t26);
@@ -44554,7 +44681,7 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         } else {
             bool _t28 = f_5types_is_interface((*v_c).m_table, v_t);
             if (_t28) {
-                // line 2910
+                // line 2911
                 static const vela_str _t29[] = {VELA_STR_INIT("interface '", 11), {NULL, NULL, 0}, VELA_STR_INIT("' is a bound, not a value constructor", 37)};
                 vela_str _t30[3];
                 memcpy(_t30, _t29, sizeof _t30);
@@ -44568,7 +44695,7 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
                 int64_t _t33 = f_5types_ERROR();
                 bool _t34 = _t32 != _t33;
                 if (_t34) {
-                    // line 2912
+                    // line 2913
                     static const vela_str _t35[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' is an enum; build its values with ", 36), {NULL, NULL, 0}, VELA_STR_INIT(".Variant", 8)};
                     vela_str _t36[5];
                     memcpy(_t36, _t35, sizeof _t36);
@@ -44581,63 +44708,63 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
                 }
             }
         }
-        // line 2914
+        // line 2915
         vela_array * _t39 = v_fields;
         vela_array_retain(_t39);
         vela_array * _t38 = _t39;
         for (int64_t _t40 = 0; _t40 < _t38->len; _t40++) {
             t_3ast_FieldInit v_f = ((t_3ast_FieldInit *)_t38->data)[_t40];
-            // line 2915
+            // line 2916
             t_3ast_Expr _t41 = v_f.m_value;
             rc_retain_t_3ast_Expr(_t41);
             int64_t _t42 = f_7checker_infer(&(*v_c), _t41);
             rc_release_t_3ast_Expr(_t41);
         }
         vela_array_release(_t38);
-        // line 2917
+        // line 2918
         int64_t _t43 = f_5types_ERROR();
         int64_t _t44 = _t43;
         vela_str_release(v_written);
         return _t44;
     }
-    // line 2919
+    // line 2920
     bool _t45 = f_5types_is_generic((*v_c).m_table, v_t);
     if (_t45) {
-        // line 2920
+        // line 2921
         int64_t _t46 = f_7checker_generic_struct_lit(&(*v_c), v_e, v_t, v_fields, v_expected);
         int64_t _t47 = _t46;
         vela_str_release(v_written);
         return _t47;
     }
-    // line 2922
+    // line 2923
     vela_array * _t48 = vela_array_new(&vela_type_str, 0);
     vela_array * v_seen = _t48;
-    // line 2923
+    // line 2924
     vela_array * _t50 = v_fields;
     vela_array_retain(_t50);
     vela_array * _t49 = _t50;
     for (int64_t _t51 = 0; _t51 < _t49->len; _t51++) {
         t_3ast_FieldInit v_f_2 = ((t_3ast_FieldInit *)_t49->data)[_t51];
-        // line 2924
+        // line 2925
         int64_t _t52 = f_5types_field_index((*v_c).m_table, v_t, v_f_2.m_name);
         int64_t v_fi = _t52;
-        // line 2925
-        bool v_twice = false;
         // line 2926
+        bool v_twice = false;
+        // line 2927
         vela_array * _t54 = v_seen;
         vela_array_retain(_t54);
         vela_array * _t53 = _t54;
         for (int64_t _t55 = 0; _t55 < _t53->len; _t55++) {
             vela_str v_s = ((vela_str *)_t53->data)[_t55];
-            // line 2927
+            // line 2928
             bool _t56 = vela_str_eq(v_s, v_f_2.m_name);
             if (_t56) {
-                // line 2928
+                // line 2929
                 v_twice = true;
             }
         }
         vela_array_release(_t53);
-        // line 2931
+        // line 2932
         bool _t57 = v_twice;
         if (!_t57) {
             int64_t _t58 = v_fi;
@@ -44645,9 +44772,9 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
             _t57 = _t59;
         }
         if (_t57) {
-            // line 2932
+            // line 2933
             if (v_twice) {
-                // line 2933
+                // line 2934
                 static const vela_str _t60[] = {VELA_STR_INIT("field '", 7), {NULL, NULL, 0}, VELA_STR_INIT("' is given twice", 16)};
                 vela_str _t61[3];
                 memcpy(_t61, _t60, sizeof _t61);
@@ -44657,7 +44784,7 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
                 vela_str_release(_t62);
                 vela_str_release(VELA_STR("E3127", 5));
             } else {
-                // line 2935
+                // line 2936
                 static const vela_str _t63[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' has no field '", 16), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
                 vela_str _t64[5];
                 memcpy(_t64, _t63, sizeof _t64);
@@ -44670,26 +44797,26 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
                 vela_str_release(_t66);
                 vela_str_release(VELA_STR("E3128", 5));
             }
-            // line 2937
+            // line 2938
             t_3ast_Expr _t67 = v_f_2.m_value;
             rc_retain_t_3ast_Expr(_t67);
             int64_t _t68 = f_7checker_infer(&(*v_c), _t67);
             rc_release_t_3ast_Expr(_t67);
-            // line 2938
+            // line 2939
             continue;
         }
-        // line 2940
+        // line 2941
         vela_str _t69 = v_f_2.m_name;
         vela_str_retain(_t69);
         vela_unique(&v_seen);
         vela_str _t70 = _t69;
         vela_push(v_seen, &_t70, sizeof(vela_str));
-        // line 2941
+        // line 2942
         t_5types_TypeInfo _t71 = f_5types_get((*v_c).m_table, v_t);
-        t_5types_FieldInfo _t72 = *(t_5types_FieldInfo *)vela_at(_t71.m_fields, v_fi, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:2941:48");
+        t_5types_FieldInfo _t72 = *(t_5types_FieldInfo *)vela_at(_t71.m_fields, v_fi, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:2942:48");
         int64_t v_want = _t72.m_ty;
         rc_release_t_5types_TypeInfo(_t71);
-        // line 2942
+        // line 2943
         t_3ast_Expr _t73 = v_f_2.m_value;
         rc_retain_t_3ast_Expr(_t73);
         static const vela_str _t74[] = {VELA_STR_INIT("field '", 7), {NULL, NULL, 0}, VELA_STR_INIT("' of '", 6), {NULL, NULL, 0}, VELA_STR_INIT("' is ", 5), {NULL, NULL, 0}, VELA_STR_INIT(", but this is ", 14)};
@@ -44710,10 +44837,10 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         vela_str_release(_t78);
     }
     vela_array_release(_t49);
-    // line 2945
+    // line 2946
     vela_array * _t80 = vela_array_new(&vela_type_str, 0);
     vela_array * v_missing = _t80;
-    // line 2946
+    // line 2947
     t_5types_TypeInfo _t82 = f_5types_get((*v_c).m_table, v_t);
     vela_array * _t83 = _t82.m_fields;
     vela_array_retain(_t83);
@@ -44721,26 +44848,26 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
     vela_unique(&v_missing);
     for (int64_t _t84 = 0; _t84 < _t81->len; _t84++) {
         t_5types_FieldInfo v_fd = ((t_5types_FieldInfo *)_t81->data)[_t84];
-        // line 2947
-        bool v_given = false;
         // line 2948
+        bool v_given = false;
+        // line 2949
         vela_array * _t86 = v_seen;
         vela_array_retain(_t86);
         vela_array * _t85 = _t86;
         for (int64_t _t87 = 0; _t87 < _t85->len; _t87++) {
             vela_str v_s_2 = ((vela_str *)_t85->data)[_t87];
-            // line 2949
+            // line 2950
             bool _t88 = vela_str_eq(v_s_2, v_fd.m_name);
             if (_t88) {
-                // line 2950
+                // line 2951
                 v_given = true;
             }
         }
         vela_array_release(_t85);
-        // line 2953
+        // line 2954
         bool _t89 = !v_given;
         if (_t89) {
-            // line 2954
+            // line 2955
             vela_str _t90 = v_fd.m_name;
             vela_str_retain(_t90);
             vela_str _t91 = _t90;
@@ -44749,28 +44876,28 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
     }
     vela_array_release(_t81);
     rc_release_t_5types_TypeInfo(_t82);
-    // line 2957
+    // line 2958
     int64_t _t92 = v_missing->len;
     int64_t _t93 = _t92;
     bool _t94 = _t93 > 0;
     if (_t94) {
-        // line 2958
+        // line 2959
         vela_array * _t95 = vela_array_new(&vela_type_byte, 64);
         vela_array * v_names = _t95;
-        // line 2959
+        // line 2960
         int64_t _t96 = v_missing->len;
         int64_t _t97 = _t96;
         vela_unique(&v_names);
         for (int64_t _t98 = 0; _t98 < _t97; _t98++) {
             int64_t v_i = _t98;
-            // line 2960
+            // line 2961
             int64_t _t99 = v_i;
             bool _t100 = _t99 > 0;
             if (_t100) {
-                // line 2961
+                // line 2962
                 vela_builder_add(v_names, VELA_STR(", ", 2));
             }
-            // line 2963
+            // line 2964
             static const vela_str _t101[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t102[3];
             memcpy(_t102, _t101, sizeof _t102);
@@ -44780,18 +44907,18 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
             vela_builder_add(v_names, _t104);
             vela_str_release(_t104);
         }
-        // line 2965
-        vela_str v_word = VELA_STR("fields", 6);
         // line 2966
+        vela_str v_word = VELA_STR("fields", 6);
+        // line 2967
         int64_t _t105 = v_missing->len;
         int64_t _t106 = _t105;
         bool _t107 = _t106 == 1;
         if (_t107) {
-            // line 2967
+            // line 2968
             vela_str_release(v_word);
             v_word = VELA_STR("field", 5);
         }
-        // line 2969
+        // line 2970
         static const vela_str _t108[] = {VELA_STR_INIT("missing ", 8), {NULL, NULL, 0}, VELA_STR_INIT(" ", 1), {NULL, NULL, 0}, VELA_STR_INIT(" in this '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' value", 7)};
         vela_str _t109[7];
         memcpy(_t109, _t108, sizeof _t109);
@@ -44809,7 +44936,7 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         vela_str_release(v_word);
         vela_array_release(v_names);
     }
-    // line 2971
+    // line 2972
     int64_t _t113 = v_t;
     vela_array_release(v_missing);
     vela_array_release(v_seen);
@@ -44819,22 +44946,22 @@ int64_t f_7checker_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
 /* vela: part */
 
 int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v_decl, vela_array * v_fields, int64_t v_expected) {
-    // line 2977
+    // line 2978
     vela_str _t1 = f_7checker_show((*v_c), v_decl);
     vela_str v_name = _t1;
-    // line 2978
+    // line 2979
     vela_array * _t2 = vela_array_new(&vela_type_str, 0);
     vela_array * v_seen = _t2;
-    // line 2979
+    // line 2980
     vela_array * _t3 = vela_array_new(vt_t_3ast_Expr(), 0);
     vela_array * v_values = _t3;
-    // line 2980
+    // line 2981
     vela_array * _t4 = vela_array_new(&vela_type_int, 0);
     vela_array * v_wants = _t4;
-    // line 2981
+    // line 2982
     vela_array * _t5 = vela_array_new(&vela_type_str, 0);
     vela_array * v_labels = _t5;
-    // line 2982
+    // line 2983
     vela_array * _t7 = v_fields;
     vela_array_retain(_t7);
     vela_array * _t6 = _t7;
@@ -44843,26 +44970,26 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
     vela_unique(&v_labels);
     for (int64_t _t8 = 0; _t8 < _t6->len; _t8++) {
         t_3ast_FieldInit v_f = ((t_3ast_FieldInit *)_t6->data)[_t8];
-        // line 2983
+        // line 2984
         int64_t _t9 = f_5types_field_index((*v_c).m_table, v_decl, v_f.m_name);
         int64_t v_fi = _t9;
-        // line 2984
-        bool v_twice = false;
         // line 2985
+        bool v_twice = false;
+        // line 2986
         vela_array * _t11 = v_seen;
         vela_array_retain(_t11);
         vela_array * _t10 = _t11;
         for (int64_t _t12 = 0; _t12 < _t10->len; _t12++) {
             vela_str v_s = ((vela_str *)_t10->data)[_t12];
-            // line 2986
+            // line 2987
             bool _t13 = vela_str_eq(v_s, v_f.m_name);
             if (_t13) {
-                // line 2987
+                // line 2988
                 v_twice = true;
             }
         }
         vela_array_release(_t10);
-        // line 2990
+        // line 2991
         bool _t14 = v_twice;
         if (!_t14) {
             int64_t _t15 = v_fi;
@@ -44870,9 +44997,9 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
             _t14 = _t16;
         }
         if (_t14) {
-            // line 2991
+            // line 2992
             if (v_twice) {
-                // line 2992
+                // line 2993
                 static const vela_str _t17[] = {VELA_STR_INIT("field '", 7), {NULL, NULL, 0}, VELA_STR_INIT("' is given twice", 16)};
                 vela_str _t18[3];
                 memcpy(_t18, _t17, sizeof _t18);
@@ -44882,7 +45009,7 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
                 vela_str_release(_t19);
                 vela_str_release(VELA_STR("E3130", 5));
             } else {
-                // line 2994
+                // line 2995
                 static const vela_str _t20[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' has no field '", 16), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
                 vela_str _t21[5];
                 memcpy(_t21, _t20, sizeof _t21);
@@ -44893,32 +45020,32 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
                 vela_str_release(_t22);
                 vela_str_release(VELA_STR("E3131", 5));
             }
-            // line 2996
+            // line 2997
             t_3ast_Expr _t23 = v_f.m_value;
             rc_retain_t_3ast_Expr(_t23);
             int64_t _t24 = f_7checker_infer(&(*v_c), _t23);
             rc_release_t_3ast_Expr(_t23);
-            // line 2997
+            // line 2998
             continue;
         }
-        // line 2999
+        // line 3000
         vela_str _t25 = v_f.m_name;
         vela_str_retain(_t25);
         vela_unique(&v_seen);
         vela_str _t26 = _t25;
         vela_push(v_seen, &_t26, sizeof(vela_str));
-        // line 3000
+        // line 3001
         t_3ast_Expr _t27 = v_f.m_value;
         rc_retain_t_3ast_Expr(_t27);
         t_3ast_Expr _t28 = _t27;
         vela_push(v_values, &_t28, sizeof(t_3ast_Expr));
-        // line 3001
+        // line 3002
         t_5types_TypeInfo _t29 = f_5types_get((*v_c).m_table, v_decl);
-        t_5types_FieldInfo _t30 = *(t_5types_FieldInfo *)vela_at(_t29.m_fields, v_fi, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:3001:56");
+        t_5types_FieldInfo _t30 = *(t_5types_FieldInfo *)vela_at(_t29.m_fields, v_fi, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:3002:56");
         int64_t _t31 = _t30.m_ty;
         vela_push(v_wants, &_t31, sizeof(int64_t));
         rc_release_t_5types_TypeInfo(_t29);
-        // line 3002
+        // line 3003
         static const vela_str _t32[] = {VELA_STR_INIT("field '", 7), {NULL, NULL, 0}, VELA_STR_INIT("' of '", 6), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
         vela_str _t33[5];
         memcpy(_t33, _t32, sizeof _t33);
@@ -44929,34 +45056,34 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
         vela_push(v_labels, &_t35, sizeof(vela_str));
     }
     vela_array_release(_t6);
-    // line 3004
+    // line 3005
     t_5types_TypeInfo _t36 = f_5types_get((*v_c).m_table, v_decl);
     vela_array * _t37 = _t36.m_params;
     vela_array_retain(_t37);
     vela_array * v_params = _t37;
     rc_release_t_5types_TypeInfo(_t36);
-    // line 3005
+    // line 3006
     vela_array * _t38 = vela_array_new(&vela_type_bool, 0);
     vela_array * v_mutable = _t38;
-    // line 3006
+    // line 3007
     vela_array * _t40 = v_values;
     vela_array_retain(_t40);
     vela_array * _t39 = _t40;
     vela_unique(&v_mutable);
     for (int64_t _t41 = 0; _t41 < _t39->len; _t41++) {
         t_3ast_Expr v__ = ((t_3ast_Expr *)_t39->data)[_t41];
-        // line 3007
+        // line 3008
         bool _t42 = false;
         vela_push(v_mutable, &_t42, sizeof(bool));
     }
     vela_array_release(_t39);
-    // line 3011
+    // line 3012
     int64_t _t43 = v_params->len;
     vela_array * _t44 = f_7checker_unknown(_t43);
     vela_array * v_known = _t44;
-    // line 3012
-    f_7checker_from_context(&(*v_c), v_decl, v_expected, &v_known);
     // line 3013
+    f_7checker_from_context(&(*v_c), v_decl, v_expected, &v_known);
+    // line 3014
     vela_array * _t45 = v_params;
     vela_array_retain(_t45);
     vela_array * _t46 = v_wants;
@@ -44977,7 +45104,7 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
     vela_array_release(_t47);
     vela_array_release(_t46);
     vela_array_release(_t45);
-    // line 3014
+    // line 3015
     vela_array * _t52 = v_params;
     vela_array_retain(_t52);
     static const vela_str _t53[] = {VELA_STR_INIT("in this '", 9), {NULL, NULL, 0}, VELA_STR_INIT("' value", 7)};
@@ -44998,7 +45125,7 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
     bool _t61 = f_7checker_all_known(&(*v_c), v_e, _t52, &v_bound, _t55, _t60);
     bool _t62 = !_t61;
     if (_t62) {
-        // line 3016
+        // line 3017
         int64_t _t63 = f_5types_ERROR();
         int64_t _t64 = _t63;
         vela_str_release(_t60);
@@ -45018,32 +45145,32 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
     vela_str_release(_t60);
     vela_str_release(_t55);
     vela_array_release(_t52);
-    // line 3018
+    // line 3019
     int64_t _t65 = v_params->len;
     int64_t _t66 = _t65;
     for (int64_t _t67 = 0; _t67 < _t66; _t67++) {
         int64_t v_i = _t67;
-        // line 3019
+        // line 3020
         static const vela_str _t68[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
         vela_str _t69[3];
         memcpy(_t69, _t68, sizeof _t69);
         _t69[1] = v_name;
         vela_str _t70 = vela_str_join(_t69, 3);
-        int64_t _t71 = *(int64_t *)vela_at(v_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:3019:68");
-        int64_t _t72 = *(int64_t *)vela_at(v_bound, v_i, sizeof(int64_t), "compiler/src/checker.vl:3019:78");
+        int64_t _t71 = *(int64_t *)vela_at(v_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:3020:68");
+        int64_t _t72 = *(int64_t *)vela_at(v_bound, v_i, sizeof(int64_t), "compiler/src/checker.vl:3020:78");
         f_7checker_check_bounds(&(*v_c), v_e.m_line, v_e.m_col, _t70, _t71, _t72);
         vela_str_release(_t70);
     }
-    // line 3021
+    // line 3022
     vela_array * _t73 = v_bound;
     vela_array_retain(_t73);
     int64_t _t74 = f_5types_instantiate(&(*v_c).m_table, v_decl, _t73);
     int64_t v_t = _t74;
     vela_array_release(_t73);
-    // line 3022
+    // line 3023
     vela_array * _t75 = vela_array_new(&vela_type_str, 0);
     vela_array * v_missing = _t75;
-    // line 3023
+    // line 3024
     t_5types_TypeInfo _t77 = f_5types_get((*v_c).m_table, v_t);
     vela_array * _t78 = _t77.m_fields;
     vela_array_retain(_t78);
@@ -45051,26 +45178,26 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
     vela_unique(&v_missing);
     for (int64_t _t79 = 0; _t79 < _t76->len; _t79++) {
         t_5types_FieldInfo v_fd = ((t_5types_FieldInfo *)_t76->data)[_t79];
-        // line 3024
-        bool v_given = false;
         // line 3025
+        bool v_given = false;
+        // line 3026
         vela_array * _t81 = v_seen;
         vela_array_retain(_t81);
         vela_array * _t80 = _t81;
         for (int64_t _t82 = 0; _t82 < _t80->len; _t82++) {
             vela_str v_s_2 = ((vela_str *)_t80->data)[_t82];
-            // line 3026
+            // line 3027
             bool _t83 = vela_str_eq(v_s_2, v_fd.m_name);
             if (_t83) {
-                // line 3027
+                // line 3028
                 v_given = true;
             }
         }
         vela_array_release(_t80);
-        // line 3030
+        // line 3031
         bool _t84 = !v_given;
         if (_t84) {
-            // line 3031
+            // line 3032
             static const vela_str _t85[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t86[3];
             memcpy(_t86, _t85, sizeof _t86);
@@ -45082,23 +45209,23 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
     }
     vela_array_release(_t76);
     rc_release_t_5types_TypeInfo(_t77);
-    // line 3034
+    // line 3035
     int64_t _t89 = v_missing->len;
     int64_t _t90 = _t89;
     bool _t91 = _t90 > 0;
     if (_t91) {
-        // line 3035
-        vela_str v_word = VELA_STR("fields ", 7);
         // line 3036
+        vela_str v_word = VELA_STR("fields ", 7);
+        // line 3037
         int64_t _t92 = v_missing->len;
         int64_t _t93 = _t92;
         bool _t94 = _t93 == 1;
         if (_t94) {
-            // line 3037
+            // line 3038
             vela_str_release(v_word);
             v_word = VELA_STR("field ", 6);
         }
-        // line 3039
+        // line 3040
         static const vela_str _t95[] = {VELA_STR_INIT("missing ", 8), {NULL, NULL, 0}, {NULL, NULL, 0}, VELA_STR_INIT(" in this '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' value", 7)};
         vela_str _t96[6];
         memcpy(_t96, _t95, sizeof _t96);
@@ -45115,7 +45242,7 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
         vela_str_release(VELA_STR("E3132", 5));
         vela_str_release(v_word);
     }
-    // line 3041
+    // line 3042
     int64_t _t100 = v_t;
     vela_array_release(v_missing);
     vela_array_release(v_bound);
@@ -45132,27 +45259,27 @@ int64_t f_7checker_generic_struct_lit(t_7checker_Checker * v_c, t_3ast_Expr v_e,
 /* vela: part */
 
 vela_str f_7checker_join(vela_array * v_words) {
-    // line 3045
+    // line 3046
     vela_array * _t1 = vela_array_new(&vela_type_byte, 64);
     vela_array * v_b = _t1;
-    // line 3046
+    // line 3047
     int64_t _t2 = v_words->len;
     int64_t _t3 = _t2;
     vela_unique(&v_b);
     for (int64_t _t4 = 0; _t4 < _t3; _t4++) {
         int64_t v_i = _t4;
-        // line 3047
+        // line 3048
         int64_t _t5 = v_i;
         bool _t6 = _t5 > 0;
         if (_t6) {
-            // line 3048
+            // line 3049
             vela_builder_add(v_b, VELA_STR(", ", 2));
         }
-        // line 3050
+        // line 3051
         vela_str _t7 = *((vela_str *)v_words->data + v_i);
         vela_builder_add(v_b, _t7);
     }
-    // line 3052
+    // line 3053
     vela_str _t8 = vela_builder_build(v_b);
     vela_str _t9 = _t8;
     vela_array_release(v_b);
@@ -45161,29 +45288,29 @@ vela_str f_7checker_join(vela_array * v_words) {
 /* vela: part */
 
 int64_t f_7checker_param_index(vela_array * v_params, int64_t v_t) {
-    // line 3059
+    // line 3060
     int64_t _t1 = v_params->len;
     int64_t _t2 = _t1;
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v_i = _t3;
-        // line 3060
+        // line 3061
         int64_t _t4 = *((int64_t *)v_params->data + v_i);
         int64_t _t5 = _t4;
         bool _t6 = _t5 == v_t;
         if (_t6) {
-            // line 3061
+            // line 3062
             int64_t _t7 = v_i;
             return _t7;
         }
     }
-    // line 3064
+    // line 3065
     int64_t _t8 = -1;
     return _t8;
 }
 /* vela: part */
 
 bool f_7checker_mentions(t_7checker_Checker v_c, int64_t v_t, vela_array * v_params) {
-    // line 3069
+    // line 3070
     int64_t _t1 = v_t;
     bool _t2 = _t1 < 0;
     bool _t3 = _t2;
@@ -45193,30 +45320,30 @@ bool f_7checker_mentions(t_7checker_Checker v_c, int64_t v_t, vela_array * v_par
         _t3 = _t5;
     }
     if (_t3) {
-        // line 3070
+        // line 3071
         bool _t6 = false;
         return _t6;
     }
-    // line 3072
+    // line 3073
     int64_t _t7 = f_7checker_param_index(v_params, v_t);
     int64_t _t8 = _t7;
     bool _t9 = _t8 >= 0;
     if (_t9) {
-        // line 3073
+        // line 3074
         bool _t10 = true;
         return _t10;
     }
-    // line 3075
+    // line 3076
     t_5types_TypeInfo _t12 = f_5types_get(v_c.m_table, v_t);
     vela_array * _t13 = _t12.m_args;
     vela_array_retain(_t13);
     vela_array * _t11 = _t13;
     for (int64_t _t14 = 0; _t14 < _t11->len; _t14++) {
         int64_t v_a = ((int64_t *)_t11->data)[_t14];
-        // line 3076
+        // line 3077
         bool _t15 = f_7checker_mentions(v_c, v_a, v_params);
         if (_t15) {
-            // line 3077
+            // line 3078
             bool _t16 = true;
             vela_array_release(_t11);
             rc_release_t_5types_TypeInfo(_t12);
@@ -45225,7 +45352,7 @@ bool f_7checker_mentions(t_7checker_Checker v_c, int64_t v_t, vela_array * v_par
     }
     vela_array_release(_t11);
     rc_release_t_5types_TypeInfo(_t12);
-    // line 3080
+    // line 3081
     t_5types_TypeInfo _t17 = f_5types_get(v_c.m_table, v_t);
     bool _t18 = f_7checker_mentions(v_c, _t17.m_result, v_params);
     bool _t19 = _t18;
@@ -45235,35 +45362,35 @@ bool f_7checker_mentions(t_7checker_Checker v_c, int64_t v_t, vela_array * v_par
 /* vela: part */
 
 int64_t f_7checker_partial(t_7checker_Checker * v_c, int64_t v_t, vela_array * v_params, vela_array * v_bound) {
-    // line 3085
+    // line 3086
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     vela_array * v_ps = _t1;
-    // line 3086
+    // line 3087
     vela_array * _t2 = vela_array_new(&vela_type_int, 0);
     vela_array * v_args = _t2;
-    // line 3087
+    // line 3088
     int64_t _t3 = v_params->len;
     int64_t _t4 = _t3;
     vela_unique(&v_ps);
     vela_unique(&v_args);
     for (int64_t _t5 = 0; _t5 < _t4; _t5++) {
         int64_t v_i = _t5;
-        // line 3088
-        int64_t _t6 = *(int64_t *)vela_at(v_bound, v_i, sizeof(int64_t), "compiler/src/checker.vl:3088:17");
+        // line 3089
+        int64_t _t6 = *(int64_t *)vela_at(v_bound, v_i, sizeof(int64_t), "compiler/src/checker.vl:3089:17");
         int64_t _t7 = _t6;
         bool _t8 = _t7 >= 0;
         if (_t8) {
-            // line 3089
-            int64_t _t9 = *(int64_t *)vela_at(v_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:3089:32");
+            // line 3090
+            int64_t _t9 = *(int64_t *)vela_at(v_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:3090:32");
             int64_t _t10 = _t9;
             vela_push(v_ps, &_t10, sizeof(int64_t));
-            // line 3090
-            int64_t _t11 = *(int64_t *)vela_at(v_bound, v_i, sizeof(int64_t), "compiler/src/checker.vl:3090:33");
+            // line 3091
+            int64_t _t11 = *(int64_t *)vela_at(v_bound, v_i, sizeof(int64_t), "compiler/src/checker.vl:3091:33");
             int64_t _t12 = _t11;
             vela_push(v_args, &_t12, sizeof(int64_t));
         }
     }
-    // line 3093
+    // line 3094
     vela_array * _t13 = v_ps;
     vela_array_retain(_t13);
     vela_array * _t14 = v_args;
@@ -45279,7 +45406,7 @@ int64_t f_7checker_partial(t_7checker_Checker * v_c, int64_t v_t, vela_array * v
 /* vela: part */
 
 bool f_7checker_unify(t_7checker_Checker v_c, int64_t v_pattern, int64_t v_actual, vela_array * v_params, vela_array * * v_bound) {
-    // line 3099
+    // line 3100
     int64_t _t1 = v_actual;
     int64_t _t2 = f_5types_ERROR();
     bool _t3 = _t1 == _t2;
@@ -45291,19 +45418,19 @@ bool f_7checker_unify(t_7checker_Checker v_c, int64_t v_pattern, int64_t v_actua
         _t4 = _t7;
     }
     if (_t4) {
-        // line 3100
+        // line 3101
         bool _t8 = true;
         return _t8;
     }
-    // line 3102
+    // line 3103
     int64_t _t9 = f_7checker_param_index(v_params, v_pattern);
     int64_t v_i = _t9;
-    // line 3103
+    // line 3104
     int64_t _t10 = v_i;
     bool _t11 = _t10 >= 0;
     if (_t11) {
-        // line 3104
-        int64_t _t12 = *(int64_t *)vela_at((*v_bound), v_i, sizeof(int64_t), "compiler/src/checker.vl:3104:17");
+        // line 3105
+        int64_t _t12 = *(int64_t *)vela_at((*v_bound), v_i, sizeof(int64_t), "compiler/src/checker.vl:3105:17");
         int64_t _t13 = _t12;
         bool _t14 = _t13 < 0;
         bool _t15 = _t14;
@@ -45313,36 +45440,36 @@ bool f_7checker_unify(t_7checker_Checker v_c, int64_t v_pattern, int64_t v_actua
             _t15 = _t17;
         }
         if (_t15) {
-            // line 3105
+            // line 3106
             vela_unique(&(*v_bound));
             int64_t *_t18 = ((int64_t *)(*v_bound)->data + v_i);
             *_t18 = v_actual;
-            // line 3106
+            // line 3107
             bool _t19 = true;
             return _t19;
         }
-        // line 3108
+        // line 3109
         int64_t _t20 = *((int64_t *)(*v_bound)->data + v_i);
         bool _t21 = f_7checker_fits(v_c, v_actual, _t20);
         bool _t22 = _t21;
         return _t22;
     }
-    // line 3110
+    // line 3111
     bool _t23 = f_7checker_mentions(v_c, v_pattern, v_params);
     bool _t24 = !_t23;
     if (_t24) {
-        // line 3111
+        // line 3112
         bool _t25 = f_7checker_fits(v_c, v_actual, v_pattern);
         bool _t26 = _t25;
         return _t26;
     }
-    // line 3113
+    // line 3114
     t_5types_TypeInfo _t27 = f_5types_get(v_c.m_table, v_pattern);
     t_5types_TypeInfo v_p = _t27;
-    // line 3114
+    // line 3115
     t_5types_TypeInfo _t28 = f_5types_get(v_c.m_table, v_actual);
     t_5types_TypeInfo v_a = _t28;
-    // line 3115
+    // line 3116
     bool _t29 = v_p.m_tag.tag != v_a.m_tag.tag;
     bool _t30 = _t29;
     if (!_t30) {
@@ -45364,31 +45491,31 @@ bool f_7checker_unify(t_7checker_Checker v_c, int64_t v_pattern, int64_t v_actua
         _t35 = _t39;
     }
     if (_t35) {
-        // line 3116
+        // line 3117
         bool _t40 = false;
         rc_release_t_5types_TypeInfo(v_a);
         rc_release_t_5types_TypeInfo(v_p);
         return _t40;
     }
-    // line 3118
+    // line 3119
     int64_t _t41 = v_p.m_args->len;
     int64_t _t42 = _t41;
     for (int64_t _t43 = 0; _t43 < _t42; _t43++) {
         int64_t v_k = _t43;
-        // line 3119
-        int64_t _t44 = *(int64_t *)vela_at(v_p.m_args, v_k, sizeof(int64_t), "compiler/src/checker.vl:3119:28");
-        int64_t _t45 = *(int64_t *)vela_at(v_a.m_args, v_k, sizeof(int64_t), "compiler/src/checker.vl:3119:39");
+        // line 3120
+        int64_t _t44 = *(int64_t *)vela_at(v_p.m_args, v_k, sizeof(int64_t), "compiler/src/checker.vl:3120:28");
+        int64_t _t45 = *(int64_t *)vela_at(v_a.m_args, v_k, sizeof(int64_t), "compiler/src/checker.vl:3120:39");
         bool _t46 = f_7checker_unify(v_c, _t44, _t45, v_params, &(*v_bound));
         bool _t47 = !_t46;
         if (_t47) {
-            // line 3120
+            // line 3121
             bool _t48 = false;
             rc_release_t_5types_TypeInfo(v_a);
             rc_release_t_5types_TypeInfo(v_p);
             return _t48;
         }
     }
-    // line 3123
+    // line 3124
     int64_t _t49 = v_p.m_result;
     bool _t50 = _t49 < 0;
     bool _t51 = _t50;
@@ -45398,7 +45525,7 @@ bool f_7checker_unify(t_7checker_Checker v_c, int64_t v_pattern, int64_t v_actua
         _t51 = _t53;
     }
     if (_t51) {
-        // line 3124
+        // line 3125
         int64_t _t54 = v_p.m_result;
         bool _t55 = _t54 == v_a.m_result;
         bool _t56 = _t55;
@@ -45406,7 +45533,7 @@ bool f_7checker_unify(t_7checker_Checker v_c, int64_t v_pattern, int64_t v_actua
         rc_release_t_5types_TypeInfo(v_p);
         return _t56;
     }
-    // line 3126
+    // line 3127
     bool _t57 = f_7checker_unify(v_c, v_p.m_result, v_a.m_result, v_params, &(*v_bound));
     bool _t58 = _t57;
     rc_release_t_5types_TypeInfo(v_a);
@@ -45416,19 +45543,19 @@ bool f_7checker_unify(t_7checker_Checker v_c, int64_t v_pattern, int64_t v_actua
 /* vela: part */
 
 bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
-    // line 3132
+    // line 3133
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_Closure) {
         vela_array * v_params = v_e.m_kind->value.as.m_Closure._0;
         vela_array_retain(v_params);
-        // line 3134
+        // line 3135
         vela_array * _t2 = v_params;
         vela_array_retain(_t2);
         vela_array * _t1 = _t2;
         for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
             t_3ast_ClosureParam v_p = ((t_3ast_ClosureParam *)_t1->data)[_t3];
-            // line 3135
+            // line 3136
             if (v_p.m_ty.tag == Option_3ast_TypeName_None) {
-                // line 3136
+                // line 3137
                 bool _t4 = true;
                 vela_array_release(_t1);
                 vela_array_release(v_params);
@@ -45437,29 +45564,29 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
             }
         }
         vela_array_release(_t1);
-        // line 3140
+        // line 3141
         bool _t5 = false;
         vela_array_release(v_params);
         return _t5;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Field) {
         t_3ast_Expr v_obj = v_e.m_kind->value.as.m_Field._0->value;
         rc_retain_t_3ast_Expr(v_obj);
-        // line 3144
+        // line 3145
         if (v_obj.m_kind->value.tag == t_3ast_ExprKind_Name) {
             vela_str v_n = v_obj.m_kind->value.as.m_Name._0;
             vela_str_retain(v_n);
-            // line 3146
+            // line 3147
             int64_t _t6 = f_7checker_lookup_local(v_c, v_n);
             int64_t _t7 = _t6;
             bool _t8 = _t7 >= 0;
             if (_t8) {
-                // line 3147
+                // line 3148
                 bool _t9 = false;
                 vela_str_release(v_n);
                 rc_release_t_3ast_Expr(v_obj);
                 return _t9;
             }
-            // line 3149
+            // line 3150
             vela_map * _t10 = f_7checker_module_types(v_c);
             vela_str _t12 = v_n;
             int64_t *_t11 = vela_map_find(_t10, &_t12);
@@ -45471,7 +45598,7 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
             }
             if (_t13.tag == Option_Int_Some) {
                 int64_t v_t = _t13.as.m_Some._0;
-                // line 3150
+                // line 3151
                 bool _t14 = f_5types_is_generic(v_c.m_table, v_t);
                 bool _t15 = _t14;
                 vela_map_release(_t10);
@@ -45479,7 +45606,7 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
                 rc_release_t_3ast_Expr(v_obj);
                 return _t15;
             } else {
-                // line 3151
+                // line 3152
                 bool _t16 = false;
                 vela_map_release(_t10);
                 vela_str_release(v_n);
@@ -45487,7 +45614,7 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
                 return _t16;
             }
         } else {
-            // line 3154
+            // line 3155
             bool _t17 = false;
             rc_release_t_3ast_Expr(v_obj);
             return _t17;
@@ -45495,7 +45622,7 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_ArrayLit) {
         vela_array * v_xs = v_e.m_kind->value.as.m_ArrayLit._0;
         vela_array_retain(v_xs);
-        // line 3157
+        // line 3158
         int64_t _t18 = v_xs->len;
         int64_t _t19 = _t18;
         bool _t20 = _t19 == 0;
@@ -45505,7 +45632,7 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_MapLit) {
         vela_array * v_xs_2 = v_e.m_kind->value.as.m_MapLit._0;
         vela_array_retain(v_xs_2);
-        // line 3158
+        // line 3159
         int64_t _t22 = v_xs_2->len;
         int64_t _t23 = _t22;
         bool _t24 = _t23 == 0;
@@ -45515,7 +45642,7 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Name) {
         vela_str v_n_2 = v_e.m_kind->value.as.m_Name._0;
         vela_str_retain(v_n_2);
-        // line 3159
+        // line 3160
         bool _t26 = vela_str_eq(v_n_2, VELA_STR("None", 4));
         bool _t27 = _t26;
         vela_str_release(v_n_2);
@@ -45523,11 +45650,11 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Call) {
         t_3ast_Expr v_callee = v_e.m_kind->value.as.m_Call._0->value;
         rc_retain_t_3ast_Expr(v_callee);
-        // line 3161
+        // line 3162
         if (v_callee.m_kind->value.tag == t_3ast_ExprKind_Name) {
             vela_str v_n_3 = v_callee.m_kind->value.as.m_Name._0;
             vela_str_retain(v_n_3);
-            // line 3162
+            // line 3163
             bool _t28 = vela_str_eq(v_n_3, VELA_STR("Ok", 2));
             bool _t29 = _t28;
             if (!_t29) {
@@ -45539,13 +45666,13 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
             rc_release_t_3ast_Expr(v_callee);
             return _t31;
         } else {
-            // line 3163
+            // line 3164
             bool _t32 = false;
             rc_release_t_3ast_Expr(v_callee);
             return _t32;
         }
     } else {
-        // line 3166
+        // line 3167
         bool _t33 = false;
         return _t33;
     }
@@ -45553,43 +45680,43 @@ bool f_7checker_needs_context(t_7checker_Checker v_c, t_3ast_Expr v_e) {
 /* vela: part */
 
 vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_params, vela_array * v_wants, vela_array * v_args, vela_array * v_mutable, vela_array * v_labels, vela_array * v_known) {
-    // line 3177
+    // line 3178
     vela_array * _t1 = v_known;
     vela_array_retain(_t1);
     vela_array * v_bound = _t1;
-    // line 3178
+    // line 3179
     int64_t _t2 = 2;
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v_pass = _t3;
-        // line 3179
+        // line 3180
         int64_t _t4 = v_args->len;
         int64_t _t5 = _t4;
         for (int64_t _t6 = 0; _t6 < _t5; _t6++) {
             int64_t v_i = _t6;
-            // line 3180
-            t_3ast_Expr _t7 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3180:27");
+            // line 3181
+            t_3ast_Expr _t7 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3181:27");
             rc_retain_t_3ast_Expr(_t7);
             t_3ast_Expr v_arg = _t7;
-            // line 3181
+            // line 3182
             int64_t _t8 = v_i;
             int64_t _t9 = v_wants->len;
             bool _t10 = _t8 >= _t9;
             if (_t10) {
-                // line 3182
+                // line 3183
                 int64_t _t11 = v_pass;
                 bool _t12 = _t11 == 0;
                 if (_t12) {
-                    // line 3183
+                    // line 3184
                     t_3ast_Expr _t13 = v_arg;
                     rc_retain_t_3ast_Expr(_t13);
                     int64_t _t14 = f_7checker_infer(&(*v_c), _t13);
                     rc_release_t_3ast_Expr(_t13);
                 }
-                // line 3185
+                // line 3186
                 rc_release_t_3ast_Expr(v_arg);
                 continue;
             }
-            // line 3187
+            // line 3188
             bool _t15 = f_7checker_needs_context((*v_c), v_arg);
             bool _t16 = _t15;
             if (_t16) {
@@ -45598,43 +45725,43 @@ vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_para
                 _t16 = _t18;
             }
             bool v_deferred = _t16;
-            // line 3188
+            // line 3189
             bool _t19 = v_deferred;
             int64_t _t20 = v_pass;
             bool _t21 = _t20 == 1;
             bool _t22 = _t19 != _t21;
             if (_t22) {
-                // line 3189
+                // line 3190
                 rc_release_t_3ast_Expr(v_arg);
                 continue;
             }
-            // line 3191
+            // line 3192
             int64_t _t23 = *((int64_t *)v_wants->data + v_i);
             vela_array * _t24 = v_bound;
             vela_array_retain(_t24);
             int64_t _t25 = f_7checker_partial(&(*v_c), _t23, v_params, _t24);
             int64_t v_want = _t25;
             vela_array_release(_t24);
-            // line 3192
-            bool _t26 = *(bool *)vela_at(v_mutable, v_i, sizeof(bool), "compiler/src/checker.vl:3192:23");
+            // line 3193
+            bool _t26 = *(bool *)vela_at(v_mutable, v_i, sizeof(bool), "compiler/src/checker.vl:3193:23");
             if (_t26) {
-                // line 3193
+                // line 3194
                 t_3ast_Expr _t27 = v_arg;
                 rc_retain_t_3ast_Expr(_t27);
                 int64_t _t28 = f_5types_NOTHING();
-                vela_str _t29 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3193:73");
+                vela_str _t29 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3194:73");
                 vela_str_retain(_t29);
                 int64_t _t30 = f_7checker_mut_argument(&(*v_c), _t27, _t28, _t29);
                 int64_t v_t = _t30;
                 vela_str_release(_t29);
                 rc_release_t_3ast_Expr(_t27);
-                // line 3194
+                // line 3195
                 t_7checker_Checker _t31 = (*v_c);
                 rc_retain_t_7checker_Checker(_t31);
                 bool _t32 = f_7checker_unify(_t31, v_want, v_t, v_params, &v_bound);
                 bool _t33 = !_t32;
                 if (_t33) {
-                    // line 3195
+                    // line 3196
                     t_3ast_Expr _t34 = v_arg;
                     rc_retain_t_3ast_Expr(_t34);
                     static const vela_str _t35[] = {{NULL, NULL, 0}, VELA_STR_INIT(" must be ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8), {NULL, NULL, 0}};
@@ -45655,34 +45782,34 @@ vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_para
                     rc_release_t_3ast_Expr(_t34);
                 }
                 rc_release_t_7checker_Checker(_t31);
-                // line 3197
+                // line 3198
                 rc_release_t_3ast_Expr(v_arg);
                 continue;
             }
-            // line 3199
+            // line 3200
             t_3ast_Expr _t41 = v_arg;
             rc_retain_t_3ast_Expr(_t41);
             t_3ast_Expr v_value_e = _t41;
-            // line 3200
+            // line 3201
             if (v_arg.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
                 t_3ast_Expr v_inner = v_arg.m_kind->value.as.m_MutArg._0->value;
                 rc_retain_t_3ast_Expr(v_inner);
-                // line 3202
+                // line 3203
                 t_3ast_Expr _t42 = v_arg;
                 rc_retain_t_3ast_Expr(_t42);
-                vela_str _t43 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3202:58");
+                vela_str _t43 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3203:58");
                 vela_str _t44 = vela_str_concat(_t43, VELA_STR(" is not a mut parameter; remove `mut`", 37));
                 f_7checker_report_at(&(*v_c), _t42, VELA_STR("E3134", 5), _t44);
                 vela_str_release(_t44);
                 vela_str_release(VELA_STR("E3134", 5));
                 rc_release_t_3ast_Expr(_t42);
-                // line 3203
-                t_7modules_Module _t45 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3203:65");
-                t_7modules_Module _t46 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3203:94");
+                // line 3204
+                t_7modules_Module _t45 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3204:65");
+                t_7modules_Module _t46 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3204:94");
                 vela_array * _t47 = f_7repairs_remove_mut(_t45.m_source, _t46.m_path, v_arg.m_line, v_arg.m_col);
                 f_7checker_last_fix(&(*v_c), _t47);
                 vela_array_release(_t47);
-                // line 3204
+                // line 3205
                 t_3ast_Expr _t48 = v_inner;
                 rc_retain_t_3ast_Expr(_t48);
                 rc_release_t_3ast_Expr(v_value_e);
@@ -45690,17 +45817,17 @@ vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_para
                 rc_release_t_3ast_Expr(v_inner);
             } else {
             }
-            // line 3208
+            // line 3209
             bool _t49 = f_7checker_mentions((*v_c), v_want, v_params);
             bool _t50 = !_t49;
             if (_t50) {
-                // line 3209
+                // line 3210
                 t_3ast_Expr _t51 = v_value_e;
                 rc_retain_t_3ast_Expr(_t51);
                 static const vela_str _t52[] = {{NULL, NULL, 0}, VELA_STR_INIT(" must be ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8)};
                 vela_str _t53[4];
                 memcpy(_t53, _t52, sizeof _t53);
-                vela_str _t54 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3209:60");
+                vela_str _t54 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3210:60");
                 _t53[0] = _t54;
                 vela_str _t55 = f_7checker_show((*v_c), v_want);
                 _t53[2] = _t55;
@@ -45711,46 +45838,46 @@ vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_para
                 rc_release_t_7checker_Msg(_t57);
                 rc_release_t_3ast_Expr(_t51);
                 vela_str_release(_t56);
-                // line 3210
+                // line 3211
                 rc_release_t_3ast_Expr(v_value_e);
                 rc_release_t_3ast_Expr(v_arg);
                 continue;
             }
-            // line 3214
+            // line 3215
             vela_array * _t58 = (*v_c).m_pending;
             vela_array_retain(_t58);
             vela_array * v_saved = _t58;
-            // line 3215
+            // line 3216
             vela_array * _t59 = v_params;
             vela_array_retain(_t59);
             vela_array_release((*v_c).m_pending);
             (*v_c).m_pending = _t59;
-            // line 3216
-            (*v_c).m_expected = v_want;
             // line 3217
+            (*v_c).m_expected = v_want;
+            // line 3218
             t_3ast_Expr _t60 = v_value_e;
             rc_retain_t_3ast_Expr(_t60);
             int64_t _t61 = f_7checker_value(&(*v_c), _t60);
             int64_t v_t_2 = _t61;
             rc_release_t_3ast_Expr(_t60);
-            // line 3218
+            // line 3219
             vela_array * _t62 = v_saved;
             vela_array_retain(_t62);
             vela_array_release((*v_c).m_pending);
             (*v_c).m_pending = _t62;
-            // line 3219
+            // line 3220
             t_7checker_Checker _t63 = (*v_c);
             rc_retain_t_7checker_Checker(_t63);
             bool _t64 = f_7checker_unify(_t63, v_want, v_t_2, v_params, &v_bound);
             bool _t65 = !_t64;
             if (_t65) {
-                // line 3220
+                // line 3221
                 t_3ast_Expr _t66 = v_value_e;
                 rc_retain_t_3ast_Expr(_t66);
                 static const vela_str _t67[] = {{NULL, NULL, 0}, VELA_STR_INIT(" must be ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8), {NULL, NULL, 0}};
                 vela_str _t68[5];
                 memcpy(_t68, _t67, sizeof _t68);
-                vela_str _t69 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3220:58");
+                vela_str _t69 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3221:58");
                 _t68[0] = _t69;
                 vela_str _t70 = f_7checker_show((*v_c), v_want);
                 _t68[2] = _t70;
@@ -45764,14 +45891,14 @@ vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_para
                 vela_str_release(VELA_STR("E3135", 5));
                 rc_release_t_3ast_Expr(_t66);
             } else {
-                // line 3223
-                int64_t _t73 = *(int64_t *)vela_at(v_wants, v_i, sizeof(int64_t), "compiler/src/checker.vl:3223:48");
+                // line 3224
+                int64_t _t73 = *(int64_t *)vela_at(v_wants, v_i, sizeof(int64_t), "compiler/src/checker.vl:3224:48");
                 vela_array * _t74 = v_bound;
                 vela_array_retain(_t74);
                 int64_t _t75 = f_7checker_partial(&(*v_c), _t73, v_params, _t74);
                 int64_t v_full = _t75;
                 vela_array_release(_t74);
-                // line 3224
+                // line 3225
                 bool _t76 = f_7checker_mentions((*v_c), v_full, v_params);
                 bool _t77 = !_t76;
                 bool _t78 = _t77;
@@ -45788,13 +45915,13 @@ vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_para
                     _t81 = _t84;
                 }
                 if (_t81) {
-                    // line 3225
+                    // line 3226
                     t_3ast_Expr _t85 = v_value_e;
                     rc_retain_t_3ast_Expr(_t85);
                     static const vela_str _t86[] = {{NULL, NULL, 0}, VELA_STR_INIT(" must be ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8), {NULL, NULL, 0}, {NULL, NULL, 0}};
                     vela_str _t87[6];
                     memcpy(_t87, _t86, sizeof _t87);
-                    vela_str _t88 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3225:62");
+                    vela_str _t88 = *(vela_str *)vela_at(v_labels, v_i, sizeof(vela_str), "compiler/src/checker.vl:3226:62");
                     _t87[0] = _t88;
                     vela_str _t89 = f_7checker_show((*v_c), v_full);
                     _t87[2] = _t89;
@@ -45818,7 +45945,7 @@ vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_para
             rc_release_t_3ast_Expr(v_arg);
         }
     }
-    // line 3231
+    // line 3232
     vela_array * _t93 = v_bound;
     vela_array_retain(_t93);
     vela_array * _t94 = _t93;
@@ -45828,19 +45955,19 @@ vela_array * f_7checker_infer_args(t_7checker_Checker * v_c, vela_array * v_para
 /* vela: part */
 
 vela_array * f_7checker_unknown(int64_t v_n) {
-    // line 3235
+    // line 3236
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     vela_array * v_out = _t1;
-    // line 3236
+    // line 3237
     int64_t _t2 = v_n;
     vela_unique(&v_out);
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v__ = _t3;
-        // line 3237
+        // line 3238
         int64_t _t4 = -1;
         vela_push(v_out, &_t4, sizeof(int64_t));
     }
-    // line 3239
+    // line 3240
     vela_array * _t5 = v_out;
     vela_array_retain(_t5);
     vela_array * _t6 = _t5;
@@ -45850,7 +45977,7 @@ vela_array * f_7checker_unknown(int64_t v_n) {
 /* vela: part */
 
 void f_7checker_from_context(t_7checker_Checker * v_c, int64_t v_decl, int64_t v_expected, vela_array * * v_bound) {
-    // line 3245
+    // line 3246
     int64_t _t1 = v_expected;
     bool _t2 = _t1 < 0;
     bool _t3 = _t2;
@@ -45868,16 +45995,16 @@ void f_7checker_from_context(t_7checker_Checker * v_c, int64_t v_decl, int64_t v
         _t7 = _t9;
     }
     if (_t7) {
-        // line 3246
+        // line 3247
         return;
     }
-    // line 3248
+    // line 3249
     t_5types_TypeInfo _t10 = f_5types_get((*v_c).m_table, v_expected);
     vela_array * _t11 = _t10.m_args;
     vela_array_retain(_t11);
     vela_array * v_args = _t11;
     rc_release_t_5types_TypeInfo(_t10);
-    // line 3249
+    // line 3250
     int64_t _t12 = (*v_bound)->len;
     int64_t _t13 = _t12;
     vela_unique(&(*v_bound));
@@ -45885,14 +46012,14 @@ void f_7checker_from_context(t_7checker_Checker * v_c, int64_t v_decl, int64_t v
     int64_t _t15n = (*v_bound)->len;
     for (int64_t _t14 = 0; _t14 < _t13; _t14++) {
         int64_t v_i = _t14;
-        // line 3250
+        // line 3251
         int64_t _t16 = *((int64_t *)_t15 + v_i);
         int64_t _t17 = _t16;
         bool _t18 = _t17 < 0;
         if (_t18) {
-            // line 3251
-            int64_t _t19 = *(int64_t *)vela_at(v_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:3251:28");
-            int64_t *_t20 = (int64_t *)vela_at_in(_t15, _t15n, v_i, sizeof(int64_t), "compiler/src/checker.vl:3251:18");
+            // line 3252
+            int64_t _t19 = *(int64_t *)vela_at(v_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:3252:28");
+            int64_t *_t20 = (int64_t *)vela_at_in(_t15, _t15n, v_i, sizeof(int64_t), "compiler/src/checker.vl:3252:18");
             *_t20 = _t19;
         }
     }
@@ -45901,32 +46028,32 @@ void f_7checker_from_context(t_7checker_Checker * v_c, int64_t v_decl, int64_t v
 /* vela: part */
 
 int64_t f_7checker_example_type(t_7checker_Checker * v_c, int64_t v_t, vela_array * v_params, vela_array * v_bound) {
-    // line 3258
+    // line 3259
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     vela_array * v_filled = _t1;
-    // line 3259
+    // line 3260
     vela_array * _t3 = v_bound;
     vela_array_retain(_t3);
     vela_array * _t2 = _t3;
     vela_unique(&v_filled);
     for (int64_t _t4 = 0; _t4 < _t2->len; _t4++) {
         int64_t v_b = ((int64_t *)_t2->data)[_t4];
-        // line 3260
+        // line 3261
         int64_t _t5 = v_b;
         bool _t6 = _t5 < 0;
         if (_t6) {
-            // line 3261
+            // line 3262
             int64_t _t7 = f_5types_INT();
             int64_t _t8 = _t7;
             vela_push(v_filled, &_t8, sizeof(int64_t));
         } else {
-            // line 3263
+            // line 3264
             int64_t _t9 = v_b;
             vela_push(v_filled, &_t9, sizeof(int64_t));
         }
     }
     vela_array_release(_t2);
-    // line 3266
+    // line 3267
     vela_array * _t10 = v_filled;
     vela_array_retain(_t10);
     int64_t _t11 = f_7checker_partial(&(*v_c), v_t, v_params, _t10);
@@ -45938,9 +46065,9 @@ int64_t f_7checker_example_type(t_7checker_Checker * v_c, int64_t v_t, vela_arra
 /* vela: part */
 
 bool f_7checker_all_known(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array * v_params, vela_array * * v_bound, vela_str v_where, vela_str v_hint) {
-    // line 3272
-    bool v_ok = true;
     // line 3273
+    bool v_ok = true;
+    // line 3274
     int64_t _t1 = v_params->len;
     int64_t _t2 = _t1;
     vela_unique(&(*v_bound));
@@ -45948,18 +46075,18 @@ bool f_7checker_all_known(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array 
     int64_t _t4n = (*v_bound)->len;
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v_i = _t3;
-        // line 3274
-        int64_t _t5 = *(int64_t *)vela_at_in(_t4, _t4n, v_i, sizeof(int64_t), "compiler/src/checker.vl:3274:17");
+        // line 3275
+        int64_t _t5 = *(int64_t *)vela_at_in(_t4, _t4n, v_i, sizeof(int64_t), "compiler/src/checker.vl:3275:17");
         int64_t _t6 = _t5;
         bool _t7 = _t6 < 0;
         if (_t7) {
-            // line 3275
+            // line 3276
             if (v_ok) {
-                // line 3276
+                // line 3277
                 static const vela_str _t8[] = {VELA_STR_INIT("cannot tell what ", 17), {NULL, NULL, 0}, VELA_STR_INIT(" is ", 4), {NULL, NULL, 0}, {NULL, NULL, 0}};
                 vela_str _t9[5];
                 memcpy(_t9, _t8, sizeof _t9);
-                int64_t _t10 = *(int64_t *)vela_at(v_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:3276:93");
+                int64_t _t10 = *(int64_t *)vela_at(v_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:3277:93");
                 t_5types_TypeInfo _t11 = f_5types_get((*v_c).m_table, _t10);
                 _t9[1] = _t11.m_name;
                 _t9[3] = v_where;
@@ -45970,11 +46097,11 @@ bool f_7checker_all_known(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array 
                 vela_str_release(VELA_STR("E3137", 5));
                 rc_release_t_5types_TypeInfo(_t11);
             }
-            // line 3278
-            int64_t _t13 = f_5types_ERROR();
-            int64_t *_t14 = (int64_t *)vela_at_in(_t4, _t4n, v_i, sizeof(int64_t), "compiler/src/checker.vl:3278:18");
-            *_t14 = _t13;
             // line 3279
+            int64_t _t13 = f_5types_ERROR();
+            int64_t *_t14 = (int64_t *)vela_at_in(_t4, _t4n, v_i, sizeof(int64_t), "compiler/src/checker.vl:3279:18");
+            *_t14 = _t13;
+            // line 3280
             v_ok = false;
         } else {
             int64_t _t15 = *((int64_t *)_t4 + v_i);
@@ -45982,32 +46109,32 @@ bool f_7checker_all_known(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array 
             int64_t _t17 = f_5types_ERROR();
             bool _t18 = _t16 == _t17;
             if (_t18) {
-                // line 3281
+                // line 3282
                 v_ok = false;
             }
         }
     }
-    // line 3284
+    // line 3285
     bool _t19 = v_ok;
     return _t19;
 }
 /* vela: part */
 
 Option_7checker_Path f_7checker_path_of(t_7checker_Checker v_c, t_3ast_Expr v_e) {
-    // line 3307
+    // line 3308
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_Name) {
-        // line 3309
-        t_7checker_Ref _t1 = *(t_7checker_Ref *)vela_at(v_c.m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3309:25");
+        // line 3310
+        t_7checker_Ref _t1 = *(t_7checker_Ref *)vela_at(v_c.m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3310:25");
         if (_t1.tag == t_7checker_Ref_Local) {
             int64_t v_l = _t1.as.m_Local._0;
-            // line 3310
+            // line 3311
             vela_array * _t2 = vela_array_new(&vela_type_str, 0);
             t_7checker_Path _t3 = (t_7checker_Path){ .m_local = v_l, .m_parts = _t2 };
             Option_7checker_Path _t4 = (Option_7checker_Path){ .tag = Option_7checker_Path_Some, .as.m_Some = { ._0 = _t3 } };
             Option_7checker_Path _t5 = _t4;
             return _t5;
         } else {
-            // line 3311
+            // line 3312
             Option_7checker_Path _t6 = (Option_7checker_Path){ .tag = Option_7checker_Path_None };
             Option_7checker_Path _t7 = _t6;
             return _t7;
@@ -46017,17 +46144,17 @@ Option_7checker_Path f_7checker_path_of(t_7checker_Checker v_c, t_3ast_Expr v_e)
         rc_retain_t_3ast_Expr(v_obj);
         vela_str v_name = v_e.m_kind->value.as.m_Field._1;
         vela_str_retain(v_name);
-        // line 3315
-        t_7checker_Ref _t8 = *(t_7checker_Ref *)vela_at(v_c.m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3315:25");
+        // line 3316
+        t_7checker_Ref _t8 = *(t_7checker_Ref *)vela_at(v_c.m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3316:25");
         if (_t8.tag == t_7checker_Ref_Variant) {
-            // line 3316
+            // line 3317
             Option_7checker_Path _t9 = (Option_7checker_Path){ .tag = Option_7checker_Path_None };
             Option_7checker_Path _t10 = _t9;
             vela_str_release(v_name);
             rc_release_t_3ast_Expr(v_obj);
             return _t10;
         } else if (_t8.tag == t_7checker_Ref_Function) {
-            // line 3317
+            // line 3318
             Option_7checker_Path _t11 = (Option_7checker_Path){ .tag = Option_7checker_Path_None };
             Option_7checker_Path _t12 = _t11;
             vela_str_release(v_name);
@@ -46035,7 +46162,7 @@ Option_7checker_Path f_7checker_path_of(t_7checker_Checker v_c, t_3ast_Expr v_e)
             return _t12;
         } else {
         }
-        // line 3320
+        // line 3321
         Option_7checker_Path _t13 = f_7checker_path_of(v_c, v_obj);
         if (_t13.tag == Option_7checker_Path_None) {
             Option_7checker_Path _t14 = (Option_7checker_Path){ .tag = Option_7checker_Path_None };
@@ -46048,13 +46175,13 @@ Option_7checker_Path f_7checker_path_of(t_7checker_Checker v_c, t_3ast_Expr v_e)
         rc_retain_t_7checker_Path(_t15);
         t_7checker_Path v_p = _t15;
         rc_release_Option_7checker_Path(_t13);
-        // line 3321
+        // line 3322
         vela_str _t16 = v_name;
         vela_str_retain(_t16);
         vela_unique(&v_p.m_parts);
         vela_str _t17 = _t16;
         vela_push(v_p.m_parts, &_t17, sizeof(vela_str));
-        // line 3322
+        // line 3323
         t_7checker_Path _t18 = v_p;
         rc_retain_t_7checker_Path(_t18);
         Option_7checker_Path _t19 = (Option_7checker_Path){ .tag = Option_7checker_Path_Some, .as.m_Some = { ._0 = _t18 } };
@@ -46066,7 +46193,7 @@ Option_7checker_Path f_7checker_path_of(t_7checker_Checker v_c, t_3ast_Expr v_e)
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Index) {
         t_3ast_Expr v_obj_2 = v_e.m_kind->value.as.m_Index._0->value;
         rc_retain_t_3ast_Expr(v_obj_2);
-        // line 3325
+        // line 3326
         Option_7checker_Path _t21 = f_7checker_path_of(v_c, v_obj_2);
         if (_t21.tag == Option_7checker_Path_None) {
             Option_7checker_Path _t22 = (Option_7checker_Path){ .tag = Option_7checker_Path_None };
@@ -46078,11 +46205,11 @@ Option_7checker_Path f_7checker_path_of(t_7checker_Checker v_c, t_3ast_Expr v_e)
         rc_retain_t_7checker_Path(_t23);
         t_7checker_Path v_p_2 = _t23;
         rc_release_Option_7checker_Path(_t21);
-        // line 3326
+        // line 3327
         vela_unique(&v_p_2.m_parts);
         vela_str _t24 = VELA_STR("[]", 2);
         vela_push(v_p_2.m_parts, &_t24, sizeof(vela_str));
-        // line 3327
+        // line 3328
         t_7checker_Path _t25 = v_p_2;
         rc_retain_t_7checker_Path(_t25);
         Option_7checker_Path _t26 = (Option_7checker_Path){ .tag = Option_7checker_Path_Some, .as.m_Some = { ._0 = _t25 } };
@@ -46091,7 +46218,7 @@ Option_7checker_Path f_7checker_path_of(t_7checker_Checker v_c, t_3ast_Expr v_e)
         rc_release_t_3ast_Expr(v_obj_2);
         return _t27;
     } else {
-        // line 3329
+        // line 3330
         Option_7checker_Path _t28 = (Option_7checker_Path){ .tag = Option_7checker_Path_None };
         Option_7checker_Path _t29 = _t28;
         return _t29;
@@ -46100,34 +46227,34 @@ Option_7checker_Path f_7checker_path_of(t_7checker_Checker v_c, t_3ast_Expr v_e)
 /* vela: part */
 
 vela_str f_7checker_path_text(t_7checker_Checker v_c, t_7checker_Path v_p) {
-    // line 3334
+    // line 3335
     vela_array * _t1 = vela_array_new(&vela_type_byte, 64);
     vela_array * v_b = _t1;
-    // line 3335
-    t_7checker_Local _t2 = *(t_7checker_Local *)vela_at(v_c.m_locals, v_p.m_local, sizeof(t_7checker_Local), "compiler/src/checker.vl:3335:32");
+    // line 3336
+    t_7checker_Local _t2 = *(t_7checker_Local *)vela_at(v_c.m_locals, v_p.m_local, sizeof(t_7checker_Local), "compiler/src/checker.vl:3336:32");
     vela_unique(&v_b);
     vela_builder_add(v_b, _t2.m_name);
-    // line 3336
+    // line 3337
     vela_array * _t4 = v_p.m_parts;
     vela_array_retain(_t4);
     vela_array * _t3 = _t4;
     vela_unique(&v_b);
     for (int64_t _t5 = 0; _t5 < _t3->len; _t5++) {
         vela_str v_part = ((vela_str *)_t3->data)[_t5];
-        // line 3337
+        // line 3338
         bool _t6 = vela_str_eq(v_part, VELA_STR("[]", 2));
         if (_t6) {
-            // line 3338
+            // line 3339
             vela_builder_add(v_b, VELA_STR("[...]", 5));
         } else {
-            // line 3340
+            // line 3341
             vela_str _t7 = vela_str_concat(VELA_STR(".", 1), v_part);
             vela_builder_add(v_b, _t7);
             vela_str_release(_t7);
         }
     }
     vela_array_release(_t3);
-    // line 3343
+    // line 3344
     vela_str _t8 = vela_builder_build(v_b);
     vela_str _t9 = _t8;
     vela_array_release(v_b);
@@ -46136,7 +46263,7 @@ vela_str f_7checker_path_text(t_7checker_Checker v_c, t_7checker_Path v_p) {
 /* vela: part */
 
 bool f_7checker_covers(t_7checker_Path v_read, t_7checker_Path v_changed) {
-    // line 3348
+    // line 3349
     int64_t _t1 = v_read.m_local;
     bool _t2 = _t1 != v_changed.m_local;
     bool _t3 = _t2;
@@ -46148,42 +46275,42 @@ bool f_7checker_covers(t_7checker_Path v_read, t_7checker_Path v_changed) {
         _t3 = _t7;
     }
     if (_t3) {
-        // line 3349
+        // line 3350
         bool _t8 = false;
         return _t8;
     }
-    // line 3351
+    // line 3352
     int64_t _t9 = v_read.m_parts->len;
     int64_t _t10 = _t9;
     for (int64_t _t11 = 0; _t11 < _t10; _t11++) {
         int64_t v_i = _t11;
-        // line 3352
-        vela_str _t12 = *(vela_str *)vela_at(v_read.m_parts, v_i, sizeof(vela_str), "compiler/src/checker.vl:3352:22");
-        vela_str _t13 = *(vela_str *)vela_at(v_changed.m_parts, v_i, sizeof(vela_str), "compiler/src/checker.vl:3352:42");
+        // line 3353
+        vela_str _t12 = *(vela_str *)vela_at(v_read.m_parts, v_i, sizeof(vela_str), "compiler/src/checker.vl:3353:22");
+        vela_str _t13 = *(vela_str *)vela_at(v_changed.m_parts, v_i, sizeof(vela_str), "compiler/src/checker.vl:3353:42");
         bool _t14 = !vela_str_eq(_t12, _t13);
         if (_t14) {
-            // line 3353
+            // line 3354
             bool _t15 = false;
             return _t15;
         }
     }
-    // line 3356
+    // line 3357
     bool _t16 = true;
     return _t16;
 }
 /* vela: part */
 
 void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * * v_reads, vela_array * * v_changes) {
-    // line 3362
+    // line 3363
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
         t_3ast_Expr v_p = v_e.m_kind->value.as.m_MutArg._0->value;
         rc_retain_t_3ast_Expr(v_p);
-        // line 3364
+        // line 3365
         Option_7checker_Path _t1 = f_7checker_path_of(v_c, v_p);
         if (_t1.tag == Option_7checker_Path_Some) {
             t_7checker_Path v_path = _t1.as.m_Some._0;
             rc_retain_t_7checker_Path(v_path);
-            // line 3365
+            // line 3366
             t_7checker_Path _t2 = v_path;
             rc_retain_t_7checker_Path(_t2);
             vela_unique(&(*v_changes));
@@ -46193,7 +46320,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
         } else {
         }
         rc_release_Option_7checker_Path(_t1);
-        // line 3368
+        // line 3369
         rc_release_t_3ast_Expr(v_p);
         return;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Name) {
@@ -46201,7 +46328,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Index) {
         t_3ast_Expr v_i = v_e.m_kind->value.as.m_Index._1->value;
         rc_retain_t_3ast_Expr(v_i);
-        // line 3372
+        // line 3373
         t_3ast_Expr _t4 = v_i;
         rc_retain_t_3ast_Expr(_t4);
         f_7checker_accesses(v_c, _t4, &(*v_reads), &(*v_changes));
@@ -46209,32 +46336,32 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
         rc_release_t_3ast_Expr(v_i);
     } else {
     }
-    // line 3375
+    // line 3376
     Option_7checker_Path _t5 = f_7checker_path_of(v_c, v_e);
     if (_t5.tag == Option_7checker_Path_Some) {
         t_7checker_Path v_path_2 = _t5.as.m_Some._0;
         rc_retain_t_7checker_Path(v_path_2);
-        // line 3377
+        // line 3378
         t_7checker_Path _t6 = v_path_2;
         rc_retain_t_7checker_Path(_t6);
         vela_unique(&(*v_reads));
         t_7checker_Path _t7 = _t6;
         vela_push((*v_reads), &_t7, sizeof(t_7checker_Path));
-        // line 3378
+        // line 3379
         rc_release_t_7checker_Path(v_path_2);
         rc_release_Option_7checker_Path(_t5);
         return;
     } else {
     }
     rc_release_Option_7checker_Path(_t5);
-    // line 3382
+    // line 3383
     vela_array * _t8 = vela_array_new(vt_t_3ast_Expr(), 0);
     vela_array * v_parts = _t8;
-    // line 3383
+    // line 3384
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_Unary) {
         t_3ast_Expr v_x = v_e.m_kind->value.as.m_Unary._1->value;
         rc_retain_t_3ast_Expr(v_x);
-        // line 3384
+        // line 3385
         vela_array * _t9 = vela_array_new(vt_t_3ast_Expr(), 1);
         t_3ast_Expr _t10 = v_x;
         rc_retain_t_3ast_Expr(_t10);
@@ -46248,7 +46375,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
         rc_retain_t_3ast_Expr(v_l);
         t_3ast_Expr v_r = v_e.m_kind->value.as.m_Binary._2->value;
         rc_retain_t_3ast_Expr(v_r);
-        // line 3385
+        // line 3386
         vela_array * _t12 = vela_array_new(vt_t_3ast_Expr(), 2);
         t_3ast_Expr _t13 = v_l;
         rc_retain_t_3ast_Expr(_t13);
@@ -46267,12 +46394,12 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
         rc_retain_t_3ast_Expr(v_callee);
         vela_array * v_args = v_e.m_kind->value.as.m_Call._1;
         vela_array_retain(v_args);
-        // line 3387
+        // line 3388
         vela_array * _t17 = v_args;
         vela_array_retain(_t17);
         vela_array_release(v_parts);
         v_parts = _t17;
-        // line 3388
+        // line 3389
         t_3ast_Expr _t18 = v_callee;
         rc_retain_t_3ast_Expr(_t18);
         vela_unique(&v_parts);
@@ -46283,7 +46410,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Field) {
         t_3ast_Expr v_obj = v_e.m_kind->value.as.m_Field._0->value;
         rc_retain_t_3ast_Expr(v_obj);
-        // line 3390
+        // line 3391
         vela_array * _t20 = vela_array_new(vt_t_3ast_Expr(), 1);
         t_3ast_Expr _t21 = v_obj;
         rc_retain_t_3ast_Expr(_t21);
@@ -46295,7 +46422,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Index) {
         t_3ast_Expr v_obj_2 = v_e.m_kind->value.as.m_Index._0->value;
         rc_retain_t_3ast_Expr(v_obj_2);
-        // line 3391
+        // line 3392
         vela_array * _t23 = vela_array_new(vt_t_3ast_Expr(), 1);
         t_3ast_Expr _t24 = v_obj_2;
         rc_retain_t_3ast_Expr(_t24);
@@ -46307,7 +46434,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Try) {
         t_3ast_Expr v_x_2 = v_e.m_kind->value.as.m_Try._0->value;
         rc_retain_t_3ast_Expr(v_x_2);
-        // line 3392
+        // line 3393
         vela_array * _t26 = vela_array_new(vt_t_3ast_Expr(), 1);
         t_3ast_Expr _t27 = v_x_2;
         rc_retain_t_3ast_Expr(_t27);
@@ -46323,7 +46450,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
         rc_retain_t_3ast_Expr(v_lo);
         t_3ast_Expr v_hi = v_e.m_kind->value.as.m_Slice._2->value;
         rc_retain_t_3ast_Expr(v_hi);
-        // line 3393
+        // line 3394
         vela_array * _t29 = vela_array_new(vt_t_3ast_Expr(), 3);
         t_3ast_Expr _t30 = v_obj_3;
         rc_retain_t_3ast_Expr(_t30);
@@ -46345,7 +46472,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Interpolate) {
         vela_array * v_segments = v_e.m_kind->value.as.m_Interpolate._0;
         vela_array_retain(v_segments);
-        // line 3394
+        // line 3395
         vela_array * _t36 = f_3ast_interpolation_holes(v_segments);
         vela_array_release(v_parts);
         v_parts = _t36;
@@ -46353,7 +46480,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_ArrayLit) {
         vela_array * v_xs = v_e.m_kind->value.as.m_ArrayLit._0;
         vela_array_retain(v_xs);
-        // line 3395
+        // line 3396
         vela_array * _t37 = v_xs;
         vela_array_retain(_t37);
         vela_array_release(v_parts);
@@ -46362,19 +46489,19 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_MapLit) {
         vela_array * v_entries = v_e.m_kind->value.as.m_MapLit._0;
         vela_array_retain(v_entries);
-        // line 3397
+        // line 3398
         vela_array * _t39 = v_entries;
         vela_array_retain(_t39);
         vela_array * _t38 = _t39;
         vela_unique(&v_parts);
         for (int64_t _t40 = 0; _t40 < _t38->len; _t40++) {
             t_3ast_MapEntry v_en = ((t_3ast_MapEntry *)_t38->data)[_t40];
-            // line 3398
+            // line 3399
             t_3ast_Expr _t41 = v_en.m_key;
             rc_retain_t_3ast_Expr(_t41);
             t_3ast_Expr _t42 = _t41;
             vela_push(v_parts, &_t42, sizeof(t_3ast_Expr));
-            // line 3399
+            // line 3400
             t_3ast_Expr _t43 = v_en.m_value;
             rc_retain_t_3ast_Expr(_t43);
             t_3ast_Expr _t44 = _t43;
@@ -46385,14 +46512,14 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_StructLit) {
         vela_array * v_fields = v_e.m_kind->value.as.m_StructLit._2;
         vela_array_retain(v_fields);
-        // line 3403
+        // line 3404
         vela_array * _t46 = v_fields;
         vela_array_retain(_t46);
         vela_array * _t45 = _t46;
         vela_unique(&v_parts);
         for (int64_t _t47 = 0; _t47 < _t45->len; _t47++) {
             t_3ast_FieldInit v_f = ((t_3ast_FieldInit *)_t45->data)[_t47];
-            // line 3404
+            // line 3405
             t_3ast_Expr _t48 = v_f.m_value;
             rc_retain_t_3ast_Expr(_t48);
             t_3ast_Expr _t49 = _t48;
@@ -46403,7 +46530,7 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_Match) {
         t_3ast_Expr v_scrutinee = v_e.m_kind->value.as.m_Match._0->value;
         rc_retain_t_3ast_Expr(v_scrutinee);
-        // line 3407
+        // line 3408
         vela_array * _t50 = vela_array_new(vt_t_3ast_Expr(), 1);
         t_3ast_Expr _t51 = v_scrutinee;
         rc_retain_t_3ast_Expr(_t51);
@@ -46414,13 +46541,13 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
         rc_release_t_3ast_Expr(v_scrutinee);
     } else {
     }
-    // line 3410
+    // line 3411
     vela_array * _t54 = v_parts;
     vela_array_retain(_t54);
     vela_array * _t53 = _t54;
     for (int64_t _t55 = 0; _t55 < _t53->len; _t55++) {
         t_3ast_Expr v_x_3 = ((t_3ast_Expr *)_t53->data)[_t55];
-        // line 3411
+        // line 3412
         t_3ast_Expr _t56 = v_x_3;
         rc_retain_t_3ast_Expr(_t56);
         f_7checker_accesses(v_c, _t56, &(*v_reads), &(*v_changes));
@@ -46432,24 +46559,24 @@ void f_7checker_accesses(t_7checker_Checker v_c, t_3ast_Expr v_e, vela_array * *
 /* vela: part */
 
 void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
-    // line 3418
+    // line 3419
     int64_t _t1 = v_args->len;
     int64_t _t2 = _t1;
     bool _t3 = _t2 < 2;
     if (_t3) {
-        // line 3419
+        // line 3420
         return;
     }
-    // line 3421
+    // line 3422
     vela_array * _t4 = vela_array_new(&vela_type_array, 0);
     vela_array * v_reads = _t4;
-    // line 3422
+    // line 3423
     vela_array * _t5 = vela_array_new(&vela_type_array, 0);
     vela_array * v_changes = _t5;
-    // line 3423
+    // line 3424
     vela_array * _t6 = vela_array_new(vt_Option_7checker_Path(), 0);
     vela_array * v_direct = _t6;
-    // line 3424
+    // line 3425
     vela_array * _t8 = v_args;
     vela_array_retain(_t8);
     vela_array * _t7 = _t8;
@@ -46458,29 +46585,29 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
     vela_unique(&v_direct);
     for (int64_t _t9 = 0; _t9 < _t7->len; _t9++) {
         t_3ast_Expr v_a = ((t_3ast_Expr *)_t7->data)[_t9];
-        // line 3425
+        // line 3426
         vela_array * _t10 = vela_array_new(vt_t_7checker_Path(), 0);
         vela_array * v_r = _t10;
-        // line 3426
+        // line 3427
         vela_array * _t11 = vela_array_new(vt_t_7checker_Path(), 0);
         vela_array * v_w = _t11;
-        // line 3427
+        // line 3428
         Option_7checker_Path _t12 = (Option_7checker_Path){ .tag = Option_7checker_Path_None };
         Option_7checker_Path v_d = _t12;
-        // line 3428
+        // line 3429
         if (v_a.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
             t_3ast_Expr v_p = v_a.m_kind->value.as.m_MutArg._0->value;
             rc_retain_t_3ast_Expr(v_p);
-            // line 3429
+            // line 3430
             Option_7checker_Path _t13 = f_7checker_path_of((*v_c), v_p);
             rc_release_Option_7checker_Path(v_d);
             v_d = _t13;
             rc_release_t_3ast_Expr(v_p);
         } else {
-            // line 3431
+            // line 3432
             vela_array * _t14 = vela_array_new(vt_t_7checker_Path(), 0);
             vela_array * v_nested_reads = _t14;
-            // line 3432
+            // line 3433
             t_7checker_Checker _t15 = (*v_c);
             rc_retain_t_7checker_Checker(_t15);
             t_3ast_Expr _t16 = v_a;
@@ -46488,12 +46615,12 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
             f_7checker_accesses(_t15, _t16, &v_nested_reads, &v_w);
             rc_release_t_3ast_Expr(_t16);
             rc_release_t_7checker_Checker(_t15);
-            // line 3433
+            // line 3434
             Option_7checker_Path _t17 = f_7checker_path_of((*v_c), v_a);
             if (_t17.tag == Option_7checker_Path_Some) {
                 t_7checker_Path v_p_2 = _t17.as.m_Some._0;
                 rc_retain_t_7checker_Path(v_p_2);
-                // line 3434
+                // line 3435
                 t_7checker_Path _t18 = v_p_2;
                 rc_retain_t_7checker_Path(_t18);
                 vela_unique(&v_r);
@@ -46505,17 +46632,17 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
             rc_release_Option_7checker_Path(_t17);
             vela_array_release(v_nested_reads);
         }
-        // line 3439
+        // line 3440
         vela_array * _t20 = v_r;
         vela_array_retain(_t20);
         vela_array * _t21 = _t20;
         vela_push(v_reads, &_t21, sizeof(vela_array *));
-        // line 3440
+        // line 3441
         vela_array * _t22 = v_w;
         vela_array_retain(_t22);
         vela_array * _t23 = _t22;
         vela_push(v_changes, &_t23, sizeof(vela_array *));
-        // line 3441
+        // line 3442
         Option_7checker_Path _t24 = v_d;
         rc_retain_Option_7checker_Path(_t24);
         Option_7checker_Path _t25 = _t24;
@@ -46525,30 +46652,30 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
         vela_array_release(v_r);
     }
     vela_array_release(_t7);
-    // line 3443
+    // line 3444
     int64_t _t26 = v_args->len;
     int64_t _t27 = _t26;
     for (int64_t _t28 = 0; _t28 < _t27; _t28++) {
         int64_t v_i = _t28;
-        // line 3444
-        vela_array * _t30 = *(vela_array * *)vela_at(v_reads, v_i, sizeof(vela_array *), "compiler/src/checker.vl:3444:26");
+        // line 3445
+        vela_array * _t30 = *(vela_array * *)vela_at(v_reads, v_i, sizeof(vela_array *), "compiler/src/checker.vl:3445:26");
         vela_array_retain(_t30);
         vela_array * _t29 = _t30;
         for (int64_t _t31 = 0; _t31 < _t29->len; _t31++) {
             t_7checker_Path v_read = ((t_7checker_Path *)_t29->data)[_t31];
-            // line 3445
+            // line 3446
             int64_t _t32 = v_args->len;
             int64_t _t33 = _t32;
             for (int64_t _t34 = 0; _t34 < _t33; _t34++) {
                 int64_t v_j = _t34;
-                // line 3446
+                // line 3447
                 int64_t _t35 = v_j;
                 bool _t36 = _t35 == v_i;
                 if (_t36) {
-                    // line 3447
+                    // line 3448
                     continue;
                 }
-                // line 3449
+                // line 3450
                 static const vela_str _t37[] = {VELA_STR_INIT("argument ", 9), {NULL, NULL, 0}, VELA_STR_INIT(" is a copy of '", 15), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
                 vela_str _t38[5];
                 memcpy(_t38, _t37, sizeof _t38);
@@ -46562,16 +46689,16 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
                 vela_str_release(_t38[1]);
                 vela_str_release(_t38[3]);
                 vela_str v_what = _t43;
-                // line 3450
-                Option_7checker_Path _t44 = *(Option_7checker_Path *)vela_at(v_direct, v_j, sizeof(Option_7checker_Path), "compiler/src/checker.vl:3450:29");
+                // line 3451
+                Option_7checker_Path _t44 = *(Option_7checker_Path *)vela_at(v_direct, v_j, sizeof(Option_7checker_Path), "compiler/src/checker.vl:3451:29");
                 if (_t44.tag == Option_7checker_Path_Some) {
                     t_7checker_Path v_changed = _t44.as.m_Some._0;
                     rc_retain_t_7checker_Path(v_changed);
-                    // line 3452
+                    // line 3453
                     bool _t45 = f_7checker_covers(v_read, v_changed);
                     if (_t45) {
-                        // line 3453
-                        t_3ast_Expr _t46 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3453:48");
+                        // line 3454
+                        t_3ast_Expr _t46 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3454:48");
                         rc_retain_t_3ast_Expr(_t46);
                         static const vela_str _t47[] = {{NULL, NULL, 0}, VELA_STR_INIT(", but the call changes '", 24), {NULL, NULL, 0}, VELA_STR_INIT("' through `mut` in argument ", 28), {NULL, NULL, 0}, VELA_STR_INIT(", and the copy will not show it; pass only the part the call needs", 66)};
                         vela_str _t48[6];
@@ -46590,7 +46717,7 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
                         vela_str_release(_t53);
                         vela_str_release(VELA_STR("E3138", 5));
                         rc_release_t_3ast_Expr(_t46);
-                        // line 3456
+                        // line 3457
                         rc_release_t_7checker_Path(v_changed);
                         vela_str_release(v_what);
                         vela_array_release(_t29);
@@ -46602,21 +46729,21 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
                     rc_release_t_7checker_Path(v_changed);
                 } else {
                 }
-                // line 3461
+                // line 3462
                 int64_t _t54 = v_j;
                 bool _t55 = _t54 > v_i;
                 if (_t55) {
-                    // line 3462
-                    vela_array * _t57 = *(vela_array * *)vela_at(v_changes, v_j, sizeof(vela_array *), "compiler/src/checker.vl:3462:43");
+                    // line 3463
+                    vela_array * _t57 = *(vela_array * *)vela_at(v_changes, v_j, sizeof(vela_array *), "compiler/src/checker.vl:3463:43");
                     vela_array_retain(_t57);
                     vela_array * _t56 = _t57;
                     for (int64_t _t58 = 0; _t58 < _t56->len; _t58++) {
                         t_7checker_Path v_changed_2 = ((t_7checker_Path *)_t56->data)[_t58];
-                        // line 3463
+                        // line 3464
                         bool _t59 = f_7checker_covers(v_read, v_changed_2);
                         if (_t59) {
-                            // line 3464
-                            t_3ast_Expr _t60 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3464:48");
+                            // line 3465
+                            t_3ast_Expr _t60 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3465:48");
                             rc_retain_t_3ast_Expr(_t60);
                             static const vela_str _t61[] = {{NULL, NULL, 0}, VELA_STR_INIT(" made before argument ", 22), {NULL, NULL, 0}, VELA_STR_INIT(" changes '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' through `mut`, so it has the old value; make the change ", 58), VELA_STR_INIT("in a statement before this call", 31)};
                             vela_str _t62[7];
@@ -46635,7 +46762,7 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
                             vela_str_release(_t67);
                             vela_str_release(VELA_STR("E3139", 5));
                             rc_release_t_3ast_Expr(_t60);
-                            // line 3467
+                            // line 3468
                             vela_array_release(_t56);
                             vela_str_release(v_what);
                             vela_array_release(_t29);
@@ -46659,14 +46786,14 @@ void f_7checker_stale_copies(t_7checker_Checker * v_c, vela_array * v_args) {
 /* vela: part */
 
 int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v_callee, vela_array * v_args, int64_t v_expected) {
-    // line 3479
+    // line 3480
     t_7checker_Ref _t1 = f_7checker_call_target(&(*v_c), v_callee);
     t_7checker_Ref v_target = _t1;
-    // line 3480
+    // line 3481
     if (v_target.tag == t_7checker_Ref_Method) {
         int64_t v_t = v_target.as.m_Method._0;
         vela_str v_name = v_target.as.m_Method._1;
-        // line 3481
+        // line 3482
         vela_str _t2 = v_name;
         vela_str_retain(_t2);
         int64_t _t3 = f_7checker_method_call(&(*v_c), v_e, v_callee, v_args, v_t, _t2, v_expected);
@@ -46675,97 +46802,97 @@ int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v
         rc_release_t_7checker_Ref(v_target);
         return _t4;
     } else if (v_target.tag == t_7checker_Ref_NoRef) {
-        // line 3483
+        // line 3484
         vela_array * _t6 = v_args;
         vela_array_retain(_t6);
         vela_array * _t5 = _t6;
         for (int64_t _t7 = 0; _t7 < _t5->len; _t7++) {
             t_3ast_Expr v_a = ((t_3ast_Expr *)_t5->data)[_t7];
-            // line 3484
+            // line 3485
             t_3ast_Expr _t8 = v_a;
             rc_retain_t_3ast_Expr(_t8);
             int64_t _t9 = f_7checker_infer(&(*v_c), _t8);
             rc_release_t_3ast_Expr(_t8);
         }
         vela_array_release(_t5);
-        // line 3486
+        // line 3487
         int64_t _t10 = f_5types_ERROR();
         int64_t _t11 = _t10;
         rc_release_t_7checker_Ref(v_target);
         return _t11;
     } else if (v_target.tag == t_7checker_Ref_Builtin) {
         vela_str v_name_2 = v_target.as.m_Builtin._0;
-        // line 3489
+        // line 3490
         bool _t12 = vela_str_eq(v_name_2, VELA_STR("Some", 4));
         if (_t12) {
-            // line 3492
+            // line 3493
             int64_t _t13 = v_args->len;
             int64_t _t14 = _t13;
             bool _t15 = _t14 != 1;
             if (_t15) {
-                // line 3493
+                // line 3494
                 int64_t _t16 = v_args->len;
                 bool _t17 = f_7checker_arity(&(*v_c), v_e, VELA_STR("Some", 4), 1, _t16);
                 vela_str_release(VELA_STR("Some", 4));
-                // line 3494
+                // line 3495
                 vela_array * _t19 = v_args;
                 vela_array_retain(_t19);
                 vela_array * _t18 = _t19;
                 for (int64_t _t20 = 0; _t20 < _t18->len; _t20++) {
                     t_3ast_Expr v_a_2 = ((t_3ast_Expr *)_t18->data)[_t20];
-                    // line 3495
+                    // line 3496
                     t_3ast_Expr _t21 = v_a_2;
                     rc_retain_t_3ast_Expr(_t21);
                     int64_t _t22 = f_7checker_infer(&(*v_c), _t21);
                     rc_release_t_3ast_Expr(_t21);
                 }
                 vela_array_release(_t18);
-                // line 3497
+                // line 3498
                 int64_t _t23 = f_5types_ERROR();
                 int64_t _t24 = _t23;
                 rc_release_t_7checker_Ref(v_target);
                 return _t24;
             }
-            // line 3499
-            t_3ast_Expr _t25 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3499:68");
+            // line 3500
+            t_3ast_Expr _t25 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3500:68");
             rc_retain_t_3ast_Expr(_t25);
             int64_t _t26 = f_7checker_value(&(*v_c), _t25);
             int64_t _t27 = f_5types_option(&(*v_c).m_table, _t26);
             int64_t v_t_2 = _t27;
             rc_release_t_3ast_Expr(_t25);
-            // line 3500
+            // line 3501
             bool _t28 = f_5types_is_enum((*v_c).m_table, v_t_2);
             if (_t28) {
-                // line 3501
+                // line 3502
                 int64_t _t29 = f_5types_variant_index((*v_c).m_table, v_t_2, VELA_STR("Some", 4));
                 t_7checker_Ref _t30 = (t_7checker_Ref){ .tag = t_7checker_Ref_Variant, .as.m_Variant = { ._0 = v_t_2, ._1 = _t29 } };
                 vela_unique(&(*v_c).m_refs);
-                t_7checker_Ref *_t31 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3501:27");
+                t_7checker_Ref *_t31 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3502:27");
                 rc_release_t_7checker_Ref(*_t31);
                 *_t31 = _t30;
             }
-            // line 3503
+            // line 3504
             int64_t _t32 = v_t_2;
             rc_release_t_7checker_Ref(v_target);
             return _t32;
         }
-        // line 3505
+        // line 3506
         bool _t33 = f_7checker_is_builtin_variant(v_name_2);
         if (_t33) {
-            // line 3506
+            // line 3507
             vela_array * _t35 = v_args;
             vela_array_retain(_t35);
             vela_array * _t34 = _t35;
             for (int64_t _t36 = 0; _t36 < _t34->len; _t36++) {
                 t_3ast_Expr v_a_3 = ((t_3ast_Expr *)_t34->data)[_t36];
-                // line 3507
+                // line 3508
                 t_3ast_Expr _t37 = v_a_3;
                 rc_retain_t_3ast_Expr(_t37);
                 int64_t _t38 = f_7checker_infer(&(*v_c), _t37);
                 rc_release_t_3ast_Expr(_t37);
             }
             vela_array_release(_t34);
-            // line 3509
+            // line 3510
             static const vela_str _t39[] = {VELA_STR_INIT("cannot tell which Result this ", 30), {NULL, NULL, 0}, VELA_STR_INIT("(...) is; give it a type, as in ", 32), VELA_STR_INIT("`let r: Result[Int, Str] = ", 27), {NULL, NULL, 0}, VELA_STR_INIT("(...)`", 6)};
             vela_str _t40[6];
             memcpy(_t40, _t39, sizeof _t40);
@@ -46775,28 +46902,28 @@ int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3140", 5), _t41);
             vela_str_release(_t41);
             vela_str_release(VELA_STR("E3140", 5));
-            // line 3511
+            // line 3512
             int64_t _t42 = f_5types_ERROR();
             int64_t _t43 = _t42;
             rc_release_t_7checker_Ref(v_target);
             return _t43;
         }
-        // line 3513
+        // line 3514
         vela_str _t44 = v_name_2;
         vela_str_retain(_t44);
         t_7checker_Ref _t45 = (t_7checker_Ref){ .tag = t_7checker_Ref_Builtin, .as.m_Builtin = { ._0 = _t44 } };
         vela_unique(&(*v_c).m_refs);
-        t_7checker_Ref *_t46 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3513:19");
+        t_7checker_Ref *_t46 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3514:19");
         rc_release_t_7checker_Ref(*_t46);
         *_t46 = _t45;
-        // line 3514
+        // line 3515
         vela_str _t47 = f_7checker_effect_of(v_name_2);
         vela_str _t48 = v_name_2;
         vela_str_retain(_t48);
         f_7checker_use_effect(&(*v_c), v_e, _t47, _t48);
         vela_str_release(_t48);
         vela_str_release(_t47);
-        // line 3515
+        // line 3516
         bool _t49 = vela_str_eq(v_name_2, VELA_STR("tasks.map", 9));
         bool _t50 = _t49;
         if (!_t50) {
@@ -46804,7 +46931,7 @@ int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v
             _t50 = _t51;
         }
         if (_t50) {
-            // line 3516
+            // line 3517
             vela_str _t52 = v_name_2;
             vela_str_retain(_t52);
             int64_t _t53 = f_7checker_tasks_call(&(*v_c), v_e, _t52, v_args);
@@ -46813,7 +46940,7 @@ int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v
             rc_release_t_7checker_Ref(v_target);
             return _t54;
         }
-        // line 3518
+        // line 3519
         vela_str _t55 = v_name_2;
         vela_str_retain(_t55);
         vela_str _t56 = f_7checker_written(v_callee);
@@ -46826,66 +46953,66 @@ int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v
     } else if (v_target.tag == t_7checker_Ref_Variant) {
         int64_t v_enum = v_target.as.m_Variant._0;
         int64_t v_vi = v_target.as.m_Variant._1;
-        // line 3521
+        // line 3522
         bool _t59 = f_5types_is_generic((*v_c).m_table, v_enum);
         if (_t59) {
-            // line 3522
+            // line 3523
             int64_t _t60 = f_7checker_generic_variant(&(*v_c), v_e, v_args, v_enum, v_vi, v_expected);
             int64_t _t61 = _t60;
             rc_release_t_7checker_Ref(v_target);
             return _t61;
         }
-        // line 3524
+        // line 3525
         static const vela_str _t62[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
         vela_str _t63[3];
         memcpy(_t63, _t62, sizeof _t63);
         vela_str _t64 = f_7checker_show((*v_c), v_enum);
         _t63[0] = _t64;
         t_5types_TypeInfo _t65 = f_5types_get((*v_c).m_table, v_enum);
-        t_5types_Variant _t66 = *(t_5types_Variant *)vela_at(_t65.m_variants, v_vi, sizeof(t_5types_Variant), "compiler/src/checker.vl:3524:104");
+        t_5types_Variant _t66 = *(t_5types_Variant *)vela_at(_t65.m_variants, v_vi, sizeof(t_5types_Variant), "compiler/src/checker.vl:3525:104");
         _t63[2] = _t66.m_name;
         vela_str _t67 = vela_str_join(_t63, 3);
         vela_str_release(_t63[0]);
         f_7checker_construct(&(*v_c), v_e, v_args, v_enum, v_vi, _t67);
         vela_str_release(_t67);
         rc_release_t_5types_TypeInfo(_t65);
-        // line 3525
+        // line 3526
         int64_t _t68 = v_enum;
         rc_release_t_7checker_Ref(v_target);
         return _t68;
     } else if (v_target.tag == t_7checker_Ref_Constant) {
         int64_t v_id = v_target.as.m_Constant._0;
-        // line 3528
+        // line 3529
         static const vela_str _t69[] = {VELA_STR_INIT("constant '", 10), {NULL, NULL, 0}, VELA_STR_INIT("' is a value, not a function", 28)};
         vela_str _t70[3];
         memcpy(_t70, _t69, sizeof _t70);
-        t_7checker_FnInfo _t71 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:3528:67");
+        t_7checker_FnInfo _t71 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:3529:67");
         _t70[1] = _t71.m_decl.m_name;
         vela_str _t72 = vela_str_join(_t70, 3);
         f_7checker_report_at(&(*v_c), v_callee, VELA_STR("E3233", 5), _t72);
         vela_str_release(_t72);
         vela_str_release(VELA_STR("E3233", 5));
-        // line 3529
+        // line 3530
         vela_array * _t74 = v_args;
         vela_array_retain(_t74);
         vela_array * _t73 = _t74;
         for (int64_t _t75 = 0; _t75 < _t73->len; _t75++) {
             t_3ast_Expr v_a_4 = ((t_3ast_Expr *)_t73->data)[_t75];
-            // line 3529
+            // line 3530
             t_3ast_Expr _t76 = v_a_4;
             rc_retain_t_3ast_Expr(_t76);
             int64_t _t77 = f_7checker_infer(&(*v_c), _t76);
             rc_release_t_3ast_Expr(_t76);
         }
         vela_array_release(_t73);
-        // line 3530
+        // line 3531
         int64_t _t78 = f_5types_ERROR();
         int64_t _t79 = _t78;
         rc_release_t_7checker_Ref(v_target);
         return _t79;
     } else if (v_target.tag == t_7checker_Ref_Function) {
         int64_t v_id_2 = v_target.as.m_Function._0;
-        // line 3532
+        // line 3533
         vela_str _t80 = f_7checker_written(v_callee);
         int64_t _t81 = f_7checker_known_call(&(*v_c), v_e, v_id_2, _t80, v_args, v_expected);
         int64_t _t82 = _t81;
@@ -46894,21 +47021,21 @@ int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v
         return _t82;
     } else if (v_target.tag == t_7checker_Ref_Local) {
         int64_t v_id_3 = v_target.as.m_Local._0;
-        // line 3534
-        t_7checker_Local _t83 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_id_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:3534:43");
-        f_7checker_set_ty(&(*v_c), v_callee, _t83.m_ty);
         // line 3535
+        t_7checker_Local _t83 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_id_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:3535:43");
+        f_7checker_set_ty(&(*v_c), v_callee, _t83.m_ty);
+        // line 3536
         t_7checker_Ref _t84 = (t_7checker_Ref){ .tag = t_7checker_Ref_Local, .as.m_Local = { ._0 = v_id_3 } };
         vela_unique(&(*v_c).m_refs);
-        t_7checker_Ref *_t85 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_callee.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3535:19");
+        t_7checker_Ref *_t85 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_callee.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3536:19");
         rc_release_t_7checker_Ref(*_t85);
         *_t85 = _t84;
-        // line 3536
-        t_7checker_Local _t86 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_id_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:3536:52");
+        // line 3537
+        t_7checker_Local _t86 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_id_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:3537:52");
         static const vela_str _t87[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
         vela_str _t88[3];
         memcpy(_t88, _t87, sizeof _t88);
-        t_7checker_Local _t89 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_id_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:3536:81");
+        t_7checker_Local _t89 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_id_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:3537:81");
         _t88[1] = _t89.m_name;
         vela_str _t90 = vela_str_join(_t88, 3);
         int64_t _t91 = f_7checker_indirect_call(&(*v_c), v_e, _t86.m_ty, v_args, _t90);
@@ -46917,8 +47044,8 @@ int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v
         rc_release_t_7checker_Ref(v_target);
         return _t92;
     } else {
-        // line 3538
-        int64_t _t93 = *(int64_t *)vela_at((*v_c).m_ty, v_callee.m_id, sizeof(int64_t), "compiler/src/checker.vl:3538:60");
+        // line 3539
+        int64_t _t93 = *(int64_t *)vela_at((*v_c).m_ty, v_callee.m_id, sizeof(int64_t), "compiler/src/checker.vl:3539:60");
         int64_t _t94 = f_7checker_indirect_call(&(*v_c), v_e, _t93, v_args, VELA_STR("a function value", 16));
         int64_t _t95 = _t94;
         vela_str_release(VELA_STR("a function value", 16));
@@ -46929,20 +47056,20 @@ int64_t f_7checker_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v
 /* vela: part */
 
 int64_t f_7checker_mut_argument(t_7checker_Checker * v_c, t_3ast_Expr v_arg, int64_t v_want, vela_str v_what) {
-    // line 3545
+    // line 3546
     if (v_arg.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
         t_3ast_Expr v_p = v_arg.m_kind->value.as.m_MutArg._0->value;
         rc_retain_t_3ast_Expr(v_p);
-        // line 3547
+        // line 3548
         t_3ast_Expr _t1 = v_p;
         rc_retain_t_3ast_Expr(_t1);
         int64_t _t2 = f_7checker_place(&(*v_c), _t1, VELA_STR("change", 6));
         int64_t v_t = _t2;
         vela_str_release(VELA_STR("change", 6));
         rc_release_t_3ast_Expr(_t1);
-        // line 3548
-        f_7checker_set_ty(&(*v_c), v_arg, v_t);
         // line 3549
+        f_7checker_set_ty(&(*v_c), v_arg, v_t);
+        // line 3550
         int64_t _t3 = v_want;
         int64_t _t4 = f_5types_NOTHING();
         bool _t5 = _t3 != _t4;
@@ -46967,7 +47094,7 @@ int64_t f_7checker_mut_argument(t_7checker_Checker * v_c, t_3ast_Expr v_arg, int
             _t13 = _t16;
         }
         if (_t13) {
-            // line 3550
+            // line 3551
             t_3ast_Expr _t17 = v_p;
             rc_retain_t_3ast_Expr(_t17);
             static const vela_str _t18[] = {{NULL, NULL, 0}, VELA_STR_INIT(" must be ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8), {NULL, NULL, 0}};
@@ -46986,54 +47113,54 @@ int64_t f_7checker_mut_argument(t_7checker_Checker * v_c, t_3ast_Expr v_arg, int
             vela_str_release(VELA_STR("E3142", 5));
             rc_release_t_3ast_Expr(_t17);
         }
-        // line 3552
+        // line 3553
         int64_t _t23 = v_t;
         rc_release_t_3ast_Expr(v_p);
         return _t23;
     } else {
-        // line 3555
+        // line 3556
         vela_str _t24 = vela_str_concat(v_what, VELA_STR(" is changed by the call; write `mut` before it", 46));
         f_7checker_report_at(&(*v_c), v_arg, VELA_STR("E3143", 5), _t24);
         vela_str_release(_t24);
         vela_str_release(VELA_STR("E3143", 5));
-        // line 3556
+        // line 3557
         if (v_arg.m_kind->value.tag == t_3ast_ExprKind_Name) {
-            // line 3557
-            t_7modules_Module _t25 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3557:87");
-            t_7modules_Module _t26 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3557:116");
+            // line 3558
+            t_7modules_Module _t25 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3558:87");
+            t_7modules_Module _t26 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3558:116");
             vela_array * _t27 = f_7repairs_mut_argument(_t25.m_source, _t26.m_path, v_arg);
             f_7checker_last_fix(&(*v_c), _t27);
             vela_array_release(_t27);
         } else if (v_arg.m_kind->value.tag == t_3ast_ExprKind_Field) {
-            // line 3558
-            t_7modules_Module _t28 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3558:91");
-            t_7modules_Module _t29 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3558:120");
+            // line 3559
+            t_7modules_Module _t28 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3559:91");
+            t_7modules_Module _t29 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3559:120");
             vela_array * _t30 = f_7repairs_mut_argument(_t28.m_source, _t29.m_path, v_arg);
             f_7checker_last_fix(&(*v_c), _t30);
             vela_array_release(_t30);
         } else if (v_arg.m_kind->value.tag == t_3ast_ExprKind_Index) {
-            // line 3559
-            t_7modules_Module _t31 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3559:91");
-            t_7modules_Module _t32 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3559:120");
+            // line 3560
+            t_7modules_Module _t31 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3560:91");
+            t_7modules_Module _t32 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3560:120");
             vela_array * _t33 = f_7repairs_mut_argument(_t31.m_source, _t32.m_path, v_arg);
             f_7checker_last_fix(&(*v_c), _t33);
             vela_array_release(_t33);
         } else {
         }
-        // line 3562
+        // line 3563
         int64_t _t34 = f_7checker_infer(&(*v_c), v_arg);
         int64_t v_t_2 = _t34;
-        // line 3563
+        // line 3564
         int64_t _t35 = v_t_2;
         int64_t _t36 = f_5types_NOTHING();
         bool _t37 = _t35 == _t36;
         if (_t37) {
-            // line 3564
+            // line 3565
             int64_t _t38 = f_5types_ERROR();
             int64_t _t39 = _t38;
             return _t39;
         }
-        // line 3566
+        // line 3567
         int64_t _t40 = v_t_2;
         return _t40;
     }
@@ -47041,36 +47168,36 @@ int64_t f_7checker_mut_argument(t_7checker_Checker * v_c, t_3ast_Expr v_arg, int
 /* vela: part */
 
 void f_7checker_exclusive(t_7checker_Checker * v_c, vela_array * v_args) {
-    // line 3573
+    // line 3574
     vela_array * _t1 = vela_array_new(&vela_type_str, 0);
     vela_array * v_seen = _t1;
-    // line 3574
+    // line 3575
     vela_array * _t3 = v_args;
     vela_array_retain(_t3);
     vela_array * _t2 = _t3;
     for (int64_t _t4 = 0; _t4 < _t2->len; _t4++) {
         t_3ast_Expr v_a = ((t_3ast_Expr *)_t2->data)[_t4];
-        // line 3575
+        // line 3576
         if (v_a.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
             t_3ast_Expr v_p = v_a.m_kind->value.as.m_MutArg._0->value;
             rc_retain_t_3ast_Expr(v_p);
-            // line 3577
+            // line 3578
             t_3ast_Expr _t5 = f_7checker_root_of(v_p);
             t_3ast_Expr v_root = _t5;
-            // line 3578
+            // line 3579
             if (v_root.m_kind->value.tag == t_3ast_ExprKind_Name) {
                 vela_str v_name = v_root.m_kind->value.as.m_Name._0;
                 vela_str_retain(v_name);
-                // line 3580
+                // line 3581
                 vela_array * _t7 = v_seen;
                 vela_array_retain(_t7);
                 vela_array * _t6 = _t7;
                 for (int64_t _t8 = 0; _t8 < _t6->len; _t8++) {
                     vela_str v_s = ((vela_str *)_t6->data)[_t8];
-                    // line 3581
+                    // line 3582
                     bool _t9 = vela_str_eq(v_s, v_name);
                     if (_t9) {
-                        // line 3582
+                        // line 3583
                         t_3ast_Expr _t10 = v_a;
                         rc_retain_t_3ast_Expr(_t10);
                         static const vela_str _t11[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' is passed as mut twice in this call", 37)};
@@ -47085,7 +47212,7 @@ void f_7checker_exclusive(t_7checker_Checker * v_c, vela_array * v_args) {
                     }
                 }
                 vela_array_release(_t6);
-                // line 3585
+                // line 3586
                 vela_str _t14 = v_name;
                 vela_str_retain(_t14);
                 vela_unique(&v_seen);
@@ -47105,24 +47232,24 @@ void f_7checker_exclusive(t_7checker_Checker * v_c, vela_array * v_args) {
 /* vela: part */
 
 int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v_id, vela_str v_name, vela_array * v_args, int64_t v_expected) {
-    // line 3599
-    t_7checker_FnInfo _t1 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:3599:18");
+    // line 3600
+    t_7checker_FnInfo _t1 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:3600:18");
     rc_retain_t_7checker_FnInfo(_t1);
     t_7checker_FnInfo v_f = _t1;
-    // line 3600
+    // line 3601
     int64_t _t2 = v_f.m_params->len;
     int64_t _t3 = v_args->len;
     bool _t4 = f_7checker_arity(&(*v_c), v_e, v_name, _t2, _t3);
-    // line 3601
+    // line 3602
     vela_array * _t5 = vela_array_new(&vela_type_str, 0);
     vela_array * v_labels = _t5;
-    // line 3602
+    // line 3603
     int64_t _t6 = v_args->len;
     int64_t _t7 = _t6;
     vela_unique(&v_labels);
     for (int64_t _t8 = 0; _t8 < _t7; _t8++) {
         int64_t v_i = _t8;
-        // line 3603
+        // line 3604
         static const vela_str _t9[] = {VELA_STR_INIT("argument ", 9), {NULL, NULL, 0}, VELA_STR_INIT(" of '", 5), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
         vela_str _t10[5];
         memcpy(_t10, _t9, sizeof _t10);
@@ -47136,11 +47263,11 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
         vela_str _t15 = _t14;
         vela_push(v_labels, &_t15, sizeof(vela_str));
     }
-    // line 3605
+    // line 3606
     vela_array * _t16 = v_f.m_type_params;
     vela_array_retain(_t16);
     vela_array * v_tp = _t16;
-    // line 3606
+    // line 3607
     vela_array * _t17 = v_tp;
     vela_array_retain(_t17);
     vela_array * _t18 = v_f.m_params;
@@ -47158,9 +47285,9 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
     vela_array_release(_t19);
     vela_array_release(_t18);
     vela_array_release(_t17);
-    // line 3607
-    f_7checker_exclusive(&(*v_c), v_args);
     // line 3608
+    f_7checker_exclusive(&(*v_c), v_args);
+    // line 3609
     int64_t _t24 = v_expected;
     bool _t25 = _t24 >= 0;
     bool _t26 = _t25;
@@ -47170,7 +47297,7 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
         _t26 = _t28;
     }
     if (_t26) {
-        // line 3609
+        // line 3610
         t_7checker_Checker _t29 = (*v_c);
         rc_retain_t_7checker_Checker(_t29);
         vela_array * _t30 = v_tp;
@@ -47179,13 +47306,13 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
         vela_array_release(_t30);
         rc_release_t_7checker_Checker(_t29);
     }
-    // line 3613
-    vela_str v_hint = VELA_STR("; pass arguments whose types tell", 33);
     // line 3614
+    vela_str v_hint = VELA_STR("; pass arguments whose types tell", 33);
+    // line 3615
     int64_t _t32 = v_f.m_result;
     bool _t33 = _t32 >= 0;
     if (_t33) {
-        // line 3615
+        // line 3616
         vela_array * _t34 = v_tp;
         vela_array_retain(_t34);
         vela_array * _t35 = v_bound;
@@ -47194,7 +47321,7 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
         int64_t v_example = _t36;
         vela_array_release(_t35);
         vela_array_release(_t34);
-        // line 3616
+        // line 3617
         static const vela_str _t37[] = {VELA_STR_INIT("; give the result a type, as in `let x: ", 40), {NULL, NULL, 0}, VELA_STR_INIT(" = ", 3), {NULL, NULL, 0}, VELA_STR_INIT("(...)`", 6)};
         vela_str _t38[5];
         memcpy(_t38, _t37, sizeof _t38);
@@ -47206,7 +47333,7 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
         vela_str_release(v_hint);
         v_hint = _t40;
     }
-    // line 3618
+    // line 3619
     vela_array * _t41 = v_tp;
     vela_array_retain(_t41);
     static const vela_str _t42[] = {VELA_STR_INIT("in this call to '", 17), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
@@ -47221,34 +47348,34 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
     vela_str_release(_t45);
     vela_str_release(_t44);
     vela_array_release(_t41);
-    // line 3619
+    // line 3620
     if (v_ok) {
-        // line 3620
+        // line 3621
         int64_t _t47 = v_tp->len;
         int64_t _t48 = _t47;
         for (int64_t _t49 = 0; _t49 < _t48; _t49++) {
             int64_t v_i_2 = _t49;
-            // line 3621
+            // line 3622
             static const vela_str _t50[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t51[3];
             memcpy(_t51, _t50, sizeof _t51);
             _t51[1] = v_name;
             vela_str _t52 = vela_str_join(_t51, 3);
-            int64_t _t53 = *(int64_t *)vela_at(v_tp, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:3621:68");
-            int64_t _t54 = *(int64_t *)vela_at(v_bound, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:3621:78");
+            int64_t _t53 = *(int64_t *)vela_at(v_tp, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:3622:68");
+            int64_t _t54 = *(int64_t *)vela_at(v_bound, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:3622:78");
             f_7checker_check_bounds(&(*v_c), v_e.m_line, v_e.m_col, _t52, _t53, _t54);
             vela_str_release(_t52);
         }
     }
-    // line 3624
+    // line 3625
     if (v_ok) {
-        // line 3625
+        // line 3626
         vela_array * _t55 = v_bound;
         vela_array_retain(_t55);
         f_7checker_note_generic_use(&(*v_c), v_e, v_id, _t55);
         vela_array_release(_t55);
     }
-    // line 3627
+    // line 3628
     int64_t _t56 = v_id;
     bool _t57 = _t56 == (*v_c).m_current_fn;
     bool _t58 = _t57;
@@ -47256,26 +47383,26 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
         _t58 = v_ok;
     }
     if (_t58) {
-        // line 3630
+        // line 3631
         int64_t _t59 = v_tp->len;
         int64_t _t60 = _t59;
         for (int64_t _t61 = 0; _t61 < _t60; _t61++) {
             int64_t v_i_3 = _t61;
-            // line 3631
-            int64_t _t62 = *(int64_t *)vela_at(v_bound, v_i_3, sizeof(int64_t), "compiler/src/checker.vl:3631:21");
+            // line 3632
+            int64_t _t62 = *(int64_t *)vela_at(v_bound, v_i_3, sizeof(int64_t), "compiler/src/checker.vl:3632:21");
             int64_t _t63 = _t62;
-            int64_t _t64 = *(int64_t *)vela_at(v_tp, v_i_3, sizeof(int64_t), "compiler/src/checker.vl:3631:30");
+            int64_t _t64 = *(int64_t *)vela_at(v_tp, v_i_3, sizeof(int64_t), "compiler/src/checker.vl:3632:30");
             bool _t65 = _t63 != _t64;
             if (_t65) {
-                // line 3632
+                // line 3633
                 static const vela_str _t66[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' calls itself with ", 20), {NULL, NULL, 0}, VELA_STR_INIT(" for ", 5), {NULL, NULL, 0}, VELA_STR_INIT("; a generic function can only call itself with its own type parameters", 70)};
                 vela_str _t67[7];
                 memcpy(_t67, _t66, sizeof _t67);
                 _t67[1] = v_name;
-                int64_t _t68 = *(int64_t *)vela_at(v_bound, v_i_3, sizeof(int64_t), "compiler/src/checker.vl:3632:97");
+                int64_t _t68 = *(int64_t *)vela_at(v_bound, v_i_3, sizeof(int64_t), "compiler/src/checker.vl:3633:97");
                 vela_str _t69 = f_7checker_show((*v_c), _t68);
                 _t67[3] = _t69;
-                int64_t _t70 = *(int64_t *)vela_at(v_tp, v_i_3, sizeof(int64_t), "compiler/src/checker.vl:3633:42");
+                int64_t _t70 = *(int64_t *)vela_at(v_tp, v_i_3, sizeof(int64_t), "compiler/src/checker.vl:3634:42");
                 t_5types_TypeInfo _t71 = f_5types_get((*v_c).m_table, _t70);
                 _t67[5] = _t71.m_name;
                 vela_str _t72 = vela_str_join(_t67, 7);
@@ -47284,21 +47411,21 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
                 vela_str_release(_t72);
                 vela_str_release(VELA_STR("E3145", 5));
                 rc_release_t_5types_TypeInfo(_t71);
-                // line 3634
-                v_ok = false;
                 // line 3635
+                v_ok = false;
+                // line 3636
                 break;
             }
         }
     }
-    // line 3639
+    // line 3640
     vela_array * _t73 = v_bound;
     vela_array_retain(_t73);
     vela_unique(&(*v_c).m_targs);
-    vela_array * *_t74 = (vela_array * *)vela_at((*v_c).m_targs, v_e.m_id, sizeof(vela_array *), "compiler/src/checker.vl:3639:12");
+    vela_array * *_t74 = (vela_array * *)vela_at((*v_c).m_targs, v_e.m_id, sizeof(vela_array *), "compiler/src/checker.vl:3640:12");
     vela_array_release(*_t74);
     *_t74 = _t73;
-    // line 3640
+    // line 3641
     vela_array * _t75 = v_tp;
     vela_array_retain(_t75);
     vela_array * _t76 = v_bound;
@@ -47307,7 +47434,7 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
     int64_t v_result = _t77;
     vela_array_release(_t76);
     vela_array_release(_t75);
-    // line 3641
+    // line 3642
     int64_t _t78 = v_result;
     vela_str_release(v_hint);
     vela_array_release(v_bound);
@@ -47319,13 +47446,13 @@ int64_t f_7checker_generic_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64
 /* vela: part */
 
 int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array * v_args, int64_t v_decl, int64_t v_vi, int64_t v_expected) {
-    // line 3646
+    // line 3647
     t_5types_TypeInfo _t1 = f_5types_get((*v_c).m_table, v_decl);
-    t_5types_Variant _t2 = *(t_5types_Variant *)vela_at(_t1.m_variants, v_vi, sizeof(t_5types_Variant), "compiler/src/checker.vl:3646:46");
+    t_5types_Variant _t2 = *(t_5types_Variant *)vela_at(_t1.m_variants, v_vi, sizeof(t_5types_Variant), "compiler/src/checker.vl:3647:46");
     rc_retain_t_5types_Variant(_t2);
     t_5types_Variant v_v = _t2;
     rc_release_t_5types_TypeInfo(_t1);
-    // line 3647
+    // line 3648
     static const vela_str _t3[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
     vela_str _t4[3];
     memcpy(_t4, _t3, sizeof _t4);
@@ -47335,18 +47462,18 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
     vela_str _t6 = vela_str_join(_t4, 3);
     vela_str_release(_t4[0]);
     vela_str v_written = _t6;
-    // line 3648
+    // line 3649
     t_5types_TypeInfo _t7 = f_5types_get((*v_c).m_table, v_decl);
     vela_array * _t8 = _t7.m_params;
     vela_array_retain(_t8);
     vela_array * v_params = _t8;
     rc_release_t_5types_TypeInfo(_t7);
-    // line 3649
+    // line 3650
     int64_t _t9 = v_v.m_payload->len;
     int64_t _t10 = _t9;
     bool _t11 = _t10 == 0;
     if (_t11) {
-        // line 3650
+        // line 3651
         vela_str _t12 = vela_str_concat(v_written, VELA_STR(" carries no values; write it without parentheses", 48));
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3146", 5), _t12);
         vela_str_release(_t12);
@@ -47357,7 +47484,7 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
         int64_t _t15 = v_v.m_payload->len;
         bool _t16 = _t14 != _t15;
         if (_t16) {
-            // line 3652
+            // line 3653
             static const vela_str _t17[] = {{NULL, NULL, 0}, VELA_STR_INIT(" carries ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", got ", 6), {NULL, NULL, 0}};
             vela_str _t18[5];
             memcpy(_t18, _t17, sizeof _t18);
@@ -47376,20 +47503,20 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
             vela_str_release(VELA_STR("E3147", 5));
         }
     }
-    // line 3654
+    // line 3655
     vela_array * _t24 = vela_array_new(&vela_type_str, 0);
     vela_array * v_labels = _t24;
-    // line 3655
+    // line 3656
     vela_array * _t25 = vela_array_new(&vela_type_bool, 0);
     vela_array * v_mutable = _t25;
-    // line 3656
+    // line 3657
     int64_t _t26 = v_args->len;
     int64_t _t27 = _t26;
     vela_unique(&v_labels);
     vela_unique(&v_mutable);
     for (int64_t _t28 = 0; _t28 < _t27; _t28++) {
         int64_t v_i = _t28;
-        // line 3657
+        // line 3658
         static const vela_str _t29[] = {VELA_STR_INIT("value ", 6), {NULL, NULL, 0}, VELA_STR_INIT(" of ", 4), {NULL, NULL, 0}};
         vela_str _t30[4];
         memcpy(_t30, _t29, sizeof _t30);
@@ -47402,17 +47529,17 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
         vela_str_release(_t30[1]);
         vela_str _t35 = _t34;
         vela_push(v_labels, &_t35, sizeof(vela_str));
-        // line 3658
+        // line 3659
         bool _t36 = false;
         vela_push(v_mutable, &_t36, sizeof(bool));
     }
-    // line 3660
+    // line 3661
     int64_t _t37 = v_params->len;
     vela_array * _t38 = f_7checker_unknown(_t37);
     vela_array * v_known = _t38;
-    // line 3661
-    f_7checker_from_context(&(*v_c), v_decl, v_expected, &v_known);
     // line 3662
+    f_7checker_from_context(&(*v_c), v_decl, v_expected, &v_known);
+    // line 3663
     vela_array * _t39 = v_params;
     vela_array_retain(_t39);
     vela_array * _t40 = v_v.m_payload;
@@ -47430,7 +47557,7 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
     vela_array_release(_t41);
     vela_array_release(_t40);
     vela_array_release(_t39);
-    // line 3663
+    // line 3664
     vela_array * _t45 = v_params;
     vela_array_retain(_t45);
     static const vela_str _t46[] = {VELA_STR_INIT("in this ", 8), {NULL, NULL, 0}, VELA_STR_INIT("(...)", 5)};
@@ -47453,7 +47580,7 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
     bool _t55 = f_7checker_all_known(&(*v_c), v_e, _t45, &v_bound, _t48, _t54);
     bool _t56 = !_t55;
     if (_t56) {
-        // line 3665
+        // line 3666
         int64_t _t57 = f_5types_ERROR();
         int64_t _t58 = _t57;
         vela_str_release(_t54);
@@ -47471,12 +47598,12 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
     vela_str_release(_t54);
     vela_str_release(_t48);
     vela_array_release(_t45);
-    // line 3667
+    // line 3668
     int64_t _t59 = v_params->len;
     int64_t _t60 = _t59;
     for (int64_t _t61 = 0; _t61 < _t60; _t61++) {
         int64_t v_i_2 = _t61;
-        // line 3668
+        // line 3669
         static const vela_str _t62[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
         vela_str _t63[3];
         memcpy(_t63, _t62, sizeof _t63);
@@ -47484,24 +47611,24 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
         _t63[1] = _t64;
         vela_str _t65 = vela_str_join(_t63, 3);
         vela_str_release(_t63[1]);
-        int64_t _t66 = *(int64_t *)vela_at(v_params, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:3668:77");
-        int64_t _t67 = *(int64_t *)vela_at(v_bound, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:3668:87");
+        int64_t _t66 = *(int64_t *)vela_at(v_params, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:3669:77");
+        int64_t _t67 = *(int64_t *)vela_at(v_bound, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:3669:87");
         f_7checker_check_bounds(&(*v_c), v_e.m_line, v_e.m_col, _t65, _t66, _t67);
         vela_str_release(_t65);
     }
-    // line 3670
+    // line 3671
     vela_array * _t68 = v_bound;
     vela_array_retain(_t68);
     int64_t _t69 = f_5types_instantiate(&(*v_c).m_table, v_decl, _t68);
     int64_t v_t = _t69;
     vela_array_release(_t68);
-    // line 3671
+    // line 3672
     t_7checker_Ref _t70 = (t_7checker_Ref){ .tag = t_7checker_Ref_Variant, .as.m_Variant = { ._0 = v_t, ._1 = v_vi } };
     vela_unique(&(*v_c).m_refs);
-    t_7checker_Ref *_t71 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3671:11");
+    t_7checker_Ref *_t71 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3672:11");
     rc_release_t_7checker_Ref(*_t71);
     *_t71 = _t70;
-    // line 3672
+    // line 3673
     int64_t _t72 = v_t;
     vela_array_release(v_bound);
     vela_array_release(v_known);
@@ -47515,27 +47642,27 @@ int64_t f_7checker_generic_variant(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
 /* vela: part */
 
 void f_7checker_construct(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array * v_args, int64_t v_enum, int64_t v_vi, vela_str v_written) {
-    // line 3677
+    // line 3678
     t_7checker_Ref _t1 = (t_7checker_Ref){ .tag = t_7checker_Ref_Variant, .as.m_Variant = { ._0 = v_enum, ._1 = v_vi } };
     vela_unique(&(*v_c).m_refs);
-    t_7checker_Ref *_t2 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3677:11");
+    t_7checker_Ref *_t2 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:3678:11");
     rc_release_t_7checker_Ref(*_t2);
     *_t2 = _t1;
-    // line 3678
-    f_7checker_set_ty(&(*v_c), v_e, v_enum);
     // line 3679
+    f_7checker_set_ty(&(*v_c), v_e, v_enum);
+    // line 3680
     t_5types_TypeInfo _t3 = f_5types_get((*v_c).m_table, v_enum);
-    t_5types_Variant _t4 = *(t_5types_Variant *)vela_at(_t3.m_variants, v_vi, sizeof(t_5types_Variant), "compiler/src/checker.vl:3679:52");
+    t_5types_Variant _t4 = *(t_5types_Variant *)vela_at(_t3.m_variants, v_vi, sizeof(t_5types_Variant), "compiler/src/checker.vl:3680:52");
     vela_array * _t5 = _t4.m_payload;
     vela_array_retain(_t5);
     vela_array * v_payload = _t5;
     rc_release_t_5types_TypeInfo(_t3);
-    // line 3680
+    // line 3681
     int64_t _t6 = v_payload->len;
     int64_t _t7 = _t6;
     bool _t8 = _t7 == 0;
     if (_t8) {
-        // line 3681
+        // line 3682
         vela_str _t9 = vela_str_concat(v_written, VELA_STR(" carries no values; write it without parentheses", 48));
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3148", 5), _t9);
         vela_str_release(_t9);
@@ -47546,7 +47673,7 @@ void f_7checker_construct(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array 
         int64_t _t12 = v_payload->len;
         bool _t13 = _t11 != _t12;
         if (_t13) {
-            // line 3683
+            // line 3684
             static const vela_str _t14[] = {{NULL, NULL, 0}, VELA_STR_INIT(" carries ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", got ", 6), {NULL, NULL, 0}};
             vela_str _t15[5];
             memcpy(_t15, _t14, sizeof _t15);
@@ -47565,29 +47692,29 @@ void f_7checker_construct(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array 
             vela_str_release(VELA_STR("E3149", 5));
         }
     }
-    // line 3685
+    // line 3686
     int64_t _t21 = v_args->len;
     int64_t _t22 = _t21;
     for (int64_t _t23 = 0; _t23 < _t22; _t23++) {
         int64_t v_i = _t23;
-        // line 3686
+        // line 3687
         int64_t _t24 = v_i;
         int64_t _t25 = v_payload->len;
         bool _t26 = _t24 >= _t25;
         if (_t26) {
-            // line 3687
+            // line 3688
             t_3ast_Expr _t27 = *((t_3ast_Expr *)v_args->data + v_i);
             rc_retain_t_3ast_Expr(_t27);
             int64_t _t28 = f_7checker_infer(&(*v_c), _t27);
             rc_release_t_3ast_Expr(_t27);
-            // line 3688
+            // line 3689
             continue;
         }
-        // line 3690
+        // line 3691
         int64_t _t29 = *((int64_t *)v_payload->data + v_i);
         int64_t v_want = _t29;
-        // line 3691
-        t_3ast_Expr _t30 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3691:31");
+        // line 3692
+        t_3ast_Expr _t30 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3692:31");
         rc_retain_t_3ast_Expr(_t30);
         static const vela_str _t31[] = {VELA_STR_INIT("value ", 6), {NULL, NULL, 0}, VELA_STR_INIT(" of ", 4), {NULL, NULL, 0}, VELA_STR_INIT(" must be ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8)};
         vela_str _t32[7];
@@ -47613,13 +47740,13 @@ void f_7checker_construct(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array 
 /* vela: part */
 
 t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_callee) {
-    // line 3699
+    // line 3700
     if (v_callee.m_kind->value.tag == t_3ast_ExprKind_Field) {
         t_3ast_Expr v_obj = v_callee.m_kind->value.as.m_Field._0->value;
         rc_retain_t_3ast_Expr(v_obj);
         vela_str v_name = v_callee.m_kind->value.as.m_Field._1;
         vela_str_retain(v_name);
-        // line 3701
+        // line 3702
         vela_str _t1 = v_name;
         vela_str_retain(_t1);
         vela_array * _t2 = vela_array_new(vt_t_3ast_Expr(), 1);
@@ -47630,14 +47757,14 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
         f_7checker_completing(&(*v_c), _t1, _t2);
         vela_array_release(_t2);
         vela_str_release(_t1);
-        // line 3702
+        // line 3703
         int64_t _t5 = f_7checker_module_named((*v_c), v_obj);
         int64_t v_module = _t5;
-        // line 3703
+        // line 3704
         int64_t _t6 = v_module;
         bool _t7 = _t6 >= 0;
         if (_t7) {
-            // line 3704
+            // line 3705
             vela_str _t8 = v_name;
             vela_str_retain(_t8);
             t_7checker_Ref _t9 = f_7checker_module_fn(&(*v_c), v_callee.m_line, v_callee.m_col, v_module, _t8);
@@ -47647,30 +47774,30 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             rc_release_t_3ast_Expr(v_obj);
             return _t10;
         }
-        // line 3706
+        // line 3707
         t_3ast_Expr _t11 = v_obj;
         rc_retain_t_3ast_Expr(_t11);
         int64_t _t12 = f_7checker_named_receiver(&(*v_c), _t11);
         int64_t v_owner = _t12;
         rc_release_t_3ast_Expr(_t11);
-        // line 3707
+        // line 3708
         int64_t _t13 = v_owner;
         bool _t14 = _t13 >= 0;
         if (_t14) {
-            // line 3708
+            // line 3709
             t_5types_TypeInfo _t15 = f_5types_get((*v_c).m_table, v_owner);
             t_5types_TypeInfo v_ti = _t15;
-            // line 3709
+            // line 3710
             int64_t _t16 = (*v_c).m_modules->len;
             int64_t _t17 = _t16;
             for (int64_t _t18 = 0; _t18 < _t17; _t18++) {
                 int64_t v_m = _t18;
-                // line 3710
-                t_7modules_Module _t19 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:3710:33");
+                // line 3711
+                t_7modules_Module _t19 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:3711:33");
                 bool _t20 = vela_str_eq(_t19.m_name, v_ti.m_module);
                 bool _t21 = _t20;
                 if (_t21) {
-                    t_7modules_Module _t22 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:3710:76");
+                    t_7modules_Module _t22 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:3711:76");
                     static const vela_str _t23[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
                     vela_str _t24[3];
                     memcpy(_t24, _t23, sizeof _t24);
@@ -47684,12 +47811,12 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                     vela_str_release(_t25);
                 }
                 if (_t21) {
-                    // line 3711
+                    // line 3712
                     int64_t _t29 = v_m;
                     bool _t30 = _t29 == (*v_c).m_current;
                     if (_t30) {
-                        // line 3711
-                        t_7modules_Module _t31 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:3711:74");
+                        // line 3712
+                        t_7modules_Module _t31 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:3712:74");
                         static const vela_str _t33[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
                         vela_str _t34[3];
                         memcpy(_t34, _t33, sizeof _t34);
@@ -47697,7 +47824,7 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                         _t34[2] = v_name;
                         vela_str _t35 = vela_str_join(_t34, 3);
                         vela_str _t36 = _t35;
-                        int64_t _t32 = *(int64_t *)vela_map_at(_t31.m_fns, &_t36, "compiler/src/checker.vl:3711:81");
+                        int64_t _t32 = *(int64_t *)vela_map_at(_t31.m_fns, &_t36, "compiler/src/checker.vl:3712:81");
                         t_7checker_Ref _t37 = (t_7checker_Ref){ .tag = t_7checker_Ref_Function, .as.m_Function = { ._0 = _t32 } };
                         t_7checker_Ref _t38 = _t37;
                         vela_str_release(_t35);
@@ -47706,7 +47833,7 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                         rc_release_t_3ast_Expr(v_obj);
                         return _t38;
                     }
-                    // line 3712
+                    // line 3713
                     static const vela_str _t39[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
                     vela_str _t40[3];
                     memcpy(_t40, _t39, sizeof _t40);
@@ -47724,36 +47851,36 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             }
             rc_release_t_5types_TypeInfo(v_ti);
         }
-        // line 3716
+        // line 3717
         t_3ast_Expr _t44 = v_obj;
         rc_retain_t_3ast_Expr(_t44);
         int64_t _t45 = f_7checker_enum_named(&(*v_c), _t44);
         int64_t v_enum = _t45;
         rc_release_t_3ast_Expr(_t44);
-        // line 3717
+        // line 3718
         int64_t _t46 = v_enum;
         int64_t _t47 = f_5types_ERROR();
         bool _t48 = _t46 == _t47;
         if (_t48) {
-            // line 3718
+            // line 3719
             t_7checker_Ref _t49 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
             t_7checker_Ref _t50 = _t49;
             vela_str_release(v_name);
             rc_release_t_3ast_Expr(v_obj);
             return _t50;
         }
-        // line 3720
+        // line 3721
         int64_t _t51 = v_enum;
         bool _t52 = _t51 >= 0;
         if (_t52) {
-            // line 3721
+            // line 3722
             int64_t _t53 = f_5types_variant_index((*v_c).m_table, v_enum, v_name);
             int64_t v_vi = _t53;
-            // line 3722
+            // line 3723
             int64_t _t54 = v_vi;
             bool _t55 = _t54 < 0;
             if (_t55) {
-                // line 3723
+                // line 3724
                 static const vela_str _t56[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' has no variant '", 18), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
                 vela_str _t57[5];
                 memcpy(_t57, _t56, sizeof _t57);
@@ -47765,25 +47892,25 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                 f_7checker_report_at(&(*v_c), v_callee, VELA_STR("E3150", 5), _t59);
                 vela_str_release(_t59);
                 vela_str_release(VELA_STR("E3150", 5));
-                // line 3724
+                // line 3725
                 t_7checker_Ref _t60 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
                 t_7checker_Ref _t61 = _t60;
                 vela_str_release(v_name);
                 rc_release_t_3ast_Expr(v_obj);
                 return _t61;
             }
-            // line 3726
+            // line 3727
             t_7checker_Ref _t62 = (t_7checker_Ref){ .tag = t_7checker_Ref_Variant, .as.m_Variant = { ._0 = v_enum, ._1 = v_vi } };
             t_7checker_Ref _t63 = _t62;
             vela_str_release(v_name);
             rc_release_t_3ast_Expr(v_obj);
             return _t63;
         }
-        // line 3728
+        // line 3729
         if (v_obj.m_kind->value.tag == t_3ast_ExprKind_Name) {
             vela_str v_m_2 = v_obj.m_kind->value.as.m_Name._0;
             vela_str_retain(v_m_2);
-            // line 3730
+            // line 3731
             int64_t _t64 = f_7checker_lookup_local((*v_c), v_m_2);
             int64_t _t65 = _t64;
             bool _t66 = _t65 < 0;
@@ -47798,7 +47925,7 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                 vela_map_release(_t68);
             }
             if (_t67) {
-                // line 3732
+                // line 3733
                 t_3ast_Expr _t73 = v_obj;
                 rc_retain_t_3ast_Expr(_t73);
                 static const vela_str _t74[] = {VELA_STR_INIT("unknown module '", 16), {NULL, NULL, 0}, VELA_STR_INIT("'; is `import ", 14), {NULL, NULL, 0}, VELA_STR_INIT("` missing\?", 10)};
@@ -47811,13 +47938,13 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                 vela_str_release(_t76);
                 vela_str_release(VELA_STR("E3151", 5));
                 rc_release_t_3ast_Expr(_t73);
-                // line 3733
-                t_7modules_Module _t77 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3733:72");
-                t_7modules_Module _t78 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3733:101");
+                // line 3734
+                t_7modules_Module _t77 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3734:72");
+                t_7modules_Module _t78 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3734:101");
                 vela_array * _t79 = f_7repairs_import_module(_t77.m_source, _t78.m_path, v_m_2);
                 f_7checker_last_fix(&(*v_c), _t79);
                 vela_array_release(_t79);
-                // line 3734
+                // line 3735
                 t_7checker_Ref _t80 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
                 t_7checker_Ref _t81 = _t80;
                 vela_str_release(v_m_2);
@@ -47828,43 +47955,43 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             vela_str_release(v_m_2);
         } else {
         }
-        // line 3739
+        // line 3740
         t_3ast_Expr _t82 = v_obj;
         rc_retain_t_3ast_Expr(_t82);
         int64_t _t83 = f_7checker_value(&(*v_c), _t82);
         int64_t v_receiver = _t83;
         rc_release_t_3ast_Expr(_t82);
-        // line 3740
+        // line 3741
         int64_t _t84 = v_receiver;
         int64_t _t85 = f_5types_ERROR();
         bool _t86 = _t84 == _t85;
         if (_t86) {
-            // line 3740
+            // line 3741
             t_7checker_Ref _t87 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
             t_7checker_Ref _t88 = _t87;
             vela_str_release(v_name);
             rc_release_t_3ast_Expr(v_obj);
             return _t88;
         }
-        // line 3741
+        // line 3742
         bool _t89 = f_5types_is_struct((*v_c).m_table, v_receiver);
         if (_t89) {
-            // line 3742
+            // line 3743
             int64_t _t90 = f_5types_field_index((*v_c).m_table, v_receiver, v_name);
             int64_t v_field = _t90;
-            // line 3743
+            // line 3744
             int64_t _t91 = v_field;
             bool _t92 = _t91 >= 0;
             if (_t92) {
-                // line 3744
+                // line 3745
                 t_5types_TypeInfo _t93 = f_5types_get((*v_c).m_table, v_receiver);
-                t_5types_FieldInfo _t94 = *(t_5types_FieldInfo *)vela_at(_t93.m_fields, v_field, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:3744:65");
+                t_5types_FieldInfo _t94 = *(t_5types_FieldInfo *)vela_at(_t93.m_fields, v_field, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:3745:65");
                 int64_t v_ft = _t94.m_ty;
                 rc_release_t_5types_TypeInfo(_t93);
-                // line 3745
+                // line 3746
                 t_7checker_Dispatch _t95 = f_7checker_lookup_method((*v_c).m_table, (*v_c).m_fns, (*v_c).m_modules, v_receiver, v_name);
                 t_7checker_Dispatch v_method = _t95;
-                // line 3746
+                // line 3747
                 bool _t96 = f_5types_is_func((*v_c).m_table, v_ft);
                 bool _t97 = _t96;
                 if (!_t97) {
@@ -47873,7 +48000,7 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                     _t97 = _t99;
                 }
                 if (_t97) {
-                    // line 3746
+                    // line 3747
                     t_7checker_Ref _t100 = f_7checker_callee_value(&(*v_c), v_callee);
                     t_7checker_Ref _t101 = _t100;
                     rc_release_t_7checker_Dispatch(v_method);
@@ -47884,7 +48011,7 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                 rc_release_t_7checker_Dispatch(v_method);
             }
         }
-        // line 3749
+        // line 3750
         vela_str _t102 = v_name;
         vela_str_retain(_t102);
         t_7checker_Ref _t103 = (t_7checker_Ref){ .tag = t_7checker_Ref_Method, .as.m_Method = { ._0 = v_receiver, ._1 = _t102 } };
@@ -47895,44 +48022,44 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
     } else if (v_callee.m_kind->value.tag == t_3ast_ExprKind_Name) {
         vela_str v_name_2 = v_callee.m_kind->value.as.m_Name._0;
         vela_str_retain(v_name_2);
-        // line 3752
+        // line 3753
         vela_str _t105 = v_name_2;
         vela_str_retain(_t105);
         vela_array * _t106 = vela_array_new(vt_t_3ast_Expr(), 0);
         f_7checker_completing(&(*v_c), _t105, _t106);
         vela_array_release(_t106);
         vela_str_release(_t105);
-        // line 3753
+        // line 3754
         int64_t _t107 = f_7checker_lookup_local((*v_c), v_name_2);
         int64_t v_local = _t107;
-        // line 3754
+        // line 3755
         int64_t _t108 = v_local;
         bool _t109 = _t108 >= 0;
         if (_t109) {
-            // line 3755
-            t_7checker_Local _t110 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_local, sizeof(t_7checker_Local), "compiler/src/checker.vl:3755:51");
+            // line 3756
+            t_7checker_Local _t110 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_local, sizeof(t_7checker_Local), "compiler/src/checker.vl:3756:51");
             bool _t111 = f_5types_is_func((*v_c).m_table, _t110.m_ty);
             if (_t111) {
-                // line 3756
-                f_7checker_capture(&(*v_c), v_local);
                 // line 3757
+                f_7checker_capture(&(*v_c), v_local);
+                // line 3758
                 t_7checker_Ref _t112 = (t_7checker_Ref){ .tag = t_7checker_Ref_Local, .as.m_Local = { ._0 = v_local } };
                 t_7checker_Ref _t113 = _t112;
                 vela_str_release(v_name_2);
                 return _t113;
             }
-            // line 3759
-            t_7checker_Local _t114 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_local, sizeof(t_7checker_Local), "compiler/src/checker.vl:3759:28");
+            // line 3760
+            t_7checker_Local _t114 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_local, sizeof(t_7checker_Local), "compiler/src/checker.vl:3760:28");
             int64_t _t115 = _t114.m_ty;
             int64_t _t116 = f_5types_ERROR();
             bool _t117 = _t115 != _t116;
             if (_t117) {
-                // line 3760
+                // line 3761
                 static const vela_str _t118[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' is a variable of type ", 24), {NULL, NULL, 0}, VELA_STR_INIT(", not a function", 16)};
                 vela_str _t119[5];
                 memcpy(_t119, _t118, sizeof _t119);
                 _t119[1] = v_name_2;
-                t_7checker_Local _t120 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_local, sizeof(t_7checker_Local), "compiler/src/checker.vl:3760:113");
+                t_7checker_Local _t120 = *(t_7checker_Local *)vela_at((*v_c).m_locals, v_local, sizeof(t_7checker_Local), "compiler/src/checker.vl:3761:113");
                 vela_str _t121 = f_7checker_show((*v_c), _t120.m_ty);
                 _t119[3] = _t121;
                 vela_str _t122 = vela_str_join(_t119, 5);
@@ -47941,13 +48068,13 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
                 vela_str_release(_t122);
                 vela_str_release(VELA_STR("E3152", 5));
             }
-            // line 3763
+            // line 3764
             t_7checker_Ref _t123 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
             t_7checker_Ref _t124 = _t123;
             vela_str_release(v_name_2);
             return _t124;
         }
-        // line 3765
+        // line 3766
         vela_map * _t125 = f_7checker_module_fns((*v_c));
         vela_str _t127 = v_name_2;
         int64_t *_t126 = vela_map_find(_t125, &_t127);
@@ -47959,17 +48086,17 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
         }
         if (_t128.tag == Option_Int_Some) {
             int64_t v_f = _t128.as.m_Some._0;
-            // line 3766
-            t_7checker_FnInfo _t129 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_f, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:3766:38");
+            // line 3767
+            t_7checker_FnInfo _t129 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_f, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:3767:38");
             if (_t129.m_decl.m_constant) {
-                // line 3766
+                // line 3767
                 t_7checker_Ref _t130 = (t_7checker_Ref){ .tag = t_7checker_Ref_Constant, .as.m_Constant = { ._0 = v_f } };
                 t_7checker_Ref _t131 = _t130;
                 vela_map_release(_t125);
                 vela_str_release(v_name_2);
                 return _t131;
             }
-            // line 3766
+            // line 3767
             t_7checker_Ref _t132 = (t_7checker_Ref){ .tag = t_7checker_Ref_Function, .as.m_Function = { ._0 = v_f } };
             t_7checker_Ref _t133 = _t132;
             vela_map_release(_t125);
@@ -47978,7 +48105,7 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
         } else {
         }
         vela_map_release(_t125);
-        // line 3769
+        // line 3770
         bool _t134 = f_7checker_is_prelude(v_name_2);
         bool _t135 = _t134;
         if (!_t135) {
@@ -47986,7 +48113,7 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             _t135 = _t136;
         }
         if (_t135) {
-            // line 3770
+            // line 3771
             vela_str _t137 = v_name_2;
             vela_str_retain(_t137);
             t_7checker_Ref _t138 = (t_7checker_Ref){ .tag = t_7checker_Ref_Builtin, .as.m_Builtin = { ._0 = _t137 } };
@@ -47994,13 +48121,13 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             vela_str_release(v_name_2);
             return _t139;
         }
-        // line 3772
-        t_7modules_Module _t140 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3772:34");
+        // line 3773
+        t_7modules_Module _t140 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:3773:34");
         vela_str _t142 = v_name_2;
         int64_t *_t141 = vela_map_find(_t140.m_imports, &_t142);
         bool _t143 = _t141 != NULL;
         if (_t143) {
-            // line 3773
+            // line 3774
             static const vela_str _t144[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' is a module; call its functions as ", 37), {NULL, NULL, 0}, VELA_STR_INIT(".name(...)", 10)};
             vela_str _t145[5];
             memcpy(_t145, _t144, sizeof _t145);
@@ -48010,19 +48137,19 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             f_7checker_report_at(&(*v_c), v_callee, VELA_STR("E3153", 5), _t146);
             vela_str_release(_t146);
             vela_str_release(VELA_STR("E3153", 5));
-            // line 3774
+            // line 3775
             t_7checker_Ref _t147 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
             t_7checker_Ref _t148 = _t147;
             vela_str_release(v_name_2);
             return _t148;
         }
-        // line 3776
+        // line 3777
         vela_map * _t149 = f_7checker_module_types((*v_c));
         vela_str _t151 = v_name_2;
         int64_t *_t150 = vela_map_find(_t149, &_t151);
         bool _t152 = _t150 != NULL;
         if (_t152) {
-            // line 3777
+            // line 3778
             static const vela_str _t153[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' is a type; build a value with ", 32), {NULL, NULL, 0}, VELA_STR_INIT(" { ... }", 8)};
             vela_str _t154[5];
             memcpy(_t154, _t153, sizeof _t154);
@@ -48032,7 +48159,7 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             f_7checker_report_at(&(*v_c), v_callee, VELA_STR("E3154", 5), _t155);
             vela_str_release(_t155);
             vela_str_release(VELA_STR("E3154", 5));
-            // line 3778
+            // line 3779
             t_7checker_Ref _t156 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
             t_7checker_Ref _t157 = _t156;
             vela_map_release(_t149);
@@ -48040,17 +48167,17 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             return _t157;
         }
         vela_map_release(_t149);
-        // line 3780
+        // line 3781
         bool _t158 = f_7checker_was_undefined((*v_c), v_name_2);
         bool _t159 = !_t158;
         if (_t159) {
-            // line 3781
+            // line 3782
             vela_str _t160 = v_name_2;
             vela_str_retain(_t160);
             vela_unique(&(*v_c).m_undefined);
             vela_str _t161 = _t160;
             vela_push((*v_c).m_undefined, &_t161, sizeof(vela_str));
-            // line 3782
+            // line 3783
             static const vela_str _t162[] = {VELA_STR_INIT("undefined function '", 20), {NULL, NULL, 0}, VELA_STR_INIT("'", 1), {NULL, NULL, 0}};
             vela_str _t163[4];
             memcpy(_t163, _t162, sizeof _t163);
@@ -48063,13 +48190,13 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
             vela_str_release(_t165);
             vela_str_release(VELA_STR("E3155", 5));
         }
-        // line 3784
+        // line 3785
         t_7checker_Ref _t166 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
         t_7checker_Ref _t167 = _t166;
         vela_str_release(v_name_2);
         return _t167;
     } else {
-        // line 3786
+        // line 3787
         t_7checker_Ref _t168 = f_7checker_callee_value(&(*v_c), v_callee);
         t_7checker_Ref _t169 = _t168;
         return _t169;
@@ -48078,23 +48205,23 @@ t_7checker_Ref f_7checker_call_target(t_7checker_Checker * v_c, t_3ast_Expr v_ca
 /* vela: part */
 
 t_7checker_Ref f_7checker_callee_value(t_7checker_Checker * v_c, t_3ast_Expr v_callee) {
-    // line 3793
+    // line 3794
     int64_t _t1 = f_7checker_value(&(*v_c), v_callee);
     int64_t v_t = _t1;
-    // line 3794
+    // line 3795
     bool _t2 = f_5types_is_func((*v_c).m_table, v_t);
     if (_t2) {
-        // line 3795
+        // line 3796
         t_7checker_Ref _t3 = (t_7checker_Ref){ .tag = t_7checker_Ref_Indirect };
         t_7checker_Ref _t4 = _t3;
         return _t4;
     }
-    // line 3797
+    // line 3798
     int64_t _t5 = v_t;
     int64_t _t6 = f_5types_ERROR();
     bool _t7 = _t5 != _t6;
     if (_t7) {
-        // line 3798
+        // line 3799
         vela_str _t8 = f_7checker_show((*v_c), v_t);
         vela_str _t9 = vela_str_concat(VELA_STR("only a function can be called, and this is ", 43), _t8);
         vela_str_release(_t8);
@@ -48102,7 +48229,7 @@ t_7checker_Ref f_7checker_callee_value(t_7checker_Checker * v_c, t_3ast_Expr v_c
         vela_str_release(_t9);
         vela_str_release(VELA_STR("E3156", 5));
     }
-    // line 3800
+    // line 3801
     t_7checker_Ref _t10 = (t_7checker_Ref){ .tag = t_7checker_Ref_NoRef };
     t_7checker_Ref _t11 = _t10;
     return _t11;
@@ -48110,39 +48237,39 @@ t_7checker_Ref f_7checker_callee_value(t_7checker_Checker * v_c, t_3ast_Expr v_c
 /* vela: part */
 
 bool f_7checker_captured(t_7checker_Checker v_c, int64_t v_id) {
-    // line 3808
+    // line 3809
     int64_t _t1 = v_c.m_in_closures->len;
     int64_t v_n = _t1;
-    // line 3809
+    // line 3810
     int64_t _t2 = v_n;
     bool _t3 = _t2 == 0;
     if (_t3) {
-        // line 3810
+        // line 3811
         bool _t4 = false;
         return _t4;
     }
-    // line 3812
+    // line 3813
     int64_t _t6 = v_n;
     int64_t _t7 = (_t6 - 1);
-    t_7checker_ClosureCtx _t5 = *(t_7checker_ClosureCtx *)vela_at(v_c.m_in_closures, _t7, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3812:27");
+    t_7checker_ClosureCtx _t5 = *(t_7checker_ClosureCtx *)vela_at(v_c.m_in_closures, _t7, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3813:27");
     int64_t _t8 = v_c.m_scopes->len;
     int64_t _t9 = _t8;
     for (int64_t _t10 = _t5.m_boundary; _t10 < _t9; _t10++) {
         int64_t v_i = _t10;
-        // line 3813
-        vela_map * _t12 = *(vela_map * *)vela_at(v_c.m_scopes, v_i, sizeof(vela_map *), "compiler/src/checker.vl:3813:39");
+        // line 3814
+        vela_map * _t12 = *(vela_map * *)vela_at(v_c.m_scopes, v_i, sizeof(vela_map *), "compiler/src/checker.vl:3814:39");
         vela_array * _t13 = vela_map_keys(_t12);
         vela_array * _t11 = _t13;
         for (int64_t _t14 = 0; _t14 < _t11->len; _t14++) {
             vela_str v_name = ((vela_str *)_t11->data)[_t14];
-            // line 3814
-            vela_map * _t15 = *(vela_map * *)vela_at(v_c.m_scopes, v_i, sizeof(vela_map *), "compiler/src/checker.vl:3814:24");
+            // line 3815
+            vela_map * _t15 = *(vela_map * *)vela_at(v_c.m_scopes, v_i, sizeof(vela_map *), "compiler/src/checker.vl:3815:24");
             vela_str _t17 = v_name;
-            int64_t _t16 = *(int64_t *)vela_map_at(_t15, &_t17, "compiler/src/checker.vl:3814:27");
+            int64_t _t16 = *(int64_t *)vela_map_at(_t15, &_t17, "compiler/src/checker.vl:3815:27");
             int64_t _t18 = _t16;
             bool _t19 = _t18 == v_id;
             if (_t19) {
-                // line 3815
+                // line 3816
                 bool _t20 = false;
                 vela_array_release(_t11);
                 return _t20;
@@ -48150,83 +48277,83 @@ bool f_7checker_captured(t_7checker_Checker v_c, int64_t v_id) {
         }
         vela_array_release(_t11);
     }
-    // line 3819
+    // line 3820
     bool _t21 = true;
     return _t21;
 }
 /* vela: part */
 
 void f_7checker_capture(t_7checker_Checker * v_c, int64_t v_id) {
-    // line 3826
+    // line 3827
     int64_t _t1 = (*v_c).m_in_closures->len;
     int64_t _t2 = _t1;
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v_k = _t3;
-        // line 3827
-        bool v_inside = false;
         // line 3828
-        t_7checker_ClosureCtx _t4 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, v_k, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3828:31");
+        bool v_inside = false;
+        // line 3829
+        t_7checker_ClosureCtx _t4 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, v_k, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3829:31");
         int64_t _t5 = (*v_c).m_scopes->len;
         int64_t _t6 = _t5;
         for (int64_t _t7 = _t4.m_boundary; _t7 < _t6; _t7++) {
             int64_t v_i = _t7;
-            // line 3829
-            vela_map * _t9 = *(vela_map * *)vela_at((*v_c).m_scopes, v_i, sizeof(vela_map *), "compiler/src/checker.vl:3829:43");
+            // line 3830
+            vela_map * _t9 = *(vela_map * *)vela_at((*v_c).m_scopes, v_i, sizeof(vela_map *), "compiler/src/checker.vl:3830:43");
             vela_array * _t10 = vela_map_keys(_t9);
             vela_array * _t8 = _t10;
             for (int64_t _t11 = 0; _t11 < _t8->len; _t11++) {
                 vela_str v_name = ((vela_str *)_t8->data)[_t11];
-                // line 3830
-                vela_map * _t12 = *(vela_map * *)vela_at((*v_c).m_scopes, v_i, sizeof(vela_map *), "compiler/src/checker.vl:3830:28");
+                // line 3831
+                vela_map * _t12 = *(vela_map * *)vela_at((*v_c).m_scopes, v_i, sizeof(vela_map *), "compiler/src/checker.vl:3831:28");
                 vela_str _t14 = v_name;
-                int64_t _t13 = *(int64_t *)vela_map_at(_t12, &_t14, "compiler/src/checker.vl:3830:31");
+                int64_t _t13 = *(int64_t *)vela_map_at(_t12, &_t14, "compiler/src/checker.vl:3831:31");
                 int64_t _t15 = _t13;
                 bool _t16 = _t15 == v_id;
                 if (_t16) {
-                    // line 3831
+                    // line 3832
                     v_inside = true;
                 }
             }
             vela_array_release(_t8);
         }
-        // line 3835
+        // line 3836
         if (v_inside) {
-            // line 3836
+            // line 3837
             continue;
         }
-        // line 3838
-        bool v_seen = false;
         // line 3839
-        t_7checker_ClosureCtx _t18 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, v_k, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3839:31");
+        bool v_seen = false;
+        // line 3840
+        t_7checker_ClosureCtx _t18 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, v_k, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3840:31");
         vela_array * _t19 = _t18.m_captures;
         vela_array_retain(_t19);
         vela_array * _t17 = _t19;
         for (int64_t _t20 = 0; _t20 < _t17->len; _t20++) {
             int64_t v_x = ((int64_t *)_t17->data)[_t20];
-            // line 3840
+            // line 3841
             int64_t _t21 = v_x;
             bool _t22 = _t21 == v_id;
             if (_t22) {
-                // line 3841
+                // line 3842
                 v_seen = true;
             }
         }
         vela_array_release(_t17);
-        // line 3844
+        // line 3845
         bool _t23 = !v_seen;
         if (_t23) {
-            // line 3845
+            // line 3846
             vela_unique(&(*v_c).m_in_closures);
-            vela_unique(&(*(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, v_k, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3845:35")).m_captures);
+            vela_unique(&(*(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, v_k, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3846:35")).m_captures);
             int64_t _t24 = v_id;
-            vela_push((*(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, v_k, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3845:35")).m_captures, &_t24, sizeof(int64_t));
+            vela_push((*(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, v_k, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3846:35")).m_captures, &_t24, sizeof(int64_t));
         }
     }
 }
 /* vela: part */
 
 bool f_7checker_known_type(t_7checker_Checker v_c, int64_t v_t) {
-    // line 3853
+    // line 3854
     int64_t _t1 = v_t;
     bool _t2 = _t1 >= 0;
     bool _t3 = _t2;
@@ -48241,12 +48368,12 @@ bool f_7checker_known_type(t_7checker_Checker v_c, int64_t v_t) {
 /* vela: part */
 
 int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array * v_params, Option_3ast_TypeName v_result, t_3ast_Block v_body, int64_t v_expected) {
-    // line 3860
+    // line 3861
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     vela_array * v_want_params = _t1;
-    // line 3861
-    int64_t v_want_result = -3;
     // line 3862
+    int64_t v_want_result = -3;
+    // line 3863
     int64_t _t2 = v_expected;
     bool _t3 = _t2 >= 0;
     bool _t4 = _t3;
@@ -48265,14 +48392,14 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
         rc_release_t_5types_TypeInfo(_t7);
     }
     if (_t6) {
-        // line 3863
+        // line 3864
         t_5types_TypeInfo _t12 = f_5types_get((*v_c).m_table, v_expected);
         vela_array * _t13 = _t12.m_args;
         vela_array_retain(_t13);
         vela_array_release(v_want_params);
         v_want_params = _t13;
         rc_release_t_5types_TypeInfo(_t12);
-        // line 3864
+        // line 3865
         t_5types_TypeInfo _t14 = f_5types_get((*v_c).m_table, v_expected);
         bool _t15 = f_7checker_known_type((*v_c), _t14.m_result);
         bool _t16 = _t15;
@@ -48285,23 +48412,23 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
             rc_release_t_5types_TypeInfo(_t17);
         }
         if (_t16) {
-            // line 3865
+            // line 3866
             t_5types_TypeInfo _t21 = f_5types_get((*v_c).m_table, v_expected);
             v_want_result = _t21.m_result;
             rc_release_t_5types_TypeInfo(_t21);
         }
         rc_release_t_5types_TypeInfo(_t14);
     }
-    // line 3868
+    // line 3869
     vela_map * _t22 = vela_map_new(&vela_type_str, &vela_type_int);
     vela_map * v_scope = _t22;
-    // line 3869
+    // line 3870
     vela_array * _t23 = vela_array_new(&vela_type_int, 0);
     vela_array * v_locals = _t23;
-    // line 3870
+    // line 3871
     vela_array * _t24 = vela_array_new(&vela_type_int, 0);
     vela_array * v_param_types = _t24;
-    // line 3871
+    // line 3872
     int64_t _t25 = v_params->len;
     int64_t _t26 = _t25;
     vela_unique_map(&v_scope);
@@ -48309,18 +48436,18 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
     vela_unique(&v_param_types);
     for (int64_t _t27 = 0; _t27 < _t26; _t27++) {
         int64_t v_i = _t27;
-        // line 3872
-        t_3ast_ClosureParam _t28 = *(t_3ast_ClosureParam *)vela_at(v_params, v_i, sizeof(t_3ast_ClosureParam), "compiler/src/checker.vl:3872:23");
+        // line 3873
+        t_3ast_ClosureParam _t28 = *(t_3ast_ClosureParam *)vela_at(v_params, v_i, sizeof(t_3ast_ClosureParam), "compiler/src/checker.vl:3873:23");
         rc_retain_t_3ast_ClosureParam(_t28);
         t_3ast_ClosureParam v_p = _t28;
-        // line 3873
+        // line 3874
         int64_t _t29 = f_5types_ERROR();
         int64_t v_t = _t29;
-        // line 3874
+        // line 3875
         if (v_p.m_ty.tag == Option_3ast_TypeName_Some) {
             t_3ast_TypeName v_tn = v_p.m_ty.as.m_Some._0;
             rc_retain_t_3ast_TypeName(v_tn);
-            // line 3875
+            // line 3876
             t_3ast_TypeName _t30 = v_tn;
             rc_retain_t_3ast_TypeName(_t30);
             int64_t _t31 = f_7checker_resolve_type(&(*v_c), _t30);
@@ -48328,7 +48455,7 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
             rc_release_t_3ast_TypeName(_t30);
             rc_release_t_3ast_TypeName(v_tn);
         } else {
-            // line 3877
+            // line 3878
             int64_t _t32 = v_i;
             int64_t _t33 = v_want_params->len;
             bool _t34 = _t32 < _t33;
@@ -48339,11 +48466,11 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
                 _t35 = _t37;
             }
             if (_t35) {
-                // line 3878
+                // line 3879
                 int64_t _t38 = *((int64_t *)v_want_params->data + v_i);
                 v_t = _t38;
             } else {
-                // line 3880
+                // line 3881
                 static const vela_str _t39[] = {VELA_STR_INIT("cannot tell the type of parameter '", 35), {NULL, NULL, 0}, VELA_STR_INIT("'; write it, as in fn(", 22), {NULL, NULL, 0}, VELA_STR_INIT(": Int) => ...", 13)};
                 vela_str _t40[5];
                 memcpy(_t40, _t39, sizeof _t40);
@@ -48355,12 +48482,12 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
                 vela_str_release(VELA_STR("E3157", 5));
             }
         }
-        // line 3885
+        // line 3886
         vela_str _t43 = v_p.m_name;
         int64_t *_t42 = vela_map_find(v_scope, &_t43);
         bool _t44 = _t42 != NULL;
         if (_t44) {
-            // line 3886
+            // line 3887
             static const vela_str _t45[] = {VELA_STR_INIT("parameter '", 11), {NULL, NULL, 0}, VELA_STR_INIT("' is already declared", 21)};
             vela_str _t46[3];
             memcpy(_t46, _t45, sizeof _t46);
@@ -48370,38 +48497,38 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
             vela_str_release(_t47);
             vela_str_release(VELA_STR("E3158", 5));
         }
-        // line 3888
+        // line 3889
         vela_str _t48 = v_p.m_name;
         vela_str_retain(_t48);
         f_7checker_check_name_allowed(&(*v_c), _t48, v_p.m_line, v_p.m_col);
         vela_str_release(_t48);
-        // line 3889
+        // line 3890
         vela_str _t49 = v_p.m_name;
         vela_str_retain(_t49);
         int64_t _t50 = f_7checker_new_local(&(*v_c), _t49, v_t, VELA_STR("parameter", 9), v_p.m_line, v_p.m_col);
         int64_t v_local = _t50;
         vela_str_release(VELA_STR("parameter", 9));
         vela_str_release(_t49);
-        // line 3890
+        // line 3891
         vela_str _t51 = v_p.m_name;
         vela_str_retain(_t51);
         vela_str _t52 = _t51;
         int64_t _t53 = v_local;
         vela_map_set(v_scope, &_t52, &_t53);
-        // line 3891
+        // line 3892
         int64_t _t54 = v_local;
         vela_push(v_locals, &_t54, sizeof(int64_t));
-        // line 3892
+        // line 3893
         int64_t _t55 = v_t;
         vela_push(v_param_types, &_t55, sizeof(int64_t));
         rc_release_t_3ast_ClosureParam(v_p);
     }
-    // line 3894
-    int64_t v_res = v_want_result;
     // line 3895
+    int64_t v_res = v_want_result;
+    // line 3896
     if (v_result.tag == Option_3ast_TypeName_Some) {
         t_3ast_TypeName v_tn_2 = v_result.as.m_Some._0;
-        // line 3896
+        // line 3897
         t_3ast_TypeName _t56 = v_tn_2;
         rc_retain_t_3ast_TypeName(_t56);
         int64_t _t57 = f_7checker_resolve_type(&(*v_c), _t56);
@@ -48409,11 +48536,11 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
         rc_release_t_3ast_TypeName(_t56);
     } else {
     }
-    // line 3899
-    int64_t v_saved_unsafe = (*v_c).m_unsafe_depth;
     // line 3900
-    (*v_c).m_unsafe_depth = 0;
+    int64_t v_saved_unsafe = (*v_c).m_unsafe_depth;
     // line 3901
+    (*v_c).m_unsafe_depth = 0;
+    // line 3902
     int64_t _t58 = (*v_c).m_scopes->len;
     vela_array * _t59 = vela_array_new(&vela_type_int, 0);
     vela_array * _t60 = vela_array_new(&vela_type_str, 0);
@@ -48421,66 +48548,66 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
     vela_unique(&(*v_c).m_in_closures);
     t_7checker_ClosureCtx _t62 = _t61;
     vela_push((*v_c).m_in_closures, &_t62, sizeof(t_7checker_ClosureCtx));
-    // line 3902
+    // line 3903
     vela_map * _t63 = v_scope;
     vela_map_retain(_t63);
     f_7checker_push_scope(&(*v_c), _t63);
     vela_map_release(_t63);
-    // line 3903
+    // line 3904
     vela_array * _t64 = (*v_c).m_loops;
     vela_array_retain(_t64);
     vela_array * v_saved_loops = _t64;
-    // line 3904
+    // line 3905
     vela_array * _t65 = vela_array_new(vt_t_7checker_Loop(), 0);
     vela_array_release((*v_c).m_loops);
     (*v_c).m_loops = _t65;
-    // line 3905
+    // line 3906
     vela_array * _t67 = v_body.m_stmts;
     vela_array_retain(_t67);
     vela_array * _t66 = _t67;
     for (int64_t _t68 = 0; _t68 < _t66->len; _t68++) {
         t_3ast_Stmt v_s = ((t_3ast_Stmt *)_t66->data)[_t68];
-        // line 3906
+        // line 3907
         t_3ast_Stmt _t69 = v_s;
         rc_retain_t_3ast_Stmt(_t69);
         f_7checker_stmt(&(*v_c), _t69);
         rc_release_t_3ast_Stmt(_t69);
     }
     vela_array_release(_t66);
-    // line 3908
+    // line 3909
     vela_array * _t70 = v_saved_loops;
     vela_array_retain(_t70);
     vela_array_release((*v_c).m_loops);
     (*v_c).m_loops = _t70;
-    // line 3909
-    (*v_c).m_unsafe_depth = v_saved_unsafe;
     // line 3910
-    f_7checker_pop_scope(&(*v_c));
+    (*v_c).m_unsafe_depth = v_saved_unsafe;
     // line 3911
+    f_7checker_pop_scope(&(*v_c));
+    // line 3912
     int64_t _t72 = (*v_c).m_in_closures->len;
     int64_t _t73 = _t72;
     int64_t _t74 = (_t73 - 1);
-    t_7checker_ClosureCtx _t71 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t74, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3911:28");
+    t_7checker_ClosureCtx _t71 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t74, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3912:28");
     rc_retain_t_7checker_ClosureCtx(_t71);
     t_7checker_ClosureCtx v_ctx = _t71;
-    // line 3912
+    // line 3913
     int64_t _t75 = (*v_c).m_in_closures->len;
     int64_t _t76 = _t75;
     int64_t _t77 = (_t76 - 1);
-    vela_array * _t78 = vela_array_slice((*v_c).m_in_closures, 0, _t77, "compiler/src/checker.vl:3912:34");
+    vela_array * _t78 = vela_array_slice((*v_c).m_in_closures, 0, _t77, "compiler/src/checker.vl:3913:34");
     vela_array_release((*v_c).m_in_closures);
     (*v_c).m_in_closures = _t78;
-    // line 3913
-    int64_t v_final = v_ctx.m_result;
     // line 3914
+    int64_t v_final = v_ctx.m_result;
+    // line 3915
     int64_t _t79 = v_final;
     bool _t80 = _t79 == -3;
     if (_t80) {
-        // line 3915
+        // line 3916
         int64_t _t81 = f_5types_NOTHING();
         v_final = _t81;
     }
-    // line 3917
+    // line 3918
     int64_t _t82 = v_final;
     int64_t _t83 = f_5types_NOTHING();
     bool _t84 = _t82 != _t83;
@@ -48498,7 +48625,7 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
         _t89 = _t91;
     }
     if (_t89) {
-        // line 3918
+        // line 3919
         static const vela_str _t92[] = {VELA_STR_INIT("missing return: this function value returns ", 44), {NULL, NULL, 0}, VELA_STR_INIT(", but the end of its body can be reached", 40)};
         vela_str _t93[3];
         memcpy(_t93, _t92, sizeof _t93);
@@ -48510,7 +48637,7 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
         vela_str_release(_t95);
         vela_str_release(VELA_STR("E3159", 5));
     }
-    // line 3921
+    // line 3922
     vela_array * _t96 = v_locals;
     vela_array_retain(_t96);
     vela_array * _t97 = v_ctx.m_captures;
@@ -48520,7 +48647,7 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
     int64_t _t99 = v_e.m_id;
     t_7checker_ClosureInfo _t100 = _t98;
     vela_map_set((*v_c).m_closures, &_t99, &_t100);
-    // line 3922
+    // line 3923
     vela_array * _t101 = v_param_types;
     vela_array_retain(_t101);
     vela_array * _t102 = v_ctx.m_effects;
@@ -48540,26 +48667,26 @@ int64_t f_7checker_closure(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_array
 /* vela: part */
 
 void f_7checker_closure_return(t_7checker_Checker * v_c, t_3ast_Stmt v_s, Option_3ast_Expr v_v) {
-    // line 3927
+    // line 3928
     int64_t _t1 = (*v_c).m_in_closures->len;
     int64_t v_n = _t1;
-    // line 3928
+    // line 3929
     int64_t _t3 = v_n;
     int64_t _t4 = (_t3 - 1);
-    t_7checker_ClosureCtx _t2 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t4, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3928:29");
+    t_7checker_ClosureCtx _t2 = *(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t4, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3929:29");
     int64_t v_want = _t2.m_result;
-    // line 3929
+    // line 3930
     if (v_v.tag == Option_3ast_Expr_None) {
-        // line 3931
+        // line 3932
         int64_t _t5 = v_want;
         bool _t6 = _t5 == -3;
         if (_t6) {
-            // line 3932
+            // line 3933
             int64_t _t7 = f_5types_NOTHING();
             vela_unique(&(*v_c).m_in_closures);
             int64_t _t8 = v_n;
             int64_t _t9 = (_t8 - 1);
-            (*(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t9, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3932:30")).m_result = _t7;
+            (*(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t9, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3933:30")).m_result = _t7;
         } else {
             int64_t _t10 = v_want;
             int64_t _t11 = f_5types_NOTHING();
@@ -48572,7 +48699,7 @@ void f_7checker_closure_return(t_7checker_Checker * v_c, t_3ast_Stmt v_s, Option
                 _t13 = _t16;
             }
             if (_t13) {
-                // line 3934
+                // line 3935
                 static const vela_str _t17[] = {VELA_STR_INIT("this function value returns ", 28), {NULL, NULL, 0}, VELA_STR_INIT(", so 'return' needs a value", 27)};
                 vela_str _t18[3];
                 memcpy(_t18, _t17, sizeof _t18);
@@ -48587,38 +48714,38 @@ void f_7checker_closure_return(t_7checker_Checker * v_c, t_3ast_Stmt v_s, Option
         }
     } else {
         t_3ast_Expr v_e = v_v.as.m_Some._0;
-        // line 3938
+        // line 3939
         int64_t _t21 = v_want;
         bool _t22 = _t21 == -3;
         if (_t22) {
-            // line 3939
+            // line 3940
             t_3ast_Expr _t23 = v_e;
             rc_retain_t_3ast_Expr(_t23);
             int64_t _t24 = f_7checker_value(&(*v_c), _t23);
             vela_unique(&(*v_c).m_in_closures);
             int64_t _t25 = v_n;
             int64_t _t26 = (_t25 - 1);
-            (*(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t26, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3939:30")).m_result = _t24;
+            (*(t_7checker_ClosureCtx *)vela_at((*v_c).m_in_closures, _t26, sizeof(t_7checker_ClosureCtx), "compiler/src/checker.vl:3940:30")).m_result = _t24;
             rc_release_t_3ast_Expr(_t23);
         } else {
             int64_t _t27 = v_want;
             int64_t _t28 = f_5types_NOTHING();
             bool _t29 = _t27 == _t28;
             if (_t29) {
-                // line 3941
+                // line 3942
                 t_3ast_Expr _t30 = v_e;
                 rc_retain_t_3ast_Expr(_t30);
                 f_7checker_report_at(&(*v_c), _t30, VELA_STR("E3161", 5), VELA_STR("this function value does not return a value, so 'return' cannot have one", 72));
                 vela_str_release(VELA_STR("this function value does not return a value, so 'return' cannot have one", 72));
                 vela_str_release(VELA_STR("E3161", 5));
                 rc_release_t_3ast_Expr(_t30);
-                // line 3942
+                // line 3943
                 t_3ast_Expr _t31 = v_e;
                 rc_retain_t_3ast_Expr(_t31);
                 int64_t _t32 = f_7checker_infer(&(*v_c), _t31);
                 rc_release_t_3ast_Expr(_t31);
             } else {
-                // line 3944
+                // line 3945
                 t_3ast_Expr _t33 = v_e;
                 rc_retain_t_3ast_Expr(_t33);
                 static const vela_str _t34[] = {VELA_STR_INIT("this function value returns ", 28), {NULL, NULL, 0}, VELA_STR_INIT(", but this is ", 14)};
@@ -48640,55 +48767,55 @@ void f_7checker_closure_return(t_7checker_Checker * v_c, t_3ast_Stmt v_s, Option
 /* vela: part */
 
 int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args) {
-    // line 3957
+    // line 3958
     bool _t1 = vela_str_eq(v_name, VELA_STR("tasks.map", 9));
     bool v_is_map = _t1;
-    // line 3958
+    // line 3959
     int64_t _t2 = f_5types_NOTHING();
     int64_t v_nothing = _t2;
-    // line 3959
+    // line 3960
     if (v_is_map) {
-        // line 3960
+        // line 3961
         int64_t _t3 = f_5types_ERROR();
         v_nothing = _t3;
     }
-    // line 3962
+    // line 3963
     int64_t _t4 = v_args->len;
     bool _t5 = f_7checker_arity(&(*v_c), v_e, v_name, 2, _t4);
     bool _t6 = !_t5;
     if (_t6) {
-        // line 3963
+        // line 3964
         vela_array * _t8 = v_args;
         vela_array_retain(_t8);
         vela_array * _t7 = _t8;
         for (int64_t _t9 = 0; _t9 < _t7->len; _t9++) {
             t_3ast_Expr v_a = ((t_3ast_Expr *)_t7->data)[_t9];
-            // line 3964
+            // line 3965
             t_3ast_Expr _t10 = v_a;
             rc_retain_t_3ast_Expr(_t10);
             int64_t _t11 = f_7checker_infer(&(*v_c), _t10);
             rc_release_t_3ast_Expr(_t10);
         }
         vela_array_release(_t7);
-        // line 3966
+        // line 3967
         int64_t _t12 = v_nothing;
         return _t12;
     }
-    // line 3968
+    // line 3969
     int64_t _t13 = f_5types_ERROR();
     int64_t v_elem = _t13;
-    // line 3969
-    t_3ast_Expr _t14 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3969:31");
+    // line 3970
+    t_3ast_Expr _t14 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3970:31");
     rc_retain_t_3ast_Expr(_t14);
     int64_t _t15 = f_7checker_value(&(*v_c), _t14);
     int64_t v_xs = _t15;
     rc_release_t_3ast_Expr(_t14);
-    // line 3970
+    // line 3971
     bool _t16 = f_5types_is_array((*v_c).m_table, v_xs);
     if (_t16) {
-        // line 3971
+        // line 3972
         t_5types_TypeInfo _t17 = f_5types_get((*v_c).m_table, v_xs);
-        int64_t _t18 = *(int64_t *)vela_at(_t17.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:3971:43");
+        int64_t _t18 = *(int64_t *)vela_at(_t17.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:3972:43");
         v_elem = _t18;
         rc_release_t_5types_TypeInfo(_t17);
     } else {
@@ -48696,8 +48823,8 @@ int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         int64_t _t20 = f_5types_ERROR();
         bool _t21 = _t19 != _t20;
         if (_t21) {
-            // line 3973
-            t_3ast_Expr _t22 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3973:30");
+            // line 3974
+            t_3ast_Expr _t22 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3974:30");
             rc_retain_t_3ast_Expr(_t22);
             static const vela_str _t23[] = {VELA_STR_INIT("argument 1 of '", 15), {NULL, NULL, 0}, VELA_STR_INIT("' must be an array, found ", 26), {NULL, NULL, 0}};
             vela_str _t24[4];
@@ -48713,64 +48840,64 @@ int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
             rc_release_t_3ast_Expr(_t22);
         }
     }
-    // line 3976
+    // line 3977
     int64_t _t27 = f_5types_NOTHING();
     int64_t v_result = _t27;
-    // line 3977
+    // line 3978
     vela_array * _t28 = (*v_c).m_pending;
     vela_array_retain(_t28);
     vela_array * v_saved_pending = _t28;
-    // line 3978
+    // line 3979
     if (v_is_map) {
-        // line 3979
+        // line 3980
         vela_array * _t29 = vela_array_new(&vela_type_str, 0);
         int64_t _t30 = f_5types_param(&(*v_c).m_table, VELA_STR("R", 1), _t29, v_e.m_line, v_e.m_col);
         v_result = _t30;
         vela_array_release(_t29);
         vela_str_release(VELA_STR("R", 1));
-        // line 3980
+        // line 3981
         vela_array * _t31 = vela_array_new(&vela_type_int, 1);
         int64_t _t32 = v_result;
         vela_push(_t31, &_t32, sizeof(int64_t));
         vela_array_release((*v_c).m_pending);
         (*v_c).m_pending = _t31;
     }
-    // line 3982
+    // line 3983
     vela_array * _t33 = vela_array_new(&vela_type_int, 1);
     int64_t _t34 = v_elem;
     vela_push(_t33, &_t34, sizeof(int64_t));
     int64_t _t35 = f_5types_func(&(*v_c).m_table, _t33, v_result);
     (*v_c).m_expected = _t35;
     vela_array_release(_t33);
-    // line 3983
-    t_3ast_Expr _t36 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3983:30");
+    // line 3984
+    t_3ast_Expr _t36 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3984:30");
     rc_retain_t_3ast_Expr(_t36);
     int64_t _t37 = f_7checker_value(&(*v_c), _t36);
     int64_t v_f = _t37;
     rc_release_t_3ast_Expr(_t36);
-    // line 3984
+    // line 3985
     vela_array * _t38 = v_saved_pending;
     vela_array_retain(_t38);
     vela_array_release((*v_c).m_pending);
     (*v_c).m_pending = _t38;
-    // line 3985
+    // line 3986
     int64_t _t39 = v_f;
     int64_t _t40 = f_5types_ERROR();
     bool _t41 = _t39 == _t40;
     if (_t41) {
-        // line 3986
+        // line 3987
         int64_t _t42 = v_nothing;
         vela_array_release(v_saved_pending);
         return _t42;
     }
-    // line 3988
+    // line 3989
     vela_str _t43 = vela_str_concat(VELA_STR("the function given to ", 22), v_name);
     f_7checker_use_effects_of(&(*v_c), v_e, v_f, _t43);
     vela_str_release(_t43);
-    // line 3989
+    // line 3990
     t_5types_TypeInfo _t44 = f_5types_get((*v_c).m_table, v_f);
     t_5types_TypeInfo v_ft = _t44;
-    // line 3990
+    // line 3991
     bool _t45 = f_5types_is_func((*v_c).m_table, v_f);
     bool _t46 = _t45;
     if (_t46) {
@@ -48780,7 +48907,7 @@ int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         _t46 = _t49;
     }
     bool v_takes_elem = _t46;
-    // line 3991
+    // line 3992
     bool _t50 = v_takes_elem;
     if (_t50) {
         int64_t _t51 = v_elem;
@@ -48790,7 +48917,7 @@ int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
     }
     bool _t54 = _t50;
     if (_t54) {
-        int64_t _t55 = *(int64_t *)vela_at(v_ft.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:3991:54");
+        int64_t _t55 = *(int64_t *)vela_at(v_ft.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:3992:54");
         int64_t _t56 = _t55;
         int64_t _t57 = f_5types_ERROR();
         bool _t58 = _t56 != _t57;
@@ -48798,34 +48925,34 @@ int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
     }
     bool _t59 = _t54;
     if (_t59) {
-        int64_t _t60 = *(int64_t *)vela_at(v_ft.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:3991:85");
+        int64_t _t60 = *(int64_t *)vela_at(v_ft.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:3992:85");
         int64_t _t61 = _t60;
         bool _t62 = _t61 != v_elem;
         _t59 = _t62;
     }
     if (_t59) {
-        // line 3992
+        // line 3993
         v_takes_elem = false;
     }
-    // line 3994
+    // line 3995
     bool _t63 = !v_takes_elem;
     if (_t63) {
-        // line 3995
-        vela_str v_what = VELA_STR("a function taking one value", 27);
         // line 3996
+        vela_str v_what = VELA_STR("a function taking one value", 27);
+        // line 3997
         int64_t _t64 = v_elem;
         int64_t _t65 = f_5types_ERROR();
         bool _t66 = _t64 != _t65;
         if (_t66) {
-            // line 3997
+            // line 3998
             vela_str _t67 = f_7checker_show((*v_c), v_elem);
             vela_str _t68 = vela_str_concat(VELA_STR("a function taking one ", 22), _t67);
             vela_str_release(_t67);
             vela_str_release(v_what);
             v_what = _t68;
         }
-        // line 3999
-        t_3ast_Expr _t69 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:3999:30");
+        // line 4000
+        t_3ast_Expr _t69 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4000:30");
         rc_retain_t_3ast_Expr(_t69);
         static const vela_str _t70[] = {VELA_STR_INIT("argument 2 of '", 15), {NULL, NULL, 0}, VELA_STR_INIT("' must be ", 10), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8), {NULL, NULL, 0}};
         vela_str _t71[6];
@@ -48840,23 +48967,23 @@ int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
         vela_str_release(_t73);
         vela_str_release(VELA_STR("E3163", 5));
         rc_release_t_3ast_Expr(_t69);
-        // line 4000
+        // line 4001
         int64_t _t74 = v_nothing;
         vela_str_release(v_what);
         rc_release_t_5types_TypeInfo(v_ft);
         vela_array_release(v_saved_pending);
         return _t74;
     }
-    // line 4002
+    // line 4003
     bool _t75 = !v_is_map;
     if (_t75) {
-        // line 4003
+        // line 4004
         int64_t _t76 = v_ft.m_result;
         int64_t _t77 = f_5types_NOTHING();
         bool _t78 = _t76 != _t77;
         if (_t78) {
-            // line 4004
-            t_3ast_Expr _t79 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4004:34");
+            // line 4005
+            t_3ast_Expr _t79 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4005:34");
             rc_retain_t_3ast_Expr(_t79);
             static const vela_str _t80[] = {VELA_STR_INIT("the function given to tasks.each returns ", 41), {NULL, NULL, 0}, VELA_STR_INIT(", which would be lost; use tasks.map to collect the results", 59)};
             vela_str _t81[3];
@@ -48870,34 +48997,34 @@ int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
             vela_str_release(VELA_STR("E3164", 5));
             rc_release_t_3ast_Expr(_t79);
         }
-        // line 4007
+        // line 4008
         int64_t _t84 = f_5types_NOTHING();
         int64_t _t85 = _t84;
         rc_release_t_5types_TypeInfo(v_ft);
         vela_array_release(v_saved_pending);
         return _t85;
     }
-    // line 4009
+    // line 4010
     int64_t _t86 = v_ft.m_result;
     int64_t _t87 = f_5types_NOTHING();
     bool _t88 = _t86 == _t87;
     if (_t88) {
-        // line 4010
-        t_3ast_Expr _t89 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4010:30");
+        // line 4011
+        t_3ast_Expr _t89 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4011:30");
         rc_retain_t_3ast_Expr(_t89);
         vela_str _t90 = vela_str_concat(VELA_STR("the function given to tasks.map returns nothing, so there are no results to collect; ", 85), VELA_STR("use tasks.each", 14));
         f_7checker_report_at(&(*v_c), _t89, VELA_STR("E3165", 5), _t90);
         vela_str_release(_t90);
         vela_str_release(VELA_STR("E3165", 5));
         rc_release_t_3ast_Expr(_t89);
-        // line 4012
+        // line 4013
         int64_t _t91 = f_5types_ERROR();
         int64_t _t92 = _t91;
         rc_release_t_5types_TypeInfo(v_ft);
         vela_array_release(v_saved_pending);
         return _t92;
     }
-    // line 4014
+    // line 4015
     int64_t _t93 = f_5types_array(&(*v_c).m_table, v_ft.m_result);
     int64_t _t94 = _t93;
     rc_release_t_5types_TypeInfo(v_ft);
@@ -48907,32 +49034,32 @@ int64_t f_7checker_tasks_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_st
 /* vela: part */
 
 int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v_id, vela_str v_name, int64_t v_expected) {
-    // line 4020
-    t_7checker_FnInfo _t1 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4020:18");
+    // line 4021
+    t_7checker_FnInfo _t1 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4021:18");
     rc_retain_t_7checker_FnInfo(_t1);
     t_7checker_FnInfo v_f = _t1;
-    // line 4021
+    // line 4022
     bool _t2 = !vela_str_eq(v_f.m_decl.m_foreign, VELA_STR("", 0));
     if (_t2) {
-        // line 4021
+        // line 4022
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3205", 5), VELA_STR("an extern function is not a Vela function value; wrap the call in a Vela function", 81));
         vela_str_release(VELA_STR("an extern function is not a Vela function value; wrap the call in a Vela function", 81));
         vela_str_release(VELA_STR("E3205", 5));
-        // line 4021
+        // line 4022
         int64_t _t3 = f_5types_ERROR();
         int64_t _t4 = _t3;
         rc_release_t_7checker_FnInfo(v_f);
         return _t4;
     }
-    // line 4022
+    // line 4023
     vela_array * _t6 = v_f.m_mutable;
     vela_array_retain(_t6);
     vela_array * _t5 = _t6;
     for (int64_t _t7 = 0; _t7 < _t5->len; _t7++) {
         bool v_m = ((bool *)_t5->data)[_t7];
-        // line 4023
+        // line 4024
         if (v_m) {
-            // line 4024
+            // line 4025
             static const vela_str _t8[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' has a mut parameter, so it cannot be used as a value", 54)};
             vela_str _t9[3];
             memcpy(_t9, _t8, sizeof _t9);
@@ -48941,7 +49068,7 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3166", 5), _t10);
             vela_str_release(_t10);
             vela_str_release(VELA_STR("E3166", 5));
-            // line 4025
+            // line 4026
             int64_t _t11 = f_5types_ERROR();
             int64_t _t12 = _t11;
             vela_array_release(_t5);
@@ -48950,19 +49077,19 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
         }
     }
     vela_array_release(_t5);
-    // line 4029
+    // line 4030
     vela_array * _t13 = vela_array_new(&vela_type_str, 0);
     vela_array * v_effects = _t13;
-    // line 4030
+    // line 4031
     vela_array * _t15 = v_f.m_decl.m_effects;
     vela_array_retain(_t15);
     vela_array * _t14 = _t15;
     for (int64_t _t16 = 0; _t16 < _t14->len; _t16++) {
         vela_str v_u = ((vela_str *)_t14->data)[_t16];
-        // line 4031
+        // line 4032
         bool _t17 = f_5types_concrete_effect(v_u);
         if (_t17) {
-            // line 4032
+            // line 4033
             vela_array * _t18 = vela_array_new(&vela_type_str, 1);
             vela_str _t19 = v_u;
             vela_str_retain(_t19);
@@ -48977,7 +49104,7 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
             int64_t _t23 = _t22;
             bool _t24 = _t23 >= 0;
             if (_t24) {
-                // line 4034
+                // line 4035
                 static const vela_str _t25[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("' uses whatever its parameter ", 30), {NULL, NULL, 0}, VELA_STR_INIT(" uses, so it cannot be used as a ", 33), VELA_STR_INIT("value; call it from a closure instead", 37)};
                 vela_str _t26[6];
                 memcpy(_t26, _t25, sizeof _t26);
@@ -48987,7 +49114,7 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
                 f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3167", 5), _t27);
                 vela_str_release(_t27);
                 vela_str_release(VELA_STR("E3167", 5));
-                // line 4036
+                // line 4037
                 int64_t _t28 = f_5types_ERROR();
                 int64_t _t29 = _t28;
                 vela_array_release(_t14);
@@ -48998,21 +49125,21 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
         }
     }
     vela_array_release(_t14);
-    // line 4039
+    // line 4040
     t_7checker_Ref _t30 = (t_7checker_Ref){ .tag = t_7checker_Ref_Function, .as.m_Function = { ._0 = v_id } };
     vela_unique(&(*v_c).m_refs);
-    t_7checker_Ref *_t31 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4039:11");
+    t_7checker_Ref *_t31 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4040:11");
     rc_release_t_7checker_Ref(*_t31);
     *_t31 = _t30;
-    // line 4040
+    // line 4041
     vela_array * _t32 = v_f.m_type_params;
     vela_array_retain(_t32);
     vela_array * v_tp = _t32;
-    // line 4041
+    // line 4042
     int64_t _t33 = v_tp->len;
     vela_array * _t34 = f_7checker_unknown(_t33);
     vela_array * v_bound = _t34;
-    // line 4042
+    // line 4043
     int64_t _t35 = v_tp->len;
     int64_t _t36 = _t35;
     bool _t37 = _t36 > 0;
@@ -49033,13 +49160,13 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
         _t43 = _t44;
     }
     if (_t43) {
-        // line 4043
+        // line 4044
         vela_array * _t45 = v_f.m_params;
         vela_array_retain(_t45);
         int64_t _t46 = f_5types_func(&(*v_c).m_table, _t45, v_f.m_result);
         int64_t v_pattern = _t46;
         vela_array_release(_t45);
-        // line 4044
+        // line 4045
         t_7checker_Checker _t47 = (*v_c);
         rc_retain_t_7checker_Checker(_t47);
         vela_array * _t48 = v_tp;
@@ -49048,12 +49175,12 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
         vela_array_release(_t48);
         rc_release_t_7checker_Checker(_t47);
     }
-    // line 4046
+    // line 4047
     int64_t _t50 = v_tp->len;
     int64_t _t51 = _t50;
     bool _t52 = _t51 > 0;
     if (_t52) {
-        // line 4047
+        // line 4048
         vela_array * _t53 = v_f.m_params;
         vela_array_retain(_t53);
         int64_t _t54 = f_5types_func(&(*v_c).m_table, _t53, v_f.m_result);
@@ -49066,7 +49193,7 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
         vela_array_release(_t56);
         vela_array_release(_t55);
         vela_array_release(_t53);
-        // line 4048
+        // line 4049
         vela_array * _t58 = v_tp;
         vela_array_retain(_t58);
         static const vela_str _t59[] = {VELA_STR_INIT("in '", 4), {NULL, NULL, 0}, VELA_STR_INIT("' used as a value", 17)};
@@ -49085,7 +49212,7 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
         bool _t66 = f_7checker_all_known(&(*v_c), v_e, _t58, &v_bound, _t61, _t65);
         bool _t67 = !_t66;
         if (_t67) {
-            // line 4050
+            // line 4051
             int64_t _t68 = f_5types_ERROR();
             int64_t _t69 = _t68;
             vela_str_release(_t65);
@@ -49100,46 +49227,46 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
         vela_str_release(_t65);
         vela_str_release(_t61);
         vela_array_release(_t58);
-        // line 4052
+        // line 4053
         int64_t _t70 = v_tp->len;
         int64_t _t71 = _t70;
         for (int64_t _t72 = 0; _t72 < _t71; _t72++) {
             int64_t v_i = _t72;
-            // line 4053
+            // line 4054
             static const vela_str _t73[] = {VELA_STR_INIT("'", 1), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t74[3];
             memcpy(_t74, _t73, sizeof _t74);
             _t74[1] = v_name;
             vela_str _t75 = vela_str_join(_t74, 3);
-            int64_t _t76 = *(int64_t *)vela_at(v_tp, v_i, sizeof(int64_t), "compiler/src/checker.vl:4053:68");
-            int64_t _t77 = *(int64_t *)vela_at(v_bound, v_i, sizeof(int64_t), "compiler/src/checker.vl:4053:78");
+            int64_t _t76 = *(int64_t *)vela_at(v_tp, v_i, sizeof(int64_t), "compiler/src/checker.vl:4054:68");
+            int64_t _t77 = *(int64_t *)vela_at(v_bound, v_i, sizeof(int64_t), "compiler/src/checker.vl:4054:78");
             f_7checker_check_bounds(&(*v_c), v_e.m_line, v_e.m_col, _t75, _t76, _t77);
             vela_str_release(_t75);
         }
-        // line 4055
+        // line 4056
         vela_array * _t78 = v_bound;
         vela_array_retain(_t78);
         vela_unique(&(*v_c).m_targs);
-        vela_array * *_t79 = (vela_array * *)vela_at((*v_c).m_targs, v_e.m_id, sizeof(vela_array *), "compiler/src/checker.vl:4055:16");
+        vela_array * *_t79 = (vela_array * *)vela_at((*v_c).m_targs, v_e.m_id, sizeof(vela_array *), "compiler/src/checker.vl:4056:16");
         vela_array_release(*_t79);
         *_t79 = _t78;
-        // line 4056
+        // line 4057
         vela_array * _t80 = v_bound;
         vela_array_retain(_t80);
         f_7checker_note_generic_use(&(*v_c), v_e, v_id, _t80);
         vela_array_release(_t80);
     }
-    // line 4058
+    // line 4059
     vela_array * _t81 = vela_array_new(&vela_type_int, 0);
     vela_array * v_params = _t81;
-    // line 4059
+    // line 4060
     vela_array * _t83 = v_f.m_params;
     vela_array_retain(_t83);
     vela_array * _t82 = _t83;
     vela_unique(&v_params);
     for (int64_t _t84 = 0; _t84 < _t82->len; _t84++) {
         int64_t v_p = ((int64_t *)_t82->data)[_t84];
-        // line 4060
+        // line 4061
         vela_array * _t85 = v_tp;
         vela_array_retain(_t85);
         vela_array * _t86 = v_bound;
@@ -49151,7 +49278,7 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
         vela_array_release(_t85);
     }
     vela_array_release(_t82);
-    // line 4062
+    // line 4063
     vela_array * _t89 = v_tp;
     vela_array_retain(_t89);
     vela_array * _t90 = v_bound;
@@ -49160,7 +49287,7 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
     int64_t v_result = _t91;
     vela_array_release(_t90);
     vela_array_release(_t89);
-    // line 4063
+    // line 4064
     vela_array * _t92 = v_params;
     vela_array_retain(_t92);
     vela_array * _t93 = v_effects;
@@ -49179,49 +49306,49 @@ int64_t f_7checker_fn_value(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v
 /* vela: part */
 
 int64_t f_7checker_indirect_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v_t, vela_array * v_args, vela_str v_through) {
-    // line 4068
+    // line 4069
     t_5types_TypeInfo _t1 = f_5types_get((*v_c).m_table, v_t);
     t_5types_TypeInfo v_ft = _t1;
-    // line 4069
+    // line 4070
     t_7checker_Ref _t2 = (t_7checker_Ref){ .tag = t_7checker_Ref_Indirect };
     vela_unique(&(*v_c).m_refs);
-    t_7checker_Ref *_t3 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4069:11");
+    t_7checker_Ref *_t3 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4070:11");
     rc_release_t_7checker_Ref(*_t3);
     *_t3 = _t2;
-    // line 4070
-    f_7checker_use_effects_of(&(*v_c), v_e, v_t, v_through);
     // line 4071
+    f_7checker_use_effects_of(&(*v_c), v_e, v_t, v_through);
+    // line 4072
     int64_t _t4 = v_ft.m_args->len;
     int64_t _t5 = v_args->len;
     bool _t6 = f_7checker_arity(&(*v_c), v_e, VELA_STR("this function", 13), _t4, _t5);
     vela_str_release(VELA_STR("this function", 13));
-    // line 4072
+    // line 4073
     int64_t _t7 = v_args->len;
     int64_t _t8 = _t7;
     for (int64_t _t9 = 0; _t9 < _t8; _t9++) {
         int64_t v_i = _t9;
-        // line 4073
+        // line 4074
         t_3ast_Expr _t10 = *((t_3ast_Expr *)v_args->data + v_i);
         rc_retain_t_3ast_Expr(_t10);
         t_3ast_Expr v_arg = _t10;
-        // line 4074
+        // line 4075
         int64_t _t11 = v_i;
         int64_t _t12 = v_ft.m_args->len;
         bool _t13 = _t11 >= _t12;
         if (_t13) {
-            // line 4075
+            // line 4076
             t_3ast_Expr _t14 = v_arg;
             rc_retain_t_3ast_Expr(_t14);
             int64_t _t15 = f_7checker_infer(&(*v_c), _t14);
             rc_release_t_3ast_Expr(_t14);
-            // line 4076
+            // line 4077
             rc_release_t_3ast_Expr(v_arg);
             continue;
         }
-        // line 4078
-        int64_t _t16 = *(int64_t *)vela_at(v_ft.m_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:4078:27");
-        int64_t v_want = _t16;
         // line 4079
+        int64_t _t16 = *(int64_t *)vela_at(v_ft.m_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:4079:27");
+        int64_t v_want = _t16;
+        // line 4080
         static const vela_str _t17[] = {VELA_STR_INIT("argument ", 9), {NULL, NULL, 0}, VELA_STR_INIT(" must be ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8)};
         vela_str _t18[5];
         memcpy(_t18, _t17, sizeof _t18);
@@ -49237,24 +49364,24 @@ int64_t f_7checker_indirect_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int6
         t_7checker_Msg _t24 = f_7checker_msg(_t23, VELA_STR("", 0));
         t_7checker_Msg v_m = _t24;
         vela_str_release(_t23);
-        // line 4080
+        // line 4081
         if (v_arg.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
             t_3ast_Expr v_p = v_arg.m_kind->value.as.m_MutArg._0->value;
             rc_retain_t_3ast_Expr(v_p);
-            // line 4082
+            // line 4083
             t_3ast_Expr _t25 = v_arg;
             rc_retain_t_3ast_Expr(_t25);
             f_7checker_report_at(&(*v_c), _t25, VELA_STR("E3168", 5), VELA_STR("a function value has no mut parameters; remove `mut`", 52));
             vela_str_release(VELA_STR("a function value has no mut parameters; remove `mut`", 52));
             vela_str_release(VELA_STR("E3168", 5));
             rc_release_t_3ast_Expr(_t25);
-            // line 4083
-            t_7modules_Module _t26 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4083:61");
-            t_7modules_Module _t27 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4083:90");
+            // line 4084
+            t_7modules_Module _t26 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4084:61");
+            t_7modules_Module _t27 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4084:90");
             vela_array * _t28 = f_7repairs_remove_mut(_t26.m_source, _t27.m_path, v_arg.m_line, v_arg.m_col);
             f_7checker_last_fix(&(*v_c), _t28);
             vela_array_release(_t28);
-            // line 4084
+            // line 4085
             t_3ast_Expr _t29 = v_p;
             rc_retain_t_3ast_Expr(_t29);
             t_7checker_Msg _t30 = v_m;
@@ -49264,7 +49391,7 @@ int64_t f_7checker_indirect_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int6
             rc_release_t_3ast_Expr(_t29);
             rc_release_t_3ast_Expr(v_p);
         } else {
-            // line 4086
+            // line 4087
             t_3ast_Expr _t31 = v_arg;
             rc_retain_t_3ast_Expr(_t31);
             t_7checker_Msg _t32 = v_m;
@@ -49276,7 +49403,7 @@ int64_t f_7checker_indirect_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int6
         rc_release_t_7checker_Msg(v_m);
         rc_release_t_3ast_Expr(v_arg);
     }
-    // line 4089
+    // line 4090
     int64_t _t33 = v_ft.m_result;
     rc_release_t_5types_TypeInfo(v_ft);
     return _t33;
@@ -49284,11 +49411,11 @@ int64_t f_7checker_indirect_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int6
 /* vela: part */
 
 bool f_7checker_arity(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, int64_t v_expected, int64_t v_got) {
-    // line 4093
+    // line 4094
     int64_t _t1 = v_got;
     bool _t2 = _t1 != v_expected;
     if (_t2) {
-        // line 4094
+        // line 4095
         static const vela_str _t3[] = {{NULL, NULL, 0}, VELA_STR_INIT(" expects ", 9), {NULL, NULL, 0}, VELA_STR_INIT(", got ", 6), {NULL, NULL, 0}};
         vela_str _t4[5];
         memcpy(_t4, _t3, sizeof _t4);
@@ -49303,18 +49430,18 @@ bool f_7checker_arity(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name
         f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3169", 5), _t7);
         vela_str_release(_t7);
         vela_str_release(VELA_STR("E3169", 5));
-        // line 4095
+        // line 4096
         bool _t8 = false;
         return _t8;
     }
-    // line 4097
+    // line 4098
     bool _t9 = true;
     return _t9;
 }
 /* vela: part */
 
 bool f_7checker_is_printable(int64_t v_t) {
-    // line 4101
+    // line 4102
     bool _t1 = f_5types_is_integer(v_t);
     bool _t2 = _t1;
     if (!_t2) {
@@ -49343,13 +49470,13 @@ bool f_7checker_is_printable(int64_t v_t) {
 /* vela: part */
 
 bool f_7checker_has_signature(vela_str v_name) {
-    // line 4107
+    // line 4108
     int64_t _t1 = v_name.len;
     int64_t _t2 = _t1;
     bool _t3 = _t2 > 6;
     bool _t4 = _t3;
     if (_t4) {
-        vela_str _t5 = vela_slice(v_name, 0, 6, "compiler/src/checker.vl:4107:33");
+        vela_str _t5 = vela_slice(v_name, 0, 6, "compiler/src/checker.vl:4108:33");
         bool _t6 = vela_str_eq(_t5, VELA_STR("files.", 6));
         _t4 = _t6;
         vela_str_release(_t5);
@@ -49416,7 +49543,7 @@ bool f_7checker_has_signature(vela_str v_name) {
         bool _t32 = _t31 > 8;
         bool _t33 = _t32;
         if (_t33) {
-            vela_str _t34 = vela_slice(v_name, 0, 8, "compiler/src/checker.vl:4111:30");
+            vela_str _t34 = vela_slice(v_name, 0, 8, "compiler/src/checker.vl:4112:30");
             bool _t35 = vela_str_eq(_t34, VELA_STR("strings.", 8));
             _t33 = _t35;
             vela_str_release(_t34);
@@ -49429,19 +49556,19 @@ bool f_7checker_has_signature(vela_str v_name) {
 /* vela: part */
 
 vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
-    // line 4116
+    // line 4117
     int64_t _t1 = f_5types_STR();
     int64_t v_s = _t1;
-    // line 4117
+    // line 4118
     int64_t _t2 = f_5types_BUILDER();
     int64_t v_b = _t2;
-    // line 4118
+    // line 4119
     int64_t _t3 = f_5types_NOTHING();
     int64_t v_nothing = _t3;
-    // line 4119
+    // line 4120
     bool _t4 = vela_str_eq(v_name, VELA_STR("files.read", 10));
     if (_t4) {
-        // line 4120
+        // line 4121
         vela_array * _t5 = vela_array_new(&vela_type_int, 2);
         int64_t _t6 = v_s;
         vela_push(_t5, &_t6, sizeof(int64_t));
@@ -49451,10 +49578,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t9 = _t5;
         return _t9;
     }
-    // line 4122
+    // line 4123
     bool _t10 = vela_str_eq(v_name, VELA_STR("files.write", 11));
     if (_t10) {
-        // line 4123
+        // line 4124
         vela_array * _t11 = vela_array_new(&vela_type_int, 3);
         int64_t _t12 = v_s;
         vela_push(_t11, &_t12, sizeof(int64_t));
@@ -49467,10 +49594,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t17 = _t11;
         return _t17;
     }
-    // line 4125
+    // line 4126
     bool _t18 = vela_str_eq(v_name, VELA_STR("files.remove", 12));
     if (_t18) {
-        // line 4126
+        // line 4127
         vela_array * _t19 = vela_array_new(&vela_type_int, 2);
         int64_t _t20 = v_s;
         vela_push(_t19, &_t20, sizeof(int64_t));
@@ -49481,10 +49608,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t24 = _t19;
         return _t24;
     }
-    // line 4128
+    // line 4129
     bool _t25 = vela_str_eq(v_name, VELA_STR("files.temp_dir", 14));
     if (_t25) {
-        // line 4129
+        // line 4130
         vela_array * _t26 = vela_array_new(&vela_type_int, 1);
         int64_t _t27 = f_5types_result(&(*v_c).m_table, v_s, v_s);
         int64_t _t28 = _t27;
@@ -49492,10 +49619,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t29 = _t26;
         return _t29;
     }
-    // line 4131
+    // line 4132
     bool _t30 = vela_str_eq(v_name, VELA_STR("os.args", 7));
     if (_t30) {
-        // line 4132
+        // line 4133
         vela_array * _t31 = vela_array_new(&vela_type_int, 1);
         int64_t _t32 = f_5types_array(&(*v_c).m_table, v_s);
         int64_t _t33 = _t32;
@@ -49503,13 +49630,13 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t34 = _t31;
         return _t34;
     }
-    // line 4134
+    // line 4135
     bool _t35 = vela_str_eq(v_name, VELA_STR("os.run", 6));
     if (_t35) {
-        // line 4135
+        // line 4136
         int64_t _t36 = f_5types_array(&(*v_c).m_table, v_s);
         int64_t v_command = _t36;
-        // line 4136
+        // line 4137
         vela_array * _t37 = vela_array_new(&vela_type_int, 2);
         int64_t _t38 = v_command;
         vela_push(_t37, &_t38, sizeof(int64_t));
@@ -49520,13 +49647,13 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t42 = _t37;
         return _t42;
     }
-    // line 4138
+    // line 4139
     bool _t43 = vela_str_eq(v_name, VELA_STR("os.output", 9));
     if (_t43) {
-        // line 4139
+        // line 4140
         int64_t _t44 = f_5types_array(&(*v_c).m_table, v_s);
         int64_t v_command_2 = _t44;
-        // line 4140
+        // line 4141
         vela_array * _t45 = vela_array_new(&vela_type_int, 2);
         int64_t _t46 = v_command_2;
         vela_push(_t45, &_t46, sizeof(int64_t));
@@ -49536,10 +49663,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t49 = _t45;
         return _t49;
     }
-    // line 4142
+    // line 4143
     bool _t50 = vela_str_eq(v_name, VELA_STR("os.env", 6));
     if (_t50) {
-        // line 4143
+        // line 4144
         vela_array * _t51 = vela_array_new(&vela_type_int, 2);
         int64_t _t52 = v_s;
         vela_push(_t51, &_t52, sizeof(int64_t));
@@ -49549,10 +49676,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t55 = _t51;
         return _t55;
     }
-    // line 4145
+    // line 4146
     bool _t56 = vela_str_eq(v_name, VELA_STR("os.read_line", 12));
     if (_t56) {
-        // line 4146
+        // line 4147
         vela_array * _t57 = vela_array_new(&vela_type_int, 1);
         int64_t _t58 = f_5types_option(&(*v_c).m_table, v_s);
         int64_t _t59 = _t58;
@@ -49560,10 +49687,10 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t60 = _t57;
         return _t60;
     }
-    // line 4148
+    // line 4149
     bool _t61 = vela_str_eq(v_name, VELA_STR("strings.parse_float", 19));
     if (_t61) {
-        // line 4149
+        // line 4150
         vela_array * _t62 = vela_array_new(&vela_type_int, 2);
         int64_t _t63 = v_s;
         vela_push(_t62, &_t63, sizeof(int64_t));
@@ -49574,7 +49701,7 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
         vela_array * _t67 = _t62;
         return _t67;
     }
-    // line 4151
+    // line 4152
     vela_array * _t68;
     int64_t _t69 = 12;
     switch ((v_name).len) {
@@ -49722,29 +49849,29 @@ vela_array * f_7checker_signature(t_7checker_Checker * v_c, vela_str v_name) {
 /* vela: part */
 
 int64_t f_7checker_integer_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args, int64_t v_expected) {
-    // line 4169
+    // line 4170
     int64_t _t1 = f_8integers_type_id(v_name);
     int64_t v_target = _t1;
-    // line 4170
+    // line 4171
     vela_str _t2 = v_name;
     vela_str_retain(_t2);
     vela_str v_short = _t2;
-    // line 4171
+    // line 4172
     int64_t _t3 = v_target;
     bool _t4 = _t3 < 0;
     if (_t4) {
-        // line 4171
+        // line 4172
         int64_t _t5 = v_name.len;
-        vela_str _t6 = vela_slice(v_name, 5, _t5, "compiler/src/checker.vl:4171:33");
+        vela_str _t6 = vela_slice(v_name, 5, _t5, "compiler/src/checker.vl:4172:33");
         vela_str_release(v_short);
         v_short = _t6;
     }
-    // line 4172
+    // line 4173
     int64_t _t7 = f_8integers_function_op(v_short);
     int64_t v_op = _t7;
-    // line 4173
-    int64_t v_count = 2;
     // line 4174
+    int64_t v_count = 2;
+    // line 4175
     int64_t _t8 = v_target;
     bool _t9 = _t8 >= 0;
     bool _t10 = _t9;
@@ -49759,45 +49886,45 @@ int64_t f_7checker_integer_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
         _t12 = _t14;
     }
     if (_t12) {
-        // line 4174
+        // line 4175
         v_count = 1;
     }
-    // line 4175
+    // line 4176
     int64_t _t15 = v_args->len;
     bool _t16 = f_7checker_arity(&(*v_c), v_e, v_name, v_count, _t15);
     bool _t17 = !_t16;
     if (_t17) {
-        // line 4176
+        // line 4177
         vela_array * _t19 = v_args;
         vela_array_retain(_t19);
         vela_array * _t18 = _t19;
         for (int64_t _t20 = 0; _t20 < _t18->len; _t20++) {
             t_3ast_Expr v_a = ((t_3ast_Expr *)_t18->data)[_t20];
-            // line 4176
+            // line 4177
             t_3ast_Expr _t21 = v_a;
             rc_retain_t_3ast_Expr(_t21);
             int64_t _t22 = f_7checker_infer(&(*v_c), _t21);
             rc_release_t_3ast_Expr(_t21);
         }
         vela_array_release(_t18);
-        // line 4177
+        // line 4178
         int64_t _t23 = v_target;
         bool _t24 = _t23 >= 0;
         if (_t24) {
-            // line 4177
+            // line 4178
             int64_t _t25 = v_target;
             vela_str_release(v_short);
             return _t25;
         }
-        // line 4178
+        // line 4179
         int64_t _t26 = f_5types_ERROR();
         int64_t _t27 = _t26;
         vela_str_release(v_short);
         return _t27;
     }
-    // line 4180
-    int64_t v_context = v_target;
     // line 4181
+    int64_t v_context = v_target;
+    // line 4182
     int64_t _t28 = v_target;
     bool _t29 = _t28 < 0;
     bool _t30 = _t29;
@@ -49806,10 +49933,10 @@ int64_t f_7checker_integer_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
         _t30 = _t31;
     }
     if (_t30) {
-        // line 4181
+        // line 4182
         v_context = v_expected;
     }
-    // line 4182
+    // line 4183
     int64_t _t32 = v_target;
     bool _t33 = _t32 < 0;
     bool _t34 = _t33;
@@ -49825,17 +49952,17 @@ int64_t f_7checker_integer_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
         rc_release_t_5types_TypeInfo(_t37);
     }
     if (_t36) {
-        // line 4183
+        // line 4184
         t_5types_TypeInfo _t39 = f_5types_get((*v_c).m_table, v_expected);
-        int64_t _t40 = *(int64_t *)vela_at(_t39.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:4183:52");
+        int64_t _t40 = *(int64_t *)vela_at(_t39.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:4184:52");
         v_context = _t40;
         rc_release_t_5types_TypeInfo(_t39);
     }
-    // line 4185
+    // line 4186
     bool _t41 = f_5types_is_integer(v_context);
     bool _t42 = _t41;
     if (_t42) {
-        t_3ast_Expr _t43 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4185:59");
+        t_3ast_Expr _t43 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4186:59");
         rc_retain_t_3ast_Expr(_t43);
         bool _t44 = f_7checker_is_int_lit(&(*v_c), _t43);
         _t42 = _t44;
@@ -49847,23 +49974,23 @@ int64_t f_7checker_integer_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
         bool _t47 = _t46 < 0;
         bool _t48 = _t47;
         if (!_t48) {
-            t_3ast_Expr _t49 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4185:99");
+            t_3ast_Expr _t49 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4186:99");
             bool _t50 = f_7checker_literals_fit(_t49, v_target);
             _t48 = _t50;
         }
         _t45 = _t48;
     }
     if (_t45) {
-        // line 4186
+        // line 4187
         (*v_c).m_expected = v_context;
     }
-    // line 4188
-    t_3ast_Expr _t51 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4188:30");
+    // line 4189
+    t_3ast_Expr _t51 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4189:30");
     rc_retain_t_3ast_Expr(_t51);
     int64_t _t52 = f_7checker_value(&(*v_c), _t51);
     int64_t v_t = _t52;
     rc_release_t_3ast_Expr(_t51);
-    // line 4189
+    // line 4190
     bool _t53 = f_5types_is_integer(v_t);
     bool _t54 = !_t53;
     bool _t55 = _t54;
@@ -49874,56 +50001,56 @@ int64_t f_7checker_integer_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
         _t55 = _t58;
     }
     if (_t55) {
-        // line 4190
-        t_3ast_Expr _t59 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4190:30");
+        // line 4191
+        t_3ast_Expr _t59 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4191:30");
         rc_retain_t_3ast_Expr(_t59);
         f_7checker_report_at(&(*v_c), _t59, VELA_STR("E3184", 5), VELA_STR("integer conversion and arithmetic functions require an integer", 62));
         vela_str_release(VELA_STR("integer conversion and arithmetic functions require an integer", 62));
         vela_str_release(VELA_STR("E3184", 5));
         rc_release_t_3ast_Expr(_t59);
     }
-    // line 4192
+    // line 4193
     int64_t _t60 = v_target;
     bool _t61 = _t60 >= 0;
     if (_t61) {
-        // line 4192
+        // line 4193
         int64_t _t62 = v_target;
         vela_str_release(v_short);
         return _t62;
     }
-    // line 4193
+    // line 4194
     bool _t63 = vela_str_eq(v_short, VELA_STR("to_str", 6));
     if (_t63) {
-        // line 4193
+        // line 4194
         int64_t _t64 = f_5types_STR();
         int64_t _t65 = _t64;
         vela_str_release(v_short);
         return _t65;
     }
-    // line 4194
+    // line 4195
     int64_t _t66 = v_count;
     bool _t67 = _t66 == 2;
     if (_t67) {
-        // line 4194
-        t_3ast_Expr _t68 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4194:43");
+        // line 4195
+        t_3ast_Expr _t68 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4195:43");
         rc_retain_t_3ast_Expr(_t68);
         t_7checker_Msg _t69 = f_7checker_msg(VELA_STR("integer operands must have the same type, found ", 48), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t68, v_t, _t69);
         rc_release_t_7checker_Msg(_t69);
         rc_release_t_3ast_Expr(_t68);
     }
-    // line 4195
+    // line 4196
     int64_t _t70 = f_8integers_mode(v_short);
     int64_t _t71 = _t70;
     bool _t72 = _t71 == 1;
     if (_t72) {
-        // line 4195
+        // line 4196
         int64_t _t73 = f_5types_option(&(*v_c).m_table, v_t);
         int64_t _t74 = _t73;
         vela_str_release(v_short);
         return _t74;
     }
-    // line 4196
+    // line 4197
     int64_t _t75 = v_t;
     vela_str_release(v_short);
     return _t75;
@@ -49931,27 +50058,27 @@ int64_t f_7checker_integer_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, ve
 /* vela: part */
 
 bool f_7checker_literals_fit(t_3ast_Expr v_e, int64_t v_t) {
-    // line 4204
+    // line 4205
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_IntLit) {
-        // line 4205
+        // line 4206
         bool _t1 = true;
         return _t1;
     } else if (v_e.m_kind->value.tag == t_3ast_ExprKind_FixedIntLit) {
-        // line 4206
+        // line 4207
         bool _t2 = true;
         return _t2;
     } else {
     }
-    // line 4209
+    // line 4210
     vela_array * _t3 = vela_array_new(vt_t_3ast_Expr(), 1);
     t_3ast_Expr _t4 = v_e;
     rc_retain_t_3ast_Expr(_t4);
     t_3ast_Expr _t5 = _t4;
     vela_push(_t3, &_t5, sizeof(t_3ast_Expr));
     vela_array * v_work = _t3;
-    // line 4210
-    int64_t v_i = 0;
     // line 4211
+    int64_t v_i = 0;
+    // line 4212
     vela_unique(&v_work);
     for (;;) {
         int64_t _t6 = v_i;
@@ -49959,24 +50086,24 @@ bool f_7checker_literals_fit(t_3ast_Expr v_e, int64_t v_t) {
         bool _t8 = _t6 < _t7;
         bool _t9 = _t8;
         if (!_t9) break;
-        // line 4212
+        // line 4213
         t_3ast_Expr _t10 = *((t_3ast_Expr *)v_work->data + v_i);
         rc_retain_t_3ast_Expr(_t10);
         t_3ast_Expr v_x = _t10;
-        // line 4213
+        // line 4214
         int64_t _t11 = v_i;
         int64_t _t12 = (_t11 + 1);
         v_i = _t12;
-        // line 4214
+        // line 4215
         if (v_x.m_kind->value.tag == t_3ast_ExprKind_IntLit) {
             int64_t v_n = v_x.m_kind->value.as.m_IntLit._0;
-            // line 4216
+            // line 4217
             int64_t _t13 = v_n;
             bool _t14 = _t13 < 0;
             bool _t15 = f_8integers_fits(v_n, v_t, _t14);
             bool _t16 = !_t15;
             if (_t16) {
-                // line 4216
+                // line 4217
                 bool _t17 = false;
                 rc_release_t_3ast_Expr(v_x);
                 vela_array_release(v_work);
@@ -49985,11 +50112,11 @@ bool f_7checker_literals_fit(t_3ast_Expr v_e, int64_t v_t) {
         } else if (v_x.m_kind->value.tag == t_3ast_ExprKind_FixedIntLit) {
             int64_t v_n_2 = v_x.m_kind->value.as.m_FixedIntLit._0;
             bool v_neg = v_x.m_kind->value.as.m_FixedIntLit._2;
-            // line 4219
+            // line 4220
             bool _t18 = f_8integers_fits(v_n_2, v_t, v_neg);
             bool _t19 = !_t18;
             if (_t19) {
-                // line 4219
+                // line 4220
                 bool _t20 = false;
                 rc_release_t_3ast_Expr(v_x);
                 vela_array_release(v_work);
@@ -49998,7 +50125,7 @@ bool f_7checker_literals_fit(t_3ast_Expr v_e, int64_t v_t) {
         } else if (v_x.m_kind->value.tag == t_3ast_ExprKind_Unary) {
             t_3ast_Expr v_y = v_x.m_kind->value.as.m_Unary._1->value;
             rc_retain_t_3ast_Expr(v_y);
-            // line 4221
+            // line 4222
             t_3ast_Expr _t21 = v_y;
             rc_retain_t_3ast_Expr(_t21);
             t_3ast_Expr _t22 = _t21;
@@ -50009,12 +50136,12 @@ bool f_7checker_literals_fit(t_3ast_Expr v_e, int64_t v_t) {
             rc_retain_t_3ast_Expr(v_l);
             t_3ast_Expr v_r = v_x.m_kind->value.as.m_Binary._2->value;
             rc_retain_t_3ast_Expr(v_r);
-            // line 4223
+            // line 4224
             t_3ast_Expr _t23 = v_l;
             rc_retain_t_3ast_Expr(_t23);
             t_3ast_Expr _t24 = _t23;
             vela_push(v_work, &_t24, sizeof(t_3ast_Expr));
-            // line 4224
+            // line 4225
             t_3ast_Expr _t25 = v_r;
             rc_retain_t_3ast_Expr(_t25);
             t_3ast_Expr _t26 = _t25;
@@ -50025,7 +50152,7 @@ bool f_7checker_literals_fit(t_3ast_Expr v_e, int64_t v_t) {
         }
         rc_release_t_3ast_Expr(v_x);
     }
-    // line 4229
+    // line 4230
     bool _t27 = true;
     vela_array_release(v_work);
     return _t27;
@@ -50033,17 +50160,17 @@ bool f_7checker_literals_fit(t_3ast_Expr v_e, int64_t v_t) {
 /* vela: part */
 
 int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args, vela_str v_written, int64_t v_expected) {
-    // line 4235
+    // line 4236
     int64_t _t1 = v_name.len;
     int64_t _t2 = _t1;
     bool _t3 = _t2 > 6;
     bool _t4 = _t3;
     if (_t4) {
-        vela_str _t5 = vela_slice(v_name, 0, 6, "compiler/src/checker.vl:4235:30");
+        vela_str _t5 = vela_slice(v_name, 0, 6, "compiler/src/checker.vl:4236:30");
         bool _t6 = vela_str_eq(_t5, VELA_STR("sysio.", 6));
         bool _t7 = _t6;
         if (!_t7) {
-            vela_str _t8 = vela_slice(v_name, 0, 6, "compiler/src/checker.vl:4235:56");
+            vela_str _t8 = vela_slice(v_name, 0, 6, "compiler/src/checker.vl:4236:56");
             bool _t9 = vela_str_eq(_t8, VELA_STR("clock.", 6));
             _t7 = _t9;
             vela_str_release(_t8);
@@ -50052,55 +50179,55 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         vela_str_release(_t5);
     }
     if (_t4) {
-        // line 4235
+        // line 4236
         int64_t _t10 = v_name.len;
-        vela_str _t11 = vela_slice(v_name, 6, _t10, "compiler/src/checker.vl:4235:114");
+        vela_str _t11 = vela_slice(v_name, 6, _t10, "compiler/src/checker.vl:4236:114");
         int64_t _t12 = f_7checker_system_builtin(&(*v_c), v_e, _t11, v_args);
         int64_t _t13 = _t12;
         vela_str_release(_t11);
         return _t13;
     }
-    // line 4236
+    // line 4237
     int64_t _t14 = v_name.len;
     int64_t _t15 = _t14;
     bool _t16 = _t15 > 7;
     bool _t17 = _t16;
     if (_t17) {
-        vela_str _t18 = vela_slice(v_name, 0, 7, "compiler/src/checker.vl:4236:29");
+        vela_str _t18 = vela_slice(v_name, 0, 7, "compiler/src/checker.vl:4237:29");
         bool _t19 = vela_str_eq(_t18, VELA_STR("memory.", 7));
         _t17 = _t19;
         vela_str_release(_t18);
     }
     if (_t17) {
-        // line 4236
+        // line 4237
         int64_t _t20 = v_name.len;
-        vela_str _t21 = vela_slice(v_name, 7, _t20, "compiler/src/checker.vl:4236:87");
+        vela_str _t21 = vela_slice(v_name, 7, _t20, "compiler/src/checker.vl:4237:87");
         int64_t _t22 = f_7checker_memory_builtin(&(*v_c), v_e, _t21, v_args, v_expected);
         int64_t _t23 = _t22;
         vela_str_release(_t21);
         return _t23;
     }
-    // line 4237
+    // line 4238
     int64_t _t24 = v_name.len;
     int64_t _t25 = _t24;
     bool _t26 = _t25 > 2;
     bool _t27 = _t26;
     if (_t27) {
-        vela_str _t28 = vela_slice(v_name, 0, 2, "compiler/src/checker.vl:4237:29");
+        vela_str _t28 = vela_slice(v_name, 0, 2, "compiler/src/checker.vl:4238:29");
         bool _t29 = vela_str_eq(_t28, VELA_STR("c.", 2));
         _t27 = _t29;
         vela_str_release(_t28);
     }
     if (_t27) {
-        // line 4237
+        // line 4238
         int64_t _t30 = v_name.len;
-        vela_str _t31 = vela_slice(v_name, 2, _t30, "compiler/src/checker.vl:4237:77");
+        vela_str _t31 = vela_slice(v_name, 2, _t30, "compiler/src/checker.vl:4238:77");
         int64_t _t32 = f_7checker_c_builtin(&(*v_c), v_e, _t31, v_args, v_expected);
         int64_t _t33 = _t32;
         vela_str_release(_t31);
         return _t33;
     }
-    // line 4238
+    // line 4239
     int64_t _t34 = f_8integers_type_id(v_name);
     int64_t _t35 = _t34;
     bool _t36 = _t35 >= 0;
@@ -50111,7 +50238,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         bool _t40 = _t39 > 5;
         bool _t41 = _t40;
         if (_t41) {
-            vela_str _t42 = vela_slice(v_name, 0, 5, "compiler/src/checker.vl:4238:60");
+            vela_str _t42 = vela_slice(v_name, 0, 5, "compiler/src/checker.vl:4239:60");
             bool _t43 = vela_str_eq(_t42, VELA_STR("ints.", 5));
             _t41 = _t43;
             vela_str_release(_t42);
@@ -50119,22 +50246,22 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         _t37 = _t41;
     }
     if (_t37) {
-        // line 4239
+        // line 4240
         int64_t _t44 = f_7checker_integer_builtin(&(*v_c), v_e, v_name, v_args, v_expected);
         int64_t _t45 = _t44;
         return _t45;
     }
-    // line 4241
+    // line 4242
     bool _t46 = f_7checker_has_signature(v_name);
     if (_t46) {
-        // line 4242
+        // line 4243
         int64_t _t47 = f_7checker_fixed_builtin(&(*v_c), v_e, v_name, v_args, v_written);
         int64_t _t48 = _t47;
         return _t48;
     }
-    // line 4244
-    int64_t v_want = 2;
     // line 4245
+    int64_t v_want = 2;
+    // line 4246
     bool _t49 = vela_str_eq(v_name, VELA_STR("print", 5));
     bool _t50 = _t49;
     if (!_t50) {
@@ -50172,28 +50299,28 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         _t62 = _t63;
     }
     if (_t62) {
-        // line 4247
+        // line 4248
         v_want = 1;
     }
-    // line 4249
+    // line 4250
     int64_t _t64 = v_args->len;
     bool _t65 = f_7checker_arity(&(*v_c), v_e, v_written, v_want, _t64);
     bool _t66 = !_t65;
     if (_t66) {
-        // line 4250
+        // line 4251
         vela_array * _t68 = v_args;
         vela_array_retain(_t68);
         vela_array * _t67 = _t68;
         for (int64_t _t69 = 0; _t69 < _t67->len; _t69++) {
             t_3ast_Expr v_a = ((t_3ast_Expr *)_t67->data)[_t69];
-            // line 4251
+            // line 4252
             t_3ast_Expr _t70 = v_a;
             rc_retain_t_3ast_Expr(_t70);
             int64_t _t71 = f_7checker_infer(&(*v_c), _t70);
             rc_release_t_3ast_Expr(_t70);
         }
         vela_array_release(_t67);
-        // line 4253
+        // line 4254
         int64_t _t72;
         int64_t _t73 = 10;
         switch ((v_name).len) {
@@ -50259,7 +50386,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         int64_t _t85 = _t72;
         return _t85;
     }
-    // line 4267
+    // line 4268
     bool _t86 = vela_str_eq(v_name, VELA_STR("print", 5));
     bool _t87 = _t86;
     if (!_t87) {
@@ -50267,13 +50394,13 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         _t87 = _t88;
     }
     if (_t87) {
-        // line 4268
-        t_3ast_Expr _t89 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4268:34");
+        // line 4269
+        t_3ast_Expr _t89 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4269:34");
         rc_retain_t_3ast_Expr(_t89);
         int64_t _t90 = f_7checker_value(&(*v_c), _t89);
         int64_t v_t = _t90;
         rc_release_t_3ast_Expr(_t89);
-        // line 4269
+        // line 4270
         bool _t91 = f_7checker_is_printable(v_t);
         bool _t92 = !_t91;
         bool _t93 = _t92;
@@ -50284,8 +50411,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             _t93 = _t96;
         }
         if (_t93) {
-            // line 4270
-            t_3ast_Expr _t97 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4270:34");
+            // line 4271
+            t_3ast_Expr _t97 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4271:34");
             rc_retain_t_3ast_Expr(_t97);
             static const vela_str _t98[] = {{NULL, NULL, 0}, VELA_STR_INIT(" takes an integer, Float, Bool or Str, not ", 43), {NULL, NULL, 0}};
             vela_str _t99[3];
@@ -50300,37 +50427,37 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(VELA_STR("E3170", 5));
             rc_release_t_3ast_Expr(_t97);
         }
-        // line 4272
+        // line 4273
         int64_t _t102 = f_5types_NOTHING();
         int64_t _t103 = _t102;
         return _t103;
     }
-    // line 4274
+    // line 4275
     bool _t104 = vela_str_eq(v_name, VELA_STR("assert", 6));
     if (_t104) {
-        // line 4275
-        t_3ast_Expr _t105 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4275:31");
+        // line 4276
+        t_3ast_Expr _t105 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4276:31");
         rc_retain_t_3ast_Expr(_t105);
         int64_t _t106 = f_5types_BOOL();
         t_7checker_Msg _t107 = f_7checker_msg(VELA_STR("assert takes a Bool, found ", 27), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t105, _t106, _t107);
         rc_release_t_7checker_Msg(_t107);
         rc_release_t_3ast_Expr(_t105);
-        // line 4276
+        // line 4277
         int64_t _t108 = f_5types_NOTHING();
         int64_t _t109 = _t108;
         return _t109;
     }
-    // line 4278
+    // line 4279
     bool _t110 = vela_str_eq(v_name, VELA_STR("len", 3));
     if (_t110) {
-        // line 4279
-        t_3ast_Expr _t111 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4279:34");
+        // line 4280
+        t_3ast_Expr _t111 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4280:34");
         rc_retain_t_3ast_Expr(_t111);
         int64_t _t112 = f_7checker_value(&(*v_c), _t111);
         int64_t v_t_2 = _t112;
         rc_release_t_3ast_Expr(_t111);
-        // line 4280
+        // line 4281
         int64_t _t113 = v_t_2;
         int64_t _t114 = f_5types_STR();
         bool _t115 = _t113 == _t114;
@@ -50353,8 +50480,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         }
         bool _t124 = !_t120;
         if (_t124) {
-            // line 4281
-            t_3ast_Expr _t125 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4281:34");
+            // line 4282
+            t_3ast_Expr _t125 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4282:34");
             rc_retain_t_3ast_Expr(_t125);
             vela_str _t126 = f_7checker_show((*v_c), v_t_2);
             vela_str _t127 = vela_str_concat(VELA_STR("len takes a Str, an array or a map, not ", 40), _t126);
@@ -50364,21 +50491,21 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(VELA_STR("E3171", 5));
             rc_release_t_3ast_Expr(_t125);
         }
-        // line 4283
+        // line 4284
         int64_t _t128 = f_5types_INT();
         int64_t _t129 = _t128;
         return _t129;
     }
-    // line 4285
+    // line 4286
     bool _t130 = vela_str_eq(v_name, VELA_STR("int", 3));
     if (_t130) {
-        // line 4286
-        t_3ast_Expr _t131 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4286:34");
+        // line 4287
+        t_3ast_Expr _t131 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4287:34");
         rc_retain_t_3ast_Expr(_t131);
         int64_t _t132 = f_7checker_value(&(*v_c), _t131);
         int64_t v_t_3 = _t132;
         rc_release_t_3ast_Expr(_t131);
-        // line 4287
+        // line 4288
         bool _t133 = f_5types_is_integer(v_t_3);
         bool _t134 = !_t133;
         bool _t135 = _t134;
@@ -50396,8 +50523,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             _t139 = _t142;
         }
         if (_t139) {
-            // line 4288
-            t_3ast_Expr _t143 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4288:34");
+            // line 4289
+            t_3ast_Expr _t143 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4289:34");
             rc_retain_t_3ast_Expr(_t143);
             vela_str _t144 = f_7checker_show((*v_c), v_t_3);
             vela_str _t145 = vela_str_concat(VELA_STR("int takes an integer or a Float, found ", 39), _t144);
@@ -50407,21 +50534,21 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(VELA_STR("E3172", 5));
             rc_release_t_3ast_Expr(_t143);
         }
-        // line 4290
+        // line 4291
         int64_t _t146 = f_5types_INT();
         int64_t _t147 = _t146;
         return _t147;
     }
-    // line 4292
+    // line 4293
     bool _t148 = vela_str_eq(v_name, VELA_STR("float", 5));
     if (_t148) {
-        // line 4293
-        t_3ast_Expr _t149 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4293:34");
+        // line 4294
+        t_3ast_Expr _t149 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4294:34");
         rc_retain_t_3ast_Expr(_t149);
         int64_t _t150 = f_7checker_value(&(*v_c), _t149);
         int64_t v_t_4 = _t150;
         rc_release_t_3ast_Expr(_t149);
-        // line 4294
+        // line 4295
         bool _t151 = f_5types_is_integer(v_t_4);
         bool _t152 = !_t151;
         bool _t153 = _t152;
@@ -50432,8 +50559,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             _t153 = _t156;
         }
         if (_t153) {
-            // line 4294
-            t_3ast_Expr _t157 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4294:78");
+            // line 4295
+            t_3ast_Expr _t157 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4295:78");
             rc_retain_t_3ast_Expr(_t157);
             vela_str _t158 = f_7checker_show((*v_c), v_t_4);
             vela_str _t159 = vela_str_concat(VELA_STR("float takes an Int, found ", 26), _t158);
@@ -50443,21 +50570,21 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(VELA_STR("E3093", 5));
             rc_release_t_3ast_Expr(_t157);
         }
-        // line 4295
+        // line 4296
         int64_t _t160 = f_5types_FLOAT();
         int64_t _t161 = _t160;
         return _t161;
     }
-    // line 4297
+    // line 4298
     bool _t162 = vela_str_eq(v_name, VELA_STR("byte", 4));
     if (_t162) {
-        // line 4298
-        t_3ast_Expr _t163 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4298:34");
+        // line 4299
+        t_3ast_Expr _t163 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4299:34");
         rc_retain_t_3ast_Expr(_t163);
         int64_t _t164 = f_7checker_value(&(*v_c), _t163);
         int64_t v_t_5 = _t164;
         rc_release_t_3ast_Expr(_t163);
-        // line 4299
+        // line 4300
         bool _t165 = f_5types_is_integer(v_t_5);
         bool _t166 = !_t165;
         bool _t167 = _t166;
@@ -50468,8 +50595,8 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             _t167 = _t170;
         }
         if (_t167) {
-            // line 4299
-            t_3ast_Expr _t171 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4299:78");
+            // line 4300
+            t_3ast_Expr _t171 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4300:78");
             rc_retain_t_3ast_Expr(_t171);
             vela_str _t172 = f_7checker_show((*v_c), v_t_5);
             vela_str _t173 = vela_str_concat(VELA_STR("byte takes an Int, found ", 25), _t172);
@@ -50479,32 +50606,32 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(VELA_STR("E3093", 5));
             rc_release_t_3ast_Expr(_t171);
         }
-        // line 4300
+        // line 4301
         int64_t _t174 = f_5types_BYTE();
         int64_t _t175 = _t174;
         return _t175;
     }
-    // line 4302
+    // line 4303
     bool _t176 = vela_str_eq(v_name, VELA_STR("push", 4));
     if (_t176) {
-        // line 4303
-        t_3ast_Expr _t177 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4303:41");
+        // line 4304
+        t_3ast_Expr _t177 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4304:41");
         rc_retain_t_3ast_Expr(_t177);
         int64_t _t178 = f_5types_NOTHING();
         int64_t _t179 = f_7checker_mut_argument(&(*v_c), _t177, _t178, VELA_STR("argument 1 of 'push'", 20));
         int64_t v_t_6 = _t179;
         vela_str_release(VELA_STR("argument 1 of 'push'", 20));
         rc_release_t_3ast_Expr(_t177);
-        // line 4304
+        // line 4305
         bool _t180 = f_5types_is_array((*v_c).m_table, v_t_6);
         if (_t180) {
-            // line 4305
+            // line 4306
             t_5types_TypeInfo _t181 = f_5types_get((*v_c).m_table, v_t_6);
-            int64_t _t182 = *(int64_t *)vela_at(_t181.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:4305:50");
+            int64_t _t182 = *(int64_t *)vela_at(_t181.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:4306:50");
             int64_t v_elem = _t182;
             rc_release_t_5types_TypeInfo(_t181);
-            // line 4306
-            t_3ast_Expr _t183 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4306:35");
+            // line 4307
+            t_3ast_Expr _t183 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4307:35");
             rc_retain_t_3ast_Expr(_t183);
             static const vela_str _t184[] = {VELA_STR_INIT("the elements of ", 16), {NULL, NULL, 0}, VELA_STR_INIT(" are ", 5), {NULL, NULL, 0}, VELA_STR_INIT(", but this is ", 14)};
             vela_str _t185[5];
@@ -50522,13 +50649,13 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             rc_release_t_3ast_Expr(_t183);
             vela_str_release(_t188);
         } else {
-            // line 4308
+            // line 4309
             int64_t _t190 = v_t_6;
             int64_t _t191 = f_5types_ERROR();
             bool _t192 = _t190 != _t191;
             if (_t192) {
-                // line 4309
-                t_3ast_Expr _t193 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4309:38");
+                // line 4310
+                t_3ast_Expr _t193 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4310:38");
                 rc_retain_t_3ast_Expr(_t193);
                 vela_str _t194 = f_7checker_show((*v_c), v_t_6);
                 vela_str _t195 = vela_str_concat(VELA_STR("push needs an array, not ", 25), _t194);
@@ -50538,25 +50665,25 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
                 vela_str_release(VELA_STR("E3173", 5));
                 rc_release_t_3ast_Expr(_t193);
             }
-            // line 4311
-            t_3ast_Expr _t196 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4311:30");
+            // line 4312
+            t_3ast_Expr _t196 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4312:30");
             rc_retain_t_3ast_Expr(_t196);
             int64_t _t197 = f_7checker_infer(&(*v_c), _t196);
             rc_release_t_3ast_Expr(_t196);
         }
-        // line 4313
+        // line 4314
         int64_t _t198 = f_5types_NOTHING();
         int64_t _t199 = _t198;
         return _t199;
     }
-    // line 4316
+    // line 4317
     int64_t _t200 = f_5types_ERROR();
     int64_t v_t_7 = _t200;
-    // line 4317
+    // line 4318
     bool _t201 = vela_str_eq(v_name, VELA_STR("maps.remove", 11));
     if (_t201) {
-        // line 4318
-        t_3ast_Expr _t202 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4318:37");
+        // line 4319
+        t_3ast_Expr _t202 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4319:37");
         rc_retain_t_3ast_Expr(_t202);
         int64_t _t203 = f_5types_NOTHING();
         static const vela_str _t204[] = {VELA_STR_INIT("argument 1 of '", 15), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
@@ -50569,24 +50696,24 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
         vela_str_release(_t206);
         rc_release_t_3ast_Expr(_t202);
     } else {
-        // line 4320
-        t_3ast_Expr _t208 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4320:30");
+        // line 4321
+        t_3ast_Expr _t208 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4321:30");
         rc_retain_t_3ast_Expr(_t208);
         int64_t _t209 = f_7checker_value(&(*v_c), _t208);
         v_t_7 = _t209;
         rc_release_t_3ast_Expr(_t208);
     }
-    // line 4322
+    // line 4323
     bool _t210 = f_5types_is_map((*v_c).m_table, v_t_7);
     bool _t211 = !_t210;
     if (_t211) {
-        // line 4323
+        // line 4324
         int64_t _t212 = v_t_7;
         int64_t _t213 = f_5types_ERROR();
         bool _t214 = _t212 != _t213;
         if (_t214) {
-            // line 4324
-            t_3ast_Expr _t215 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4324:34");
+            // line 4325
+            t_3ast_Expr _t215 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4325:34");
             rc_retain_t_3ast_Expr(_t215);
             static const vela_str _t216[] = {{NULL, NULL, 0}, VELA_STR_INIT(" needs a map, not ", 18), {NULL, NULL, 0}};
             vela_str _t217[3];
@@ -50601,55 +50728,55 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
             vela_str_release(VELA_STR("E3174", 5));
             rc_release_t_3ast_Expr(_t215);
         }
-        // line 4326
+        // line 4327
         int64_t _t221 = v_args->len;
-        vela_array * _t222 = vela_array_slice(v_args, 1, _t221, "compiler/src/checker.vl:4326:22");
+        vela_array * _t222 = vela_array_slice(v_args, 1, _t221, "compiler/src/checker.vl:4327:22");
         vela_array * _t220 = _t222;
         for (int64_t _t223 = 0; _t223 < _t220->len; _t223++) {
             t_3ast_Expr v_a_2 = ((t_3ast_Expr *)_t220->data)[_t223];
-            // line 4327
+            // line 4328
             t_3ast_Expr _t224 = v_a_2;
             rc_retain_t_3ast_Expr(_t224);
             int64_t _t225 = f_7checker_infer(&(*v_c), _t224);
             rc_release_t_3ast_Expr(_t224);
         }
         vela_array_release(_t220);
-        // line 4329
+        // line 4330
         bool _t226 = vela_str_eq(v_name, VELA_STR("maps.has", 8));
         if (_t226) {
-            // line 4330
+            // line 4331
             int64_t _t227 = f_5types_BOOL();
             int64_t _t228 = _t227;
             return _t228;
         }
-        // line 4332
+        // line 4333
         bool _t229 = vela_str_eq(v_name, VELA_STR("maps.remove", 11));
         if (_t229) {
-            // line 4333
+            // line 4334
             int64_t _t230 = f_5types_NOTHING();
             int64_t _t231 = _t230;
             return _t231;
         }
-        // line 4335
+        // line 4336
         int64_t _t232 = f_5types_ERROR();
         int64_t _t233 = _t232;
         return _t233;
     }
-    // line 4337
+    // line 4338
     t_5types_TypeInfo _t234 = f_5types_get((*v_c).m_table, v_t_7);
-    int64_t _t235 = *(int64_t *)vela_at(_t234.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:4337:41");
+    int64_t _t235 = *(int64_t *)vela_at(_t234.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:4338:41");
     int64_t v_key = _t235;
     rc_release_t_5types_TypeInfo(_t234);
-    // line 4338
+    // line 4339
     bool _t236 = vela_str_eq(v_name, VELA_STR("maps.keys", 9));
     if (_t236) {
-        // line 4339
+        // line 4340
         int64_t _t237 = f_5types_array(&(*v_c).m_table, v_key);
         int64_t _t238 = _t237;
         return _t238;
     }
-    // line 4341
-    t_3ast_Expr _t239 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4341:27");
+    // line 4342
+    t_3ast_Expr _t239 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4342:27");
     rc_retain_t_3ast_Expr(_t239);
     static const vela_str _t240[] = {VELA_STR_INIT("the keys of ", 12), {NULL, NULL, 0}, VELA_STR_INIT(" are ", 5), {NULL, NULL, 0}, VELA_STR_INIT(", but this is ", 14)};
     vela_str _t241[5];
@@ -50666,26 +50793,26 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
     rc_release_t_7checker_Msg(_t245);
     rc_release_t_3ast_Expr(_t239);
     vela_str_release(_t244);
-    // line 4342
+    // line 4343
     bool _t246 = vela_str_eq(v_name, VELA_STR("maps.has", 8));
     if (_t246) {
-        // line 4343
+        // line 4344
         int64_t _t247 = f_5types_BOOL();
         int64_t _t248 = _t247;
         return _t248;
     }
-    // line 4345
+    // line 4346
     bool _t249 = vela_str_eq(v_name, VELA_STR("maps.get", 8));
     if (_t249) {
-        // line 4346
+        // line 4347
         t_5types_TypeInfo _t250 = f_5types_get((*v_c).m_table, v_t_7);
-        int64_t _t251 = *(int64_t *)vela_at(_t250.m_args, 1, sizeof(int64_t), "compiler/src/checker.vl:4346:68");
+        int64_t _t251 = *(int64_t *)vela_at(_t250.m_args, 1, sizeof(int64_t), "compiler/src/checker.vl:4347:68");
         int64_t _t252 = f_5types_option(&(*v_c).m_table, _t251);
         int64_t _t253 = _t252;
         rc_release_t_5types_TypeInfo(_t250);
         return _t253;
     }
-    // line 4348
+    // line 4349
     int64_t _t254 = f_5types_NOTHING();
     int64_t _t255 = _t254;
     return _t255;
@@ -50693,7 +50820,7 @@ int64_t f_7checker_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v
 /* vela: part */
 
 bool f_7checker_changes_first(vela_str v_name) {
-    // line 4352
+    // line 4353
     bool _t1 = vela_str_eq(v_name, VELA_STR("strings.add", 11));
     bool _t2 = _t1;
     if (!_t2) {
@@ -50711,48 +50838,48 @@ bool f_7checker_changes_first(vela_str v_name) {
 /* vela: part */
 
 int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args, vela_str v_written) {
-    // line 4356
+    // line 4357
     vela_array * _t1 = f_7checker_signature(&(*v_c), v_name);
     vela_array * v_sig = _t1;
-    // line 4357
+    // line 4358
     int64_t _t2 = v_sig->len;
     int64_t _t3 = _t2;
     int64_t _t4 = (_t3 - 1);
     int64_t v_n = _t4;
-    // line 4358
-    int64_t _t5 = *(int64_t *)vela_at(v_sig, v_n, sizeof(int64_t), "compiler/src/checker.vl:4358:21");
-    int64_t v_result = _t5;
     // line 4359
+    int64_t _t5 = *(int64_t *)vela_at(v_sig, v_n, sizeof(int64_t), "compiler/src/checker.vl:4359:21");
+    int64_t v_result = _t5;
+    // line 4360
     int64_t _t6 = v_args->len;
     bool _t7 = f_7checker_arity(&(*v_c), v_e, v_written, v_n, _t6);
     bool _t8 = !_t7;
     if (_t8) {
-        // line 4360
+        // line 4361
         vela_array * _t10 = v_args;
         vela_array_retain(_t10);
         vela_array * _t9 = _t10;
         for (int64_t _t11 = 0; _t11 < _t9->len; _t11++) {
             t_3ast_Expr v_a = ((t_3ast_Expr *)_t9->data)[_t11];
-            // line 4361
+            // line 4362
             t_3ast_Expr _t12 = v_a;
             rc_retain_t_3ast_Expr(_t12);
             int64_t _t13 = f_7checker_infer(&(*v_c), _t12);
             rc_release_t_3ast_Expr(_t12);
         }
         vela_array_release(_t9);
-        // line 4363
+        // line 4364
         int64_t _t14 = v_result;
         vela_array_release(v_sig);
         return _t14;
     }
-    // line 4365
+    // line 4366
     int64_t _t15 = v_n;
     for (int64_t _t16 = 0; _t16 < _t15; _t16++) {
         int64_t v_i = _t16;
-        // line 4366
-        int64_t _t17 = *(int64_t *)vela_at(v_sig, v_i, sizeof(int64_t), "compiler/src/checker.vl:4366:23");
-        int64_t v_want = _t17;
         // line 4367
+        int64_t _t17 = *(int64_t *)vela_at(v_sig, v_i, sizeof(int64_t), "compiler/src/checker.vl:4367:23");
+        int64_t v_want = _t17;
+        // line 4368
         int64_t _t18 = v_i;
         bool _t19 = _t18 == 0;
         bool _t20 = _t19;
@@ -50761,8 +50888,8 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
             _t20 = _t21;
         }
         if (_t20) {
-            // line 4368
-            t_3ast_Expr _t22 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4368:37");
+            // line 4369
+            t_3ast_Expr _t22 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4369:37");
             rc_retain_t_3ast_Expr(_t22);
             static const vela_str _t23[] = {VELA_STR_INIT("argument 1 of '", 15), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t24[3];
@@ -50773,8 +50900,8 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
             vela_str_release(_t25);
             rc_release_t_3ast_Expr(_t22);
         } else {
-            // line 4370
-            t_3ast_Expr _t27 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4370:35");
+            // line 4371
+            t_3ast_Expr _t27 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:4371:35");
             rc_retain_t_3ast_Expr(_t27);
             static const vela_str _t28[] = {VELA_STR_INIT("argument ", 9), {NULL, NULL, 0}, VELA_STR_INIT(" of '", 5), {NULL, NULL, 0}, VELA_STR_INIT("' must be ", 10), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8)};
             vela_str _t29[7];
@@ -50796,7 +50923,7 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
             vela_str_release(_t34);
         }
     }
-    // line 4374
+    // line 4375
     int64_t _t36 = v_result;
     vela_array_release(v_sig);
     return _t36;
@@ -50804,7 +50931,7 @@ int64_t f_7checker_fixed_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela
 /* vela: part */
 
 vela_str f_7checker_written(t_3ast_Expr v_callee) {
-    // line 4379
+    // line 4380
     vela_str _t1;
     if (v_callee.m_kind->value.tag == t_3ast_ExprKind_Field) {
         t_3ast_Expr v_obj = v_callee.m_kind->value.as.m_Field._0->value;
@@ -50838,28 +50965,28 @@ vela_str f_7checker_written(t_3ast_Expr v_callee) {
 /* vela: part */
 
 vela_str f_7checker_describe_target(t_3ast_Expr v_target) {
-    // line 4388
+    // line 4389
     vela_array * _t1 = vela_array_new(&vela_type_str, 0);
     vela_array * v_parts = _t1;
-    // line 4389
+    // line 4390
     t_3ast_Expr _t2 = v_target;
     rc_retain_t_3ast_Expr(_t2);
     t_3ast_Expr v_node = _t2;
-    // line 4390
+    // line 4391
     vela_unique(&v_parts);
     for (;;) {
-        // line 4391
+        // line 4392
         if (v_node.m_kind->value.tag == t_3ast_ExprKind_Field) {
             t_3ast_Expr v_obj = v_node.m_kind->value.as.m_Field._0->value;
             rc_retain_t_3ast_Expr(v_obj);
             vela_str v_name = v_node.m_kind->value.as.m_Field._1;
             vela_str_retain(v_name);
-            // line 4393
+            // line 4394
             vela_str _t3 = v_name;
             vela_str_retain(_t3);
             vela_str _t4 = _t3;
             vela_push(v_parts, &_t4, sizeof(vela_str));
-            // line 4394
+            // line 4395
             t_3ast_Expr _t5 = v_obj;
             rc_retain_t_3ast_Expr(_t5);
             rc_release_t_3ast_Expr(v_node);
@@ -50867,15 +50994,15 @@ vela_str f_7checker_describe_target(t_3ast_Expr v_target) {
             vela_str_release(v_name);
             rc_release_t_3ast_Expr(v_obj);
         } else {
-            // line 4396
+            // line 4397
             break;
         }
     }
-    // line 4399
+    // line 4400
     if (v_node.m_kind->value.tag == t_3ast_ExprKind_Name) {
         vela_str v_name_2 = v_node.m_kind->value.as.m_Name._0;
         vela_str_retain(v_name_2);
-        // line 4400
+        // line 4401
         vela_str _t6 = v_name_2;
         vela_str_retain(_t6);
         vela_unique(&v_parts);
@@ -50884,46 +51011,46 @@ vela_str f_7checker_describe_target(t_3ast_Expr v_target) {
         vela_str_release(v_name_2);
     } else {
     }
-    // line 4403
+    // line 4404
     vela_array * _t8 = vela_array_new(&vela_type_byte, 64);
     vela_array * v_b = _t8;
-    // line 4404
+    // line 4405
     vela_unique(&v_b);
     uint8_t _t9 = 39;
     vela_push(v_b, &_t9, 1);
-    // line 4405
+    // line 4406
     int64_t _t10 = v_parts->len;
     int64_t _t11 = _t10;
     int64_t _t12 = (_t11 - 1);
     int64_t v_i = _t12;
-    // line 4406
+    // line 4407
     vela_unique(&v_b);
     for (;;) {
         int64_t _t13 = v_i;
         bool _t14 = _t13 >= 0;
         bool _t15 = _t14;
         if (!_t15) break;
-        // line 4407
+        // line 4408
         vela_str _t16 = *((vela_str *)v_parts->data + v_i);
         vela_builder_add(v_b, _t16);
-        // line 4408
+        // line 4409
         int64_t _t17 = v_i;
         bool _t18 = _t17 > 0;
         if (_t18) {
-            // line 4409
+            // line 4410
             uint8_t _t19 = 46;
             vela_push(v_b, &_t19, 1);
         }
-        // line 4411
+        // line 4412
         int64_t _t20 = v_i;
         int64_t _t21 = (_t20 - 1);
         v_i = _t21;
     }
-    // line 4413
+    // line 4414
     vela_unique(&v_b);
     uint8_t _t22 = 39;
     vela_push(v_b, &_t22, 1);
-    // line 4414
+    // line 4415
     vela_str _t23 = vela_builder_build(v_b);
     vela_str _t24 = _t23;
     vela_array_release(v_b);
@@ -50934,17 +51061,17 @@ vela_str f_7checker_describe_target(t_3ast_Expr v_target) {
 /* vela: part */
 
 bool f_7checker_terminates_block(t_7checker_Checker v_c, t_3ast_Block v_b) {
-    // line 4420
+    // line 4421
     int64_t _t1 = v_b.m_stmts->len;
     int64_t v_n = _t1;
-    // line 4421
+    // line 4422
     int64_t _t2 = v_n;
     bool _t3 = _t2 > 0;
     bool _t4 = _t3;
     if (_t4) {
         int64_t _t6 = v_n;
         int64_t _t7 = (_t6 - 1);
-        t_3ast_Stmt _t5 = *(t_3ast_Stmt *)vela_at(v_b.m_stmts, _t7, sizeof(t_3ast_Stmt), "compiler/src/checker.vl:4421:42");
+        t_3ast_Stmt _t5 = *(t_3ast_Stmt *)vela_at(v_b.m_stmts, _t7, sizeof(t_3ast_Stmt), "compiler/src/checker.vl:4422:42");
         bool _t8 = f_7checker_terminates(v_c, _t5);
         _t4 = _t8;
     }
@@ -50954,35 +51081,35 @@ bool f_7checker_terminates_block(t_7checker_Checker v_c, t_3ast_Block v_b) {
 /* vela: part */
 
 bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
-    // line 4425
+    // line 4426
     if (v_s.m_kind->value.tag == t_3ast_StmtKind_Return) {
-        // line 4426
+        // line 4427
         bool _t1 = true;
         return _t1;
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_ExprStmt) {
         t_3ast_Expr v_e = v_s.m_kind->value.as.m_ExprStmt._0;
         rc_retain_t_3ast_Expr(v_e);
-        // line 4428
+        // line 4429
         if (v_e.m_kind->value.tag == t_3ast_ExprKind_Call) {
-            // line 4430
-            t_7checker_Ref _t2 = *(t_7checker_Ref *)vela_at(v_c.m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4430:33");
+            // line 4431
+            t_7checker_Ref _t2 = *(t_7checker_Ref *)vela_at(v_c.m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4431:33");
             if (_t2.tag == t_7checker_Ref_Builtin) {
                 vela_str v_name = _t2.as.m_Builtin._0;
                 vela_str_retain(v_name);
-                // line 4431
+                // line 4432
                 bool _t3 = vela_str_eq(v_name, VELA_STR("os.exit", 7));
                 bool _t4 = _t3;
                 vela_str_release(v_name);
                 rc_release_t_3ast_Expr(v_e);
                 return _t4;
             } else {
-                // line 4432
+                // line 4433
                 bool _t5 = false;
                 rc_release_t_3ast_Expr(v_e);
                 return _t5;
             }
         } else {
-            // line 4435
+            // line 4436
             bool _t6 = false;
             rc_release_t_3ast_Expr(v_e);
             return _t6;
@@ -50990,7 +51117,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_Block) {
         t_3ast_Block v_b = v_s.m_kind->value.as.m_Block._0;
         rc_retain_t_3ast_Block(v_b);
-        // line 4438
+        // line 4439
         bool _t7 = f_7checker_terminates_block(v_c, v_b);
         bool _t8 = _t7;
         rc_release_t_3ast_Block(v_b);
@@ -51000,16 +51127,16 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
         rc_retain_t_3ast_Block(v_then);
         t_3ast_Else v_otherwise = v_s.m_kind->value.as.m_If._2->value;
         rc_retain_t_3ast_Else(v_otherwise);
-        // line 4440
+        // line 4441
         if (v_otherwise.tag == t_3ast_Else_NoElse) {
-            // line 4441
+            // line 4442
             bool _t9 = false;
             rc_release_t_3ast_Else(v_otherwise);
             rc_release_t_3ast_Block(v_then);
             return _t9;
         } else if (v_otherwise.tag == t_3ast_Else_ElseBlock) {
             t_3ast_Block v_b_2 = v_otherwise.as.m_ElseBlock._0;
-            // line 4442
+            // line 4443
             bool _t10 = f_7checker_terminates_block(v_c, v_then);
             bool _t11 = _t10;
             if (_t11) {
@@ -51022,7 +51149,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
             return _t13;
         } else {
             t_3ast_Stmt v_s2 = v_otherwise.as.m_ElseIf._0->value;
-            // line 4443
+            // line 4444
             bool _t14 = f_7checker_terminates_block(v_c, v_then);
             bool _t15 = _t14;
             if (_t15) {
@@ -51037,15 +51164,15 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_For) {
         Option_3ast_Expr v_cond = box_Option_3ast_Expr_get(v_s.m_kind->value.as.m_For._0);
         rc_retain_Option_3ast_Expr(v_cond);
-        // line 4447
+        // line 4448
         if (v_cond.tag == Option_3ast_Expr_Some) {
-            // line 4448
+            // line 4449
             bool _t18 = false;
             rc_release_Option_3ast_Expr(v_cond);
             return _t18;
         } else {
-            // line 4449
-            bool _t19 = *(bool *)vela_at(v_c.m_breaks, v_s.m_id, sizeof(bool), "compiler/src/checker.vl:4449:41");
+            // line 4450
+            bool _t19 = *(bool *)vela_at(v_c.m_breaks, v_s.m_id, sizeof(bool), "compiler/src/checker.vl:4450:41");
             bool _t20 = !_t19;
             bool _t21 = _t20;
             rc_release_Option_3ast_Expr(v_cond);
@@ -51054,31 +51181,31 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_MatchStmt) {
         vela_array * v_arms = v_s.m_kind->value.as.m_MatchStmt._1;
         vela_array_retain(v_arms);
-        // line 4454
+        // line 4455
         int64_t _t22 = v_arms->len;
         int64_t _t23 = _t22;
         bool _t24 = _t23 == 0;
         if (_t24) {
-            // line 4455
+            // line 4456
             bool _t25 = false;
             vela_array_release(v_arms);
             return _t25;
         }
-        // line 4457
+        // line 4458
         vela_array * _t27 = v_arms;
         vela_array_retain(_t27);
         vela_array * _t26 = _t27;
         for (int64_t _t28 = 0; _t28 < _t26->len; _t28++) {
             t_3ast_Arm v_a = ((t_3ast_Arm *)_t26->data)[_t28];
-            // line 4458
+            // line 4459
             if (v_a.m_body.tag == t_3ast_ArmBody_Do) {
                 t_3ast_Stmt v_body = v_a.m_body.as.m_Do._0;
                 rc_retain_t_3ast_Stmt(v_body);
-                // line 4460
+                // line 4461
                 bool _t29 = f_7checker_terminates(v_c, v_body);
                 bool _t30 = !_t29;
                 if (_t30) {
-                    // line 4461
+                    // line 4462
                     bool _t31 = false;
                     rc_release_t_3ast_Stmt(v_body);
                     vela_array_release(_t26);
@@ -51087,7 +51214,7 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
                 }
                 rc_release_t_3ast_Stmt(v_body);
             } else {
-                // line 4464
+                // line 4465
                 bool _t32 = false;
                 vela_array_release(_t26);
                 vela_array_release(v_arms);
@@ -51095,14 +51222,14 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
             }
         }
         vela_array_release(_t26);
-        // line 4467
+        // line 4468
         bool _t33 = true;
         vela_array_release(v_arms);
         return _t33;
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_Unsafe) {
         t_3ast_Block v_body_2 = v_s.m_kind->value.as.m_Unsafe._0;
         rc_retain_t_3ast_Block(v_body_2);
-        // line 4469
+        // line 4470
         bool _t34 = f_7checker_terminates_block(v_c, v_body_2);
         bool _t35 = _t34;
         rc_release_t_3ast_Block(v_body_2);
@@ -51110,13 +51237,13 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
     } else if (v_s.m_kind->value.tag == t_3ast_StmtKind_With) {
         t_3ast_Block v_body_3 = v_s.m_kind->value.as.m_With._1;
         rc_retain_t_3ast_Block(v_body_3);
-        // line 4470
+        // line 4471
         bool _t36 = f_7checker_terminates_block(v_c, v_body_3);
         bool _t37 = _t36;
         rc_release_t_3ast_Block(v_body_3);
         return _t37;
     } else {
-        // line 4471
+        // line 4472
         bool _t38 = false;
         return _t38;
     }
@@ -51124,146 +51251,146 @@ bool f_7checker_terminates(t_7checker_Checker v_c, t_3ast_Stmt v_s) {
 /* vela: part */
 
 t_7checker_Checked f_7checker_erased(t_7checker_Checked v_k) {
-    // line 4480
-    bool v_any = false;
     // line 4481
+    bool v_any = false;
+    // line 4482
     vela_array * _t2 = v_k.m_table.m_types;
     vela_array_retain(_t2);
     vela_array * _t1 = _t2;
     for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
         t_5types_TypeInfo v_ti = ((t_5types_TypeInfo *)_t1->data)[_t3];
-        // line 4482
+        // line 4483
         int64_t _t4 = v_ti.m_effects->len;
         int64_t _t5 = _t4;
         bool _t6 = _t5 > 0;
         if (_t6) {
-            // line 4483
-            v_any = true;
             // line 4484
+            v_any = true;
+            // line 4485
             break;
         }
     }
     vela_array_release(_t1);
-    // line 4487
+    // line 4488
     bool _t7 = !v_any;
     if (_t7) {
-        // line 4488
+        // line 4489
         t_7checker_Checked _t8 = v_k;
         rc_retain_t_7checker_Checked(_t8);
         t_7checker_Checked _t9 = _t8;
         return _t9;
     }
-    // line 4490
+    // line 4491
     t_7checker_Checked _t10 = v_k;
     rc_retain_t_7checker_Checked(_t10);
     t_7checker_Checked v_out = _t10;
-    // line 4491
+    // line 4492
     vela_array * _t11 = f_5types_erase_all(&v_out.m_table);
     vela_array * v_er = _t11;
-    // line 4492
+    // line 4493
     int64_t _t12 = v_out.m_ty->len;
     int64_t _t13 = _t12;
     for (int64_t _t14 = 0; _t14 < _t13; _t14++) {
         int64_t v_i = _t14;
-        // line 4493
-        int64_t _t15 = *(int64_t *)vela_at(v_out.m_ty, v_i, sizeof(int64_t), "compiler/src/checker.vl:4493:40");
+        // line 4494
+        int64_t _t15 = *(int64_t *)vela_at(v_out.m_ty, v_i, sizeof(int64_t), "compiler/src/checker.vl:4494:40");
         int64_t _t16 = f_7checker_erase_id(v_er, _t15);
         vela_unique(&v_out.m_ty);
-        int64_t *_t17 = (int64_t *)vela_at(v_out.m_ty, v_i, sizeof(int64_t), "compiler/src/checker.vl:4493:15");
+        int64_t *_t17 = (int64_t *)vela_at(v_out.m_ty, v_i, sizeof(int64_t), "compiler/src/checker.vl:4494:15");
         *_t17 = _t16;
     }
-    // line 4495
+    // line 4496
     int64_t _t18 = v_out.m_fns->len;
     int64_t _t19 = _t18;
     for (int64_t _t20 = 0; _t20 < _t19; _t20++) {
         int64_t v_i_2 = _t20;
-        // line 4496
-        t_7checker_FnInfo _t21 = *(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4496:32");
+        // line 4497
+        t_7checker_FnInfo _t21 = *(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4497:32");
         int64_t _t22 = _t21.m_params->len;
         int64_t _t23 = _t22;
         for (int64_t _t24 = 0; _t24 < _t23; _t24++) {
             int64_t v_j = _t24;
-            // line 4497
-            t_7checker_FnInfo _t25 = *(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4497:56");
-            int64_t _t26 = *(int64_t *)vela_at(_t25.m_params, v_j, sizeof(int64_t), "compiler/src/checker.vl:4497:66");
+            // line 4498
+            t_7checker_FnInfo _t25 = *(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4498:56");
+            int64_t _t26 = *(int64_t *)vela_at(_t25.m_params, v_j, sizeof(int64_t), "compiler/src/checker.vl:4498:66");
             int64_t _t27 = f_7checker_erase_id(v_er, _t26);
             vela_unique(&v_out.m_fns);
-            vela_unique(&(*(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4497:20")).m_params);
-            int64_t *_t28 = (int64_t *)vela_at((*(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4497:20")).m_params, v_j, sizeof(int64_t), "compiler/src/checker.vl:4497:30");
+            vela_unique(&(*(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4498:20")).m_params);
+            int64_t *_t28 = (int64_t *)vela_at((*(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4498:20")).m_params, v_j, sizeof(int64_t), "compiler/src/checker.vl:4498:30");
             *_t28 = _t27;
         }
-        // line 4499
-        t_7checker_FnInfo _t29 = *(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4499:49");
+        // line 4500
+        t_7checker_FnInfo _t29 = *(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4500:49");
         int64_t _t30 = f_7checker_erase_id(v_er, _t29.m_result);
         vela_unique(&v_out.m_fns);
-        (*(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4499:16")).m_result = _t30;
+        (*(t_7checker_FnInfo *)vela_at(v_out.m_fns, v_i_2, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4500:16")).m_result = _t30;
     }
-    // line 4501
+    // line 4502
     int64_t _t31 = v_out.m_locals->len;
     int64_t _t32 = _t31;
     for (int64_t _t33 = 0; _t33 < _t32; _t33++) {
         int64_t v_i_3 = _t33;
-        // line 4502
-        t_7checker_Local _t34 = *(t_7checker_Local *)vela_at(v_out.m_locals, v_i_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:4502:51");
+        // line 4503
+        t_7checker_Local _t34 = *(t_7checker_Local *)vela_at(v_out.m_locals, v_i_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:4503:51");
         int64_t _t35 = f_7checker_erase_id(v_er, _t34.m_ty);
         vela_unique(&v_out.m_locals);
-        (*(t_7checker_Local *)vela_at(v_out.m_locals, v_i_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:4502:19")).m_ty = _t35;
+        (*(t_7checker_Local *)vela_at(v_out.m_locals, v_i_3, sizeof(t_7checker_Local), "compiler/src/checker.vl:4503:19")).m_ty = _t35;
     }
-    // line 4504
+    // line 4505
     int64_t _t36 = v_out.m_targs->len;
     int64_t _t37 = _t36;
     for (int64_t _t38 = 0; _t38 < _t37; _t38++) {
         int64_t v_i_4 = _t38;
-        // line 4505
-        vela_array * _t39 = *(vela_array * *)vela_at(v_out.m_targs, v_i_4, sizeof(vela_array *), "compiler/src/checker.vl:4505:34");
+        // line 4506
+        vela_array * _t39 = *(vela_array * *)vela_at(v_out.m_targs, v_i_4, sizeof(vela_array *), "compiler/src/checker.vl:4506:34");
         int64_t _t40 = _t39->len;
         int64_t _t41 = _t40;
         for (int64_t _t42 = 0; _t42 < _t41; _t42++) {
             int64_t v_j_2 = _t42;
-            // line 4506
-            vela_array * _t43 = *(vela_array * *)vela_at(v_out.m_targs, v_i_4, sizeof(vela_array *), "compiler/src/checker.vl:4506:53");
-            int64_t _t44 = *(int64_t *)vela_at(_t43, v_j_2, sizeof(int64_t), "compiler/src/checker.vl:4506:56");
+            // line 4507
+            vela_array * _t43 = *(vela_array * *)vela_at(v_out.m_targs, v_i_4, sizeof(vela_array *), "compiler/src/checker.vl:4507:53");
+            int64_t _t44 = *(int64_t *)vela_at(_t43, v_j_2, sizeof(int64_t), "compiler/src/checker.vl:4507:56");
             int64_t _t45 = f_7checker_erase_id(v_er, _t44);
             vela_unique(&v_out.m_targs);
-            vela_unique(&(*(vela_array * *)vela_at(v_out.m_targs, v_i_4, sizeof(vela_array *), "compiler/src/checker.vl:4506:22")));
-            int64_t *_t46 = (int64_t *)vela_at((*(vela_array * *)vela_at(v_out.m_targs, v_i_4, sizeof(vela_array *), "compiler/src/checker.vl:4506:22")), v_j_2, sizeof(int64_t), "compiler/src/checker.vl:4506:25");
+            vela_unique(&(*(vela_array * *)vela_at(v_out.m_targs, v_i_4, sizeof(vela_array *), "compiler/src/checker.vl:4507:22")));
+            int64_t *_t46 = (int64_t *)vela_at((*(vela_array * *)vela_at(v_out.m_targs, v_i_4, sizeof(vela_array *), "compiler/src/checker.vl:4507:22")), v_j_2, sizeof(int64_t), "compiler/src/checker.vl:4507:25");
             *_t46 = _t45;
         }
     }
-    // line 4509
+    // line 4510
     int64_t _t47 = v_out.m_refs->len;
     int64_t _t48 = _t47;
     for (int64_t _t49 = 0; _t49 < _t48; _t49++) {
         int64_t v_i_5 = _t49;
-        // line 4510
-        t_7checker_Ref _t50 = *(t_7checker_Ref *)vela_at(v_out.m_refs, v_i_5, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4510:23");
+        // line 4511
+        t_7checker_Ref _t50 = *(t_7checker_Ref *)vela_at(v_out.m_refs, v_i_5, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4511:23");
         if (_t50.tag == t_7checker_Ref_Variant) {
             int64_t v_t = _t50.as.m_Variant._0;
             int64_t v_vi = _t50.as.m_Variant._1;
-            // line 4511
+            // line 4512
             int64_t _t51 = f_7checker_erase_id(v_er, v_t);
             t_7checker_Ref _t52 = (t_7checker_Ref){ .tag = t_7checker_Ref_Variant, .as.m_Variant = { ._0 = _t51, ._1 = v_vi } };
             vela_unique(&v_out.m_refs);
-            t_7checker_Ref *_t53 = (t_7checker_Ref *)vela_at(v_out.m_refs, v_i_5, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4511:43");
+            t_7checker_Ref *_t53 = (t_7checker_Ref *)vela_at(v_out.m_refs, v_i_5, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4512:43");
             rc_release_t_7checker_Ref(*_t53);
             *_t53 = _t52;
         } else {
         }
     }
-    // line 4515
+    // line 4516
     vela_array * _t55 = vela_map_keys(v_out.m_closures);
     vela_array * _t54 = _t55;
     for (int64_t _t56 = 0; _t56 < _t54->len; _t56++) {
         int64_t v_id = ((int64_t *)_t54->data)[_t56];
-        // line 4516
+        // line 4517
         int64_t _t58 = v_id;
-        t_7checker_ClosureInfo _t57 = *(t_7checker_ClosureInfo *)vela_map_at(v_out.m_closures, &_t58, "compiler/src/checker.vl:4516:36");
+        t_7checker_ClosureInfo _t57 = *(t_7checker_ClosureInfo *)vela_map_at(v_out.m_closures, &_t58, "compiler/src/checker.vl:4517:36");
         rc_retain_t_7checker_ClosureInfo(_t57);
         t_7checker_ClosureInfo v_info = _t57;
-        // line 4517
+        // line 4518
         int64_t _t59 = f_7checker_erase_id(v_er, v_info.m_result);
         v_info.m_result = _t59;
-        // line 4518
+        // line 4519
         t_7checker_ClosureInfo _t60 = v_info;
         rc_retain_t_7checker_ClosureInfo(_t60);
         vela_unique_map(&v_out.m_closures);
@@ -51273,7 +51400,7 @@ t_7checker_Checked f_7checker_erased(t_7checker_Checked v_k) {
         rc_release_t_7checker_ClosureInfo(v_info);
     }
     vela_array_release(_t54);
-    // line 4520
+    // line 4521
     t_7checker_Checked _t63 = v_out;
     rc_retain_t_7checker_Checked(_t63);
     t_7checker_Checked _t64 = _t63;
@@ -51284,7 +51411,7 @@ t_7checker_Checked f_7checker_erased(t_7checker_Checked v_k) {
 /* vela: part */
 
 int64_t f_7checker_erase_id(vela_array * v_er, int64_t v_t) {
-    // line 4524
+    // line 4525
     int64_t _t1 = v_t;
     bool _t2 = _t1 >= 0;
     bool _t3 = _t2;
@@ -51295,60 +51422,60 @@ int64_t f_7checker_erase_id(vela_array * v_er, int64_t v_t) {
         _t3 = _t6;
     }
     if (_t3) {
-        // line 4525
+        // line 4526
         int64_t _t7 = *((int64_t *)v_er->data + v_t);
         int64_t _t8 = _t7;
         return _t8;
     }
-    // line 4527
+    // line 4528
     int64_t _t9 = v_t;
     return _t9;
 }
 /* vela: part */
 
 vela_str f_7checker_resolve_bound(t_7checker_Checker * v_c, vela_str v_name, int64_t v_line, int64_t v_col) {
-    // line 4533
-    int64_t v_id = -1;
     // line 4534
-    int64_t v_dot = -1;
+    int64_t v_id = -1;
     // line 4535
+    int64_t v_dot = -1;
+    // line 4536
     int64_t _t1 = v_name.len;
     int64_t _t2 = _t1;
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v_i = _t3;
-        // line 4535
+        // line 4536
         uint8_t _t4 = v_name.data[v_i];
         uint8_t _t5 = _t4;
         bool _t6 = _t5 == 46;
         if (_t6) {
-            // line 4535
+            // line 4536
             v_dot = v_i;
         }
     }
-    // line 4536
+    // line 4537
     int64_t _t7 = v_dot;
     bool _t8 = _t7 >= 0;
     if (_t8) {
-        // line 4537
-        vela_str _t9 = vela_slice(v_name, 0, v_dot, "compiler/src/checker.vl:4537:59");
+        // line 4538
+        vela_str _t9 = vela_slice(v_name, 0, v_dot, "compiler/src/checker.vl:4538:59");
         int64_t _t10 = f_7checker_module_in_type(&(*v_c), v_line, v_col, _t9);
         int64_t v_module = _t10;
         vela_str_release(_t9);
-        // line 4538
+        // line 4539
         int64_t _t11 = v_module;
         bool _t12 = _t11 >= 0;
         if (_t12) {
-            // line 4538
+            // line 4539
             int64_t _t13 = v_dot;
             int64_t _t14 = (_t13 + 1);
             int64_t _t15 = v_name.len;
-            vela_str _t16 = vela_slice(v_name, _t14, _t15, "compiler/src/checker.vl:4538:73");
+            vela_str _t16 = vela_slice(v_name, _t14, _t15, "compiler/src/checker.vl:4539:73");
             int64_t _t17 = f_7checker_module_type(&(*v_c), v_line, v_col, v_module, _t16);
             v_id = _t17;
             vela_str_release(_t16);
         }
     } else {
-        // line 4540
+        // line 4541
         vela_map * _t18 = f_7checker_module_types((*v_c));
         vela_str _t20 = v_name;
         int64_t *_t19 = vela_map_find(_t18, &_t20);
@@ -51360,25 +51487,25 @@ vela_str f_7checker_resolve_bound(t_7checker_Checker * v_c, vela_str v_name, int
         }
         if (_t21.tag == Option_Int_Some) {
             int64_t v_t = _t21.as.m_Some._0;
-            // line 4540
+            // line 4541
             v_id = v_t;
         } else {
         }
         vela_map_release(_t18);
-        // line 4541
+        // line 4542
         bool _t22 = f_5types_is_interface((*v_c).m_table, v_id);
         bool _t23 = !_t22;
         if (_t23) {
-            // line 4542
+            // line 4543
             vela_array * _t25 = (*v_c).m_decls;
             vela_array_retain(_t25);
             vela_array * _t24 = _t25;
             for (int64_t _t26 = 0; _t26 < _t24->len; _t26++) {
                 int64_t v_t_2 = ((int64_t *)_t24->data)[_t26];
-                // line 4543
+                // line 4544
                 t_5types_TypeInfo _t27 = f_5types_get((*v_c).m_table, v_t_2);
                 t_5types_TypeInfo v_ti = _t27;
-                // line 4544
+                // line 4545
                 bool _t28 = vela_str_eq(v_ti.m_module, VELA_STR("<prelude>", 9));
                 bool _t29 = _t28;
                 if (_t29) {
@@ -51386,7 +51513,7 @@ vela_str f_7checker_resolve_bound(t_7checker_Checker * v_c, vela_str v_name, int
                     _t29 = _t30;
                 }
                 if (_t29) {
-                    // line 4544
+                    // line 4545
                     v_id = v_t_2;
                 }
                 rc_release_t_5types_TypeInfo(v_ti);
@@ -51394,11 +51521,11 @@ vela_str f_7checker_resolve_bound(t_7checker_Checker * v_c, vela_str v_name, int
             vela_array_release(_t24);
         }
     }
-    // line 4548
+    // line 4549
     bool _t31 = f_5types_is_interface((*v_c).m_table, v_id);
     bool _t32 = !_t31;
     if (_t32) {
-        // line 4549
+        // line 4550
         static const vela_str _t33[] = {VELA_STR_INIT("unknown interface bound '", 25), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
         vela_str _t34[3];
         memcpy(_t34, _t33, sizeof _t34);
@@ -51407,13 +51534,13 @@ vela_str f_7checker_resolve_bound(t_7checker_Checker * v_c, vela_str v_name, int
         f_7checker_report(&(*v_c), v_line, v_col, VELA_STR("E3009", 5), _t35);
         vela_str_release(_t35);
         vela_str_release(VELA_STR("E3009", 5));
-        // line 4550
+        // line 4551
         vela_str _t36 = v_name;
         vela_str_retain(_t36);
         vela_str _t37 = _t36;
         return _t37;
     }
-    // line 4552
+    // line 4553
     t_5types_TypeInfo _t38 = f_5types_get((*v_c).m_table, v_id);
     vela_str _t39 = f_5types_interface_name(_t38);
     vela_str _t40 = _t39;
@@ -51423,52 +51550,52 @@ vela_str f_7checker_resolve_bound(t_7checker_Checker * v_c, vela_str v_name, int
 /* vela: part */
 
 void f_7checker_define_interface(t_7checker_Checker * v_c, int64_t v_id, t_3ast_TypeDecl v_d) {
-    // line 4556
+    // line 4557
     int64_t _t1 = v_d.m_params->len;
     int64_t _t2 = _t1;
     bool _t3 = _t2 > 0;
     if (_t3) {
-        // line 4556
+        // line 4557
         f_7checker_report(&(*v_c), v_d.m_line, v_d.m_col, VELA_STR("E3191", 5), VELA_STR("interfaces use Self, not type parameters", 40));
         vela_str_release(VELA_STR("interfaces use Self, not type parameters", 40));
         vela_str_release(VELA_STR("E3191", 5));
     }
-    // line 4557
+    // line 4558
     vela_array * _t5 = v_d.m_parents;
     vela_array_retain(_t5);
     vela_array * _t4 = _t5;
     for (int64_t _t6 = 0; _t6 < _t4->len; _t6++) {
         vela_str v_parent = ((vela_str *)_t4->data)[_t6];
-        // line 4557
+        // line 4558
         vela_str _t7 = v_parent;
         vela_str_retain(_t7);
         vela_str _t8 = f_7checker_resolve_bound(&(*v_c), _t7, v_d.m_line, v_d.m_col);
         vela_unique(&(*v_c).m_table.m_types);
-        vela_unique(&(*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4557:53")).m_bounds);
+        vela_unique(&(*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4558:53")).m_bounds);
         vela_str _t9 = _t8;
-        vela_push((*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4557:53")).m_bounds, &_t9, sizeof(vela_str));
+        vela_push((*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4558:53")).m_bounds, &_t9, sizeof(vela_str));
         vela_str_release(_t7);
     }
     vela_array_release(_t4);
-    // line 4558
+    // line 4559
     t_5types_TypeInfo _t10 = f_5types_get((*v_c).m_table, v_id);
-    int64_t _t11 = *(int64_t *)vela_at(_t10.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4558:45");
+    int64_t _t11 = *(int64_t *)vela_at(_t10.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4559:45");
     int64_t v_self = _t11;
     rc_release_t_5types_TypeInfo(_t10);
-    // line 4559
+    // line 4560
     vela_array * _t13 = v_d.m_methods;
     vela_array_retain(_t13);
     vela_array * _t12 = _t13;
     for (int64_t _t14 = 0; _t14 < _t12->len; _t14++) {
         t_3ast_FnDecl v_method = ((t_3ast_FnDecl *)_t12->data)[_t14];
-        // line 4560
+        // line 4561
         if (v_method.m_variadic) {
-            // line 4560
+            // line 4561
             f_7checker_report(&(*v_c), v_method.m_line, v_method.m_col, VELA_STR("E3200", 5), VELA_STR("only extern declarations may be variadic", 40));
             vela_str_release(VELA_STR("only extern declarations may be variadic", 40));
             vela_str_release(VELA_STR("E3200", 5));
         }
-        // line 4561
+        // line 4562
         int64_t _t15 = v_method.m_type_params->len;
         int64_t _t16 = _t15;
         bool _t17 = _t16 > 0;
@@ -51487,38 +51614,38 @@ void f_7checker_define_interface(t_7checker_Checker * v_c, int64_t v_id, t_3ast_
             _t22 = _t25;
         }
         if (_t22) {
-            // line 4562
+            // line 4563
             f_7checker_report(&(*v_c), v_method.m_line, v_method.m_col, VELA_STR("E3191", 5), VELA_STR("interface signatures cannot have type parameters, bodies or contracts", 69));
             vela_str_release(VELA_STR("interface signatures cannot have type parameters, bodies or contracts", 69));
             vela_str_release(VELA_STR("E3191", 5));
         }
-        // line 4564
+        // line 4565
         vela_array * _t26 = vela_array_new(&vela_type_int, 0);
         vela_array * v_params = _t26;
-        // line 4565
+        // line 4566
         vela_array * _t28 = v_method.m_params;
         vela_array_retain(_t28);
         vela_array * _t27 = _t28;
         vela_unique(&v_params);
         for (int64_t _t29 = 0; _t29 < _t27->len; _t29++) {
             t_3ast_Param v_p = ((t_3ast_Param *)_t27->data)[_t29];
-            // line 4566
+            // line 4567
             if (v_p.m_mutable) {
-                // line 4566
+                // line 4567
                 f_7checker_report(&(*v_c), v_p.m_line, v_p.m_col, VELA_STR("E3191", 5), VELA_STR("interface parameters are immutable values", 41));
                 vela_str_release(VELA_STR("interface parameters are immutable values", 41));
                 vela_str_release(VELA_STR("E3191", 5));
             }
-            // line 4567
+            // line 4568
             t_3ast_TypeName _t30 = v_p.m_ty;
             rc_retain_t_3ast_TypeName(_t30);
             int64_t _t31 = f_7checker_resolve_type(&(*v_c), _t30);
             int64_t _t32 = _t31;
             vela_push(v_params, &_t32, sizeof(int64_t));
             rc_release_t_3ast_TypeName(_t30);
-            // line 4568
+            // line 4569
             if (v_d.m_public) {
-                // line 4568
+                // line 4569
                 t_3ast_TypeName _t33 = v_p.m_ty;
                 rc_retain_t_3ast_TypeName(_t33);
                 static const vela_str _t34[] = {VELA_STR_INIT("interface '", 11), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
@@ -51532,39 +51659,39 @@ void f_7checker_define_interface(t_7checker_Checker * v_c, int64_t v_id, t_3ast_
             }
         }
         vela_array_release(_t27);
-        // line 4570
+        // line 4571
         int64_t _t37 = v_params->len;
         int64_t _t38 = _t37;
         bool _t39 = _t38 == 0;
         bool _t40 = _t39;
         if (!_t40) {
-            int64_t _t41 = *(int64_t *)vela_at(v_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4570:38");
+            int64_t _t41 = *(int64_t *)vela_at(v_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4571:38");
             int64_t _t42 = _t41;
             bool _t43 = _t42 != v_self;
             _t40 = _t43;
         }
         if (_t40) {
-            // line 4571
+            // line 4572
             f_7checker_report(&(*v_c), v_method.m_line, v_method.m_col, VELA_STR("E3191", 5), VELA_STR("an interface method's first parameter must be Self", 50));
             vela_str_release(VELA_STR("an interface method's first parameter must be Self", 50));
             vela_str_release(VELA_STR("E3191", 5));
         }
-        // line 4573
+        // line 4574
         int64_t _t44 = f_5types_NOTHING();
         int64_t v_result = _t44;
-        // line 4574
+        // line 4575
         if (v_method.m_result.tag == Option_3ast_TypeName_Some) {
             t_3ast_TypeName v_t = v_method.m_result.as.m_Some._0;
             rc_retain_t_3ast_TypeName(v_t);
-            // line 4574
+            // line 4575
             t_3ast_TypeName _t45 = v_t;
             rc_retain_t_3ast_TypeName(_t45);
             int64_t _t46 = f_7checker_resolve_type(&(*v_c), _t45);
             v_result = _t46;
             rc_release_t_3ast_TypeName(_t45);
-            // line 4574
+            // line 4575
             if (v_d.m_public) {
-                // line 4574
+                // line 4575
                 t_3ast_TypeName _t47 = v_t;
                 rc_retain_t_3ast_TypeName(_t47);
                 static const vela_str _t48[] = {VELA_STR_INIT("interface '", 11), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
@@ -51579,29 +51706,29 @@ void f_7checker_define_interface(t_7checker_Checker * v_c, int64_t v_id, t_3ast_
             rc_release_t_3ast_TypeName(v_t);
         } else {
         }
-        // line 4575
+        // line 4576
         vela_array * _t52 = v_method.m_effects;
         vela_array_retain(_t52);
         vela_array * _t51 = _t52;
         for (int64_t _t53 = 0; _t53 < _t51->len; _t53++) {
             vela_str v_effect = ((vela_str *)_t51->data)[_t53];
-            // line 4576
+            // line 4577
             bool _t54 = f_5types_concrete_effect(v_effect);
             bool _t55 = !_t54;
             if (_t55) {
-                // line 4576
+                // line 4577
                 f_7checker_report(&(*v_c), v_method.m_line, v_method.m_col, VELA_STR("E3191", 5), VELA_STR("interface effects must be fs, os, unsafe, net or clock", 54));
                 vela_str_release(VELA_STR("interface effects must be fs, os, unsafe, net or clock", 54));
                 vela_str_release(VELA_STR("E3191", 5));
             }
         }
         vela_array_release(_t51);
-        // line 4578
+        // line 4579
         int64_t _t56 = f_5types_field_index((*v_c).m_table, v_id, v_method.m_name);
         int64_t _t57 = _t56;
         bool _t58 = _t57 >= 0;
         if (_t58) {
-            // line 4579
+            // line 4580
             static const vela_str _t59[] = {VELA_STR_INIT("duplicate interface method '", 28), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t60[3];
             memcpy(_t60, _t59, sizeof _t60);
@@ -51611,7 +51738,7 @@ void f_7checker_define_interface(t_7checker_Checker * v_c, int64_t v_id, t_3ast_
             vela_str_release(_t61);
             vela_str_release(VELA_STR("E3192", 5));
         }
-        // line 4581
+        // line 4582
         vela_array * _t62 = v_params;
         vela_array_retain(_t62);
         vela_array * _t63 = v_method.m_effects;
@@ -51620,38 +51747,38 @@ void f_7checker_define_interface(t_7checker_Checker * v_c, int64_t v_id, t_3ast_
         int64_t v_ft = _t64;
         vela_array_release(_t63);
         vela_array_release(_t62);
-        // line 4582
+        // line 4583
         vela_str _t65 = v_method.m_name;
         vela_str_retain(_t65);
         t_5types_FieldInfo _t66 = (t_5types_FieldInfo){ .m_name = _t65, .m_ty = v_ft };
         vela_unique(&(*v_c).m_table.m_types);
-        vela_unique(&(*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4582:31")).m_fields);
+        vela_unique(&(*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4583:31")).m_fields);
         t_5types_FieldInfo _t67 = _t66;
-        vela_push((*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4582:31")).m_fields, &_t67, sizeof(t_5types_FieldInfo));
+        vela_push((*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4583:31")).m_fields, &_t67, sizeof(t_5types_FieldInfo));
         vela_array_release(v_params);
     }
     vela_array_release(_t12);
-    // line 4584
+    // line 4585
     vela_unique(&(*v_c).m_table.m_types);
-    (*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4584:18")).m_filled = true;
+    (*(t_5types_TypeInfo *)vela_at((*v_c).m_table.m_types, v_id, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4585:18")).m_filled = true;
 }
 /* vela: part */
 
 vela_array * f_7checker_interface_fields(t_5types_Table v_table, int64_t v_id, int64_t v_depth) {
-    // line 4588
+    // line 4589
     vela_array * _t1 = vela_array_new(vt_t_5types_FieldInfo(), 0);
     vela_array * v_out = _t1;
-    // line 4589
+    // line 4590
     vela_array * _t2 = vela_array_new(&vela_type_int, 1);
     int64_t _t3 = v_id;
     vela_push(_t2, &_t3, sizeof(int64_t));
     vela_array * v_queue = _t2;
-    // line 4590
+    // line 4591
     vela_map * _t4 = vela_map_new(&vela_type_int, &vela_type_bool);
     vela_map * v_seen = _t4;
-    // line 4591
-    int64_t v_i = 0;
     // line 4592
+    int64_t v_i = 0;
+    // line 4593
     vela_unique_map(&v_seen);
     vela_unique(&v_out);
     vela_unique(&v_queue);
@@ -51661,14 +51788,14 @@ vela_array * f_7checker_interface_fields(t_5types_Table v_table, int64_t v_id, i
         bool _t7 = _t5 < _t6;
         bool _t8 = _t7;
         if (!_t8) break;
-        // line 4593
+        // line 4594
         int64_t _t9 = *((int64_t *)v_queue->data + v_i);
         int64_t v_current = _t9;
-        // line 4594
+        // line 4595
         int64_t _t10 = v_i;
         int64_t _t11 = (_t10 + 1);
         v_i = _t11;
-        // line 4595
+        // line 4596
         int64_t _t12 = v_current;
         bool _t13 = _t12 < 0;
         bool _t14 = _t13;
@@ -51681,42 +51808,42 @@ vela_array * f_7checker_interface_fields(t_5types_Table v_table, int64_t v_id, i
             _t14 = _t19;
         }
         if (_t14) {
-            // line 4595
+            // line 4596
             continue;
         }
-        // line 4596
+        // line 4597
         int64_t _t20 = v_current;
         bool _t21 = true;
         vela_map_set(v_seen, &_t20, &_t21);
-        // line 4597
-        t_5types_TypeInfo _t23 = *(t_5types_TypeInfo *)vela_at(v_table.m_types, v_current, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4597:33");
+        // line 4598
+        t_5types_TypeInfo _t23 = *(t_5types_TypeInfo *)vela_at(v_table.m_types, v_current, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4598:33");
         vela_array * _t24 = _t23.m_fields;
         vela_array_retain(_t24);
         vela_array * _t22 = _t24;
         for (int64_t _t25 = 0; _t25 < _t22->len; _t25++) {
             t_5types_FieldInfo v_field = ((t_5types_FieldInfo *)_t22->data)[_t25];
-            // line 4597
+            // line 4598
             t_5types_FieldInfo _t26 = v_field;
             rc_retain_t_5types_FieldInfo(_t26);
             t_5types_FieldInfo _t27 = _t26;
             vela_push(v_out, &_t27, sizeof(t_5types_FieldInfo));
         }
         vela_array_release(_t22);
-        // line 4598
-        t_5types_TypeInfo _t29 = *(t_5types_TypeInfo *)vela_at(v_table.m_types, v_current, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4598:34");
+        // line 4599
+        t_5types_TypeInfo _t29 = *(t_5types_TypeInfo *)vela_at(v_table.m_types, v_current, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4599:34");
         vela_array * _t30 = _t29.m_bounds;
         vela_array_retain(_t30);
         vela_array * _t28 = _t30;
         for (int64_t _t31 = 0; _t31 < _t28->len; _t31++) {
             vela_str v_parent = ((vela_str *)_t28->data)[_t31];
-            // line 4598
+            // line 4599
             int64_t _t32 = f_5types_interface_id(v_table, v_parent);
             int64_t _t33 = _t32;
             vela_push(v_queue, &_t33, sizeof(int64_t));
         }
         vela_array_release(_t28);
     }
-    // line 4600
+    // line 4601
     vela_array * _t34 = v_out;
     vela_array_retain(_t34);
     vela_array * _t35 = _t34;
@@ -51728,33 +51855,33 @@ vela_array * f_7checker_interface_fields(t_5types_Table v_table, int64_t v_id, i
 /* vela: part */
 
 int64_t f_7checker_interface_signature(t_7checker_Checker * v_c, int64_t v_t, vela_str v_name) {
-    // line 4604
-    int64_t v_found = -1;
     // line 4605
+    int64_t v_found = -1;
+    // line 4606
     t_5types_TypeInfo _t2 = f_5types_get((*v_c).m_table, v_t);
     vela_array * _t3 = _t2.m_bounds;
     vela_array_retain(_t3);
     vela_array * _t1 = _t3;
     for (int64_t _t4 = 0; _t4 < _t1->len; _t4++) {
         vela_str v_bound = ((vela_str *)_t1->data)[_t4];
-        // line 4606
+        // line 4607
         int64_t _t5 = f_5types_interface_id((*v_c).m_table, v_bound);
         int64_t v_id = _t5;
-        // line 4607
+        // line 4608
         vela_array * _t7 = f_7checker_interface_fields((*v_c).m_table, v_id, 0);
         vela_array * _t6 = _t7;
         for (int64_t _t8 = 0; _t8 < _t6->len; _t8++) {
             t_5types_FieldInfo v_field = ((t_5types_FieldInfo *)_t6->data)[_t8];
-            // line 4608
+            // line 4609
             bool _t9 = !vela_str_eq(v_field.m_name, v_name);
             if (_t9) {
-                // line 4608
+                // line 4609
                 continue;
             }
-            // line 4610
+            // line 4611
             int64_t _t10 = f_7checker_replace_self(&(*v_c).m_table, v_field.m_ty, v_t);
             int64_t v_signature = _t10;
-            // line 4611
+            // line 4612
             int64_t _t11 = v_found;
             bool _t12 = _t11 >= 0;
             bool _t13 = _t12;
@@ -51764,45 +51891,45 @@ int64_t f_7checker_interface_signature(t_7checker_Checker * v_c, int64_t v_t, ve
                 _t13 = _t15;
             }
             if (_t13) {
-                // line 4611
+                // line 4612
                 int64_t _t16 = -2;
                 vela_array_release(_t6);
                 vela_array_release(_t1);
                 rc_release_t_5types_TypeInfo(_t2);
                 return _t16;
             }
-            // line 4612
+            // line 4613
             v_found = v_signature;
         }
         vela_array_release(_t6);
     }
     vela_array_release(_t1);
     rc_release_t_5types_TypeInfo(_t2);
-    // line 4615
+    // line 4616
     int64_t _t17 = v_found;
     return _t17;
 }
 /* vela: part */
 
 int64_t f_7checker_replace_self(t_5types_Table * v_table, int64_t v_ft, int64_t v_t) {
-    // line 4619
+    // line 4620
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     vela_array * v_params = _t1;
-    // line 4620
+    // line 4621
     vela_array * _t2 = vela_array_new(&vela_type_int, 0);
     vela_array * v_args = _t2;
-    // line 4621
+    // line 4622
     int64_t _t3 = (*v_table).m_types->len;
     int64_t _t4 = _t3;
     vela_unique(&v_params);
     vela_unique(&v_args);
     for (int64_t _t5 = 0; _t5 < _t4; _t5++) {
         int64_t v_i = _t5;
-        // line 4622
-        t_5types_TypeInfo _t6 = *(t_5types_TypeInfo *)vela_at((*v_table).m_types, v_i, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4622:29");
+        // line 4623
+        t_5types_TypeInfo _t6 = *(t_5types_TypeInfo *)vela_at((*v_table).m_types, v_i, sizeof(t_5types_TypeInfo), "compiler/src/checker.vl:4623:29");
         rc_retain_t_5types_TypeInfo(_t6);
         t_5types_TypeInfo v_ti = _t6;
-        // line 4623
+        // line 4624
         t_5types_Tag _t7 = (t_5types_Tag){ .tag = t_5types_Tag_Interface };
         bool _t8 = v_ti.m_tag.tag == _t7.tag;
         bool _t9 = _t8;
@@ -51813,17 +51940,17 @@ int64_t f_7checker_replace_self(t_5types_Table * v_table, int64_t v_ft, int64_t 
             _t9 = _t12;
         }
         if (_t9) {
-            // line 4623
-            int64_t _t13 = *(int64_t *)vela_at(v_ti.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4623:93");
+            // line 4624
+            int64_t _t13 = *(int64_t *)vela_at(v_ti.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4624:93");
             int64_t _t14 = _t13;
             vela_push(v_params, &_t14, sizeof(int64_t));
-            // line 4623
+            // line 4624
             int64_t _t15 = v_t;
             vela_push(v_args, &_t15, sizeof(int64_t));
         }
         rc_release_t_5types_TypeInfo(v_ti);
     }
-    // line 4625
+    // line 4626
     vela_array * _t16 = v_params;
     vela_array_retain(_t16);
     vela_array * _t17 = v_args;
@@ -51839,7 +51966,7 @@ int64_t f_7checker_replace_self(t_5types_Table * v_table, int64_t v_ft, int64_t 
 /* vela: part */
 
 bool f_7checker_method_unify(t_5types_Table v_table, int64_t v_pattern, int64_t v_actual, vela_array * v_params, vela_array * * v_bound) {
-    // line 4631
+    // line 4632
     int64_t _t1 = v_params->len;
     int64_t _t2 = _t1;
     vela_unique(&(*v_bound));
@@ -51847,21 +51974,21 @@ bool f_7checker_method_unify(t_5types_Table v_table, int64_t v_pattern, int64_t 
     int64_t _t4n = (*v_bound)->len;
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v_i = _t3;
-        // line 4632
+        // line 4633
         int64_t _t5 = v_pattern;
         int64_t _t6 = *((int64_t *)v_params->data + v_i);
         bool _t7 = _t5 == _t6;
         if (_t7) {
-            // line 4633
-            int64_t _t8 = *(int64_t *)vela_at_in(_t4, _t4n, v_i, sizeof(int64_t), "compiler/src/checker.vl:4633:21");
+            // line 4634
+            int64_t _t8 = *(int64_t *)vela_at_in(_t4, _t4n, v_i, sizeof(int64_t), "compiler/src/checker.vl:4634:21");
             int64_t _t9 = _t8;
             bool _t10 = _t9 < 0;
             if (_t10) {
-                // line 4633
+                // line 4634
                 int64_t *_t11 = ((int64_t *)_t4 + v_i);
                 *_t11 = v_actual;
             }
-            // line 4634
+            // line 4635
             int64_t _t12 = *((int64_t *)_t4 + v_i);
             int64_t _t13 = _t12;
             bool _t14 = _t13 == v_actual;
@@ -51869,15 +51996,15 @@ bool f_7checker_method_unify(t_5types_Table v_table, int64_t v_pattern, int64_t 
             return _t15;
         }
     }
-    // line 4637
+    // line 4638
     int64_t _t16 = v_pattern;
     bool _t17 = _t16 == v_actual;
     if (_t17) {
-        // line 4637
+        // line 4638
         bool _t18 = true;
         return _t18;
     }
-    // line 4638
+    // line 4639
     int64_t _t19 = v_pattern;
     bool _t20 = _t19 < 0;
     bool _t21 = _t20;
@@ -51887,17 +52014,17 @@ bool f_7checker_method_unify(t_5types_Table v_table, int64_t v_pattern, int64_t 
         _t21 = _t23;
     }
     if (_t21) {
-        // line 4638
+        // line 4639
         bool _t24 = false;
         return _t24;
     }
-    // line 4639
+    // line 4640
     t_5types_TypeInfo _t25 = f_5types_get(v_table, v_pattern);
     t_5types_TypeInfo v_p = _t25;
-    // line 4640
+    // line 4641
     t_5types_TypeInfo _t26 = f_5types_get(v_table, v_actual);
     t_5types_TypeInfo v_a = _t26;
-    // line 4641
+    // line 4642
     bool _t27 = v_p.m_tag.tag != v_a.m_tag.tag;
     bool _t28 = _t27;
     if (!_t28) {
@@ -51924,42 +52051,42 @@ bool f_7checker_method_unify(t_5types_Table v_table, int64_t v_pattern, int64_t 
         _t35 = _t39;
     }
     if (_t35) {
-        // line 4641
+        // line 4642
         bool _t40 = false;
         rc_release_t_5types_TypeInfo(v_a);
         rc_release_t_5types_TypeInfo(v_p);
         return _t40;
     }
-    // line 4642
+    // line 4643
     int64_t _t41 = v_p.m_args->len;
     int64_t _t42 = _t41;
     for (int64_t _t43 = 0; _t43 < _t42; _t43++) {
         int64_t v_i_2 = _t43;
-        // line 4642
-        int64_t _t44 = *(int64_t *)vela_at(v_p.m_args, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:4642:61");
-        int64_t _t45 = *(int64_t *)vela_at(v_a.m_args, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:4642:72");
+        // line 4643
+        int64_t _t44 = *(int64_t *)vela_at(v_p.m_args, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:4643:61");
+        int64_t _t45 = *(int64_t *)vela_at(v_a.m_args, v_i_2, sizeof(int64_t), "compiler/src/checker.vl:4643:72");
         bool _t46 = f_7checker_method_unify(v_table, _t44, _t45, v_params, &(*v_bound));
         bool _t47 = !_t46;
         if (_t47) {
-            // line 4642
+            // line 4643
             bool _t48 = false;
             rc_release_t_5types_TypeInfo(v_a);
             rc_release_t_5types_TypeInfo(v_p);
             return _t48;
         }
     }
-    // line 4643
+    // line 4644
     int64_t _t49 = v_p.m_args->len;
     int64_t _t50 = _t49;
     bool _t51 = _t50 == 0;
     if (_t51) {
-        // line 4643
+        // line 4644
         bool _t52 = false;
         rc_release_t_5types_TypeInfo(v_a);
         rc_release_t_5types_TypeInfo(v_p);
         return _t52;
     }
-    // line 4644
+    // line 4645
     int64_t _t53 = v_p.m_result;
     bool _t54 = _t53 == v_a.m_result;
     bool _t55 = _t54;
@@ -51975,25 +52102,25 @@ bool f_7checker_method_unify(t_5types_Table v_table, int64_t v_pattern, int64_t 
 /* vela: part */
 
 t_7checker_Dispatch f_7checker_lookup_method(t_5types_Table v_table, vela_array * v_fns, vela_array * v_mods, int64_t v_t, vela_str v_name) {
-    // line 4648
+    // line 4649
     vela_array * _t1 = vela_array_new(&vela_type_int, 0);
     t_7checker_Dispatch _t2 = (t_7checker_Dispatch){ .m_fn_id = -1, .m_args = _t1 };
     t_7checker_Dispatch v_empty = _t2;
-    // line 4649
+    // line 4650
     int64_t _t3 = v_t;
     bool _t4 = _t3 < 0;
     if (_t4) {
-        // line 4649
+        // line 4650
         t_7checker_Dispatch _t5 = v_empty;
         rc_retain_t_7checker_Dispatch(_t5);
         t_7checker_Dispatch _t6 = _t5;
         rc_release_t_7checker_Dispatch(v_empty);
         return _t6;
     }
-    // line 4650
+    // line 4651
     t_5types_TypeInfo _t7 = f_5types_get(v_table, v_t);
     t_5types_TypeInfo v_ti = _t7;
-    // line 4651
+    // line 4652
     t_5types_Tag _t8 = (t_5types_Tag){ .tag = t_5types_Tag_Struct };
     bool _t9 = v_ti.m_tag.tag != _t8.tag;
     bool _t10 = _t9;
@@ -52003,7 +52130,7 @@ t_7checker_Dispatch f_7checker_lookup_method(t_5types_Table v_table, vela_array 
         _t10 = _t12;
     }
     if (_t10) {
-        // line 4651
+        // line 4652
         t_7checker_Dispatch _t13 = v_empty;
         rc_retain_t_7checker_Dispatch(_t13);
         t_7checker_Dispatch _t14 = _t13;
@@ -52011,7 +52138,7 @@ t_7checker_Dispatch f_7checker_lookup_method(t_5types_Table v_table, vela_array 
         rc_release_t_7checker_Dispatch(v_empty);
         return _t14;
     }
-    // line 4652
+    // line 4653
     static const vela_str _t15[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
     vela_str _t16[3];
     memcpy(_t16, _t15, sizeof _t16);
@@ -52019,50 +52146,50 @@ t_7checker_Dispatch f_7checker_lookup_method(t_5types_Table v_table, vela_array 
     _t16[2] = v_name;
     vela_str _t17 = vela_str_join(_t16, 3);
     vela_str v_qualified = _t17;
-    // line 4653
+    // line 4654
     int64_t _t18 = 2;
     for (int64_t _t19 = 0; _t19 < _t18; _t19++) {
         int64_t v_pass = _t19;
-        // line 4654
+        // line 4655
         int64_t _t20 = v_fns->len;
         int64_t _t21 = _t20;
         for (int64_t _t22 = 0; _t22 < _t21; _t22++) {
             int64_t v_id = _t22;
-            // line 4655
+            // line 4656
             t_7checker_FnInfo _t23 = *((t_7checker_FnInfo *)v_fns->data + v_id);
             rc_retain_t_7checker_FnInfo(_t23);
             t_7checker_FnInfo v_f = _t23;
-            // line 4656
+            // line 4657
             int64_t _t24 = v_f.m_params->len;
             int64_t _t25 = _t24;
             bool _t26 = _t25 == 0;
             if (_t26) {
-                // line 4656
+                // line 4657
                 rc_release_t_7checker_FnInfo(v_f);
                 continue;
             }
-            // line 4657
-            int64_t _t27 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4657:50");
+            // line 4658
+            int64_t _t27 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4658:50");
             t_5types_TypeInfo _t28 = f_5types_get(v_table, _t27);
             vela_str _t29 = _t28.m_module;
             vela_str_retain(_t29);
             vela_str v_owner = _t29;
             rc_release_t_5types_TypeInfo(_t28);
-            // line 4658
+            // line 4659
             bool _t30 = !vela_str_eq(v_owner, v_ti.m_module);
             bool _t31 = _t30;
             if (!_t31) {
-                t_7modules_Module _t32 = *(t_7modules_Module *)vela_at(v_mods, v_f.m_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:4658:42");
+                t_7modules_Module _t32 = *(t_7modules_Module *)vela_at(v_mods, v_f.m_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:4659:42");
                 bool _t33 = !vela_str_eq(_t32.m_name, v_ti.m_module);
                 _t31 = _t33;
             }
             if (_t31) {
-                // line 4658
+                // line 4659
                 vela_str_release(v_owner);
                 rc_release_t_7checker_FnInfo(v_f);
                 continue;
             }
-            // line 4659
+            // line 4660
             int64_t _t34 = v_pass;
             bool _t35 = _t34 == 0;
             bool _t36 = _t35;
@@ -52082,23 +52209,23 @@ t_7checker_Dispatch f_7checker_lookup_method(t_5types_Table v_table, vela_array 
                 _t38 = _t41;
             }
             if (_t38) {
-                // line 4659
+                // line 4660
                 vela_str_release(v_owner);
                 rc_release_t_7checker_FnInfo(v_f);
                 continue;
             }
-            // line 4660
+            // line 4661
             int64_t _t43 = v_f.m_type_params->len;
             vela_array * _t44 = f_7checker_unknown(_t43);
             vela_array * v_args = _t44;
-            // line 4661
-            int64_t _t45 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4661:45");
+            // line 4662
+            int64_t _t45 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4662:45");
             vela_array * _t46 = v_f.m_type_params;
             vela_array_retain(_t46);
             bool _t47 = f_7checker_method_unify(v_table, _t45, v_t, _t46, &v_args);
             bool _t48 = !_t47;
             if (_t48) {
-                // line 4661
+                // line 4662
                 vela_array_release(_t46);
                 vela_array_release(v_args);
                 vela_str_release(v_owner);
@@ -52106,7 +52233,7 @@ t_7checker_Dispatch f_7checker_lookup_method(t_5types_Table v_table, vela_array 
                 continue;
             }
             vela_array_release(_t46);
-            // line 4662
+            // line 4663
             vela_array * _t49 = v_args;
             vela_array_retain(_t49);
             t_7checker_Dispatch _t50 = (t_7checker_Dispatch){ .m_fn_id = v_id, .m_args = _t49 };
@@ -52120,7 +52247,7 @@ t_7checker_Dispatch f_7checker_lookup_method(t_5types_Table v_table, vela_array 
             return _t51;
         }
     }
-    // line 4665
+    // line 4666
     t_7checker_Dispatch _t52 = v_empty;
     rc_retain_t_7checker_Dispatch(_t52);
     t_7checker_Dispatch _t53 = _t52;
@@ -52132,7 +52259,7 @@ t_7checker_Dispatch f_7checker_lookup_method(t_5types_Table v_table, vela_array 
 /* vela: part */
 
 t_7checker_Dispatch f_7checker_method(t_7checker_Checked v_k, int64_t v_t, vela_str v_name) {
-    // line 4668
+    // line 4669
     t_7checker_Dispatch _t1 = f_7checker_lookup_method(v_k.m_table, v_k.m_fns, v_k.m_modules, v_t, v_name);
     t_7checker_Dispatch _t2 = _t1;
     return _t2;
@@ -52140,13 +52267,13 @@ t_7checker_Dispatch f_7checker_method(t_7checker_Checked v_k, int64_t v_t, vela_
 /* vela: part */
 
 bool f_7checker_intrinsic(t_5types_Table v_table, int64_t v_t, vela_str v_bound) {
-    // line 4671
+    // line 4672
     bool _t1 = vela_str_eq(v_bound, VELA_STR("Eq", 2));
     if (_t1) {
-        // line 4672
+        // line 4673
         t_5types_TypeInfo _t2 = f_5types_get(v_table, v_t);
         t_5types_TypeInfo v_ti = _t2;
-        // line 4673
+        // line 4674
         t_5types_Tag _t3 = (t_5types_Tag){ .tag = t_5types_Tag_Prim };
         bool _t4 = v_ti.m_tag.tag == _t3.tag;
         bool _t5 = _t4;
@@ -52171,10 +52298,10 @@ bool f_7checker_intrinsic(t_5types_Table v_table, int64_t v_t, vela_str v_bound)
         rc_release_t_5types_TypeInfo(v_ti);
         return _t14;
     }
-    // line 4675
+    // line 4676
     bool _t15 = vela_str_eq(v_bound, VELA_STR("Ord", 3));
     if (_t15) {
-        // line 4675
+        // line 4676
         bool _t16 = f_5types_is_integer(v_t);
         bool _t17 = _t16;
         if (!_t17) {
@@ -52193,7 +52320,7 @@ bool f_7checker_intrinsic(t_5types_Table v_table, int64_t v_t, vela_str v_bound)
         bool _t25 = _t21;
         return _t25;
     }
-    // line 4676
+    // line 4677
     bool _t26 = vela_str_eq(v_bound, VELA_STR("Key", 3));
     bool _t27 = _t26;
     if (_t27) {
@@ -52206,7 +52333,7 @@ bool f_7checker_intrinsic(t_5types_Table v_table, int64_t v_t, vela_str v_bound)
 /* vela: part */
 
 bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_bound, int64_t v_depth) {
-    // line 4680
+    // line 4681
     int64_t _t1 = v_t;
     int64_t _t2 = f_5types_ERROR();
     bool _t3 = _t1 == _t2;
@@ -52221,11 +52348,11 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
         _t6 = _t7;
     }
     if (_t6) {
-        // line 4680
+        // line 4681
         bool _t8 = true;
         return _t8;
     }
-    // line 4681
+    // line 4682
     bool _t9 = f_5types_is_param(v_c.m_table, v_t);
     bool _t10 = _t9;
     if (!_t10) {
@@ -52234,41 +52361,41 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
         _t10 = _t12;
     }
     if (_t10) {
-        // line 4681
+        // line 4682
         bool _t13 = false;
         return _t13;
     }
-    // line 4682
+    // line 4683
     int64_t _t14 = f_5types_interface_id(v_c.m_table, v_bound);
     int64_t v_id = _t14;
-    // line 4683
+    // line 4684
     int64_t _t15 = v_id;
     bool _t16 = _t15 < 0;
     if (_t16) {
-        // line 4683
+        // line 4684
         bool _t17 = false;
         return _t17;
     }
-    // line 4684
+    // line 4685
     t_5types_TypeInfo _t18 = f_5types_get(v_c.m_table, v_id);
     t_5types_TypeInfo v_ti = _t18;
-    // line 4685
+    // line 4686
     t_5types_Table _t19 = v_c.m_table;
     rc_retain_t_5types_Table(_t19);
     t_5types_Table v_table = _t19;
-    // line 4686
+    // line 4687
     vela_array * _t21 = v_ti.m_bounds;
     vela_array_retain(_t21);
     vela_array * _t20 = _t21;
     for (int64_t _t22 = 0; _t22 < _t20->len; _t22++) {
         vela_str v_parent = ((vela_str *)_t20->data)[_t22];
-        // line 4686
+        // line 4687
         int64_t _t23 = v_depth;
         int64_t _t24 = (_t23 + 1);
         bool _t25 = f_7checker_satisfies_depth(v_c, v_t, v_parent, _t24);
         bool _t26 = !_t25;
         if (_t26) {
-            // line 4686
+            // line 4687
             bool _t27 = false;
             vela_array_release(_t20);
             rc_release_t_5types_Table(v_table);
@@ -52277,23 +52404,23 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
         }
     }
     vela_array_release(_t20);
-    // line 4687
+    // line 4688
     vela_array * _t29 = v_ti.m_fields;
     vela_array_retain(_t29);
     vela_array * _t28 = _t29;
     for (int64_t _t30 = 0; _t30 < _t28->len; _t30++) {
         t_5types_FieldInfo v_field = ((t_5types_FieldInfo *)_t28->data)[_t30];
-        // line 4688
+        // line 4689
         t_7checker_Dispatch _t31 = f_7checker_lookup_method(v_table, v_c.m_fns, v_c.m_modules, v_t, v_field.m_name);
         t_7checker_Dispatch v_dispatch = _t31;
-        // line 4689
+        // line 4690
         int64_t _t32 = v_dispatch.m_fn_id;
         bool _t33 = _t32 < 0;
         if (_t33) {
-            // line 4690
+            // line 4691
             vela_str _t34 = f_7checker_intrinsic_bound(v_field.m_name);
             vela_str v_primitive_bound = _t34;
-            // line 4691
+            // line 4692
             bool _t35 = vela_str_eq(v_primitive_bound, VELA_STR("", 0));
             bool _t36 = _t35;
             if (!_t36) {
@@ -52302,7 +52429,7 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
                 _t36 = _t38;
             }
             if (_t36) {
-                // line 4691
+                // line 4692
                 bool _t39 = false;
                 vela_str_release(v_primitive_bound);
                 rc_release_t_7checker_Dispatch(v_dispatch);
@@ -52311,19 +52438,19 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
                 rc_release_t_5types_TypeInfo(v_ti);
                 return _t39;
             }
-            // line 4692
+            // line 4693
             int64_t _t40 = f_5types_interface_id(v_table, v_primitive_bound);
             int64_t v_core = _t40;
-            // line 4693
+            // line 4694
             t_5types_TypeInfo _t41 = f_5types_get(v_table, v_core);
-            t_5types_FieldInfo _t42 = *(t_5types_FieldInfo *)vela_at(_t41.m_fields, 0, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:4693:79");
+            t_5types_FieldInfo _t42 = *(t_5types_FieldInfo *)vela_at(_t41.m_fields, 0, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:4694:79");
             int64_t _t43 = f_7checker_replace_self(&v_table, _t42.m_ty, v_t);
             int64_t v_actual = _t43;
             rc_release_t_5types_TypeInfo(_t41);
-            // line 4694
+            // line 4695
             int64_t _t44 = f_7checker_replace_self(&v_table, v_field.m_ty, v_t);
             int64_t v_want = _t44;
-            // line 4695
+            // line 4696
             int64_t _t45 = f_5types_plain(v_table, v_actual);
             int64_t _t46 = _t45;
             int64_t _t47 = f_5types_plain(v_table, v_want);
@@ -52339,7 +52466,7 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
                 vela_array_release(_t50);
             }
             if (_t49) {
-                // line 4695
+                // line 4696
                 bool _t54 = false;
                 vela_str_release(v_primitive_bound);
                 rc_release_t_7checker_Dispatch(v_dispatch);
@@ -52348,26 +52475,26 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
                 rc_release_t_5types_TypeInfo(v_ti);
                 return _t54;
             }
-            // line 4696
+            // line 4697
             vela_str_release(v_primitive_bound);
             rc_release_t_7checker_Dispatch(v_dispatch);
             continue;
         }
-        // line 4698
-        t_7checker_FnInfo _t55 = *(t_7checker_FnInfo *)vela_at(v_c.m_fns, v_dispatch.m_fn_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4698:22");
+        // line 4699
+        t_7checker_FnInfo _t55 = *(t_7checker_FnInfo *)vela_at(v_c.m_fns, v_dispatch.m_fn_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4699:22");
         rc_retain_t_7checker_FnInfo(_t55);
         t_7checker_FnInfo v_f = _t55;
-        // line 4699
+        // line 4700
         vela_array * _t57 = v_dispatch.m_args;
         vela_array_retain(_t57);
         vela_array * _t56 = _t57;
         for (int64_t _t58 = 0; _t58 < _t56->len; _t58++) {
             int64_t v_arg = ((int64_t *)_t56->data)[_t58];
-            // line 4699
+            // line 4700
             int64_t _t59 = v_arg;
             bool _t60 = _t59 < 0;
             if (_t60) {
-                // line 4699
+                // line 4700
                 bool _t61 = false;
                 vela_array_release(_t56);
                 rc_release_t_7checker_FnInfo(v_f);
@@ -52379,11 +52506,11 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
             }
         }
         vela_array_release(_t56);
-        // line 4700
+        // line 4701
         bool _t62 = !v_f.m_decl.m_public;
         bool _t63 = _t62;
         if (_t63) {
-            t_7modules_Module _t64 = *(t_7modules_Module *)vela_at(v_c.m_modules, v_f.m_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:4700:39");
+            t_7modules_Module _t64 = *(t_7modules_Module *)vela_at(v_c.m_modules, v_f.m_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:4701:39");
             t_5types_TypeInfo _t65 = f_5types_get(v_table, v_id);
             bool _t66 = !vela_str_eq(_t64.m_name, _t65.m_module);
             _t63 = _t66;
@@ -52396,7 +52523,7 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
             _t67 = _t69;
         }
         if (_t67) {
-            // line 4700
+            // line 4701
             bool _t70 = false;
             rc_release_t_7checker_FnInfo(v_f);
             rc_release_t_7checker_Dispatch(v_dispatch);
@@ -52405,27 +52532,27 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
             rc_release_t_5types_TypeInfo(v_ti);
             return _t70;
         }
-        // line 4701
+        // line 4702
         int64_t _t71 = v_f.m_type_params->len;
         int64_t _t72 = _t71;
         for (int64_t _t73 = 0; _t73 < _t72; _t73++) {
             int64_t v_i = _t73;
-            // line 4702
-            int64_t _t75 = *(int64_t *)vela_at(v_f.m_type_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4702:55");
+            // line 4703
+            int64_t _t75 = *(int64_t *)vela_at(v_f.m_type_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4703:55");
             t_5types_TypeInfo _t76 = f_5types_get(v_table, _t75);
             vela_array * _t77 = _t76.m_bounds;
             vela_array_retain(_t77);
             vela_array * _t74 = _t77;
             for (int64_t _t78 = 0; _t78 < _t74->len; _t78++) {
                 vela_str v_need = ((vela_str *)_t74->data)[_t78];
-                // line 4703
-                int64_t _t79 = *(int64_t *)vela_at(v_dispatch.m_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:4703:53");
+                // line 4704
+                int64_t _t79 = *(int64_t *)vela_at(v_dispatch.m_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:4704:53");
                 int64_t _t80 = v_depth;
                 int64_t _t81 = (_t80 + 1);
                 bool _t82 = f_7checker_satisfies_depth(v_c, _t79, v_need, _t81);
                 bool _t83 = !_t82;
                 if (_t83) {
-                    // line 4703
+                    // line 4704
                     bool _t84 = false;
                     vela_array_release(_t74);
                     rc_release_t_5types_TypeInfo(_t76);
@@ -52440,15 +52567,15 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
             vela_array_release(_t74);
             rc_release_t_5types_TypeInfo(_t76);
         }
-        // line 4706
+        // line 4707
         vela_array * _t86 = v_f.m_mutable;
         vela_array_retain(_t86);
         vela_array * _t85 = _t86;
         for (int64_t _t87 = 0; _t87 < _t85->len; _t87++) {
             bool v_mutable = ((bool *)_t85->data)[_t87];
-            // line 4706
+            // line 4707
             if (v_mutable) {
-                // line 4706
+                // line 4707
                 bool _t88 = false;
                 vela_array_release(_t85);
                 rc_release_t_7checker_FnInfo(v_f);
@@ -52460,10 +52587,10 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
             }
         }
         vela_array_release(_t85);
-        // line 4707
+        // line 4708
         int64_t _t89 = f_7checker_replace_self(&v_table, v_field.m_ty, v_t);
         int64_t v_want_2 = _t89;
-        // line 4708
+        // line 4709
         vela_array * _t90 = v_f.m_params;
         vela_array_retain(_t90);
         vela_array * _t91 = v_f.m_decl.m_effects;
@@ -52472,7 +52599,7 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
         int64_t v_actual_2 = _t92;
         vela_array_release(_t91);
         vela_array_release(_t90);
-        // line 4709
+        // line 4710
         vela_array * _t93 = v_f.m_type_params;
         vela_array_retain(_t93);
         vela_array * _t94 = v_dispatch.m_args;
@@ -52481,13 +52608,13 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
         int64_t v_concrete = _t95;
         vela_array_release(_t94);
         vela_array_release(_t93);
-        // line 4711
+        // line 4712
         t_5types_TypeInfo _t96 = f_5types_get(v_table, v_concrete);
         t_5types_TypeInfo v_a = _t96;
-        // line 4712
+        // line 4713
         t_5types_TypeInfo _t97 = f_5types_get(v_table, v_want_2);
         t_5types_TypeInfo v_b = _t97;
-        // line 4713
+        // line 4714
         int64_t _t98 = f_5types_plain(v_table, v_concrete);
         int64_t _t99 = _t98;
         int64_t _t100 = f_5types_plain(v_table, v_want_2);
@@ -52499,7 +52626,7 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
             _t102 = _t104;
         }
         if (_t102) {
-            // line 4713
+            // line 4714
             bool _t105 = false;
             rc_release_t_5types_TypeInfo(v_b);
             rc_release_t_5types_TypeInfo(v_a);
@@ -52516,7 +52643,7 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
         rc_release_t_7checker_Dispatch(v_dispatch);
     }
     vela_array_release(_t28);
-    // line 4715
+    // line 4716
     bool _t106 = true;
     rc_release_t_5types_Table(v_table);
     rc_release_t_5types_TypeInfo(v_ti);
@@ -52525,7 +52652,7 @@ bool f_7checker_satisfies_depth(t_7checker_Checker v_c, int64_t v_t, vela_str v_
 /* vela: part */
 
 vela_str f_7checker_key_failure(t_7checker_Checker v_c, int64_t v_t) {
-    // line 4719
+    // line 4720
     static const vela_str _t1[] = {VELA_STR_INIT("Map key ", 8), {NULL, NULL, 0}, VELA_STR_INIT(" does not implement Key; ", 25), {NULL, NULL, 0}};
     vela_str _t2[4];
     memcpy(_t2, _t1, sizeof _t2);
@@ -52542,10 +52669,10 @@ vela_str f_7checker_key_failure(t_7checker_Checker v_c, int64_t v_t) {
 /* vela: part */
 
 vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_str v_bound, int64_t v_depth) {
-    // line 4725
+    // line 4726
     bool _t1 = f_5types_is_param(v_c.m_table, v_t);
     if (_t1) {
-        // line 4725
+        // line 4726
         static const vela_str _t2[] = {VELA_STR_INIT("type parameter ", 15), {NULL, NULL, 0}, VELA_STR_INIT(" lacks bound ", 13), {NULL, NULL, 0}};
         vela_str _t3[4];
         memcpy(_t3, _t2, sizeof _t3);
@@ -52557,43 +52684,43 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
         vela_str _t6 = _t5;
         return _t6;
     }
-    // line 4726
+    // line 4727
     int64_t _t7 = v_depth;
     bool _t8 = _t7 > 32;
     if (_t8) {
-        // line 4726
+        // line 4727
         vela_str _t9 = vela_str_concat(VELA_STR("interface obligation depth exceeded for ", 40), v_bound);
         vela_str _t10 = _t9;
         return _t10;
     }
-    // line 4727
+    // line 4728
     int64_t _t11 = f_5types_interface_id(v_c.m_table, v_bound);
     int64_t v_id = _t11;
-    // line 4728
+    // line 4729
     int64_t _t12 = v_id;
     bool _t13 = _t12 < 0;
     if (_t13) {
-        // line 4728
+        // line 4729
         vela_str _t14 = vela_str_concat(VELA_STR("unknown interface ", 18), v_bound);
         vela_str _t15 = _t14;
         return _t15;
     }
-    // line 4729
+    // line 4730
     t_5types_TypeInfo _t16 = f_5types_get(v_c.m_table, v_id);
     t_5types_TypeInfo v_ti = _t16;
-    // line 4730
+    // line 4731
     vela_array * _t18 = v_ti.m_bounds;
     vela_array_retain(_t18);
     vela_array * _t17 = _t18;
     for (int64_t _t19 = 0; _t19 < _t17->len; _t19++) {
         vela_str v_parent = ((vela_str *)_t17->data)[_t19];
-        // line 4731
+        // line 4732
         int64_t _t20 = v_depth;
         int64_t _t21 = (_t20 + 1);
         bool _t22 = f_7checker_satisfies_depth(v_c, v_t, v_parent, _t21);
         bool _t23 = !_t22;
         if (_t23) {
-            // line 4732
+            // line 4733
             static const vela_str _t24[] = {{NULL, NULL, 0}, VELA_STR_INIT(" requires ", 10), {NULL, NULL, 0}, VELA_STR_INIT(": ", 2), {NULL, NULL, 0}};
             vela_str _t25[5];
             memcpy(_t25, _t24, sizeof _t25);
@@ -52612,25 +52739,25 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
         }
     }
     vela_array_release(_t17);
-    // line 4735
+    // line 4736
     t_5types_Table _t31 = v_c.m_table;
     rc_retain_t_5types_Table(_t31);
     t_5types_Table v_table = _t31;
-    // line 4736
-    t_7modules_Module _t32 = *(t_7modules_Module *)vela_at(v_c.m_modules, v_c.m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4736:30");
+    // line 4737
+    t_7modules_Module _t32 = *(t_7modules_Module *)vela_at(v_c.m_modules, v_c.m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4737:30");
     vela_str _t33 = _t32.m_name;
     vela_str_retain(_t33);
     vela_str v_viewpoint = _t33;
-    // line 4737
+    // line 4738
     vela_array * _t35 = v_ti.m_fields;
     vela_array_retain(_t35);
     vela_array * _t34 = _t35;
     for (int64_t _t36 = 0; _t36 < _t34->len; _t36++) {
         t_5types_FieldInfo v_field = ((t_5types_FieldInfo *)_t34->data)[_t36];
-        // line 4738
+        // line 4739
         int64_t _t37 = f_7checker_replace_self(&v_table, v_field.m_ty, v_t);
         int64_t v_want = _t37;
-        // line 4739
+        // line 4740
         static const vela_str _t38[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}, VELA_STR_INIT(": expected ", 11), {NULL, NULL, 0}};
         vela_str _t39[5];
         memcpy(_t39, _t38, sizeof _t39);
@@ -52641,17 +52768,17 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
         vela_str _t41 = vela_str_join(_t39, 5);
         vela_str_release(_t39[4]);
         vela_str v_expected = _t41;
-        // line 4740
+        // line 4741
         t_7checker_Dispatch _t42 = f_7checker_lookup_method(v_table, v_c.m_fns, v_c.m_modules, v_t, v_field.m_name);
         t_7checker_Dispatch v_dispatch = _t42;
-        // line 4741
+        // line 4742
         int64_t _t43 = v_dispatch.m_fn_id;
         bool _t44 = _t43 < 0;
         if (_t44) {
-            // line 4742
+            // line 4743
             vela_str _t45 = f_7checker_intrinsic_bound(v_field.m_name);
             vela_str v_primitive_bound = _t45;
-            // line 4743
+            // line 4744
             bool _t46 = vela_str_eq(v_primitive_bound, VELA_STR("", 0));
             bool _t47 = _t46;
             if (!_t47) {
@@ -52660,7 +52787,7 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
                 _t47 = _t49;
             }
             if (_t47) {
-                // line 4743
+                // line 4744
                 vela_str _t50 = vela_str_concat(v_expected, VELA_STR("; method is missing", 19));
                 vela_str _t51 = _t50;
                 vela_str_release(v_primitive_bound);
@@ -52672,16 +52799,16 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
                 rc_release_t_5types_TypeInfo(v_ti);
                 return _t51;
             }
-            // line 4744
+            // line 4745
             int64_t _t52 = f_5types_interface_id(v_table, v_primitive_bound);
             int64_t v_core = _t52;
-            // line 4745
+            // line 4746
             t_5types_TypeInfo _t53 = f_5types_get(v_table, v_core);
-            t_5types_FieldInfo _t54 = *(t_5types_FieldInfo *)vela_at(_t53.m_fields, 0, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:4745:79");
+            t_5types_FieldInfo _t54 = *(t_5types_FieldInfo *)vela_at(_t53.m_fields, 0, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:4746:79");
             int64_t _t55 = f_7checker_replace_self(&v_table, _t54.m_ty, v_t);
             int64_t v_actual = _t55;
             rc_release_t_5types_TypeInfo(_t53);
-            // line 4746
+            // line 4747
             int64_t _t56 = f_5types_plain(v_table, v_actual);
             int64_t _t57 = _t56;
             int64_t _t58 = f_5types_plain(v_table, v_want);
@@ -52697,7 +52824,7 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
                 vela_array_release(_t61);
             }
             if (_t60) {
-                // line 4747
+                // line 4748
                 static const vela_str _t65[] = {{NULL, NULL, 0}, VELA_STR_INIT("; found intrinsic ", 18), {NULL, NULL, 0}};
                 vela_str _t66[3];
                 memcpy(_t66, _t65, sizeof _t66);
@@ -52716,27 +52843,27 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
                 rc_release_t_5types_TypeInfo(v_ti);
                 return _t69;
             }
-            // line 4749
+            // line 4750
             vela_str_release(v_primitive_bound);
             rc_release_t_7checker_Dispatch(v_dispatch);
             vela_str_release(v_expected);
             continue;
         }
-        // line 4751
-        t_7checker_FnInfo _t70 = *(t_7checker_FnInfo *)vela_at(v_c.m_fns, v_dispatch.m_fn_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4751:22");
+        // line 4752
+        t_7checker_FnInfo _t70 = *(t_7checker_FnInfo *)vela_at(v_c.m_fns, v_dispatch.m_fn_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4752:22");
         rc_retain_t_7checker_FnInfo(_t70);
         t_7checker_FnInfo v_f = _t70;
-        // line 4752
+        // line 4753
         vela_array * _t72 = v_dispatch.m_args;
         vela_array_retain(_t72);
         vela_array * _t71 = _t72;
         for (int64_t _t73 = 0; _t73 < _t71->len; _t73++) {
             int64_t v_arg = ((int64_t *)_t71->data)[_t73];
-            // line 4752
+            // line 4753
             int64_t _t74 = v_arg;
             bool _t75 = _t74 < 0;
             if (_t75) {
-                // line 4752
+                // line 4753
                 vela_str _t76 = vela_str_concat(v_expected, VELA_STR("; method type arguments cannot be inferred", 42));
                 vela_str _t77 = _t76;
                 vela_array_release(_t71);
@@ -52751,11 +52878,11 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
             }
         }
         vela_array_release(_t71);
-        // line 4753
+        // line 4754
         bool _t78 = !v_f.m_decl.m_public;
         bool _t79 = _t78;
         if (_t79) {
-            t_7modules_Module _t80 = *(t_7modules_Module *)vela_at(v_c.m_modules, v_f.m_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:4753:39");
+            t_7modules_Module _t80 = *(t_7modules_Module *)vela_at(v_c.m_modules, v_f.m_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:4754:39");
             bool _t81 = !vela_str_eq(_t80.m_name, v_ti.m_module);
             _t79 = _t81;
         }
@@ -52766,7 +52893,7 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
             _t82 = _t84;
         }
         if (_t82) {
-            // line 4753
+            // line 4754
             vela_str _t85 = vela_str_concat(v_expected, VELA_STR("; method is private", 19));
             vela_str _t86 = _t85;
             rc_release_t_7checker_FnInfo(v_f);
@@ -52778,33 +52905,33 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
             rc_release_t_5types_TypeInfo(v_ti);
             return _t86;
         }
-        // line 4754
+        // line 4755
         int64_t _t87 = v_f.m_type_params->len;
         int64_t _t88 = _t87;
         for (int64_t _t89 = 0; _t89 < _t88; _t89++) {
             int64_t v_i = _t89;
-            // line 4755
-            int64_t _t91 = *(int64_t *)vela_at(v_f.m_type_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4755:55");
+            // line 4756
+            int64_t _t91 = *(int64_t *)vela_at(v_f.m_type_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4756:55");
             t_5types_TypeInfo _t92 = f_5types_get(v_table, _t91);
             vela_array * _t93 = _t92.m_bounds;
             vela_array_retain(_t93);
             vela_array * _t90 = _t93;
             for (int64_t _t94 = 0; _t94 < _t90->len; _t94++) {
                 vela_str v_need = ((vela_str *)_t90->data)[_t94];
-                // line 4756
-                int64_t _t95 = *(int64_t *)vela_at(v_dispatch.m_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:4756:53");
+                // line 4757
+                int64_t _t95 = *(int64_t *)vela_at(v_dispatch.m_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:4757:53");
                 int64_t _t96 = v_depth;
                 int64_t _t97 = (_t96 + 1);
                 bool _t98 = f_7checker_satisfies_depth(v_c, _t95, v_need, _t97);
                 bool _t99 = !_t98;
                 if (_t99) {
-                    // line 4757
+                    // line 4758
                     static const vela_str _t100[] = {{NULL, NULL, 0}, VELA_STR_INIT("; method needs ", 15), {NULL, NULL, 0}, VELA_STR_INIT(": ", 2), {NULL, NULL, 0}};
                     vela_str _t101[5];
                     memcpy(_t101, _t100, sizeof _t101);
                     _t101[0] = v_expected;
                     _t101[2] = v_need;
-                    int64_t _t102 = *(int64_t *)vela_at(v_dispatch.m_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:4757:107");
+                    int64_t _t102 = *(int64_t *)vela_at(v_dispatch.m_args, v_i, sizeof(int64_t), "compiler/src/checker.vl:4758:107");
                     int64_t _t103 = v_depth;
                     int64_t _t104 = (_t103 + 1);
                     vela_str _t105 = f_7checker_failed_obligation(v_c, _t102, v_need, _t104);
@@ -52827,7 +52954,7 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
             vela_array_release(_t90);
             rc_release_t_5types_TypeInfo(_t92);
         }
-        // line 4761
+        // line 4762
         vela_array * _t108 = v_f.m_params;
         vela_array_retain(_t108);
         vela_array * _t109 = v_f.m_decl.m_effects;
@@ -52836,7 +52963,7 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
         int64_t v_actual_2 = _t110;
         vela_array_release(_t109);
         vela_array_release(_t108);
-        // line 4762
+        // line 4763
         vela_array * _t111 = v_f.m_type_params;
         vela_array_retain(_t111);
         vela_array * _t112 = v_dispatch.m_args;
@@ -52845,20 +52972,20 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
         int64_t v_concrete = _t113;
         vela_array_release(_t112);
         vela_array_release(_t111);
-        // line 4763
+        // line 4764
         vela_str _t114 = f_5types_show(v_table, v_concrete, v_viewpoint);
         vela_str _t115 = vela_str_concat(VELA_STR("; found ", 8), _t114);
         vela_str_release(_t114);
         vela_str v_found = _t115;
-        // line 4764
+        // line 4765
         vela_array * _t117 = v_f.m_mutable;
         vela_array_retain(_t117);
         vela_array * _t116 = _t117;
         for (int64_t _t118 = 0; _t118 < _t116->len; _t118++) {
             bool v_mutable = ((bool *)_t116->data)[_t118];
-            // line 4764
+            // line 4765
             if (v_mutable) {
-                // line 4764
+                // line 4765
                 static const vela_str _t119[] = {{NULL, NULL, 0}, {NULL, NULL, 0}, VELA_STR_INIT(" with a mutable parameter", 25)};
                 vela_str _t120[3];
                 memcpy(_t120, _t119, sizeof _t120);
@@ -52879,7 +53006,7 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
             }
         }
         vela_array_release(_t116);
-        // line 4765
+        // line 4766
         int64_t _t123 = f_5types_plain(v_table, v_concrete);
         int64_t _t124 = _t123;
         int64_t _t125 = f_5types_plain(v_table, v_want);
@@ -52895,7 +53022,7 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
             vela_array_release(_t128);
         }
         if (_t127) {
-            // line 4766
+            // line 4767
             vela_str _t132 = vela_str_concat(v_expected, v_found);
             vela_str _t133 = _t132;
             vela_str_release(v_found);
@@ -52914,7 +53041,7 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
         vela_str_release(v_expected);
     }
     vela_array_release(_t34);
-    // line 4769
+    // line 4770
     vela_str _t134 = vela_str_concat(VELA_STR("unsatisfied interface ", 22), v_bound);
     vela_str _t135 = _t134;
     vela_str_release(v_viewpoint);
@@ -52925,72 +53052,72 @@ vela_str f_7checker_failed_obligation(t_7checker_Checker v_c, int64_t v_t, vela_
 /* vela: part */
 
 void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
-    // line 4773
+    // line 4774
     vela_array * _t2 = (*v_c).m_fns;
     vela_array_retain(_t2);
     vela_array * _t1 = _t2;
     for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
         t_7checker_FnInfo v_f = ((t_7checker_FnInfo *)_t1->data)[_t3];
-        // line 4774
+        // line 4775
         if (v_f.m_is_test) {
-            // line 4774
+            // line 4775
             continue;
         }
-        // line 4775
-        (*v_c).m_current = v_f.m_module;
         // line 4776
+        (*v_c).m_current = v_f.m_module;
+        // line 4777
         vela_str _t4 = v_f.m_decl.m_name;
         vela_str_retain(_t4);
         vela_str v_name = _t4;
-        // line 4777
+        // line 4778
         int64_t _t5 = v_name.len;
         int64_t _t6 = _t5;
         for (int64_t _t7 = 0; _t7 < _t6; _t7++) {
             int64_t v_i = _t7;
-            // line 4778
+            // line 4779
             uint8_t _t8 = v_name.data[v_i];
             uint8_t _t9 = _t8;
             bool _t10 = _t9 != 46;
             if (_t10) {
-                // line 4778
+                // line 4779
                 continue;
             }
-            // line 4779
-            vela_str _t11 = vela_slice(v_name, 0, v_i, "compiler/src/checker.vl:4779:29");
-            vela_str v_owner = _t11;
             // line 4780
+            vela_str _t11 = vela_slice(v_name, 0, v_i, "compiler/src/checker.vl:4780:29");
+            vela_str v_owner = _t11;
+            // line 4781
             int64_t _t12 = v_f.m_params->len;
             int64_t _t13 = _t12;
             bool _t14 = _t13 == 0;
             if (_t14) {
-                // line 4781
+                // line 4782
                 f_7checker_report(&(*v_c), v_f.m_decl.m_line, v_f.m_decl.m_col, VELA_STR("E3196", 5), VELA_STR("a qualified method needs a receiver parameter", 45));
                 vela_str_release(VELA_STR("a qualified method needs a receiver parameter", 45));
                 vela_str_release(VELA_STR("E3196", 5));
-                // line 4782
+                // line 4783
                 vela_str_release(v_owner);
                 continue;
             }
-            // line 4784
-            int64_t _t15 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4784:49");
+            // line 4785
+            int64_t _t15 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4785:49");
             t_5types_TypeInfo _t16 = f_5types_get((*v_c).m_table, _t15);
             t_5types_TypeInfo v_ti = _t16;
-            // line 4785
+            // line 4786
             bool _t17 = !vela_str_eq(v_ti.m_name, v_owner);
             bool _t18 = _t17;
             if (!_t18) {
-                t_7modules_Module _t19 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_f.m_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:4785:58");
+                t_7modules_Module _t19 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_f.m_module, sizeof(t_7modules_Module), "compiler/src/checker.vl:4786:58");
                 bool _t20 = !vela_str_eq(v_ti.m_module, _t19.m_name);
                 _t18 = _t20;
             }
             bool _t21 = _t18;
             if (!_t21) {
-                int64_t _t22 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4785:112");
+                int64_t _t22 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4786:112");
                 bool _t23 = f_5types_is_struct((*v_c).m_table, _t22);
                 bool _t24 = !_t23;
                 bool _t25 = _t24;
                 if (_t25) {
-                    int64_t _t26 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4785:152");
+                    int64_t _t26 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4786:152");
                     bool _t27 = f_5types_is_enum((*v_c).m_table, _t26);
                     bool _t28 = !_t27;
                     _t25 = _t28;
@@ -52999,25 +53126,25 @@ void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
             }
             bool _t29 = _t21;
             if (!_t29) {
-                bool _t30 = *(bool *)vela_at(v_f.m_mutable, 0, sizeof(bool), "compiler/src/checker.vl:4785:170");
+                bool _t30 = *(bool *)vela_at(v_f.m_mutable, 0, sizeof(bool), "compiler/src/checker.vl:4786:170");
                 _t29 = _t30;
             }
             if (_t29) {
-                // line 4786
+                // line 4787
                 f_7checker_report(&(*v_c), v_f.m_decl.m_line, v_f.m_decl.m_col, VELA_STR("E3196", 5), VELA_STR("a qualified method must take its local receiver type as an immutable first parameter", 84));
                 vela_str_release(VELA_STR("a qualified method must take its local receiver type as an immutable first parameter", 84));
                 vela_str_release(VELA_STR("E3196", 5));
             }
-            // line 4788
-            int64_t _t31 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4788:47");
+            // line 4789
+            int64_t _t31 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4789:47");
             bool _t32 = f_5types_is_enum((*v_c).m_table, _t31);
             bool _t33 = _t32;
             if (_t33) {
-                int64_t _t34 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4788:92");
+                int64_t _t34 = *(int64_t *)vela_at(v_f.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4789:92");
                 int64_t _t35 = v_i;
                 int64_t _t36 = (_t35 + 1);
                 int64_t _t37 = v_name.len;
-                vela_str _t38 = vela_slice(v_name, _t36, _t37, "compiler/src/checker.vl:4788:101");
+                vela_str _t38 = vela_slice(v_name, _t36, _t37, "compiler/src/checker.vl:4789:101");
                 int64_t _t39 = f_5types_variant_index((*v_c).m_table, _t34, _t38);
                 int64_t _t40 = _t39;
                 bool _t41 = _t40 >= 0;
@@ -53025,7 +53152,7 @@ void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
                 vela_str_release(_t38);
             }
             if (_t33) {
-                // line 4789
+                // line 4790
                 f_7checker_report(&(*v_c), v_f.m_decl.m_line, v_f.m_decl.m_col, VELA_STR("E3196", 5), VELA_STR("a method cannot have the name of an enum variant", 48));
                 vela_str_release(VELA_STR("a method cannot have the name of an enum variant", 48));
                 vela_str_release(VELA_STR("E3196", 5));
@@ -53036,49 +53163,49 @@ void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
         vela_str_release(v_name);
     }
     vela_array_release(_t1);
-    // line 4793
+    // line 4794
     vela_array * _t43 = (*v_c).m_decls;
     vela_array_retain(_t43);
     vela_array * _t42 = _t43;
     for (int64_t _t44 = 0; _t44 < _t42->len; _t44++) {
         int64_t v_id = ((int64_t *)_t42->data)[_t44];
-        // line 4794
+        // line 4795
         bool _t45 = f_5types_is_interface((*v_c).m_table, v_id);
         bool _t46 = !_t45;
         if (_t46) {
-            // line 4794
+            // line 4795
             continue;
         }
-        // line 4795
+        // line 4796
         t_5types_TypeInfo _t47 = f_5types_get((*v_c).m_table, v_id);
         t_5types_TypeInfo v_ti_2 = _t47;
-        // line 4796
+        // line 4797
         int64_t _t48 = (*v_c).m_modules->len;
         int64_t _t49 = _t48;
         for (int64_t _t50 = 0; _t50 < _t49; _t50++) {
             int64_t v_m = _t50;
-            // line 4796
-            t_7modules_Module _t51 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:4796:50");
+            // line 4797
+            t_7modules_Module _t51 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:4797:50");
             bool _t52 = vela_str_eq(_t51.m_name, v_ti_2.m_module);
             if (_t52) {
-                // line 4796
+                // line 4797
                 (*v_c).m_current = v_m;
             }
         }
-        // line 4797
+        // line 4798
         vela_map * _t53 = vela_map_new(&vela_type_str, &vela_type_int);
         vela_map * v_methods = _t53;
-        // line 4798
+        // line 4799
         vela_array * _t55 = f_7checker_interface_fields((*v_c).m_table, v_id, 0);
         vela_array * _t54 = _t55;
         vela_unique_map(&v_methods);
         for (int64_t _t56 = 0; _t56 < _t54->len; _t56++) {
             t_5types_FieldInfo v_field = ((t_5types_FieldInfo *)_t54->data)[_t56];
-            // line 4799
-            int64_t _t57 = *(int64_t *)vela_at(v_ti_2.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4799:74");
+            // line 4800
+            int64_t _t57 = *(int64_t *)vela_at(v_ti_2.m_params, 0, sizeof(int64_t), "compiler/src/checker.vl:4800:74");
             int64_t _t58 = f_7checker_replace_self(&(*v_c).m_table, v_field.m_ty, _t57);
             int64_t v_signature = _t58;
-            // line 4800
+            // line 4801
             vela_str _t60 = v_field.m_name;
             int64_t *_t59 = vela_map_find(v_methods, &_t60);
             Option_Int _t61;
@@ -53089,11 +53216,11 @@ void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
             }
             if (_t61.tag == Option_Int_Some) {
                 int64_t v_previous = _t61.as.m_Some._0;
-                // line 4802
+                // line 4803
                 int64_t _t62 = v_previous;
                 bool _t63 = _t62 != v_signature;
                 if (_t63) {
-                    // line 4802
+                    // line 4803
                     static const vela_str _t64[] = {VELA_STR_INIT("conflicting inherited signatures for method '", 45), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
                     vela_str _t65[3];
                     memcpy(_t65, _t64, sizeof _t65);
@@ -53104,7 +53231,7 @@ void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
                     vela_str_release(VELA_STR("E3192", 5));
                 }
             } else {
-                // line 4804
+                // line 4805
                 vela_str _t67 = v_field.m_name;
                 vela_str_retain(_t67);
                 vela_str _t68 = _t67;
@@ -53113,16 +53240,16 @@ void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
             }
         }
         vela_array_release(_t54);
-        // line 4807
+        // line 4808
         vela_array * _t71 = v_ti_2.m_bounds;
         vela_array_retain(_t71);
         vela_array * _t70 = _t71;
         for (int64_t _t72 = 0; _t72 < _t70->len; _t72++) {
             vela_str v_parent = ((vela_str *)_t70->data)[_t72];
-            // line 4808
+            // line 4809
             int64_t _t73 = f_5types_interface_id((*v_c).m_table, v_parent);
             int64_t v_parent_id = _t73;
-            // line 4809
+            // line 4810
             bool _t74 = v_ti_2.m_public;
             if (_t74) {
                 int64_t _t75 = v_parent_id;
@@ -53137,16 +53264,16 @@ void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
                 rc_release_t_5types_TypeInfo(_t78);
             }
             if (_t77) {
-                // line 4810
+                // line 4811
                 f_7checker_report(&(*v_c), v_ti_2.m_line, v_ti_2.m_col, VELA_STR("E3195", 5), VELA_STR("a public interface cannot extend a private interface", 52));
                 vela_str_release(VELA_STR("a public interface cannot extend a private interface", 52));
                 vela_str_release(VELA_STR("E3195", 5));
             }
-            // line 4812
+            // line 4813
             vela_str _t80 = f_5types_interface_name(v_ti_2);
             bool _t81 = f_5types_bound_includes((*v_c).m_table, v_parent, _t80, 0);
             if (_t81) {
-                // line 4813
+                // line 4814
                 static const vela_str _t82[] = {VELA_STR_INIT("interface inheritance cycle involving '", 39), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
                 vela_str _t83[3];
                 memcpy(_t83, _t82, sizeof _t83);
@@ -53167,79 +53294,79 @@ void f_7checker_validate_interfaces(t_7checker_Checker * v_c) {
 /* vela: part */
 
 int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t v_id, vela_str v_name, vela_array * v_args, int64_t v_expected) {
-    // line 4820
-    t_7checker_FnInfo _t1 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4820:18");
+    // line 4821
+    t_7checker_FnInfo _t1 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4821:18");
     rc_retain_t_7checker_FnInfo(_t1);
     t_7checker_FnInfo v_f = _t1;
-    // line 4821
+    // line 4822
     t_7checker_Ref _t2 = (t_7checker_Ref){ .tag = t_7checker_Ref_Function, .as.m_Function = { ._0 = v_id } };
     vela_unique(&(*v_c).m_refs);
-    t_7checker_Ref *_t3 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4821:11");
+    t_7checker_Ref *_t3 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4822:11");
     rc_release_t_7checker_Ref(*_t3);
     *_t3 = _t2;
-    // line 4822
+    // line 4823
     int64_t _t4 = v_f.m_type_params->len;
     int64_t _t5 = _t4;
     bool _t6 = _t5 > 0;
     if (_t6) {
-        // line 4823
+        // line 4824
         int64_t _t7 = f_7checker_generic_call(&(*v_c), v_e, v_id, v_name, v_args, v_expected);
         int64_t v_t = _t7;
-        // line 4824
+        // line 4825
         t_7checker_FnInfo _t8 = v_f;
         rc_retain_t_7checker_FnInfo(_t8);
         f_7checker_use_call_effects(&(*v_c), v_e, _t8, v_args, v_name);
         rc_release_t_7checker_FnInfo(_t8);
-        // line 4825
+        // line 4826
         int64_t _t9 = v_t;
         rc_release_t_7checker_FnInfo(v_f);
         return _t9;
     }
-    // line 4827
+    // line 4828
     if (v_f.m_decl.m_variadic) {
-        // line 4828
+        // line 4829
         int64_t _t10 = v_args->len;
         int64_t _t11 = _t10;
         int64_t _t12 = v_f.m_params->len;
         bool _t13 = _t11 < _t12;
         if (_t13) {
-            // line 4828
+            // line 4829
             int64_t _t14 = v_f.m_params->len;
             int64_t _t15 = v_args->len;
             bool _t16 = f_7checker_arity(&(*v_c), v_e, v_name, _t14, _t15);
         }
     } else {
-        // line 4829
+        // line 4830
         int64_t _t17 = v_f.m_params->len;
         int64_t _t18 = v_args->len;
         bool _t19 = f_7checker_arity(&(*v_c), v_e, v_name, _t17, _t18);
     }
-    // line 4830
+    // line 4831
     int64_t _t20 = v_args->len;
     int64_t _t21 = _t20;
     for (int64_t _t22 = 0; _t22 < _t21; _t22++) {
         int64_t v_i = _t22;
-        // line 4831
+        // line 4832
         t_3ast_Expr _t23 = *((t_3ast_Expr *)v_args->data + v_i);
         rc_retain_t_3ast_Expr(_t23);
         t_3ast_Expr v_arg = _t23;
-        // line 4832
+        // line 4833
         int64_t _t24 = v_i;
         int64_t _t25 = (_t24 + 1);
         vela_str _t26 = vela_from_int(_t25);
         vela_str v_n = _t26;
-        // line 4833
+        // line 4834
         int64_t _t27 = v_i;
         int64_t _t28 = v_f.m_params->len;
         bool _t29 = _t27 >= _t28;
         if (_t29) {
-            // line 4834
+            // line 4835
             t_3ast_Expr _t30 = v_arg;
             rc_retain_t_3ast_Expr(_t30);
             int64_t _t31 = f_7checker_value(&(*v_c), _t30);
             int64_t v_actual = _t31;
             rc_release_t_3ast_Expr(_t30);
-            // line 4835
+            // line 4836
             bool _t32 = v_f.m_decl.m_variadic;
             if (_t32) {
                 bool _t33 = f_7checker_c_scalar(v_actual);
@@ -53247,7 +53374,7 @@ int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
                 _t32 = _t34;
             }
             if (_t32) {
-                // line 4835
+                // line 4836
                 t_3ast_Expr _t35 = v_arg;
                 rc_retain_t_3ast_Expr(_t35);
                 f_7checker_report_at(&(*v_c), _t35, VELA_STR("E3203", 5), VELA_STR("a C variadic argument must be a C-compatible scalar", 51));
@@ -53255,18 +53382,18 @@ int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
                 vela_str_release(VELA_STR("E3203", 5));
                 rc_release_t_3ast_Expr(_t35);
             }
-            // line 4836
+            // line 4837
             vela_str_release(v_n);
             rc_release_t_3ast_Expr(v_arg);
             continue;
         }
-        // line 4838
-        int64_t _t36 = *(int64_t *)vela_at(v_f.m_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4838:28");
-        int64_t v_want = _t36;
         // line 4839
-        bool _t37 = *(bool *)vela_at(v_f.m_mutable, v_i, sizeof(bool), "compiler/src/checker.vl:4839:21");
+        int64_t _t36 = *(int64_t *)vela_at(v_f.m_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4839:28");
+        int64_t v_want = _t36;
+        // line 4840
+        bool _t37 = *(bool *)vela_at(v_f.m_mutable, v_i, sizeof(bool), "compiler/src/checker.vl:4840:21");
         if (_t37) {
-            // line 4840
+            // line 4841
             t_3ast_Expr _t38 = v_arg;
             rc_retain_t_3ast_Expr(_t38);
             static const vela_str _t39[] = {VELA_STR_INIT("argument ", 9), {NULL, NULL, 0}, VELA_STR_INIT(" of '", 5), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
@@ -53279,7 +53406,7 @@ int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
             vela_str_release(_t41);
             rc_release_t_3ast_Expr(_t38);
         } else {
-            // line 4842
+            // line 4843
             static const vela_str _t43[] = {VELA_STR_INIT("argument ", 9), {NULL, NULL, 0}, VELA_STR_INIT(" of '", 5), {NULL, NULL, 0}, VELA_STR_INIT("' must be ", 10), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8)};
             vela_str _t44[7];
             memcpy(_t44, _t43, sizeof _t44);
@@ -53292,11 +53419,11 @@ int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
             t_7checker_Msg _t47 = f_7checker_msg(_t46, VELA_STR("", 0));
             t_7checker_Msg v_m = _t47;
             vela_str_release(_t46);
-            // line 4843
+            // line 4844
             if (v_arg.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
                 t_3ast_Expr v_p = v_arg.m_kind->value.as.m_MutArg._0->value;
                 rc_retain_t_3ast_Expr(v_p);
-                // line 4845
+                // line 4846
                 t_3ast_Expr _t48 = v_arg;
                 rc_retain_t_3ast_Expr(_t48);
                 static const vela_str _t49[] = {VELA_STR_INIT("argument ", 9), {NULL, NULL, 0}, VELA_STR_INIT(" of '", 5), {NULL, NULL, 0}, VELA_STR_INIT("' is not a mut parameter; remove `mut`", 38)};
@@ -53309,13 +53436,13 @@ int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
                 vela_str_release(_t51);
                 vela_str_release(VELA_STR("E3141", 5));
                 rc_release_t_3ast_Expr(_t48);
-                // line 4846
-                t_7modules_Module _t52 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4846:65");
-                t_7modules_Module _t53 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4846:94");
+                // line 4847
+                t_7modules_Module _t52 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4847:65");
+                t_7modules_Module _t53 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4847:94");
                 vela_array * _t54 = f_7repairs_remove_mut(_t52.m_source, _t53.m_path, v_arg.m_line, v_arg.m_col);
                 f_7checker_last_fix(&(*v_c), _t54);
                 vela_array_release(_t54);
-                // line 4847
+                // line 4848
                 t_3ast_Expr _t55 = v_p;
                 rc_retain_t_3ast_Expr(_t55);
                 t_7checker_Msg _t56 = v_m;
@@ -53325,7 +53452,7 @@ int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
                 rc_release_t_3ast_Expr(_t55);
                 rc_release_t_3ast_Expr(v_p);
             } else {
-                // line 4849
+                // line 4850
                 t_3ast_Expr _t57 = v_arg;
                 rc_retain_t_3ast_Expr(_t57);
                 t_7checker_Msg _t58 = v_m;
@@ -53339,14 +53466,14 @@ int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
         vela_str_release(v_n);
         rc_release_t_3ast_Expr(v_arg);
     }
-    // line 4853
-    f_7checker_exclusive(&(*v_c), v_args);
     // line 4854
+    f_7checker_exclusive(&(*v_c), v_args);
+    // line 4855
     t_7checker_FnInfo _t59 = v_f;
     rc_retain_t_7checker_FnInfo(_t59);
     f_7checker_use_call_effects(&(*v_c), v_e, _t59, v_args, v_name);
     rc_release_t_7checker_FnInfo(_t59);
-    // line 4856
+    // line 4857
     int64_t _t60 = v_f.m_result;
     rc_release_t_7checker_FnInfo(v_f);
     return _t60;
@@ -53354,14 +53481,14 @@ int64_t f_7checker_known_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, int64_t
 /* vela: part */
 
 int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast_Expr v_callee, vela_array * v_args, int64_t v_t, vela_str v_name, int64_t v_expected) {
-    // line 4860
+    // line 4861
     vela_array * _t1 = vela_array_new(vt_t_3ast_Expr(), 0);
     vela_array * v_all = _t1;
-    // line 4861
+    // line 4862
     if (v_callee.m_kind->value.tag == t_3ast_ExprKind_Field) {
         t_3ast_Expr v_obj = v_callee.m_kind->value.as.m_Field._0->value;
         rc_retain_t_3ast_Expr(v_obj);
-        // line 4861
+        // line 4862
         t_3ast_Expr _t2 = v_obj;
         rc_retain_t_3ast_Expr(_t2);
         vela_unique(&v_all);
@@ -53370,34 +53497,34 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
         rc_release_t_3ast_Expr(v_obj);
     } else {
     }
-    // line 4862
+    // line 4863
     vela_array * _t5 = v_args;
     vela_array_retain(_t5);
     vela_array * _t4 = _t5;
     vela_unique(&v_all);
     for (int64_t _t6 = 0; _t6 < _t4->len; _t6++) {
         t_3ast_Expr v_arg = ((t_3ast_Expr *)_t4->data)[_t6];
-        // line 4862
+        // line 4863
         t_3ast_Expr _t7 = v_arg;
         rc_retain_t_3ast_Expr(_t7);
         t_3ast_Expr _t8 = _t7;
         vela_push(v_all, &_t8, sizeof(t_3ast_Expr));
     }
     vela_array_release(_t4);
-    // line 4863
+    // line 4864
     int64_t _t9 = f_5types_ERROR();
     int64_t v_result = _t9;
-    // line 4864
+    // line 4865
     bool _t10 = f_5types_is_param((*v_c).m_table, v_t);
     if (_t10) {
-        // line 4865
+        // line 4866
         int64_t _t11 = f_7checker_interface_signature(&(*v_c), v_t, v_name);
         int64_t v_signature = _t11;
-        // line 4866
+        // line 4867
         int64_t _t12 = v_signature;
         bool _t13 = _t12 < 0;
         if (_t13) {
-            // line 4866
+            // line 4867
             static const vela_str _t14[] = {VELA_STR_INIT("missing or ambiguous interface method '", 39), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
             vela_str _t15[3];
             memcpy(_t15, _t14, sizeof _t15);
@@ -53406,12 +53533,12 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3194", 5), _t16);
             vela_str_release(_t16);
             vela_str_release(VELA_STR("E3194", 5));
-            // line 4866
+            // line 4867
             int64_t _t17 = v_result;
             vela_array_release(v_all);
             return _t17;
         }
-        // line 4867
+        // line 4868
         vela_array * _t18 = v_all;
         vela_array_retain(_t18);
         static const vela_str _t19[] = {VELA_STR_INIT("method '", 8), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
@@ -53424,18 +53551,18 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
         vela_str_release(_t21);
         vela_array_release(_t18);
     } else {
-        // line 4869
+        // line 4870
         t_7checker_Dispatch _t23 = f_7checker_lookup_method((*v_c).m_table, (*v_c).m_fns, (*v_c).m_modules, v_t, v_name);
         t_7checker_Dispatch v_dispatch = _t23;
-        // line 4870
+        // line 4871
         int64_t _t24 = v_dispatch.m_fn_id;
         bool _t25 = _t24 >= 0;
         if (_t25) {
-            // line 4871
-            t_7checker_FnInfo _t26 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_dispatch.m_fn_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4871:26");
+            // line 4872
+            t_7checker_FnInfo _t26 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_dispatch.m_fn_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4872:26");
             rc_retain_t_7checker_FnInfo(_t26);
             t_7checker_FnInfo v_f = _t26;
-            // line 4872
+            // line 4873
             int64_t _t27 = v_f.m_module;
             bool _t28 = _t27 != (*v_c).m_current;
             bool _t29 = _t28;
@@ -53444,7 +53571,7 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
                 _t29 = _t30;
             }
             if (_t29) {
-                // line 4873
+                // line 4874
                 static const vela_str _t31[] = {VELA_STR_INIT("method '", 8), {NULL, NULL, 0}, VELA_STR_INIT("' is private to its type's module", 33)};
                 vela_str _t32[3];
                 memcpy(_t32, _t31, sizeof _t32);
@@ -53454,7 +53581,7 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
                 vela_str_release(_t33);
                 vela_str_release(VELA_STR("E3195", 5));
             }
-            // line 4875
+            // line 4876
             vela_array * _t34 = v_all;
             vela_array_retain(_t34);
             int64_t _t35 = f_7checker_known_call(&(*v_c), v_e, v_dispatch.m_fn_id, v_name, _t34, v_expected);
@@ -53462,10 +53589,10 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
             vela_array_release(_t34);
             rc_release_t_7checker_FnInfo(v_f);
         } else {
-            // line 4877
+            // line 4878
             vela_str _t36 = f_7checker_intrinsic_bound(v_name);
             vela_str v_bound = _t36;
-            // line 4878
+            // line 4879
             bool _t37 = vela_str_eq(v_bound, VELA_STR("", 0));
             bool _t38 = _t37;
             if (!_t38) {
@@ -53474,7 +53601,7 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
                 _t38 = _t40;
             }
             if (_t38) {
-                // line 4879
+                // line 4880
                 static const vela_str _t41[] = {VELA_STR_INIT("no method '", 11), {NULL, NULL, 0}, VELA_STR_INIT("' on ", 5), {NULL, NULL, 0}};
                 vela_str _t42[4];
                 memcpy(_t42, _t41, sizeof _t42);
@@ -53486,36 +53613,36 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
                 f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3194", 5), _t44);
                 vela_str_release(_t44);
                 vela_str_release(VELA_STR("E3194", 5));
-                // line 4880
+                // line 4881
                 vela_array * _t46 = v_args;
                 vela_array_retain(_t46);
                 vela_array * _t45 = _t46;
                 for (int64_t _t47 = 0; _t47 < _t45->len; _t47++) {
                     t_3ast_Expr v_arg_2 = ((t_3ast_Expr *)_t45->data)[_t47];
-                    // line 4880
+                    // line 4881
                     t_3ast_Expr _t48 = v_arg_2;
                     rc_retain_t_3ast_Expr(_t48);
                     int64_t _t49 = f_7checker_infer(&(*v_c), _t48);
                     rc_release_t_3ast_Expr(_t48);
                 }
                 vela_array_release(_t45);
-                // line 4881
+                // line 4882
                 int64_t _t50 = v_result;
                 vela_str_release(v_bound);
                 rc_release_t_7checker_Dispatch(v_dispatch);
                 vela_array_release(v_all);
                 return _t50;
             }
-            // line 4883
+            // line 4884
             int64_t _t51 = f_5types_interface_id((*v_c).m_table, v_bound);
             int64_t v_id = _t51;
-            // line 4884
+            // line 4885
             t_5types_TypeInfo _t52 = f_5types_get((*v_c).m_table, v_id);
-            t_5types_FieldInfo _t53 = *(t_5types_FieldInfo *)vela_at(_t52.m_fields, 0, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:4884:84");
+            t_5types_FieldInfo _t53 = *(t_5types_FieldInfo *)vela_at(_t52.m_fields, 0, sizeof(t_5types_FieldInfo), "compiler/src/checker.vl:4885:84");
             int64_t _t54 = f_7checker_replace_self(&(*v_c).m_table, _t53.m_ty, v_t);
             int64_t v_signature_2 = _t54;
             rc_release_t_5types_TypeInfo(_t52);
-            // line 4885
+            // line 4886
             vela_array * _t55 = v_all;
             vela_array_retain(_t55);
             static const vela_str _t56[] = {VELA_STR_INIT("method '", 8), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
@@ -53531,15 +53658,15 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
         }
         rc_release_t_7checker_Dispatch(v_dispatch);
     }
-    // line 4888
+    // line 4889
     vela_str _t60 = v_name;
     vela_str_retain(_t60);
     t_7checker_Ref _t61 = (t_7checker_Ref){ .tag = t_7checker_Ref_Method, .as.m_Method = { ._0 = v_t, ._1 = _t60 } };
     vela_unique(&(*v_c).m_refs);
-    t_7checker_Ref *_t62 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4888:11");
+    t_7checker_Ref *_t62 = (t_7checker_Ref *)vela_at((*v_c).m_refs, v_e.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:4889:11");
     rc_release_t_7checker_Ref(*_t62);
     *_t62 = _t61;
-    // line 4889
+    // line 4890
     int64_t _t63 = v_result;
     vela_array_release(v_all);
     return _t63;
@@ -53547,7 +53674,7 @@ int64_t f_7checker_method_call(t_7checker_Checker * v_c, t_3ast_Expr v_e, t_3ast
 /* vela: part */
 
 vela_str f_7checker_intrinsic_bound(vela_str v_name) {
-    // line 4893
+    // line 4894
     vela_str _t1;
     if (vela_str_eq(v_name, VELA_STR("eq", 2))) {
         _t1 = VELA_STR("Eq", 2);
@@ -53564,16 +53691,16 @@ vela_str f_7checker_intrinsic_bound(vela_str v_name) {
 /* vela: part */
 
 int64_t f_7checker_named_receiver(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
-    // line 4897
+    // line 4898
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_Name) {
         vela_str v_name = v_e.m_kind->value.as.m_Name._0;
         vela_str_retain(v_name);
-        // line 4899
+        // line 4900
         int64_t _t1 = f_7checker_lookup_local((*v_c), v_name);
         int64_t _t2 = _t1;
         bool _t3 = _t2 < 0;
         if (_t3) {
-            // line 4900
+            // line 4901
             vela_map * _t4 = f_7checker_module_types((*v_c));
             vela_str _t6 = v_name;
             int64_t *_t5 = vela_map_find(_t4, &_t6);
@@ -53585,7 +53712,7 @@ int64_t f_7checker_named_receiver(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
             }
             if (_t7.tag == Option_Int_Some) {
                 int64_t v_t = _t7.as.m_Some._0;
-                // line 4900
+                // line 4901
                 int64_t _t8 = v_t;
                 vela_map_release(_t4);
                 vela_str_release(v_name);
@@ -53600,22 +53727,22 @@ int64_t f_7checker_named_receiver(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
         rc_retain_t_3ast_Expr(v_obj);
         vela_str v_name_2 = v_e.m_kind->value.as.m_Field._1;
         vela_str_retain(v_name_2);
-        // line 4904
+        // line 4905
         int64_t _t9 = f_7checker_module_named((*v_c), v_obj);
         int64_t v_m = _t9;
-        // line 4905
+        // line 4906
         int64_t _t10 = v_m;
         bool _t11 = _t10 >= 0;
         bool _t12 = _t11;
         if (_t12) {
-            t_7modules_Module _t13 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:4905:44");
+            t_7modules_Module _t13 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:4906:44");
             vela_str _t15 = v_name_2;
             int64_t *_t14 = vela_map_find(_t13.m_types, &_t15);
             bool _t16 = _t14 != NULL;
             _t12 = _t16;
         }
         if (_t12) {
-            // line 4905
+            // line 4906
             vela_str _t17 = v_name_2;
             vela_str_retain(_t17);
             int64_t _t18 = f_7checker_module_type(&(*v_c), v_e.m_line, v_e.m_col, v_m, _t17);
@@ -53629,25 +53756,25 @@ int64_t f_7checker_named_receiver(t_7checker_Checker * v_c, t_3ast_Expr v_e) {
         rc_release_t_3ast_Expr(v_obj);
     } else {
     }
-    // line 4909
+    // line 4910
     int64_t _t20 = -1;
     return _t20;
 }
 /* vela: part */
 
 vela_array * f_7checker_method_args(t_3ast_Expr v_e, vela_array * v_args) {
-    // line 4913
+    // line 4914
     vela_array * _t1 = vela_array_new(vt_t_3ast_Expr(), 0);
     vela_array * v_out = _t1;
-    // line 4914
+    // line 4915
     if (v_e.m_kind->value.tag == t_3ast_ExprKind_Call) {
         t_3ast_Expr v_callee = v_e.m_kind->value.as.m_Call._0->value;
         rc_retain_t_3ast_Expr(v_callee);
-        // line 4916
+        // line 4917
         if (v_callee.m_kind->value.tag == t_3ast_ExprKind_Field) {
             t_3ast_Expr v_obj = v_callee.m_kind->value.as.m_Field._0->value;
             rc_retain_t_3ast_Expr(v_obj);
-            // line 4916
+            // line 4917
             t_3ast_Expr _t2 = v_obj;
             rc_retain_t_3ast_Expr(_t2);
             vela_unique(&v_out);
@@ -53659,21 +53786,21 @@ vela_array * f_7checker_method_args(t_3ast_Expr v_e, vela_array * v_args) {
         rc_release_t_3ast_Expr(v_callee);
     } else {
     }
-    // line 4920
+    // line 4921
     vela_array * _t5 = v_args;
     vela_array_retain(_t5);
     vela_array * _t4 = _t5;
     vela_unique(&v_out);
     for (int64_t _t6 = 0; _t6 < _t4->len; _t6++) {
         t_3ast_Expr v_arg = ((t_3ast_Expr *)_t4->data)[_t6];
-        // line 4920
+        // line 4921
         t_3ast_Expr _t7 = v_arg;
         rc_retain_t_3ast_Expr(_t7);
         t_3ast_Expr _t8 = _t7;
         vela_push(v_out, &_t8, sizeof(t_3ast_Expr));
     }
     vela_array_release(_t4);
-    // line 4921
+    // line 4922
     vela_array * _t9 = v_out;
     vela_array_retain(_t9);
     vela_array * _t10 = _t9;
@@ -53683,17 +53810,17 @@ vela_array * f_7checker_method_args(t_3ast_Expr v_e, vela_array * v_args) {
 /* vela: part */
 
 vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_t v_module) {
-    // line 4925
+    // line 4926
     vela_array * _t1 = vela_array_new(&vela_type_str, 0);
     vela_array * v_out = _t1;
-    // line 4926
+    // line 4927
     vela_map * _t2 = vela_map_new(&vela_type_str, &vela_type_bool);
     vela_map * v_seen = _t2;
-    // line 4927
+    // line 4928
     int64_t _t3 = v_t;
     bool _t4 = _t3 < 0;
     if (_t4) {
-        // line 4927
+        // line 4928
         vela_array * _t5 = v_out;
         vela_array_retain(_t5);
         vela_array * _t6 = _t5;
@@ -53701,10 +53828,10 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
         vela_array_release(v_out);
         return _t6;
     }
-    // line 4928
+    // line 4929
     bool _t7 = f_5types_is_param(v_k.m_table, v_t);
     if (_t7) {
-        // line 4929
+        // line 4930
         t_5types_TypeInfo _t9 = f_5types_get(v_k.m_table, v_t);
         vela_array * _t10 = _t9.m_bounds;
         vela_array_retain(_t10);
@@ -53713,25 +53840,25 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
         vela_unique(&v_out);
         for (int64_t _t11 = 0; _t11 < _t8->len; _t11++) {
             vela_str v_bound = ((vela_str *)_t8->data)[_t11];
-            // line 4930
+            // line 4931
             int64_t _t13 = f_5types_interface_id(v_k.m_table, v_bound);
             vela_array * _t14 = f_7checker_interface_fields(v_k.m_table, _t13, 0);
             vela_array * _t12 = _t14;
             for (int64_t _t15 = 0; _t15 < _t12->len; _t15++) {
                 t_5types_FieldInfo v_field = ((t_5types_FieldInfo *)_t12->data)[_t15];
-                // line 4931
+                // line 4932
                 vela_str _t17 = v_field.m_name;
                 bool *_t16 = vela_map_find(v_seen, &_t17);
                 bool _t18 = _t16 != NULL;
                 bool _t19 = !_t18;
                 if (_t19) {
-                    // line 4931
+                    // line 4932
                     vela_str _t20 = v_field.m_name;
                     vela_str_retain(_t20);
                     vela_str _t21 = _t20;
                     bool _t22 = true;
                     vela_map_set(v_seen, &_t21, &_t22);
-                    // line 4931
+                    // line 4932
                     vela_str _t23 = v_field.m_name;
                     vela_str_retain(_t23);
                     vela_str _t24 = _t23;
@@ -53743,18 +53870,18 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
         vela_array_release(_t8);
         rc_release_t_5types_TypeInfo(_t9);
     } else {
-        // line 4935
+        // line 4936
         int64_t _t25 = v_k.m_fns->len;
         int64_t _t26 = _t25;
         vela_unique_map(&v_seen);
         vela_unique(&v_out);
         for (int64_t _t27 = 0; _t27 < _t26; _t27++) {
             int64_t v_id = _t27;
-            // line 4936
-            t_7checker_FnInfo _t28 = *(t_7checker_FnInfo *)vela_at(v_k.m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4936:26");
+            // line 4937
+            t_7checker_FnInfo _t28 = *(t_7checker_FnInfo *)vela_at(v_k.m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4937:26");
             rc_retain_t_7checker_FnInfo(_t28);
             t_7checker_FnInfo v_f = _t28;
-            // line 4937
+            // line 4938
             int64_t _t29 = v_f.m_module;
             bool _t30 = _t29 != v_module;
             bool _t31 = _t30;
@@ -53763,57 +53890,57 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
                 _t31 = _t32;
             }
             if (_t31) {
-                // line 4937
+                // line 4938
                 rc_release_t_7checker_FnInfo(v_f);
                 continue;
             }
-            // line 4938
+            // line 4939
             vela_str _t33 = v_f.m_decl.m_name;
             vela_str_retain(_t33);
             vela_str v_name = _t33;
-            // line 4939
+            // line 4940
             int64_t _t34 = v_name.len;
             int64_t _t35 = _t34;
             for (int64_t _t36 = 0; _t36 < _t35; _t36++) {
                 int64_t v_i = _t36;
-                // line 4939
-                uint8_t _t37 = vela_byte_at(v_name, v_i, "compiler/src/checker.vl:4939:44");
+                // line 4940
+                uint8_t _t37 = vela_byte_at(v_name, v_i, "compiler/src/checker.vl:4940:44");
                 uint8_t _t38 = _t37;
                 bool _t39 = _t38 == 46;
                 if (_t39) {
-                    // line 4939
+                    // line 4940
                     int64_t _t40 = v_i;
                     int64_t _t41 = (_t40 + 1);
                     int64_t _t42 = v_name.len;
-                    vela_str _t43 = vela_slice(v_name, _t41, _t42, "compiler/src/checker.vl:4939:68");
+                    vela_str _t43 = vela_slice(v_name, _t41, _t42, "compiler/src/checker.vl:4940:68");
                     vela_str_release(v_name);
                     v_name = _t43;
-                    // line 4939
+                    // line 4940
                     break;
                 }
             }
-            // line 4940
+            // line 4941
             vela_str _t45 = v_name;
             bool *_t44 = vela_map_find(v_seen, &_t45);
             bool _t46 = _t44 != NULL;
             if (_t46) {
-                // line 4940
+                // line 4941
                 vela_str_release(v_name);
                 rc_release_t_7checker_FnInfo(v_f);
                 continue;
             }
-            // line 4941
+            // line 4942
             t_7checker_Dispatch _t47 = f_7checker_method(v_k, v_t, v_name);
             int64_t _t48 = _t47.m_fn_id;
             bool _t49 = _t48 == v_id;
             if (_t49) {
-                // line 4941
+                // line 4942
                 vela_str _t50 = v_name;
                 vela_str_retain(_t50);
                 vela_str _t51 = _t50;
                 bool _t52 = true;
                 vela_map_set(v_seen, &_t51, &_t52);
-                // line 4941
+                // line 4942
                 vela_str _t53 = v_name;
                 vela_str_retain(_t53);
                 vela_str _t54 = _t53;
@@ -53823,7 +53950,7 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
             vela_str_release(v_name);
             rc_release_t_7checker_FnInfo(v_f);
         }
-        // line 4943
+        // line 4944
         vela_array * _t56 = vela_array_new(&vela_type_str, 3);
         vela_str _t57 = VELA_STR("eq", 2);
         vela_push(_t56, &_t57, sizeof(vela_str));
@@ -53835,7 +53962,7 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
         vela_unique(&v_out);
         for (int64_t _t60 = 0; _t60 < _t55->len; _t60++) {
             vela_str v_name_2 = ((vela_str *)_t55->data)[_t60];
-            // line 4944
+            // line 4945
             vela_str _t61 = f_7checker_intrinsic_bound(v_name_2);
             bool _t62 = f_7checker_intrinsic(v_k.m_table, v_t, _t61);
             bool _t63 = _t62;
@@ -53849,7 +53976,7 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
                 _t63 = _t69;
             }
             if (_t63) {
-                // line 4944
+                // line 4945
                 vela_str _t70 = v_name_2;
                 vela_str_retain(_t70);
                 vela_str _t71 = _t70;
@@ -53859,7 +53986,7 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
         }
         vela_array_release(_t55);
     }
-    // line 4947
+    // line 4948
     vela_array * _t72 = v_out;
     vela_array_retain(_t72);
     vela_array * _t73 = _t72;
@@ -53870,23 +53997,23 @@ vela_array * f_7checker_method_names(t_7checker_Checked v_k, int64_t v_t, int64_
 /* vela: part */
 
 void f_7checker_public_bounds(t_7checker_Checker * v_c, vela_array * v_params, int64_t v_line, int64_t v_col) {
-    // line 4951
+    // line 4952
     vela_array * _t2 = v_params;
     vela_array_retain(_t2);
     vela_array * _t1 = _t2;
     for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
         int64_t v_param = ((int64_t *)_t1->data)[_t3];
-        // line 4952
+        // line 4953
         t_5types_TypeInfo _t5 = f_5types_get((*v_c).m_table, v_param);
         vela_array * _t6 = _t5.m_bounds;
         vela_array_retain(_t6);
         vela_array * _t4 = _t6;
         for (int64_t _t7 = 0; _t7 < _t4->len; _t7++) {
             vela_str v_bound = ((vela_str *)_t4->data)[_t7];
-            // line 4953
+            // line 4954
             int64_t _t8 = f_5types_interface_id((*v_c).m_table, v_bound);
             int64_t v_id = _t8;
-            // line 4954
+            // line 4955
             int64_t _t9 = v_id;
             bool _t10 = _t9 >= 0;
             bool _t11 = _t10;
@@ -53897,7 +54024,7 @@ void f_7checker_public_bounds(t_7checker_Checker * v_c, vela_array * v_params, i
                 rc_release_t_5types_TypeInfo(_t12);
             }
             if (_t11) {
-                // line 4954
+                // line 4955
                 f_7checker_report(&(*v_c), v_line, v_col, VELA_STR("E3195", 5), VELA_STR("a public declaration cannot require a private interface", 55));
                 vela_str_release(VELA_STR("a public declaration cannot require a private interface", 55));
                 vela_str_release(VELA_STR("E3195", 5));
@@ -53911,7 +54038,7 @@ void f_7checker_public_bounds(t_7checker_Checker * v_c, vela_array * v_params, i
 /* vela: part */
 
 bool f_7checker_c_scalar(int64_t v_t) {
-    // line 4961
+    // line 4962
     bool _t1 = f_5types_is_integer(v_t);
     bool _t2 = _t1;
     if (!_t2) {
@@ -53938,29 +54065,29 @@ bool f_7checker_c_scalar(int64_t v_t) {
 /* vela: part */
 
 void f_7checker_validate_foreign(t_7checker_Checker * v_c, int64_t v_id) {
-    // line 4965
-    t_7checker_FnInfo _t1 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4965:18");
+    // line 4966
+    t_7checker_FnInfo _t1 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:4966:18");
     rc_retain_t_7checker_FnInfo(_t1);
     t_7checker_FnInfo v_f = _t1;
-    // line 4966
+    // line 4967
     bool _t2 = vela_str_eq(v_f.m_decl.m_foreign, VELA_STR("", 0));
     if (_t2) {
-        // line 4967
+        // line 4968
         if (v_f.m_decl.m_variadic) {
-            // line 4967
+            // line 4968
             f_7checker_report(&(*v_c), v_f.m_decl.m_line, v_f.m_decl.m_col, VELA_STR("E3200", 5), VELA_STR("only extern declarations may be variadic", 40));
             vela_str_release(VELA_STR("only extern declarations may be variadic", 40));
             vela_str_release(VELA_STR("E3200", 5));
         }
-        // line 4968
+        // line 4969
         rc_release_t_7checker_FnInfo(v_f);
         return;
     }
-    // line 4970
+    // line 4971
     t_3ast_FnDecl _t3 = v_f.m_decl;
     rc_retain_t_3ast_FnDecl(_t3);
     t_3ast_FnDecl v_d = _t3;
-    // line 4971
+    // line 4972
     bool _t4 = f_4cffi_symbol(v_d.m_foreign);
     bool _t5 = !_t4;
     bool _t6 = _t5;
@@ -53990,68 +54117,68 @@ void f_7checker_validate_foreign(t_7checker_Checker * v_c, int64_t v_id) {
         _t16 = _t19;
     }
     if (_t16) {
-        // line 4972
+        // line 4973
         f_7checker_report(&(*v_c), v_d.m_line, v_d.m_col, VELA_STR("E3200", 5), VELA_STR("an extern needs a C symbol and a monomorphic signature without contracts; use a Vela wrapper", 92));
         vela_str_release(VELA_STR("an extern needs a C symbol and a monomorphic signature without contracts; use a Vela wrapper", 92));
         vela_str_release(VELA_STR("E3200", 5));
     }
-    // line 4974
-    bool v_unsafe = false;
     // line 4975
+    bool v_unsafe = false;
+    // line 4976
     vela_array * _t21 = v_d.m_effects;
     vela_array_retain(_t21);
     vela_array * _t20 = _t21;
     for (int64_t _t22 = 0; _t22 < _t20->len; _t22++) {
         vela_str v_effect = ((vela_str *)_t20->data)[_t22];
-        // line 4975
+        // line 4976
         bool _t23 = vela_str_eq(v_effect, VELA_STR("unsafe", 6));
         if (_t23) {
-            // line 4975
+            // line 4976
             v_unsafe = true;
         }
     }
     vela_array_release(_t20);
-    // line 4976
+    // line 4977
     bool _t24 = !v_unsafe;
     if (_t24) {
-        // line 4977
+        // line 4978
         f_7checker_report(&(*v_c), v_d.m_line, v_d.m_col, VELA_STR("E3201", 5), VELA_STR("every extern declaration must say uses unsafe", 45));
         vela_str_release(VELA_STR("every extern declaration must say uses unsafe", 45));
         vela_str_release(VELA_STR("E3201", 5));
-        // line 4978
-        t_7modules_Module _t25 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4978:49");
-        t_7modules_Module _t26 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4978:78");
+        // line 4979
+        t_7modules_Module _t25 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4979:49");
+        t_7modules_Module _t26 = *(t_7modules_Module *)vela_at((*v_c).m_modules, (*v_c).m_current, sizeof(t_7modules_Module), "compiler/src/checker.vl:4979:78");
         vela_array * _t27 = f_7repairs_effect(_t25.m_source, _t26.m_path, v_d, VELA_STR("unsafe", 6));
         f_7checker_last_fix(&(*v_c), _t27);
         vela_array_release(_t27);
     }
-    // line 4980
+    // line 4981
     int64_t _t28 = v_f.m_params->len;
     int64_t _t29 = _t28;
     for (int64_t _t30 = 0; _t30 < _t29; _t30++) {
         int64_t v_i = _t30;
-        // line 4981
-        int64_t _t31 = *(int64_t *)vela_at(v_f.m_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4981:30");
+        // line 4982
+        int64_t _t31 = *(int64_t *)vela_at(v_f.m_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4982:30");
         bool _t32 = f_7checker_c_scalar(_t31);
         bool _t33 = !_t32;
         bool _t34 = _t33;
         if (_t34) {
-            int64_t _t35 = *(int64_t *)vela_at(v_f.m_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4981:46");
+            int64_t _t35 = *(int64_t *)vela_at(v_f.m_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:4982:46");
             int64_t _t36 = _t35;
             int64_t _t37 = f_5types_ERROR();
             bool _t38 = _t36 != _t37;
             _t34 = _t38;
         }
         if (_t34) {
-            // line 4982
-            t_3ast_Param _t39 = *(t_3ast_Param *)vela_at(v_d.m_params, v_i, sizeof(t_3ast_Param), "compiler/src/checker.vl:4982:35");
-            t_3ast_Param _t40 = *(t_3ast_Param *)vela_at(v_d.m_params, v_i, sizeof(t_3ast_Param), "compiler/src/checker.vl:4982:53");
+            // line 4983
+            t_3ast_Param _t39 = *(t_3ast_Param *)vela_at(v_d.m_params, v_i, sizeof(t_3ast_Param), "compiler/src/checker.vl:4983:35");
+            t_3ast_Param _t40 = *(t_3ast_Param *)vela_at(v_d.m_params, v_i, sizeof(t_3ast_Param), "compiler/src/checker.vl:4983:53");
             f_7checker_report(&(*v_c), _t39.m_line, _t40.m_col, VELA_STR("E3203", 5), VELA_STR("a C parameter must be a scalar or raw pointer; pass aggregates through c.Ptr", 76));
             vela_str_release(VELA_STR("a C parameter must be a scalar or raw pointer; pass aggregates through c.Ptr", 76));
             vela_str_release(VELA_STR("E3203", 5));
         }
     }
-    // line 4985
+    // line 4986
     int64_t _t41 = v_f.m_result;
     int64_t _t42 = f_5types_NOTHING();
     bool _t43 = _t41 != _t42;
@@ -54069,12 +54196,12 @@ void f_7checker_validate_foreign(t_7checker_Checker * v_c, int64_t v_id) {
         _t48 = _t50;
     }
     if (_t48) {
-        // line 4986
+        // line 4987
         f_7checker_report(&(*v_c), v_d.m_line, v_d.m_col, VELA_STR("E3203", 5), VELA_STR("a C result must be a scalar or raw pointer; return aggregates through a pointer", 79));
         vela_str_release(VELA_STR("a C result must be a scalar or raw pointer; return aggregates through a pointer", 79));
         vela_str_release(VELA_STR("E3203", 5));
     }
-    // line 4988
+    // line 4989
     bool _t51 = v_d.m_variadic;
     if (_t51) {
         int64_t _t52 = v_d.m_params->len;
@@ -54083,7 +54210,7 @@ void f_7checker_validate_foreign(t_7checker_Checker * v_c, int64_t v_id) {
         _t51 = _t54;
     }
     if (_t51) {
-        // line 4988
+        // line 4989
         f_7checker_report(&(*v_c), v_d.m_line, v_d.m_col, VELA_STR("E3200", 5), VELA_STR("a C variadic declaration needs a fixed parameter before ...", 59));
         vela_str_release(VELA_STR("a C variadic declaration needs a fixed parameter before ...", 59));
         vela_str_release(VELA_STR("E3200", 5));
@@ -54094,21 +54221,21 @@ void f_7checker_validate_foreign(t_7checker_Checker * v_c, int64_t v_id) {
 /* vela: part */
 
 int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args, int64_t v_expected) {
-    // line 4992
+    // line 4993
     bool _t1 = f_4cffi_hazardous(v_name);
     if (_t1) {
-        // line 4992
+        // line 4993
         vela_str _t2 = vela_str_concat(VELA_STR("c.", 2), v_name);
         f_7checker_use_effect(&(*v_c), v_e, VELA_STR("unsafe", 6), _t2);
         vela_str_release(_t2);
         vela_str_release(VELA_STR("unsafe", 6));
     }
-    // line 4993
+    // line 4994
     int64_t _t3 = f_4cffi_PTR();
     int64_t v_ptr = _t3;
-    // line 4994
-    int64_t v_count = 1;
     // line 4995
+    int64_t v_count = 1;
+    // line 4996
     bool _t4 = vela_str_eq(v_name, VELA_STR("null", 4));
     bool _t5 = _t4;
     if (!_t5) {
@@ -54116,10 +54243,10 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
         _t5 = _t6;
     }
     if (_t5) {
-        // line 4995
+        // line 4996
         v_count = 0;
     }
-    // line 4996
+    // line 4997
     bool _t7 = vela_str_eq(v_name, VELA_STR("bytes", 5));
     bool _t8 = _t7;
     if (!_t8) {
@@ -54137,69 +54264,69 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
         _t12 = _t13;
     }
     if (_t12) {
-        // line 4996
+        // line 4997
         v_count = 2;
     }
-    // line 4997
+    // line 4998
     vela_str _t14 = vela_str_concat(VELA_STR("c.", 2), v_name);
     int64_t _t15 = v_args->len;
     bool _t16 = f_7checker_arity(&(*v_c), v_e, _t14, v_count, _t15);
     bool _t17 = !_t16;
     if (_t17) {
-        // line 4998
+        // line 4999
         vela_array * _t19 = v_args;
         vela_array_retain(_t19);
         vela_array * _t18 = _t19;
         for (int64_t _t20 = 0; _t20 < _t18->len; _t20++) {
             t_3ast_Expr v_arg = ((t_3ast_Expr *)_t18->data)[_t20];
-            // line 4998
+            // line 4999
             t_3ast_Expr _t21 = v_arg;
             rc_retain_t_3ast_Expr(_t21);
             int64_t _t22 = f_7checker_infer(&(*v_c), _t21);
             rc_release_t_3ast_Expr(_t21);
         }
         vela_array_release(_t18);
-        // line 4999
+        // line 5000
         int64_t _t23 = f_5types_ERROR();
         int64_t _t24 = _t23;
         vela_str_release(_t14);
         return _t24;
     }
     vela_str_release(_t14);
-    // line 5001
+    // line 5002
     bool _t25 = vela_str_eq(v_name, VELA_STR("null", 4));
     if (_t25) {
-        // line 5001
+        // line 5002
         int64_t _t26 = v_ptr;
         return _t26;
     }
-    // line 5002
+    // line 5003
     bool _t27 = vela_str_eq(v_name, VELA_STR("null_fn", 7));
     if (_t27) {
-        // line 5002
+        // line 5003
         int64_t _t28 = f_4cffi_FN();
         int64_t _t29 = _t28;
         return _t29;
     }
-    // line 5003
+    // line 5004
     bool _t30 = vela_str_eq(v_name, VELA_STR("addr", 4));
     if (_t30) {
-        // line 5004
-        t_3ast_Expr _t31 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5004:19");
+        // line 5005
+        t_3ast_Expr _t31 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5005:19");
         if (_t31.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
             t_3ast_Expr v_place = _t31.m_kind->value.as.m_MutArg._0->value;
             rc_retain_t_3ast_Expr(v_place);
-            // line 5006
+            // line 5007
             t_3ast_Expr _t32 = v_place;
             rc_retain_t_3ast_Expr(_t32);
             int64_t _t33 = f_7checker_infer(&(*v_c), _t32);
             int64_t v_t = _t33;
             rc_release_t_3ast_Expr(_t32);
-            // line 5007
+            // line 5008
             bool _t34 = f_7checker_c_scalar(v_t);
             bool _t35 = !_t34;
             if (_t35) {
-                // line 5007
+                // line 5008
                 t_3ast_Expr _t36 = v_place;
                 rc_retain_t_3ast_Expr(_t36);
                 f_7checker_report_at(&(*v_c), _t36, VELA_STR("E3203", 5), VELA_STR("c.addr needs a mutable scalar place", 35));
@@ -54207,18 +54334,18 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
                 vela_str_release(VELA_STR("E3203", 5));
                 rc_release_t_3ast_Expr(_t36);
             }
-            // line 5008
-            t_3ast_Expr _t37 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5008:41");
+            // line 5009
+            t_3ast_Expr _t37 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5009:41");
             rc_retain_t_3ast_Expr(_t37);
             int64_t _t38 = f_7checker_mut_argument(&(*v_c), _t37, v_t, VELA_STR("c.addr", 6));
             vela_str_release(VELA_STR("c.addr", 6));
             rc_release_t_3ast_Expr(_t37);
-            // line 5009
+            // line 5010
             Option_7checker_Path _t39 = f_7checker_path_of((*v_c), v_place);
             if (_t39.tag == Option_7checker_Path_Some) {
                 t_7checker_Path v_path = _t39.as.m_Some._0;
                 rc_retain_t_7checker_Path(v_path);
-                // line 5009
+                // line 5010
                 vela_unique_map(&(*v_c).m_escaped);
                 int64_t _t40 = v_path.m_local;
                 bool _t41 = true;
@@ -54229,37 +54356,37 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
             rc_release_Option_7checker_Path(_t39);
             rc_release_t_3ast_Expr(v_place);
         } else {
-            // line 5011
-            t_3ast_Expr _t42 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5011:37");
+            // line 5012
+            t_3ast_Expr _t42 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5012:37");
             rc_retain_t_3ast_Expr(_t42);
             int64_t _t43 = f_7checker_infer(&(*v_c), _t42);
             rc_release_t_3ast_Expr(_t42);
-            // line 5011
-            t_3ast_Expr _t44 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5011:64");
+            // line 5012
+            t_3ast_Expr _t44 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5012:64");
             rc_retain_t_3ast_Expr(_t44);
             f_7checker_report_at(&(*v_c), _t44, VELA_STR("E3204", 5), VELA_STR("write c.addr(mut value) for a scalar address", 44));
             vela_str_release(VELA_STR("write c.addr(mut value) for a scalar address", 44));
             vela_str_release(VELA_STR("E3204", 5));
             rc_release_t_3ast_Expr(_t44);
         }
-        // line 5013
+        // line 5014
         int64_t _t45 = v_ptr;
         return _t45;
     }
-    // line 5015
+    // line 5016
     bool _t46 = vela_str_eq(v_name, VELA_STR("callback", 8));
     if (_t46) {
-        // line 5016
-        t_3ast_Expr _t47 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5016:38");
+        // line 5017
+        t_3ast_Expr _t47 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5017:38");
         rc_retain_t_3ast_Expr(_t47);
         t_7checker_Ref _t48 = f_7checker_call_target(&(*v_c), _t47);
         if (_t48.tag == t_7checker_Ref_Function) {
             int64_t v_id = _t48.as.m_Function._0;
-            // line 5018
-            t_7checker_FnInfo _t49 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:5018:30");
+            // line 5019
+            t_7checker_FnInfo _t49 = *(t_7checker_FnInfo *)vela_at((*v_c).m_fns, v_id, sizeof(t_7checker_FnInfo), "compiler/src/checker.vl:5019:30");
             rc_retain_t_7checker_FnInfo(_t49);
             t_7checker_FnInfo v_f = _t49;
-            // line 5019
+            // line 5020
             int64_t _t50 = v_f.m_type_params->len;
             int64_t _t51 = _t50;
             bool _t52 = _t51 > 0;
@@ -54281,31 +54408,31 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
                 _t54 = _t58;
             }
             if (_t54) {
-                // line 5020
-                t_3ast_Expr _t61 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5020:42");
+                // line 5021
+                t_3ast_Expr _t61 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5021:42");
                 rc_retain_t_3ast_Expr(_t61);
                 f_7checker_report_at(&(*v_c), _t61, VELA_STR("E3205", 5), VELA_STR("c.callback needs a monomorphic C-compatible top-level function", 62));
                 vela_str_release(VELA_STR("c.callback needs a monomorphic C-compatible top-level function", 62));
                 vela_str_release(VELA_STR("E3205", 5));
                 rc_release_t_3ast_Expr(_t61);
             }
-            // line 5022
+            // line 5023
             int64_t _t62 = v_f.m_params->len;
             int64_t _t63 = _t62;
             for (int64_t _t64 = 0; _t64 < _t63; _t64++) {
                 int64_t v_i = _t64;
-                // line 5023
-                int64_t _t65 = *(int64_t *)vela_at(v_f.m_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:5023:42");
+                // line 5024
+                int64_t _t65 = *(int64_t *)vela_at(v_f.m_params, v_i, sizeof(int64_t), "compiler/src/checker.vl:5024:42");
                 bool _t66 = f_7checker_c_scalar(_t65);
                 bool _t67 = !_t66;
                 bool _t68 = _t67;
                 if (!_t68) {
-                    bool _t69 = *(bool *)vela_at(v_f.m_mutable, v_i, sizeof(bool), "compiler/src/checker.vl:5023:59");
+                    bool _t69 = *(bool *)vela_at(v_f.m_mutable, v_i, sizeof(bool), "compiler/src/checker.vl:5024:59");
                     _t68 = _t69;
                 }
                 if (_t68) {
-                    // line 5023
-                    t_3ast_Expr _t70 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5023:86");
+                    // line 5024
+                    t_3ast_Expr _t70 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5024:86");
                     rc_retain_t_3ast_Expr(_t70);
                     f_7checker_report_at(&(*v_c), _t70, VELA_STR("E3205", 5), VELA_STR("a callback parameter must be an immutable C-compatible scalar", 61));
                     vela_str_release(VELA_STR("a callback parameter must be an immutable C-compatible scalar", 61));
@@ -54313,25 +54440,25 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
                     rc_release_t_3ast_Expr(_t70);
                 }
             }
-            // line 5025
+            // line 5026
             vela_array * _t71 = vela_array_new(&vela_type_str, 0);
             vela_array * v_effects = _t71;
-            // line 5026
+            // line 5027
             vela_array * _t73 = v_f.m_decl.m_effects;
             vela_array_retain(_t73);
             vela_array * _t72 = _t73;
             vela_unique(&v_effects);
             for (int64_t _t74 = 0; _t74 < _t72->len; _t74++) {
                 vela_str v_effect = ((vela_str *)_t72->data)[_t74];
-                // line 5026
+                // line 5027
                 bool _t75 = f_5types_concrete_effect(v_effect);
                 if (_t75) {
-                    // line 5026
+                    // line 5027
                     vela_str _t76 = v_effect;
                     vela_str_retain(_t76);
                     vela_str _t77 = _t76;
                     vela_push(v_effects, &_t77, sizeof(vela_str));
-                    // line 5026
+                    // line 5027
                     vela_str _t78 = v_effect;
                     vela_str_retain(_t78);
                     static const vela_str _t79[] = {VELA_STR_INIT("callback '", 10), {NULL, NULL, 0}, VELA_STR_INIT("'", 1)};
@@ -54345,30 +54472,30 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
                 }
             }
             vela_array_release(_t72);
-            // line 5027
+            // line 5028
             t_7checker_Ref _t82 = (t_7checker_Ref){ .tag = t_7checker_Ref_Function, .as.m_Function = { ._0 = v_id } };
             vela_unique(&(*v_c).m_refs);
-            t_3ast_Expr _t83 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5027:28");
-            t_7checker_Ref *_t84 = (t_7checker_Ref *)vela_at((*v_c).m_refs, _t83.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:5027:23");
+            t_3ast_Expr _t83 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5028:28");
+            t_7checker_Ref *_t84 = (t_7checker_Ref *)vela_at((*v_c).m_refs, _t83.m_id, sizeof(t_7checker_Ref), "compiler/src/checker.vl:5028:23");
             rc_release_t_7checker_Ref(*_t84);
             *_t84 = _t82;
-            // line 5028
+            // line 5029
             vela_array * _t85 = v_f.m_params;
             vela_array_retain(_t85);
             vela_array * _t86 = v_effects;
             vela_array_retain(_t86);
             int64_t _t87 = f_5types_func_with(&(*v_c).m_table, _t85, v_f.m_result, _t86);
             vela_unique(&(*v_c).m_ty);
-            t_3ast_Expr _t88 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5028:26");
-            int64_t *_t89 = (int64_t *)vela_at((*v_c).m_ty, _t88.m_id, sizeof(int64_t), "compiler/src/checker.vl:5028:21");
+            t_3ast_Expr _t88 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5029:26");
+            int64_t *_t89 = (int64_t *)vela_at((*v_c).m_ty, _t88.m_id, sizeof(int64_t), "compiler/src/checker.vl:5029:21");
             *_t89 = _t87;
             vela_array_release(_t86);
             vela_array_release(_t85);
             vela_array_release(v_effects);
             rc_release_t_7checker_FnInfo(v_f);
         } else {
-            // line 5030
-            t_3ast_Expr _t90 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5030:39");
+            // line 5031
+            t_3ast_Expr _t90 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5031:39");
             rc_retain_t_3ast_Expr(_t90);
             f_7checker_report_at(&(*v_c), _t90, VELA_STR("E3205", 5), VELA_STR("c.callback accepts a top-level function, not a closure or function variable", 75));
             vela_str_release(VELA_STR("c.callback accepts a top-level function, not a closure or function variable", 75));
@@ -54377,12 +54504,12 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
         }
         rc_release_t_3ast_Expr(_t47);
         rc_release_t_7checker_Ref(_t48);
-        // line 5032
+        // line 5033
         int64_t _t91 = f_4cffi_FN();
         int64_t _t92 = _t91;
         return _t92;
     }
-    // line 5034
+    // line 5035
     bool _t93 = vela_str_eq(v_name, VELA_STR("is_null", 7));
     bool _t94 = _t93;
     if (!_t94) {
@@ -54390,13 +54517,13 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
         _t94 = _t95;
     }
     if (_t94) {
-        // line 5035
-        t_3ast_Expr _t96 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5035:34");
+        // line 5036
+        t_3ast_Expr _t96 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5036:34");
         rc_retain_t_3ast_Expr(_t96);
         int64_t _t97 = f_7checker_value(&(*v_c), _t96);
         int64_t v_t_2 = _t97;
         rc_release_t_3ast_Expr(_t96);
-        // line 5036
+        // line 5037
         bool _t98 = f_4cffi_pointer(v_t_2);
         bool _t99 = !_t98;
         bool _t100 = _t99;
@@ -54407,8 +54534,8 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
             _t100 = _t103;
         }
         if (_t100) {
-            // line 5036
-            t_3ast_Expr _t104 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5036:74");
+            // line 5037
+            t_3ast_Expr _t104 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5037:74");
             rc_retain_t_3ast_Expr(_t104);
             static const vela_str _t105[] = {VELA_STR_INIT("c.", 2), {NULL, NULL, 0}, VELA_STR_INIT(" needs c.Ptr or c.Fn", 20)};
             vela_str _t106[3];
@@ -54420,58 +54547,58 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
             vela_str_release(VELA_STR("E3203", 5));
             rc_release_t_3ast_Expr(_t104);
         }
-        // line 5037
+        // line 5038
         bool _t108 = vela_str_eq(v_name, VELA_STR("is_null", 7));
         if (_t108) {
-            // line 5037
+            // line 5038
             int64_t _t109 = f_5types_BOOL();
             int64_t _t110 = _t109;
             return _t110;
         }
-        // line 5038
+        // line 5039
         int64_t _t111 = 13;
         return _t111;
     }
-    // line 5040
+    // line 5041
     bool _t112 = vela_str_eq(v_name, VELA_STR("from_address", 12));
     if (_t112) {
-        // line 5041
-        t_3ast_Expr _t113 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5041:31");
+        // line 5042
+        t_3ast_Expr _t113 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5042:31");
         rc_retain_t_3ast_Expr(_t113);
         t_7checker_Msg _t114 = f_7checker_msg(VELA_STR("c.from_address needs u64, found ", 32), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t113, 13, _t114);
         rc_release_t_7checker_Msg(_t114);
         rc_release_t_3ast_Expr(_t113);
-        // line 5042
+        // line 5043
         int64_t _t115 = v_ptr;
         return _t115;
     }
-    // line 5044
+    // line 5045
     bool _t116 = vela_str_eq(v_name, VELA_STR("float32", 7));
     if (_t116) {
-        // line 5045
-        t_3ast_Expr _t117 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5045:31");
+        // line 5046
+        t_3ast_Expr _t117 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5046:31");
         rc_retain_t_3ast_Expr(_t117);
         int64_t _t118 = f_5types_FLOAT();
         t_7checker_Msg _t119 = f_7checker_msg(VELA_STR("c.float32 needs Float, found ", 29), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t117, _t118, _t119);
         rc_release_t_7checker_Msg(_t119);
         rc_release_t_3ast_Expr(_t117);
-        // line 5046
+        // line 5047
         int64_t _t120 = f_5types_FLOAT();
         int64_t _t121 = _t120;
         return _t121;
     }
-    // line 5048
+    // line 5049
     bool _t122 = vela_str_eq(v_name, VELA_STR("data", 4));
     if (_t122) {
-        // line 5049
-        t_3ast_Expr _t123 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5049:34");
+        // line 5050
+        t_3ast_Expr _t123 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5050:34");
         rc_retain_t_3ast_Expr(_t123);
         int64_t _t124 = f_7checker_value(&(*v_c), _t123);
         int64_t v_t_3 = _t124;
         rc_release_t_3ast_Expr(_t123);
-        // line 5050
+        // line 5051
         int64_t _t125 = v_t_3;
         int64_t _t126 = f_5types_STR();
         bool _t127 = _t125 != _t126;
@@ -54489,23 +54616,23 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
             _t131 = _t134;
         }
         if (_t131) {
-            // line 5050
-            t_3ast_Expr _t135 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5050:105");
+            // line 5051
+            t_3ast_Expr _t135 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5051:105");
             rc_retain_t_3ast_Expr(_t135);
             f_7checker_report_at(&(*v_c), _t135, VELA_STR("E3203", 5), VELA_STR("c.data needs Str or a growable array", 36));
             vela_str_release(VELA_STR("c.data needs Str or a growable array", 36));
             vela_str_release(VELA_STR("E3203", 5));
             rc_release_t_3ast_Expr(_t135);
         }
-        // line 5051
+        // line 5052
         int64_t _t136 = v_ptr;
         return _t136;
     }
-    // line 5053
+    // line 5054
     bool _t137 = vela_str_eq(v_name, VELA_STR("cstr", 4));
     if (_t137) {
-        // line 5054
-        t_3ast_Expr _t138 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5054:31");
+        // line 5055
+        t_3ast_Expr _t138 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5055:31");
         rc_retain_t_3ast_Expr(_t138);
         int64_t _t139 = f_5types_STR();
         static const vela_str _t140[] = {VELA_STR_INIT("c.", 2), {NULL, NULL, 0}, VELA_STR_INIT(" needs Str, found ", 18)};
@@ -54518,27 +54645,27 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
         rc_release_t_7checker_Msg(_t143);
         rc_release_t_3ast_Expr(_t138);
         vela_str_release(_t142);
-        // line 5055
+        // line 5056
         int64_t _t144 = v_ptr;
         return _t144;
     }
-    // line 5057
+    // line 5058
     bool _t145 = vela_str_eq(v_name, VELA_STR("alloc", 5));
     if (_t145) {
-        // line 5058
-        t_3ast_Expr _t146 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5058:31");
+        // line 5059
+        t_3ast_Expr _t146 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5059:31");
         rc_retain_t_3ast_Expr(_t146);
         int64_t _t147 = f_5types_INT();
         t_7checker_Msg _t148 = f_7checker_msg(VELA_STR("c.alloc needs an Int size, found ", 33), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t146, _t147, _t148);
         rc_release_t_7checker_Msg(_t148);
         rc_release_t_3ast_Expr(_t146);
-        // line 5059
+        // line 5060
         int64_t _t149 = v_ptr;
         return _t149;
     }
-    // line 5061
-    t_3ast_Expr _t150 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5061:27");
+    // line 5062
+    t_3ast_Expr _t150 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5062:27");
     rc_retain_t_3ast_Expr(_t150);
     static const vela_str _t151[] = {VELA_STR_INIT("c.", 2), {NULL, NULL, 0}, VELA_STR_INIT(" needs c.Ptr, found ", 20)};
     vela_str _t152[3];
@@ -54550,7 +54677,7 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
     rc_release_t_7checker_Msg(_t154);
     rc_release_t_3ast_Expr(_t150);
     vela_str_release(_t153);
-    // line 5062
+    // line 5063
     bool _t155 = vela_str_eq(v_name, VELA_STR("bytes", 5));
     bool _t156 = _t155;
     if (!_t156) {
@@ -54558,8 +54685,8 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
         _t156 = _t157;
     }
     if (_t156) {
-        // line 5063
-        t_3ast_Expr _t158 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5063:31");
+        // line 5064
+        t_3ast_Expr _t158 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5064:31");
         rc_retain_t_3ast_Expr(_t158);
         int64_t _t159 = f_5types_INT();
         static const vela_str _t160[] = {VELA_STR_INIT("c.", 2), {NULL, NULL, 0}, VELA_STR_INIT(" needs an Int count, found ", 27)};
@@ -54572,80 +54699,80 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
         rc_release_t_7checker_Msg(_t163);
         rc_release_t_3ast_Expr(_t158);
         vela_str_release(_t162);
-        // line 5064
+        // line 5065
         bool _t164 = vela_str_eq(v_name, VELA_STR("bytes", 5));
         if (_t164) {
-            // line 5064
+            // line 5065
             int64_t _t165 = f_5types_STR();
             int64_t _t166 = _t165;
             return _t166;
         }
-        // line 5065
+        // line 5066
         int64_t _t167 = v_ptr;
         return _t167;
     }
-    // line 5067
+    // line 5068
     bool _t168 = vela_str_eq(v_name, VELA_STR("string", 6));
     if (_t168) {
-        // line 5067
+        // line 5068
         int64_t _t169 = f_5types_STR();
         int64_t _t170 = _t169;
         return _t170;
     }
-    // line 5068
+    // line 5069
     bool _t171 = vela_str_eq(v_name, VELA_STR("load_float32", 12));
     if (_t171) {
-        // line 5068
+        // line 5069
         int64_t _t172 = f_5types_FLOAT();
         int64_t _t173 = _t172;
         return _t173;
     }
-    // line 5069
+    // line 5070
     bool _t174 = vela_str_eq(v_name, VELA_STR("load", 4));
     if (_t174) {
-        // line 5070
+        // line 5071
         bool _t175 = f_7checker_c_scalar(v_expected);
         bool _t176 = !_t175;
         if (_t176) {
-            // line 5070
+            // line 5071
             f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3204", 5), VELA_STR("give c.load a scalar result type, as in let n: c.Int = c.load(ptr)", 66));
             vela_str_release(VELA_STR("give c.load a scalar result type, as in let n: c.Int = c.load(ptr)", 66));
             vela_str_release(VELA_STR("E3204", 5));
-            // line 5070
+            // line 5071
             int64_t _t177 = f_5types_ERROR();
             int64_t _t178 = _t177;
             return _t178;
         }
-        // line 5071
+        // line 5072
         int64_t _t179 = v_expected;
         return _t179;
     }
-    // line 5073
+    // line 5074
     bool _t180 = vela_str_eq(v_name, VELA_STR("store_float32", 13));
     if (_t180) {
-        // line 5073
-        t_3ast_Expr _t181 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5073:56");
+        // line 5074
+        t_3ast_Expr _t181 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5074:56");
         rc_retain_t_3ast_Expr(_t181);
         int64_t _t182 = f_5types_FLOAT();
         t_7checker_Msg _t183 = f_7checker_msg(VELA_STR("c.store_float32 needs Float, found ", 35), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t181, _t182, _t183);
         rc_release_t_7checker_Msg(_t183);
         rc_release_t_3ast_Expr(_t181);
-        // line 5073
+        // line 5074
         int64_t _t184 = f_5types_NOTHING();
         int64_t _t185 = _t184;
         return _t185;
     }
-    // line 5074
+    // line 5075
     bool _t186 = vela_str_eq(v_name, VELA_STR("store", 5));
     if (_t186) {
-        // line 5075
-        t_3ast_Expr _t187 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5075:34");
+        // line 5076
+        t_3ast_Expr _t187 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5076:34");
         rc_retain_t_3ast_Expr(_t187);
         int64_t _t188 = f_7checker_value(&(*v_c), _t187);
         int64_t v_t_4 = _t188;
         rc_release_t_3ast_Expr(_t187);
-        // line 5076
+        // line 5077
         bool _t189 = f_7checker_c_scalar(v_t_4);
         bool _t190 = !_t189;
         bool _t191 = _t190;
@@ -54656,8 +54783,8 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
             _t191 = _t194;
         }
         if (_t191) {
-            // line 5076
-            t_3ast_Expr _t195 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5076:70");
+            // line 5077
+            t_3ast_Expr _t195 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5077:70");
             rc_retain_t_3ast_Expr(_t195);
             f_7checker_report_at(&(*v_c), _t195, VELA_STR("E3203", 5), VELA_STR("c.store needs a C-compatible scalar value", 41));
             vela_str_release(VELA_STR("c.store needs a C-compatible scalar value", 41));
@@ -54665,7 +54792,7 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
             rc_release_t_3ast_Expr(_t195);
         }
     }
-    // line 5078
+    // line 5079
     int64_t _t196 = f_5types_NOTHING();
     int64_t _t197 = _t196;
     return _t197;
@@ -54673,9 +54800,9 @@ int64_t f_7checker_c_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str
 /* vela: part */
 
 int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args, int64_t v_expected) {
-    // line 5082
-    int64_t v_count = 1;
     // line 5083
+    int64_t v_count = 1;
+    // line 5084
     bool _t1 = vela_str_eq(v_name, VELA_STR("fill", 4));
     bool _t2 = _t1;
     if (!_t2) {
@@ -54688,48 +54815,48 @@ int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
         _t4 = _t5;
     }
     if (_t4) {
-        // line 5083
+        // line 5084
         v_count = 2;
     }
-    // line 5084
+    // line 5085
     bool _t6 = vela_str_eq(v_name, VELA_STR("read", 4));
     if (_t6) {
-        // line 5084
+        // line 5085
         v_count = 4;
     }
-    // line 5085
+    // line 5086
     bool _t7 = vela_str_eq(v_name, VELA_STR("write", 5));
     if (_t7) {
-        // line 5085
+        // line 5086
         v_count = 5;
     }
-    // line 5086
+    // line 5087
     vela_str _t8 = vela_str_concat(VELA_STR("memory.", 7), v_name);
     int64_t _t9 = v_args->len;
     bool _t10 = f_7checker_arity(&(*v_c), v_e, _t8, v_count, _t9);
     bool _t11 = !_t10;
     if (_t11) {
-        // line 5086
+        // line 5087
         vela_array * _t13 = v_args;
         vela_array_retain(_t13);
         vela_array * _t12 = _t13;
         for (int64_t _t14 = 0; _t14 < _t12->len; _t14++) {
             t_3ast_Expr v_arg = ((t_3ast_Expr *)_t12->data)[_t14];
-            // line 5086
+            // line 5087
             t_3ast_Expr _t15 = v_arg;
             rc_retain_t_3ast_Expr(_t15);
             int64_t _t16 = f_7checker_infer(&(*v_c), _t15);
             rc_release_t_3ast_Expr(_t15);
         }
         vela_array_release(_t12);
-        // line 5086
+        // line 5087
         int64_t _t17 = f_5types_ERROR();
         int64_t _t18 = _t17;
         vela_str_release(_t8);
         return _t18;
     }
     vela_str_release(_t8);
-    // line 5087
+    // line 5088
     bool _t19 = vela_str_eq(v_name, VELA_STR("reserve", 7));
     bool _t20 = _t19;
     if (!_t20) {
@@ -54737,125 +54864,125 @@ int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
         _t20 = _t21;
     }
     if (_t20) {
-        // line 5088
-        t_3ast_Expr _t22 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5088:31");
+        // line 5089
+        t_3ast_Expr _t22 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5089:31");
         rc_retain_t_3ast_Expr(_t22);
         int64_t _t23 = f_5types_INT();
         t_7checker_Msg _t24 = f_7checker_msg(VELA_STR("capacity must be Int, found ", 28), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t22, _t23, _t24);
         rc_release_t_7checker_Msg(_t24);
         rc_release_t_3ast_Expr(_t22);
-        // line 5089
+        // line 5090
         bool _t25 = vela_str_eq(v_name, VELA_STR("reserve", 7));
         if (_t25) {
-            // line 5090
+            // line 5091
             bool _t26 = f_5types_is_array((*v_c).m_table, v_expected);
             bool _t27 = !_t26;
             if (_t27) {
-                // line 5090
+                // line 5091
                 f_7checker_report_at(&(*v_c), v_e, VELA_STR("E3213", 5), VELA_STR("give memory.reserve a growable array result type", 48));
                 vela_str_release(VELA_STR("give memory.reserve a growable array result type", 48));
                 vela_str_release(VELA_STR("E3213", 5));
-                // line 5090
+                // line 5091
                 int64_t _t28 = f_5types_ERROR();
                 int64_t _t29 = _t28;
                 return _t29;
             }
-            // line 5091
+            // line 5092
             int64_t _t30 = v_expected;
             return _t30;
         }
-        // line 5093
+        // line 5094
         int64_t _t31 = f_5types_ERROR();
         int64_t v_elem = _t31;
-        // line 5094
+        // line 5095
         bool _t32 = f_5types_is_array((*v_c).m_table, v_expected);
         if (_t32) {
-            // line 5094
+            // line 5095
             t_5types_TypeInfo _t33 = f_5types_get((*v_c).m_table, v_expected);
-            int64_t _t34 = *(int64_t *)vela_at(_t33.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:5094:88");
+            int64_t _t34 = *(int64_t *)vela_at(_t33.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:5095:88");
             v_elem = _t34;
             rc_release_t_5types_TypeInfo(_t33);
-            // line 5094
-            t_3ast_Expr _t35 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5094:115");
+            // line 5095
+            t_3ast_Expr _t35 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5095:115");
             rc_retain_t_3ast_Expr(_t35);
             t_7checker_Msg _t36 = f_7checker_msg(VELA_STR("fill element type mismatch: ", 28), VELA_STR("", 0));
             f_7checker_check_expr(&(*v_c), _t35, v_elem, _t36);
             rc_release_t_7checker_Msg(_t36);
             rc_release_t_3ast_Expr(_t35);
         } else {
-            // line 5094
-            t_3ast_Expr _t37 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5094:200");
+            // line 5095
+            t_3ast_Expr _t37 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5095:200");
             rc_retain_t_3ast_Expr(_t37);
             int64_t _t38 = f_7checker_value(&(*v_c), _t37);
             v_elem = _t38;
             rc_release_t_3ast_Expr(_t37);
         }
-        // line 5095
+        // line 5096
         int64_t _t39 = f_5types_array(&(*v_c).m_table, v_elem);
         int64_t _t40 = _t39;
         return _t40;
     }
-    // line 5097
+    // line 5098
     bool _t41 = vela_str_eq(v_name, VELA_STR("bits", 4));
     if (_t41) {
-        // line 5097
-        t_3ast_Expr _t42 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5097:47");
+        // line 5098
+        t_3ast_Expr _t42 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5098:47");
         rc_retain_t_3ast_Expr(_t42);
         int64_t _t43 = f_5types_INT();
         t_7checker_Msg _t44 = f_7checker_msg(VELA_STR("memory.bits needs Int, found ", 29), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t42, _t43, _t44);
         rc_release_t_7checker_Msg(_t44);
         rc_release_t_3ast_Expr(_t42);
-        // line 5097
+        // line 5098
         int64_t _t45 = 13;
         return _t45;
     }
-    // line 5098
+    // line 5099
     bool _t46 = vela_str_eq(v_name, VELA_STR("signed", 6));
     if (_t46) {
-        // line 5098
-        t_3ast_Expr _t47 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5098:49");
+        // line 5099
+        t_3ast_Expr _t47 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5099:49");
         rc_retain_t_3ast_Expr(_t47);
         t_7checker_Msg _t48 = f_7checker_msg(VELA_STR("memory.signed needs u64, found ", 31), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t47, 13, _t48);
         rc_release_t_7checker_Msg(_t48);
         rc_release_t_3ast_Expr(_t47);
-        // line 5098
-        t_3ast_Expr _t49 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5098:125");
+        // line 5099
+        t_3ast_Expr _t49 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5099:125");
         rc_retain_t_3ast_Expr(_t49);
         int64_t _t50 = f_5types_INT();
         t_7checker_Msg _t51 = f_7checker_msg(VELA_STR("bit width must be Int, found ", 29), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t49, _t50, _t51);
         rc_release_t_7checker_Msg(_t51);
         rc_release_t_3ast_Expr(_t49);
-        // line 5098
+        // line 5099
         int64_t _t52 = f_5types_INT();
         int64_t _t53 = _t52;
         return _t53;
     }
-    // line 5099
+    // line 5100
     bool _t54 = vela_str_eq(v_name, VELA_STR("from_str", 8));
     if (_t54) {
-        // line 5099
-        t_3ast_Expr _t55 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5099:51");
+        // line 5100
+        t_3ast_Expr _t55 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5100:51");
         rc_retain_t_3ast_Expr(_t55);
         int64_t _t56 = f_5types_STR();
         t_7checker_Msg _t57 = f_7checker_msg(VELA_STR("memory.from_str needs Str, found ", 33), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t55, _t56, _t57);
         rc_release_t_7checker_Msg(_t57);
         rc_release_t_3ast_Expr(_t55);
-        // line 5099
+        // line 5100
         int64_t _t58 = f_5types_BYTE();
         int64_t _t59 = f_5types_array(&(*v_c).m_table, _t58);
         int64_t _t60 = _t59;
         return _t60;
     }
-    // line 5100
-    t_3ast_Expr _t61 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5100:25");
+    // line 5101
+    t_3ast_Expr _t61 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5101:25");
     rc_retain_t_3ast_Expr(_t61);
     t_3ast_Expr v_place = _t61;
-    // line 5101
+    // line 5102
     bool _t62 = vela_str_eq(v_name, VELA_STR("truncate", 8));
     bool _t63 = _t62;
     if (!_t63) {
@@ -54863,11 +54990,11 @@ int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
         _t63 = _t64;
     }
     if (_t63) {
-        // line 5101
+        // line 5102
         if (v_place.m_kind->value.tag == t_3ast_ExprKind_MutArg) {
             t_3ast_Expr v_p = v_place.m_kind->value.as.m_MutArg._0->value;
             rc_retain_t_3ast_Expr(v_p);
-            // line 5101
+            // line 5102
             t_3ast_Expr _t65 = v_p;
             rc_retain_t_3ast_Expr(_t65);
             rc_release_t_3ast_Expr(v_place);
@@ -54876,25 +55003,25 @@ int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
         } else {
         }
     }
-    // line 5102
+    // line 5103
     t_3ast_Expr _t66 = v_place;
     rc_retain_t_3ast_Expr(_t66);
     int64_t _t67 = f_7checker_value(&(*v_c), _t66);
     int64_t v_actual = _t67;
     rc_release_t_3ast_Expr(_t66);
-    // line 5103
+    // line 5104
     int64_t _t68 = f_5types_ERROR();
     int64_t v_elem_2 = _t68;
-    // line 5104
+    // line 5105
     bool _t69 = f_5types_is_array((*v_c).m_table, v_actual);
     if (_t69) {
-        // line 5104
+        // line 5105
         t_5types_TypeInfo _t70 = f_5types_get((*v_c).m_table, v_actual);
-        int64_t _t71 = *(int64_t *)vela_at(_t70.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:5104:80");
+        int64_t _t71 = *(int64_t *)vela_at(_t70.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:5105:80");
         v_elem_2 = _t71;
         rc_release_t_5types_TypeInfo(_t70);
     }
-    // line 5105
+    // line 5106
     bool _t72 = vela_str_eq(v_name, VELA_STR("truncate", 8));
     bool _t73 = _t72;
     if (!_t73) {
@@ -54902,18 +55029,18 @@ int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
         _t73 = _t74;
     }
     if (_t73) {
-        // line 5105
-        t_3ast_Expr _t75 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5105:72");
+        // line 5106
+        t_3ast_Expr _t75 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5106:72");
         rc_retain_t_3ast_Expr(_t75);
         vela_str _t76 = vela_str_concat(VELA_STR("memory.", 7), v_name);
         int64_t _t77 = f_7checker_mut_argument(&(*v_c), _t75, v_actual, _t76);
         vela_str_release(_t76);
         rc_release_t_3ast_Expr(_t75);
     }
-    // line 5106
+    // line 5107
     bool _t78 = vela_str_eq(v_name, VELA_STR("truncate", 8));
     if (_t78) {
-        // line 5107
+        // line 5108
         bool _t79 = f_5types_is_array((*v_c).m_table, v_actual);
         bool _t80 = !_t79;
         bool _t81 = _t80;
@@ -54924,29 +55051,29 @@ int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
             _t81 = _t84;
         }
         if (_t81) {
-            // line 5107
-            t_3ast_Expr _t85 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5107:95");
+            // line 5108
+            t_3ast_Expr _t85 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5108:95");
             rc_retain_t_3ast_Expr(_t85);
             f_7checker_report_at(&(*v_c), _t85, VELA_STR("E3213", 5), VELA_STR("memory.truncate needs a growable array", 38));
             vela_str_release(VELA_STR("memory.truncate needs a growable array", 38));
             vela_str_release(VELA_STR("E3213", 5));
             rc_release_t_3ast_Expr(_t85);
         }
-        // line 5108
-        t_3ast_Expr _t86 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5108:31");
+        // line 5109
+        t_3ast_Expr _t86 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5109:31");
         rc_retain_t_3ast_Expr(_t86);
         int64_t _t87 = f_5types_INT();
         t_7checker_Msg _t88 = f_7checker_msg(VELA_STR("new length must be Int, found ", 30), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t86, _t87, _t88);
         rc_release_t_7checker_Msg(_t88);
         rc_release_t_3ast_Expr(_t86);
-        // line 5109
+        // line 5110
         int64_t _t89 = f_5types_NOTHING();
         int64_t _t90 = _t89;
         rc_release_t_3ast_Expr(v_place);
         return _t90;
     }
-    // line 5111
+    // line 5112
     int64_t _t91 = v_elem_2;
     int64_t _t92 = f_5types_BYTE();
     bool _t93 = _t91 != _t92;
@@ -54971,64 +55098,64 @@ int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
         _t101 = _t104;
     }
     if (_t101) {
-        // line 5111
-        t_3ast_Expr _t105 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5111:125");
+        // line 5112
+        t_3ast_Expr _t105 = *(t_3ast_Expr *)vela_at(v_args, 0, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5112:125");
         rc_retain_t_3ast_Expr(_t105);
         f_7checker_report_at(&(*v_c), _t105, VELA_STR("E3213", 5), VELA_STR("byte storage must be [u8], or Str for a read", 44));
         vela_str_release(VELA_STR("byte storage must be [u8], or Str for a read", 44));
         vela_str_release(VELA_STR("E3213", 5));
         rc_release_t_3ast_Expr(_t105);
     }
-    // line 5112
+    // line 5113
     bool _t106 = vela_str_eq(v_name, VELA_STR("to_str", 6));
     if (_t106) {
-        // line 5112
+        // line 5113
         int64_t _t107 = f_5types_STR();
         int64_t _t108 = _t107;
         rc_release_t_3ast_Expr(v_place);
         return _t108;
     }
-    // line 5113
-    t_3ast_Expr _t109 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5113:27");
+    // line 5114
+    t_3ast_Expr _t109 = *(t_3ast_Expr *)vela_at(v_args, 1, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5114:27");
     rc_retain_t_3ast_Expr(_t109);
     int64_t _t110 = f_5types_INT();
     t_7checker_Msg _t111 = f_7checker_msg(VELA_STR("byte offset must be Int, found ", 31), VELA_STR("", 0));
     f_7checker_check_expr(&(*v_c), _t109, _t110, _t111);
     rc_release_t_7checker_Msg(_t111);
     rc_release_t_3ast_Expr(_t109);
-    // line 5114
-    t_3ast_Expr _t112 = *(t_3ast_Expr *)vela_at(v_args, 2, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5114:27");
+    // line 5115
+    t_3ast_Expr _t112 = *(t_3ast_Expr *)vela_at(v_args, 2, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5115:27");
     rc_retain_t_3ast_Expr(_t112);
     int64_t _t113 = f_5types_INT();
     t_7checker_Msg _t114 = f_7checker_msg(VELA_STR("byte width must be Int, found ", 30), VELA_STR("", 0));
     f_7checker_check_expr(&(*v_c), _t112, _t113, _t114);
     rc_release_t_7checker_Msg(_t114);
     rc_release_t_3ast_Expr(_t112);
-    // line 5115
-    t_3ast_Expr _t115 = *(t_3ast_Expr *)vela_at(v_args, 3, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5115:27");
+    // line 5116
+    t_3ast_Expr _t115 = *(t_3ast_Expr *)vela_at(v_args, 3, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5116:27");
     rc_retain_t_3ast_Expr(_t115);
     int64_t _t116 = f_5types_BOOL();
     t_7checker_Msg _t117 = f_7checker_msg(VELA_STR("byte order must be Bool, found ", 31), VELA_STR("", 0));
     f_7checker_check_expr(&(*v_c), _t115, _t116, _t117);
     rc_release_t_7checker_Msg(_t117);
     rc_release_t_3ast_Expr(_t115);
-    // line 5116
+    // line 5117
     bool _t118 = vela_str_eq(v_name, VELA_STR("write", 5));
     if (_t118) {
-        // line 5116
-        t_3ast_Expr _t119 = *(t_3ast_Expr *)vela_at(v_args, 4, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5116:48");
+        // line 5117
+        t_3ast_Expr _t119 = *(t_3ast_Expr *)vela_at(v_args, 4, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5117:48");
         rc_retain_t_3ast_Expr(_t119);
         t_7checker_Msg _t120 = f_7checker_msg(VELA_STR("stored bits must be u64, found ", 31), VELA_STR("", 0));
         f_7checker_check_expr(&(*v_c), _t119, 13, _t120);
         rc_release_t_7checker_Msg(_t120);
         rc_release_t_3ast_Expr(_t119);
-        // line 5116
+        // line 5117
         int64_t _t121 = f_5types_NOTHING();
         int64_t _t122 = _t121;
         rc_release_t_3ast_Expr(v_place);
         return _t122;
     }
-    // line 5117
+    // line 5118
     int64_t _t123 = 13;
     rc_release_t_3ast_Expr(v_place);
     return _t123;
@@ -55036,13 +55163,13 @@ int64_t f_7checker_memory_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
 /* vela: part */
 
 void f_7checker_validate_fixed(t_7checker_Checker * v_c) {
-    // line 5121
+    // line 5122
     vela_array * _t2 = (*v_c).m_table.m_instances;
     vela_array_retain(_t2);
     vela_array * _t1 = _t2;
     for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
         int64_t v_id = ((int64_t *)_t1->data)[_t3];
-        // line 5122
+        // line 5123
         bool _t4 = f_5types_is_fixed((*v_c).m_table, v_id);
         bool _t5 = !_t4;
         bool _t6 = _t5;
@@ -55059,25 +55186,25 @@ void f_7checker_validate_fixed(t_7checker_Checker * v_c) {
             rc_release_t_5types_TypeInfo(_t9);
         }
         if (_t8) {
-            // line 5122
+            // line 5123
             continue;
         }
-        // line 5123
+        // line 5124
         t_5types_TypeInfo _t12 = f_5types_get((*v_c).m_table, v_id);
-        int64_t _t13 = *(int64_t *)vela_at(_t12.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:5123:47");
+        int64_t _t13 = *(int64_t *)vela_at(_t12.m_args, 0, sizeof(int64_t), "compiler/src/checker.vl:5124:47");
         int64_t v_elem = _t13;
         rc_release_t_5types_TypeInfo(_t12);
-        // line 5124
+        // line 5125
         vela_array * _t14 = vela_array_new(&vela_type_int, 1);
         int64_t _t15 = v_elem;
         vela_push(_t14, &_t15, sizeof(int64_t));
         vela_array * v_queue = _t14;
-        // line 5125
+        // line 5126
         vela_map * _t16 = vela_map_new(&vela_type_int, &vela_type_bool);
         vela_map * v_seen = _t16;
-        // line 5126
-        int64_t v_i = 0;
         // line 5127
+        int64_t v_i = 0;
+        // line 5128
         vela_unique_map(&v_seen);
         vela_unique(&v_queue);
         for (;;) {
@@ -55086,56 +55213,56 @@ void f_7checker_validate_fixed(t_7checker_Checker * v_c) {
             bool _t19 = _t17 < _t18;
             bool _t20 = _t19;
             if (!_t20) break;
-            // line 5128
+            // line 5129
             int64_t _t21 = *((int64_t *)v_queue->data + v_i);
             int64_t v_t = _t21;
-            // line 5128
+            // line 5129
             int64_t _t22 = v_i;
             int64_t _t23 = (_t22 + 1);
             v_i = _t23;
-            // line 5129
+            // line 5130
             int64_t _t24 = v_t;
             bool _t25 = _t24 == v_id;
             if (_t25) {
-                // line 5130
+                // line 5131
                 t_5types_TypeInfo _t26 = f_5types_get((*v_c).m_table, v_elem);
                 t_5types_TypeInfo v_info = _t26;
-                // line 5131
-                int64_t v_module = 0;
                 // line 5132
+                int64_t v_module = 0;
+                // line 5133
                 int64_t _t27 = (*v_c).m_modules->len;
                 int64_t _t28 = _t27;
                 for (int64_t _t29 = 0; _t29 < _t28; _t29++) {
                     int64_t v_m = _t29;
-                    // line 5132
-                    t_7modules_Module _t30 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:5132:58");
+                    // line 5133
+                    t_7modules_Module _t30 = *(t_7modules_Module *)vela_at((*v_c).m_modules, v_m, sizeof(t_7modules_Module), "compiler/src/checker.vl:5133:58");
                     bool _t31 = vela_str_eq(_t30.m_name, v_info.m_module);
                     if (_t31) {
-                        // line 5132
+                        // line 5133
                         v_module = v_m;
                     }
                 }
-                // line 5133
-                (*v_c).m_current = v_module;
                 // line 5134
+                (*v_c).m_current = v_module;
+                // line 5135
                 f_7checker_report(&(*v_c), v_info.m_line, v_info.m_col, VELA_STR("E3212", 5), VELA_STR("a fixed array cannot participate in a recursive by-value layout", 63));
                 vela_str_release(VELA_STR("a fixed array cannot participate in a recursive by-value layout", 63));
                 vela_str_release(VELA_STR("E3212", 5));
-                // line 5135
+                // line 5136
                 rc_release_t_5types_TypeInfo(v_info);
                 break;
             }
-            // line 5137
+            // line 5138
             int64_t _t33 = v_t;
             uint64_t _t34;
             bool *_t32 = vela_map_find_hashed(v_seen, &_t33, &_t34);
             vela_map *_t35 = v_seen;
             bool _t36 = _t32 != NULL;
             if (_t36) {
-                // line 5137
+                // line 5138
                 continue;
             }
-            // line 5138
+            // line 5139
             if (v_seen == _t35 && _t32) {
                 *_t32 = true;
             } else {
@@ -55143,42 +55270,42 @@ void f_7checker_validate_fixed(t_7checker_Checker * v_c) {
                 bool _t38 = true;
                 vela_map_set_found(v_seen, _t35, _t32, _t34, &_t37, &_t38);
             }
-            // line 5139
+            // line 5140
             t_5types_TypeInfo _t39 = f_5types_get((*v_c).m_table, v_t);
             t_5types_TypeInfo v_info_2 = _t39;
-            // line 5140
+            // line 5141
             t_5types_Tag _t40 = (t_5types_Tag){ .tag = t_5types_Tag_Struct };
             bool _t41 = v_info_2.m_tag.tag == _t40.tag;
             if (_t41) {
-                // line 5140
+                // line 5141
                 vela_array * _t43 = v_info_2.m_fields;
                 vela_array_retain(_t43);
                 vela_array * _t42 = _t43;
                 for (int64_t _t44 = 0; _t44 < _t42->len; _t44++) {
                     t_5types_FieldInfo v_field = ((t_5types_FieldInfo *)_t42->data)[_t44];
-                    // line 5140
+                    // line 5141
                     int64_t _t45 = v_field.m_ty;
                     vela_push(v_queue, &_t45, sizeof(int64_t));
                 }
                 vela_array_release(_t42);
             }
-            // line 5141
+            // line 5142
             t_5types_Tag _t46 = (t_5types_Tag){ .tag = t_5types_Tag_Enum };
             bool _t47 = v_info_2.m_tag.tag == _t46.tag;
             if (_t47) {
-                // line 5141
+                // line 5142
                 vela_array * _t49 = v_info_2.m_variants;
                 vela_array_retain(_t49);
                 vela_array * _t48 = _t49;
                 for (int64_t _t50 = 0; _t50 < _t48->len; _t50++) {
                     t_5types_Variant v_variant = ((t_5types_Variant *)_t48->data)[_t50];
-                    // line 5141
+                    // line 5142
                     vela_array * _t52 = v_variant.m_payload;
                     vela_array_retain(_t52);
                     vela_array * _t51 = _t52;
                     for (int64_t _t53 = 0; _t53 < _t51->len; _t53++) {
                         int64_t v_value = ((int64_t *)_t51->data)[_t53];
-                        // line 5141
+                        // line 5142
                         int64_t _t54 = v_value;
                         vela_push(v_queue, &_t54, sizeof(int64_t));
                     }
@@ -55196,7 +55323,7 @@ void f_7checker_validate_fixed(t_7checker_Checker * v_c) {
 /* vela: part */
 
 int64_t f_7checker_system_type(t_7checker_Checker * v_c, int64_t v_tag) {
-    // line 5147
+    // line 5148
     int64_t _t1;
     if (v_tag == 1) {
         int64_t _t2 = f_5types_INT();
@@ -55224,47 +55351,47 @@ int64_t f_7checker_system_type(t_7checker_Checker * v_c, int64_t v_tag) {
 /* vela: part */
 
 int64_t f_7checker_system_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vela_str v_name, vela_array * v_args) {
-    // line 5150
+    // line 5151
     vela_str _t1 = f_6sysops_effect(v_name);
     f_7checker_use_effect(&(*v_c), v_e, _t1, v_name);
     vela_str_release(_t1);
-    // line 5151
+    // line 5152
     vela_array * _t2 = f_6sysops_params(v_name);
     vela_array * v_ps = _t2;
-    // line 5152
+    // line 5153
     int64_t _t3 = v_ps->len;
     int64_t _t4 = v_args->len;
     bool _t5 = f_7checker_arity(&(*v_c), v_e, v_name, _t3, _t4);
     bool _t6 = !_t5;
     if (_t6) {
-        // line 5152
+        // line 5153
         vela_array * _t8 = v_args;
         vela_array_retain(_t8);
         vela_array * _t7 = _t8;
         for (int64_t _t9 = 0; _t9 < _t7->len; _t9++) {
             t_3ast_Expr v_arg = ((t_3ast_Expr *)_t7->data)[_t9];
-            // line 5152
+            // line 5153
             t_3ast_Expr _t10 = v_arg;
             rc_retain_t_3ast_Expr(_t10);
             int64_t _t11 = f_7checker_infer(&(*v_c), _t10);
             rc_release_t_3ast_Expr(_t10);
         }
         vela_array_release(_t7);
-        // line 5152
+        // line 5153
         int64_t _t12 = f_5types_ERROR();
         int64_t _t13 = _t12;
         vela_array_release(v_ps);
         return _t13;
     }
-    // line 5153
+    // line 5154
     int64_t _t14 = v_args->len;
     int64_t _t15 = _t14;
     for (int64_t _t16 = 0; _t16 < _t15; _t16++) {
         int64_t v_i = _t16;
-        // line 5153
-        t_3ast_Expr _t17 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5153:51");
+        // line 5154
+        t_3ast_Expr _t17 = *(t_3ast_Expr *)vela_at(v_args, v_i, sizeof(t_3ast_Expr), "compiler/src/checker.vl:5154:51");
         rc_retain_t_3ast_Expr(_t17);
-        int64_t _t18 = *(int64_t *)vela_at(v_ps, v_i, sizeof(int64_t), "compiler/src/checker.vl:5153:77");
+        int64_t _t18 = *(int64_t *)vela_at(v_ps, v_i, sizeof(int64_t), "compiler/src/checker.vl:5154:77");
         int64_t _t19 = f_7checker_system_type(&(*v_c), _t18);
         static const vela_str _t20[] = {VELA_STR_INIT("systems argument must be ", 25), {NULL, NULL, 0}, VELA_STR_INIT(", found ", 8)};
         vela_str _t21[3];
@@ -55280,7 +55407,7 @@ int64_t f_7checker_system_builtin(t_7checker_Checker * v_c, t_3ast_Expr v_e, vel
         rc_release_t_3ast_Expr(_t17);
         vela_str_release(_t24);
     }
-    // line 5154
+    // line 5155
     int64_t _t26 = f_6sysops_result(v_name);
     int64_t _t27 = f_7checker_system_type(&(*v_c), _t26);
     int64_t _t28 = f_5types_STR();
@@ -120443,7 +120570,7 @@ vela_array * f_8complete_type_members(t_7checker_Checked v_k, int64_t v_t, int64
 
 vela_array * f_11diagnostics_all(void) {
     // line 5
-    vela_array * _t1 = vela_array_new(vt_t_11diagnostics_Entry(), 272);
+    vela_array * _t1 = vela_array_new(vt_t_11diagnostics_Entry(), 276);
     t_11diagnostics_Entry _t2 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E6012", 5), .m_message = VELA_STR("Verification options or evidence are invalid.", 45), .m_help = VELA_STR("Use bounded opt-in verification; select a supported solver explicitly. Stale sources, targets or compiler identities require fresh evidence. Unknown results keep runtime checks; property testing is not proof.", 208) };
     t_11diagnostics_Entry _t3 = _t2;
     vela_push(_t1, &_t3, sizeof(t_11diagnostics_Entry));
@@ -120642,639 +120769,651 @@ vela_array * f_11diagnostics_all(void) {
     t_11diagnostics_Entry _t132 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E2025", 5), .m_message = VELA_STR("expected ',' or ')' in argument list{value}", 43), .m_help = VELA_STR("Correct the syntax at this position. Check delimiters, commas, names and the surrounding declaration; vela guide gives the accepted syntax.", 139) };
     t_11diagnostics_Entry _t133 = _t132;
     vela_push(_t1, &_t133, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t134 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3001", 5), .m_message = VELA_STR("the program has no main function; execution starts at fn main()", 63), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t134 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E2026", 5), .m_message = VELA_STR("interpolated string expression is missing '}'", 45), .m_help = VELA_STR("Close each {expression} of an f\"...\" string with '}' on the same line. Correct the syntax at this position. Check delimiters, commas, names and the surrounding declaration; vela guide gives the accepted syntax.", 210) };
     t_11diagnostics_Entry _t135 = _t134;
     vela_push(_t1, &_t135, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t136 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3002", 5), .m_message = VELA_STR("main must take no parameters and return nothing", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t136 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E2027", 5), .m_message = VELA_STR("expected '}' after interpolated expression", 42), .m_help = VELA_STR("A hole holds one expression: f\"{a + b}\", not several. Correct the syntax at this position. Check delimiters, commas, names and the surrounding declaration; vela guide gives the accepted syntax.", 193) };
     t_11diagnostics_Entry _t137 = _t136;
     vela_push(_t1, &_t137, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t138 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3003", 5), .m_message = VELA_STR("main cannot have type parameters", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t138 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E2028", 5), .m_message = VELA_STR("a '}' in an interpolated string is written '}}'", 47), .m_help = VELA_STR("In an f\"...\" string, '{{' and '}}' are literal braces, and a single '{' starts an expression. Correct the syntax at this position. Check delimiters, commas, names and the surrounding declaration; vela guide gives the accepted syntax.", 233) };
     t_11diagnostics_Entry _t139 = _t138;
     vela_push(_t1, &_t139, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t140 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3004", 5), .m_message = VELA_STR("{value} '{value}' has the same name as an imported module", 57), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t140 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3001", 5), .m_message = VELA_STR("the program has no main function; execution starts at fn main()", 63), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t141 = _t140;
     vela_push(_t1, &_t141, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t142 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3005", 5), .m_message = VELA_STR("'{value}' is a built-in type and cannot be redefined", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t142 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3002", 5), .m_message = VELA_STR("main must take no parameters and return nothing", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t143 = _t142;
     vela_push(_t1, &_t143, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t144 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3006", 5), .m_message = VELA_STR("type '{value}' is already defined at {value}:{value}", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t144 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3003", 5), .m_message = VELA_STR("main cannot have type parameters", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t145 = _t144;
     vela_push(_t1, &_t145, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t146 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3007", 5), .m_message = VELA_STR("type parameter '{value}' is declared twice", 42), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t146 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3004", 5), .m_message = VELA_STR("{value} '{value}' has the same name as an imported module", 57), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t147 = _t146;
     vela_push(_t1, &_t147, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t148 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3008", 5), .m_message = VELA_STR("type parameter '{value}' has the name of a built-in type", 56), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t148 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3005", 5), .m_message = VELA_STR("'{value}' is a built-in type and cannot be redefined", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t149 = _t148;
     vela_push(_t1, &_t149, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t150 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3009", 5), .m_message = VELA_STR("unknown interface bound '{value}'", 33), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t150 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3006", 5), .m_message = VELA_STR("type '{value}' is already defined at {value}:{value}", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t151 = _t150;
     vela_push(_t1, &_t151, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t152 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3010", 5), .m_message = VELA_STR("struct '{value}' needs at least one field", 41), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t152 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3007", 5), .m_message = VELA_STR("type parameter '{value}' is declared twice", 42), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t153 = _t152;
     vela_push(_t1, &_t153, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t154 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3011", 5), .m_message = VELA_STR("field '{value}' is already declared in '{value}'", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t154 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3008", 5), .m_message = VELA_STR("type parameter '{value}' has the name of a built-in type", 56), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t155 = _t154;
     vela_push(_t1, &_t155, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t156 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3012", 5), .m_message = VELA_STR("enum '{value}' needs at least one variant", 41), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t156 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3009", 5), .m_message = VELA_STR("unknown interface bound '{value}'", 33), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t157 = _t156;
     vela_push(_t1, &_t157, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t158 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3013", 5), .m_message = VELA_STR("variant '{value}' is already declared in '{value}'", 50), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t158 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3010", 5), .m_message = VELA_STR("struct '{value}' needs at least one field", 41), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t159 = _t158;
     vela_push(_t1, &_t159, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t160 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3014", 5), .m_message = VELA_STR("pub {value} uses the private type '{value}'; declare it with 'pub type {value}'", 79), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t160 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3011", 5), .m_message = VELA_STR("field '{value}' is already declared in '{value}'", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t161 = _t160;
     vela_push(_t1, &_t161, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t162 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3015", 5), .m_message = VELA_STR("unknown effect '{value}'; the effects are fs (the files module), os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), net (networking), clock (time), or the name of a parameter that is a function, for whatever that function uses", 278), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t162 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3012", 5), .m_message = VELA_STR("enum '{value}' needs at least one variant", 41), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t163 = _t162;
     vela_push(_t1, &_t163, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t164 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3016", 5), .m_message = VELA_STR("`uses {value}` names parameter '{value}', which is {value}, not a function", 74), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t164 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3013", 5), .m_message = VELA_STR("variant '{value}' is already declared in '{value}'", 50), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t165 = _t164;
     vela_push(_t1, &_t165, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t166 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3017", 5), .m_message = VELA_STR("`uses {value}` names a mut parameter; the function could put a function that uses anything in it", 96), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t166 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3014", 5), .m_message = VELA_STR("pub {value} uses the private type '{value}'; declare it with 'pub type {value}'", 79), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t167 = _t166;
     vela_push(_t1, &_t167, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t168 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3018", 5), .m_message = VELA_STR("`uses {value}` lets '{value}' use anything, but its type says what it uses; write one or the other", 98), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t168 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3015", 5), .m_message = VELA_STR("unknown effect '{value}'; the effects are fs (the files module), os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), net (networking), clock (time), or the name of a parameter that is a function, for whatever that function uses", 278), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t169 = _t168;
     vela_push(_t1, &_t169, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t170 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3019", 5), .m_message = VELA_STR("effect '{value}' is listed twice", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t170 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3016", 5), .m_message = VELA_STR("`uses {value}` names parameter '{value}', which is {value}, not a function", 74), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t171 = _t170;
     vela_push(_t1, &_t171, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t172 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3020", 5), .m_message = VELA_STR("'{value}' is a built-in function and cannot be redefined", 56), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t172 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3017", 5), .m_message = VELA_STR("`uses {value}` names a mut parameter; the function could put a function that uses anything in it", 96), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t173 = _t172;
     vela_push(_t1, &_t173, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t174 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3021", 5), .m_message = VELA_STR("function '{value}' is already defined at {value}:{value}", 56), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t174 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3018", 5), .m_message = VELA_STR("`uses {value}` lets '{value}' use anything, but its type says what it uses; write one or the other", 98), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t175 = _t174;
     vela_push(_t1, &_t175, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t176 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3022", 5), .m_message = VELA_STR("test {value} is already defined at {value}:{value}", 50), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t176 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3019", 5), .m_message = VELA_STR("effect '{value}' is listed twice", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t177 = _t176;
     vela_push(_t1, &_t177, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t178 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3023", 5), .m_message = VELA_STR("unknown effect '{value}' in a function type; its effects can be fs, os, unsafe, net and clock. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to", 192), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t178 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3020", 5), .m_message = VELA_STR("'{value}' is a built-in function and cannot be redefined", 56), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t179 = _t178;
     vela_push(_t1, &_t179, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t180 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3024", 5), .m_message = VELA_STR("type parameter '{value}' takes no type arguments", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t180 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3021", 5), .m_message = VELA_STR("function '{value}' is already defined at {value}:{value}", 56), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t181 = _t180;
     vela_push(_t1, &_t181, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t182 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3025", 5), .m_message = VELA_STR("{value} needs {value}type argument{value}, as in {value}", 56), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t182 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3022", 5), .m_message = VELA_STR("test {value} is already defined at {value}:{value}", 50), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t183 = _t182;
     vela_push(_t1, &_t183, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t184 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3026", 5), .m_message = VELA_STR("Map key {value} does not implement Key; {obligation}", 52), .m_help = VELA_STR("Key extends Eq: provide eq(Self, Self) -> Bool and hash(Self) -> u64 in the type's module. The diagnostic identifies the missing, private or mismatched method, including effects. Integers, Bool and Str have intrinsic implementations.", 233) };
+    t_11diagnostics_Entry _t184 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3023", 5), .m_message = VELA_STR("unknown effect '{value}' in a function type; its effects can be fs, os, unsafe, net and clock. For whatever a parameter f uses, write `uses f` after the signature of the function it belongs to", 192), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t185 = _t184;
     vela_push(_t1, &_t185, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t186 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3027", 5), .m_message = VELA_STR("unknown type '{value}'", 22), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t186 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3024", 5), .m_message = VELA_STR("type parameter '{value}' takes no type arguments", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t187 = _t186;
     vela_push(_t1, &_t187, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t188 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3028", 5), .m_message = VELA_STR("'{value}' takes no type arguments", 33), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t188 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3025", 5), .m_message = VELA_STR("{value} needs {value}type argument{value}, as in {value}", 56), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t189 = _t188;
     vela_push(_t1, &_t189, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t190 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3029", 5), .m_message = VELA_STR("'{value}' needs {value}type argument{value}, as in {value}[{value}]", 67), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t190 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3026", 5), .m_message = VELA_STR("Map key {value} does not implement Key; {obligation}", 52), .m_help = VELA_STR("Key extends Eq: provide eq(Self, Self) -> Bool and hash(Self) -> u64 in the type's module. The diagnostic identifies the missing, private or mismatched method, including effects. Integers, Bool and Str have intrinsic implementations.", 233) };
     t_11diagnostics_Entry _t191 = _t190;
     vela_push(_t1, &_t191, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t192 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3030", 5), .m_message = VELA_STR("'{value}' can only contain itself with its own type parameters, as in {value}[{value}]", 86), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t192 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3027", 5), .m_message = VELA_STR("unknown type '{value}'", 22), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t193 = _t192;
     vela_push(_t1, &_t193, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t194 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3031", 5), .m_message = VELA_STR("{owner} needs {parameter}: {bound}, but here {parameter} is {type}; {obligation}", 80), .m_help = VELA_STR("Implement the named interface and its parents in the type's module. Compare the expected and actual signatures and effects; a pure implementation may satisfy an effectful signature. Check visibility and generic method bounds.", 225) };
+    t_11diagnostics_Entry _t194 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3028", 5), .m_message = VELA_STR("'{value}' takes no type arguments", 33), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t195 = _t194;
     vela_push(_t1, &_t195, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t196 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3032", 5), .m_message = VELA_STR("parameter '{value}' is already declared", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t196 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3029", 5), .m_message = VELA_STR("'{value}' needs {value}type argument{value}, as in {value}[{value}]", 67), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t197 = _t196;
     vela_push(_t1, &_t197, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t198 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3033", 5), .m_message = VELA_STR("'{value}' has a parameter called 'result', which its ensures clauses cannot tell from the value it returns; rename the parameter", 128), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t198 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3030", 5), .m_message = VELA_STR("'{value}' can only contain itself with its own type parameters, as in {value}[{value}]", 86), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t199 = _t198;
     vela_push(_t1, &_t199, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t200 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3034", 5), .m_message = VELA_STR("missing return: '{value}' returns {value}, but the end of its body can be reached", 81), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t200 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3031", 5), .m_message = VELA_STR("{owner} needs {parameter}: {bound}, but here {parameter} is {type}; {obligation}", 80), .m_help = VELA_STR("Implement the named interface and its parents in the type's module. Compare the expected and actual signatures and effects; a pure implementation may satisfy an effectful signature. Check visibility and generic method bounds.", 225) };
     t_11diagnostics_Entry _t201 = _t200;
     vela_push(_t1, &_t201, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t202 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3035", 5), .m_message = VELA_STR("'{value}' uses whatever its parameter {value} uses, through {value}, but does not say so; add `uses {value}` after its signature", 128), .m_help = VELA_STR("Add the named function parameter to the uses clause. This forwards its effects to callers; for example, fn apply(f: fn() -> Int) -> Int uses f. The JSON diagnostic includes an edit.", 181) };
+    t_11diagnostics_Entry _t202 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3032", 5), .m_message = VELA_STR("parameter '{value}' is already declared", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t203 = _t202;
     vela_push(_t1, &_t203, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t204 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3036", 5), .m_message = VELA_STR("'{value}' uses {value}, through {value}, but does not say so; add `uses {value}` after its signature", 100), .m_help = VELA_STR("Declare the missing fs, os, net, clock or unsafe effect after the signature and before requires/ensures. Effects propagate: callers may also need an updated uses clause. Main and tests implicitly allow fs/os/net/clock; unsafe still needs a declaration or an audited unsafe block. The JSON diagnostic includes an edit.", 317) };
+    t_11diagnostics_Entry _t204 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3033", 5), .m_message = VELA_STR("'{value}' has a parameter called 'result', which its ensures clauses cannot tell from the value it returns; rename the parameter", 128), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t205 = _t204;
     vela_push(_t1, &_t205, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t206 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3037", 5), .m_message = VELA_STR("'with' cannot be used inside a function value; put the function value inside the 'with' instead", 95), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t206 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3034", 5), .m_message = VELA_STR("missing return: '{value}' returns {value}, but the end of its body can be reached", 81), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t207 = _t206;
     vela_push(_t1, &_t207, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t208 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3038", 5), .m_message = VELA_STR("'with' only works in tests, where it fakes files, args, env, stdin, stdout, clock, net or processes for the code the test calls", 127), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t208 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3035", 5), .m_message = VELA_STR("'{value}' uses whatever its parameter {value} uses, through {value}, but does not say so; add `uses {value}` after its signature", 128), .m_help = VELA_STR("Add the named function parameter to the uses clause. This forwards its effects to callers; for example, fn apply(f: fn() -> Int) -> Int uses f. The JSON diagnostic includes an edit.", 181) };
     t_11diagnostics_Entry _t209 = _t208;
     vela_push(_t1, &_t209, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t210 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3039", 5), .m_message = VELA_STR("'{value}' is faked twice in this 'with'", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t210 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3036", 5), .m_message = VELA_STR("'{value}' uses {value}, through {value}, but does not say so; add `uses {value}` after its signature", 100), .m_help = VELA_STR("Declare the missing fs, os, net, clock or unsafe effect after the signature and before requires/ensures. Effects propagate: callers may also need an updated uses clause. Main and tests implicitly allow fs/os/net/clock; unsafe still needs a declaration or an audited unsafe block. The JSON diagnostic includes an edit.", 317) };
     t_11diagnostics_Entry _t211 = _t210;
     vela_push(_t1, &_t211, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t212 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3040", 5), .m_message = VELA_STR("'with stdout' collects what is printed into a strings.Builder variable, written `stdout = mut out`", 98), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t212 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3037", 5), .m_message = VELA_STR("'with' cannot be used inside a function value; put the function value inside the 'with' instead", 95), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t213 = _t212;
     vela_push(_t1, &_t213, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t214 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3041", 5), .m_message = VELA_STR("'with stdout' needs a strings.Builder to collect what is printed, found {value}", 79), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t214 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3038", 5), .m_message = VELA_STR("'with' only works in tests, where it fakes files, args, env, stdin, stdout, clock, net or processes for the code the test calls", 127), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t215 = _t214;
     vela_push(_t1, &_t215, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t216 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3042", 5), .m_message = VELA_STR("'with' cannot fake '{value}'; it fakes files, args, env, stdin, stdout, clock, net and processes", 96), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t216 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3039", 5), .m_message = VELA_STR("'{value}' is faked twice in this 'with'", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t217 = _t216;
     vela_push(_t1, &_t217, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t218 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3043", 5), .m_message = VELA_STR("'{value}' is a variant of {value} and cannot be used as a name", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t218 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3040", 5), .m_message = VELA_STR("'with stdout' collects what is printed into a strings.Builder variable, written `stdout = mut out`", 98), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t219 = _t218;
     vela_push(_t1, &_t219, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t220 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3044", 5), .m_message = VELA_STR("'{value}' is a type, not a module", 33), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t220 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3041", 5), .m_message = VELA_STR("'with stdout' needs a strings.Builder to collect what is printed, found {value}", 79), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t221 = _t220;
     vela_push(_t1, &_t221, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t222 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3045", 5), .m_message = VELA_STR("unknown module '{value}'; is `import {value}` missing\?", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t222 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3042", 5), .m_message = VELA_STR("'with' cannot fake '{value}'; it fakes files, args, env, stdin, stdout, clock, net and processes", 96), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t223 = _t222;
     vela_push(_t1, &_t223, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t224 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3046", 5), .m_message = VELA_STR("'{value}.{value}' is a function, not a type", 43), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t224 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3043", 5), .m_message = VELA_STR("'{value}' is a variant of {value} and cannot be used as a name", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t225 = _t224;
     vela_push(_t1, &_t225, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t226 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3047", 5), .m_message = VELA_STR("module '{value}' has no type '{value}'", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t226 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3044", 5), .m_message = VELA_STR("'{value}' is a type, not a module", 33), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t227 = _t226;
     vela_push(_t1, &_t227, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t228 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3048", 5), .m_message = VELA_STR("'{value}.{value}' is a type, not a function", 43), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t228 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3045", 5), .m_message = VELA_STR("unknown module '{value}'; is `import {value}` missing\?", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t229 = _t228;
     vela_push(_t1, &_t229, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t230 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3049", 5), .m_message = VELA_STR("module '{value}' has no function '{value}'", 42), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t230 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3046", 5), .m_message = VELA_STR("'{value}.{value}' is a function, not a type", 43), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t231 = _t230;
     vela_push(_t1, &_t231, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t232 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3050", 5), .m_message = VELA_STR("{value} '{value}' is private to module '{value}'; declare it with 'pub' in {value} to use it here", 97), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t232 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3047", 5), .m_message = VELA_STR("module '{value}' has no type '{value}'", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t233 = _t232;
     vela_push(_t1, &_t233, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t234 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3051", 5), .m_message = VELA_STR("this value is not used; only a call can stand alone as a statement", 66), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t234 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3048", 5), .m_message = VELA_STR("'{value}.{value}' is a type, not a function", 43), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t235 = _t234;
     vela_push(_t1, &_t235, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t236 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3052", 5), .m_message = VELA_STR("a map cannot be looped over directly; loop over maps.keys(m) instead", 68), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t236 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3049", 5), .m_message = VELA_STR("module '{value}' has no function '{value}'", 42), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t237 = _t236;
     vela_push(_t1, &_t237, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t238 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3053", 5), .m_message = VELA_STR("cannot loop over {value}; 'for ... in' needs an array, a Str or a range", 71), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t238 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3050", 5), .m_message = VELA_STR("{value} '{value}' is private to module '{value}'; declare it with 'pub' in {value} to use it here", 97), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t239 = _t238;
     vela_push(_t1, &_t239, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t240 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3054", 5), .m_message = VELA_STR("'{value}' is only allowed inside a loop", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t240 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3051", 5), .m_message = VELA_STR("this value is not used; only a call can stand alone as a statement", 66), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t241 = _t240;
     vela_push(_t1, &_t241, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t242 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3055", 5), .m_message = VELA_STR("'{value}' is already declared in this block, at {value}:{value}", 63), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t242 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3052", 5), .m_message = VELA_STR("a map cannot be looped over directly; loop over maps.keys(m) instead", 68), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t243 = _t242;
     vela_push(_t1, &_t243, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t244 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3056", 5), .m_message = VELA_STR("cannot assign to function '{value}'", 35), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t244 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3053", 5), .m_message = VELA_STR("cannot loop over {value}; 'for ... in' needs an array, a Str or a range", 71), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t245 = _t244;
     vela_push(_t1, &_t245, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t246 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3057", 5), .m_message = VELA_STR("only a variable, or a field or element of one, can be changed", 61), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t246 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3054", 5), .m_message = VELA_STR("'{value}' is only allowed inside a loop", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t247 = _t246;
     vela_push(_t1, &_t247, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t248 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3058", 5), .m_message = VELA_STR("a variant cannot be assigned to", 31), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t248 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3055", 5), .m_message = VELA_STR("'{value}' is already declared in this block, at {value}:{value}", 63), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t249 = _t248;
     vela_push(_t1, &_t249, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t250 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3059", 5), .m_message = VELA_STR("a Str cannot be changed; build a new one instead, for example with +", 68), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t250 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3056", 5), .m_message = VELA_STR("cannot assign to function '{value}'", 35), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t251 = _t250;
     vela_push(_t1, &_t251, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t252 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3060", 5), .m_message = VELA_STR("cannot {value} '{value}' inside a function value: it has its own copy of '{value}', made when it was created, and changes to the copy would be lost", 147), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t252 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3057", 5), .m_message = VELA_STR("only a variable, or a field or element of one, can be changed", 61), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t253 = _t252;
     vela_push(_t1, &_t253, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t254 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3061", 5), .m_message = VELA_STR("cannot {value} {value}'{value}', which was declared with 'let'; use 'let mut' to allow changes", 94), .m_help = VELA_STR("Use let mut for this local if the change is intended. Values are copies: changing this local still does not change a caller or another copy. The JSON diagnostic points to the declaration.", 187) };
+    t_11diagnostics_Entry _t254 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3058", 5), .m_message = VELA_STR("a variant cannot be assigned to", 31), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t255 = _t254;
     vela_push(_t1, &_t255, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t256 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3062", 5), .m_message = VELA_STR("cannot {value} {value}parameter '{value}'; declare it as `{value}: mut {value}` to change the caller's value, or copy it into a `let mut`", 137), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t256 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3059", 5), .m_message = VELA_STR("a Str cannot be changed; build a new one instead, for example with +", 68), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t257 = _t256;
     vela_push(_t1, &_t257, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t258 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3063", 5), .m_message = VELA_STR("cannot {value} {value} '{value}'", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t258 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3060", 5), .m_message = VELA_STR("cannot {value} '{value}' inside a function value: it has its own copy of '{value}', made when it was created, and changes to the copy would be lost", 147), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t259 = _t258;
     vela_push(_t1, &_t259, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t260 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3064", 5), .m_message = VELA_STR("'{value}' returns {value}, so 'return' needs a value", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t260 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3061", 5), .m_message = VELA_STR("cannot {value} {value}'{value}', which was declared with 'let'; use 'let mut' to allow changes", 94), .m_help = VELA_STR("Use let mut for this local if the change is intended. Values are copies: changing this local still does not change a caller or another copy. The JSON diagnostic points to the declaration.", 187) };
     t_11diagnostics_Entry _t261 = _t260;
     vela_push(_t1, &_t261, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t262 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3065", 5), .m_message = VELA_STR("'{value}' does not return a value, so 'return' cannot have one", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t262 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3062", 5), .m_message = VELA_STR("cannot {value} {value}parameter '{value}'; declare it as `{value}: mut {value}` to change the caller's value, or copy it into a `let mut`", 137), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t263 = _t262;
     vela_push(_t1, &_t263, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t264 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3066", 5), .m_message = VELA_STR("this arm can never match: the arms above it cover every value it would", 70), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t264 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3063", 5), .m_message = VELA_STR("cannot {value} {value} '{value}'", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t265 = _t264;
     vela_push(_t1, &_t265, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t266 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3067", 5), .m_message = VELA_STR("match is not exhaustive: add a '_' arm for the {value} values not listed", 72), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t266 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3064", 5), .m_message = VELA_STR("'{value}' returns {value}, so 'return' needs a value", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t267 = _t266;
     vela_push(_t1, &_t267, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t268 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3068", 5), .m_message = VELA_STR("match is not exhaustive: {value} is not covered", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t268 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3065", 5), .m_message = VELA_STR("'{value}' does not return a value, so 'return' cannot have one", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t269 = _t268;
     vela_push(_t1, &_t269, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t270 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3069", 5), .m_message = VELA_STR("'{value}' is bound twice in this pattern", 40), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t270 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3066", 5), .m_message = VELA_STR("this arm can never match: the arms above it cover every value it would", 70), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t271 = _t270;
     vela_push(_t1, &_t271, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t272 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3070", 5), .m_message = VELA_STR("a range pattern matches Int or Byte values, but the value being matched is {value}", 82), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t272 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3067", 5), .m_message = VELA_STR("match is not exhaustive: add a '_' arm for the {value} values not listed", 72), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t273 = _t272;
     vela_push(_t1, &_t273, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t274 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3071", 5), .m_message = VELA_STR("this range is empty: {value} is greater than {value}", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t274 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3068", 5), .m_message = VELA_STR("match is not exhaustive: {value} is not covered", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t275 = _t274;
     vela_push(_t1, &_t275, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t276 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3072", 5), .m_message = VELA_STR("pattern {value} matches {value} values, but the value being matched is {value}", 78), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t276 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3069", 5), .m_message = VELA_STR("'{value}' is bound twice in this pattern", 40), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t277 = _t276;
     vela_push(_t1, &_t277, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t278 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3073", 5), .m_message = VELA_STR("unknown type '{value}'", 22), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t278 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3070", 5), .m_message = VELA_STR("a range pattern matches Int or Byte values, but the value being matched is {value}", 82), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t279 = _t278;
     vela_push(_t1, &_t279, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t280 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3074", 5), .m_message = VELA_STR("'{value}' is a struct, not an enum; match on its fields instead", 63), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t280 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3071", 5), .m_message = VELA_STR("this range is empty: {value} is greater than {value}", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t281 = _t280;
     vela_push(_t1, &_t281, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t282 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3075", 5), .m_message = VELA_STR("pattern {value} matches {value} values, but the value being matched is {value}", 78), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t282 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3072", 5), .m_message = VELA_STR("pattern {value} matches {value} values, but the value being matched is {value}", 78), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t283 = _t282;
     vela_push(_t1, &_t283, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t284 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3076", 5), .m_message = VELA_STR("'{value}' has no variant '{value}'", 34), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t284 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3073", 5), .m_message = VELA_STR("unknown type '{value}'", 22), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t285 = _t284;
     vela_push(_t1, &_t285, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t286 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3077", 5), .m_message = VELA_STR("{value} carries {value}value{value}; write {value}({value}) to ignore {value}", 77), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t286 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3074", 5), .m_message = VELA_STR("'{value}' is a struct, not an enum; match on its fields instead", 63), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t287 = _t286;
     vela_push(_t1, &_t287, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t288 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3078", 5), .m_message = VELA_STR("{value} carries no values; write it without parentheses", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t288 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3075", 5), .m_message = VELA_STR("pattern {value} matches {value} values, but the value being matched is {value}", 78), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t289 = _t288;
     vela_push(_t1, &_t289, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t290 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3079", 5), .m_message = VELA_STR("{value} carries {value}value{value}, but this pattern has {value}", 65), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t290 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3076", 5), .m_message = VELA_STR("'{value}' has no variant '{value}'", 34), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t291 = _t290;
     vela_push(_t1, &_t291, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t292 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3080", 5), .m_message = VELA_STR("{value} does not fit in a Byte (0 to 255)", 41), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t292 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3077", 5), .m_message = VELA_STR("{value} carries {value}value{value}; write {value}({value}) to ignore {value}", 77), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t293 = _t292;
     vela_push(_t1, &_t293, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t294 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3081", 5), .m_message = VELA_STR("this pattern is {value}, but the value being matched is {value}", 63), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t294 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3078", 5), .m_message = VELA_STR("{value} carries no values; write it without parentheses", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t295 = _t294;
     vela_push(_t1, &_t295, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t296 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3082", 5), .m_message = VELA_STR("'{value}' is a module, not a value", 34), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t296 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3079", 5), .m_message = VELA_STR("{value} carries {value}value{value}, but this pattern has {value}", 65), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t297 = _t296;
     vela_push(_t1, &_t297, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t298 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3083", 5), .m_message = VELA_STR("'{value}' is a function; call it as {value}(...)", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t298 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3080", 5), .m_message = VELA_STR("{value} does not fit in a Byte (0 to 255)", 41), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t299 = _t298;
     vela_push(_t1, &_t299, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t300 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3084", 5), .m_message = VELA_STR("cannot tell which Option this None is; give it a type, as in `let x: Option[Int] = None`", 88), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t300 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3081", 5), .m_message = VELA_STR("this pattern is {value}, but the value being matched is {value}", 63), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t301 = _t300;
     vela_push(_t1, &_t301, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t302 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3085", 5), .m_message = VELA_STR("{value} carries a value; write {value}(...)", 43), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t302 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3082", 5), .m_message = VELA_STR("'{value}' is a module, not a value", 34), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t303 = _t302;
     vela_push(_t1, &_t303, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t304 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3086", 5), .m_message = VELA_STR("'{value}' is a type, not a value", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t304 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3083", 5), .m_message = VELA_STR("'{value}' is a function; call it as {value}(...)", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t305 = _t304;
     vela_push(_t1, &_t305, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t306 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3087", 5), .m_message = VELA_STR("undefined name '{value}'{value}", 31), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t306 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3084", 5), .m_message = VELA_STR("cannot tell which Option this None is; give it a type, as in `let x: Option[Int] = None`", 88), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t307 = _t306;
     vela_push(_t1, &_t307, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t308 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3088", 5), .m_message = VELA_STR("{value}None{value}", 18), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t308 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3085", 5), .m_message = VELA_STR("{value} carries a value; write {value}(...)", 43), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t309 = _t308;
     vela_push(_t1, &_t309, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t310 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3089", 5), .m_message = VELA_STR("{value}(...){value}", 19), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t310 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3086", 5), .m_message = VELA_STR("'{value}' is a type, not a value", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t311 = _t310;
     vela_push(_t1, &_t311, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t312 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3090", 5), .m_message = VELA_STR("{value} does not fit in a Byte (0 to 255)", 41), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t312 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3087", 5), .m_message = VELA_STR("undefined name '{value}'{value}", 31), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t313 = _t312;
     vela_push(_t1, &_t313, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t314 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3091", 5), .m_message = VELA_STR("{value}an array{value}", 22), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t314 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3088", 5), .m_message = VELA_STR("{value}None{value}", 18), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t315 = _t314;
     vela_push(_t1, &_t315, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t316 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3092", 5), .m_message = VELA_STR("{value}a map{value}", 19), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t316 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3089", 5), .m_message = VELA_STR("{value}(...){value}", 19), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t317 = _t316;
     vela_push(_t1, &_t317, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t318 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3093", 5), .m_message = VELA_STR("The expression has a different type from the one required by its context.", 73), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t318 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3090", 5), .m_message = VELA_STR("{value} does not fit in a Byte (0 to 255)", 41), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t319 = _t318;
     vela_push(_t1, &_t319, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t320 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3094", 5), .m_message = VELA_STR("{value}(...) does not produce a value", 37), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t320 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3091", 5), .m_message = VELA_STR("{value}an array{value}", 22), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t321 = _t320;
     vela_push(_t1, &_t321, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t322 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3095", 5), .m_message = VELA_STR("operator '{value}' needs {value}, found {value}", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t322 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3092", 5), .m_message = VELA_STR("{value}a map{value}", 19), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t323 = _t322;
     vela_push(_t1, &_t323, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t324 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3096", 5), .m_message = VELA_STR("`mut` only goes before an argument for a mut parameter", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t324 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3093", 5), .m_message = VELA_STR("The expression has a different type from the one required by its context.", 73), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t325 = _t324;
     vela_push(_t1, &_t325, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t326 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3097", 5), .m_message = VELA_STR("cannot compare {value} with {value}", 35), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t326 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3094", 5), .m_message = VELA_STR("{value}(...) does not produce a value", 37), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t327 = _t326;
     vela_push(_t1, &_t327, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t328 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3098", 5), .m_message = VELA_STR("{value} values cannot be compared with '{value}'; declare the type parameter as `{value}: Eq`", 93), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t328 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3095", 5), .m_message = VELA_STR("operator '{value}' needs {value}, found {value}", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t329 = _t328;
     vela_push(_t1, &_t329, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t330 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3099", 5), .m_message = VELA_STR("{value} values cannot be compared with '{value}'; use match, or compare their fields", 84), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t330 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3096", 5), .m_message = VELA_STR("`mut` only goes before an argument for a mut parameter", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t331 = _t330;
     vela_push(_t1, &_t331, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t332 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3100", 5), .m_message = VELA_STR("operator '{value}' needs Bool operands, found {value} and {value}", 65), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t332 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3097", 5), .m_message = VELA_STR("cannot compare {value} with {value}", 35), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t333 = _t332;
     vela_push(_t1, &_t333, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t334 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3101", 5), .m_message = VELA_STR("operator '+' joins two Strs, found {value} and {value}", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t334 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3098", 5), .m_message = VELA_STR("{value} values cannot be compared with '{value}'; declare the type parameter as `{value}: Eq`", 93), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t335 = _t334;
     vela_push(_t1, &_t335, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t336 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3102", 5), .m_message = VELA_STR("operator '%' needs Int operands; a Float has no remainder", 57), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t336 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3099", 5), .m_message = VELA_STR("{value} values cannot be compared with '{value}'; use match, or compare their fields", 84), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t337 = _t336;
     vela_push(_t1, &_t337, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t338 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3103", 5), .m_message = VELA_STR("operator '{value}' needs two Floats or two Ints, found {value} and {value}; convert with float() or int()", 105), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t338 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3100", 5), .m_message = VELA_STR("operator '{value}' needs Bool operands, found {value} and {value}", 65), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t339 = _t338;
     vela_push(_t1, &_t339, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t340 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3104", 5), .m_message = VELA_STR("operator '{value}' needs two Bytes or two Ints, found {value} and {value}; convert with int() or byte()", 103), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t340 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3101", 5), .m_message = VELA_STR("operator '+' joins two Strs, found {value} and {value}", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t341 = _t340;
     vela_push(_t1, &_t341, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t342 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3105", 5), .m_message = VELA_STR("operator '{value}' needs values that can be ordered; declare the type parameter as `{value}: Ord`", 97), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t342 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3102", 5), .m_message = VELA_STR("operator '%' needs Int operands; a Float has no remainder", 57), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t343 = _t342;
     vela_push(_t1, &_t343, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t344 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3106", 5), .m_message = VELA_STR("operator '{value}' needs matching integers, Floats or Strs, found {value} and {value}", 85), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t344 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3103", 5), .m_message = VELA_STR("operator '{value}' needs two Floats or two Ints, found {value} and {value}; convert with float() or int()", 105), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t345 = _t344;
     vela_push(_t1, &_t345, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t346 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3107", 5), .m_message = VELA_STR("operator '{value}' needs Int operands, found {value} and {value}", 64), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t346 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3104", 5), .m_message = VELA_STR("operator '{value}' needs two Bytes or two Ints, found {value} and {value}; convert with int() or byte()", 103), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t347 = _t346;
     vela_push(_t1, &_t347, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t348 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3108", 5), .m_message = VELA_STR("{value} cannot be indexed; only arrays, Strs and maps can", 57), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t348 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3105", 5), .m_message = VELA_STR("operator '{value}' needs values that can be ordered; declare the type parameter as `{value}: Ord`", 97), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t349 = _t348;
     vela_push(_t1, &_t349, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t350 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3109", 5), .m_message = VELA_STR("'\?' needs a Result or an Option, found {value}", 46), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t350 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3106", 5), .m_message = VELA_STR("operator '{value}' needs matching integers, Floats or Strs, found {value} and {value}", 85), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t351 = _t350;
     vela_push(_t1, &_t351, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t352 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3110", 5), .m_message = VELA_STR("'\?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... }", 99), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t352 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3107", 5), .m_message = VELA_STR("operator '{value}' needs Int operands, found {value} and {value}", 64), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t353 = _t352;
     vela_push(_t1, &_t353, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t354 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3111", 5), .m_message = VELA_STR("'\?' returns {value} from '{value}', so '{value}' must return {value}, but it {value}", 84), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t354 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3108", 5), .m_message = VELA_STR("{value} cannot be indexed; only arrays, Strs and maps can", 57), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t355 = _t354;
     vela_push(_t1, &_t355, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t356 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3112", 5), .m_message = VELA_STR("'\?' would return this {value}'s error, which is {value}, but '{value}' returns {value}", 86), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t356 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3109", 5), .m_message = VELA_STR("'\?' needs a Result or an Option, found {value}", 46), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t357 = _t356;
     vela_push(_t1, &_t357, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t358 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3113", 5), .m_message = VELA_STR("{value} cannot be sliced; only arrays and Strs can", 50), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t358 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3110", 5), .m_message = VELA_STR("'\?' in a function value needs its result type written, as in fn(x: Str) -> Result[Int, Str] { ... }", 99), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t359 = _t358;
     vela_push(_t1, &_t359, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t360 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3114", 5), .m_message = VELA_STR("cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`", 74), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t360 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3111", 5), .m_message = VELA_STR("'\?' returns {value} from '{value}', so '{value}' must return {value}, but it {value}", 84), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t361 = _t360;
     vela_push(_t1, &_t361, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t362 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3115", 5), .m_message = VELA_STR("cannot tell what this [:] holds; give it a type, as in `let m: Map[Str, Int] = [:]`", 83), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t362 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3112", 5), .m_message = VELA_STR("'\?' would return this {value}'s error, which is {value}, but '{value}' returns {value}", 86), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t363 = _t362;
     vela_push(_t1, &_t363, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t364 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3116", 5), .m_message = VELA_STR("Map key {value} does not implement Key; {obligation}", 52), .m_help = VELA_STR("A map literal needs Key keys, including Eq's eq(Self, Self) -> Bool and hash(Self) -> u64. Follow the failed obligation in the diagnostic. Integers, Bool and Str have intrinsic implementations.", 193) };
+    t_11diagnostics_Entry _t364 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3113", 5), .m_message = VELA_STR("{value} cannot be sliced; only arrays and Strs can", 50), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t365 = _t364;
     vela_push(_t1, &_t365, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t366 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3117", 5), .m_message = VELA_STR("'{value}.{value}' is a type, not a value", 40), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t366 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3114", 5), .m_message = VELA_STR("cannot tell what this [] holds; give it a type, as in `let xs: [Int] = []`", 74), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t367 = _t366;
     vela_push(_t1, &_t367, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t368 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3118", 5), .m_message = VELA_STR("'{value}.{value}' is a built-in function, which cannot be used as a value; wrap it in a function of your own", 108), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t368 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3115", 5), .m_message = VELA_STR("cannot tell what this [:] holds; give it a type, as in `let m: Map[Str, Int] = [:]`", 83), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t369 = _t368;
     vela_push(_t1, &_t369, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t370 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3119", 5), .m_message = VELA_STR("module '{value}' has no '{value}'", 33), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t370 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3116", 5), .m_message = VELA_STR("Map key {value} does not implement Key; {obligation}", 52), .m_help = VELA_STR("A map literal needs Key keys, including Eq's eq(Self, Self) -> Bool and hash(Self) -> u64. Follow the failed obligation in the diagnostic. Integers, Bool and Str have intrinsic implementations.", 193) };
     t_11diagnostics_Entry _t371 = _t370;
     vela_push(_t1, &_t371, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t372 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3120", 5), .m_message = VELA_STR("'{value}' has no variant '{value}'", 34), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t372 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3117", 5), .m_message = VELA_STR("'{value}.{value}' is a type, not a value", 40), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t373 = _t372;
     vela_push(_t1, &_t373, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t374 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3121", 5), .m_message = VELA_STR("{value}.{value} carries {value}value{value}; write {value}.{value}(...)", 71), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t374 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3118", 5), .m_message = VELA_STR("'{value}.{value}' is a built-in function, which cannot be used as a value; wrap it in a function of your own", 108), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t375 = _t374;
     vela_push(_t1, &_t375, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t376 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3122", 5), .m_message = VELA_STR("cannot tell which {value} this {value}.{value} is; give it a type, as in `let x: {value}[{value}] = {value}.{value}`", 116), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t376 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3119", 5), .m_message = VELA_STR("module '{value}' has no '{value}'", 33), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t377 = _t376;
     vela_push(_t1, &_t377, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t378 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3123", 5), .m_message = VELA_STR("{value} has no fields{value}", 28), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t378 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3120", 5), .m_message = VELA_STR("'{value}' has no variant '{value}'", 34), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t379 = _t378;
     vela_push(_t1, &_t379, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t380 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3124", 5), .m_message = VELA_STR("'{value}' has no field '{value}'", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t380 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3121", 5), .m_message = VELA_STR("{value}.{value} carries {value}value{value}; write {value}.{value}(...)", 71), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t381 = _t380;
     vela_push(_t1, &_t381, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t382 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3125", 5), .m_message = VELA_STR("unknown type '{value}'", 22), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t382 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3122", 5), .m_message = VELA_STR("cannot tell which {value} this {value}.{value} is; give it a type, as in `let x: {value}[{value}] = {value}.{value}`", 116), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t383 = _t382;
     vela_push(_t1, &_t383, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t384 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3126", 5), .m_message = VELA_STR("'{value}' is an enum; build its values with {value}.Variant", 59), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t384 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3123", 5), .m_message = VELA_STR("{value} has no fields{value}", 28), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t385 = _t384;
     vela_push(_t1, &_t385, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t386 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3127", 5), .m_message = VELA_STR("field '{value}' is given twice", 30), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t386 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3124", 5), .m_message = VELA_STR("'{value}' has no field '{value}'", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t387 = _t386;
     vela_push(_t1, &_t387, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t388 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3128", 5), .m_message = VELA_STR("'{value}' has no field '{value}'", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t388 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3125", 5), .m_message = VELA_STR("unknown type '{value}'", 22), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t389 = _t388;
     vela_push(_t1, &_t389, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t390 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3129", 5), .m_message = VELA_STR("missing {value} {value} in this '{value}' value", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t390 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3126", 5), .m_message = VELA_STR("'{value}' is an enum; build its values with {value}.Variant", 59), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t391 = _t390;
     vela_push(_t1, &_t391, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t392 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3130", 5), .m_message = VELA_STR("field '{value}' is given twice", 30), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t392 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3127", 5), .m_message = VELA_STR("field '{value}' is given twice", 30), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t393 = _t392;
     vela_push(_t1, &_t393, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t394 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3131", 5), .m_message = VELA_STR("'{value}' has no field '{value}'", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t394 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3128", 5), .m_message = VELA_STR("'{value}' has no field '{value}'", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t395 = _t394;
     vela_push(_t1, &_t395, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t396 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3132", 5), .m_message = VELA_STR("missing {value} in this '{value}' value", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t396 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3129", 5), .m_message = VELA_STR("missing {value} {value} in this '{value}' value", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t397 = _t396;
     vela_push(_t1, &_t397, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t398 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3133", 5), .m_message = VELA_STR("{value} must be {value}, found {value}", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t398 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3130", 5), .m_message = VELA_STR("field '{value}' is given twice", 30), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t399 = _t398;
     vela_push(_t1, &_t399, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t400 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3134", 5), .m_message = VELA_STR("{value} is not a mut parameter; remove `mut`", 44), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t400 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3131", 5), .m_message = VELA_STR("'{value}' has no field '{value}'", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t401 = _t400;
     vela_push(_t1, &_t401, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t402 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3135", 5), .m_message = VELA_STR("{value} must be {value}, found {value}", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t402 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3132", 5), .m_message = VELA_STR("missing {value} in this '{value}' value", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t403 = _t402;
     vela_push(_t1, &_t403, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t404 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3136", 5), .m_message = VELA_STR("{value} must be {value}, found {value}", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t404 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3133", 5), .m_message = VELA_STR("{value} must be {value}, found {value}", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t405 = _t404;
     vela_push(_t1, &_t405, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t406 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3137", 5), .m_message = VELA_STR("cannot tell what {value} is {value}", 35), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t406 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3134", 5), .m_message = VELA_STR("{value} is not a mut parameter; remove `mut`", 44), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t407 = _t406;
     vela_push(_t1, &_t407, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t408 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3138", 5), .m_message = VELA_STR("{value}, but the call changes '{value}' through `mut` in argument {value}, and the copy will not show it; pass only the part the call needs", 139), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t408 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3135", 5), .m_message = VELA_STR("{value} must be {value}, found {value}", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t409 = _t408;
     vela_push(_t1, &_t409, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t410 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3139", 5), .m_message = VELA_STR("{value} made before argument {value} changes '{value}' through `mut`, so it has the old value; make the change in a statement before this call", 142), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t410 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3136", 5), .m_message = VELA_STR("{value} must be {value}, found {value}", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t411 = _t410;
     vela_push(_t1, &_t411, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t412 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3140", 5), .m_message = VELA_STR("cannot tell which Result this {value}(...) is; give it a type, as in `let r: Result[Int, Str] = {value}(...)`", 109), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t412 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3137", 5), .m_message = VELA_STR("cannot tell what {value} is {value}", 35), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t413 = _t412;
     vela_push(_t1, &_t413, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t414 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3141", 5), .m_message = VELA_STR("argument {value} of '{value}' is not a mut parameter; remove `mut`", 66), .m_help = VELA_STR("Remove mut at this call site; this parameter takes a value copy. A read-only function parameter cannot change the caller's value.", 129) };
+    t_11diagnostics_Entry _t414 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3138", 5), .m_message = VELA_STR("{value}, but the call changes '{value}' through `mut` in argument {value}, and the copy will not show it; pass only the part the call needs", 139), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t415 = _t414;
     vela_push(_t1, &_t415, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t416 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3142", 5), .m_message = VELA_STR("{value} must be {value}, found {value}", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t416 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3139", 5), .m_message = VELA_STR("{value} made before argument {value} changes '{value}' through `mut`, so it has the old value; make the change in a statement before this call", 142), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t417 = _t416;
     vela_push(_t1, &_t417, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t418 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3143", 5), .m_message = VELA_STR("{value} is changed by the call; write `mut` before it", 53), .m_help = VELA_STR("Write mut before this argument and ensure its underlying local or parameter is mutable. For example push(mut xs, value). The JSON diagnostic includes an edit for a writable expression.", 184) };
+    t_11diagnostics_Entry _t418 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3140", 5), .m_message = VELA_STR("cannot tell which Result this {value}(...) is; give it a type, as in `let r: Result[Int, Str] = {value}(...)`", 109), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t419 = _t418;
     vela_push(_t1, &_t419, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t420 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3144", 5), .m_message = VELA_STR("'{value}' is passed as mut twice in this call", 45), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t420 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3141", 5), .m_message = VELA_STR("argument {value} of '{value}' is not a mut parameter; remove `mut`", 66), .m_help = VELA_STR("Remove mut at this call site; this parameter takes a value copy. A read-only function parameter cannot change the caller's value.", 129) };
     t_11diagnostics_Entry _t421 = _t420;
     vela_push(_t1, &_t421, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t422 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3145", 5), .m_message = VELA_STR("'{value}' calls itself with {value} for {value}; a generic function can only call itself with its own type parameters", 117), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t422 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3142", 5), .m_message = VELA_STR("{value} must be {value}, found {value}", 38), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t423 = _t422;
     vela_push(_t1, &_t423, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t424 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3146", 5), .m_message = VELA_STR("{value} carries no values; write it without parentheses", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t424 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3143", 5), .m_message = VELA_STR("{value} is changed by the call; write `mut` before it", 53), .m_help = VELA_STR("Write mut before this argument and ensure its underlying local or parameter is mutable. For example push(mut xs, value). The JSON diagnostic includes an edit for a writable expression.", 184) };
     t_11diagnostics_Entry _t425 = _t424;
     vela_push(_t1, &_t425, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t426 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3147", 5), .m_message = VELA_STR("{value} carries {value}value{value}, got {value}", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t426 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3144", 5), .m_message = VELA_STR("'{value}' is passed as mut twice in this call", 45), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t427 = _t426;
     vela_push(_t1, &_t427, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t428 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3148", 5), .m_message = VELA_STR("{value} carries no values; write it without parentheses", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t428 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3145", 5), .m_message = VELA_STR("'{value}' calls itself with {value} for {value}; a generic function can only call itself with its own type parameters", 117), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t429 = _t428;
     vela_push(_t1, &_t429, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t430 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3149", 5), .m_message = VELA_STR("{value} carries {value}value{value}, got {value}", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t430 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3146", 5), .m_message = VELA_STR("{value} carries no values; write it without parentheses", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t431 = _t430;
     vela_push(_t1, &_t431, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t432 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3150", 5), .m_message = VELA_STR("'{value}' has no variant '{value}'", 34), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t432 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3147", 5), .m_message = VELA_STR("{value} carries {value}value{value}, got {value}", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t433 = _t432;
     vela_push(_t1, &_t433, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t434 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3151", 5), .m_message = VELA_STR("unknown module '{value}'; is `import {value}` missing\?", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t434 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3148", 5), .m_message = VELA_STR("{value} carries no values; write it without parentheses", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t435 = _t434;
     vela_push(_t1, &_t435, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t436 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3152", 5), .m_message = VELA_STR("'{value}' is a variable of type {value}, not a function", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t436 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3149", 5), .m_message = VELA_STR("{value} carries {value}value{value}, got {value}", 48), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t437 = _t436;
     vela_push(_t1, &_t437, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t438 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3153", 5), .m_message = VELA_STR("'{value}' is a module; call its functions as {value}.name(...)", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t438 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3150", 5), .m_message = VELA_STR("'{value}' has no variant '{value}'", 34), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t439 = _t438;
     vela_push(_t1, &_t439, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t440 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3154", 5), .m_message = VELA_STR("'{value}' is a type; build a value with {value} { ... }", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t440 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3151", 5), .m_message = VELA_STR("unknown module '{value}'; is `import {value}` missing\?", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t441 = _t440;
     vela_push(_t1, &_t441, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t442 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3155", 5), .m_message = VELA_STR("undefined function '{value}'{value}", 35), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t442 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3152", 5), .m_message = VELA_STR("'{value}' is a variable of type {value}, not a function", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t443 = _t442;
     vela_push(_t1, &_t443, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t444 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3156", 5), .m_message = VELA_STR("only a function can be called, and this is {value}", 50), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t444 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3153", 5), .m_message = VELA_STR("'{value}' is a module; call its functions as {value}.name(...)", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t445 = _t444;
     vela_push(_t1, &_t445, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t446 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3157", 5), .m_message = VELA_STR("cannot tell the type of parameter '{value}'; write it, as in fn({value}: Int) => ...", 84), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t446 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3154", 5), .m_message = VELA_STR("'{value}' is a type; build a value with {value} { ... }", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t447 = _t446;
     vela_push(_t1, &_t447, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t448 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3158", 5), .m_message = VELA_STR("parameter '{value}' is already declared", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t448 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3155", 5), .m_message = VELA_STR("undefined function '{value}'{value}", 35), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t449 = _t448;
     vela_push(_t1, &_t449, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t450 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3159", 5), .m_message = VELA_STR("missing return: this function value returns {value}, but the end of its body can be reached", 91), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t450 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3156", 5), .m_message = VELA_STR("only a function can be called, and this is {value}", 50), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t451 = _t450;
     vela_push(_t1, &_t451, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t452 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3160", 5), .m_message = VELA_STR("this function value returns {value}, so 'return' needs a value", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t452 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3157", 5), .m_message = VELA_STR("cannot tell the type of parameter '{value}'; write it, as in fn({value}: Int) => ...", 84), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t453 = _t452;
     vela_push(_t1, &_t453, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t454 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3161", 5), .m_message = VELA_STR("this function value does not return a value, so 'return' cannot have one", 72), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t454 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3158", 5), .m_message = VELA_STR("parameter '{value}' is already declared", 39), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t455 = _t454;
     vela_push(_t1, &_t455, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t456 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3162", 5), .m_message = VELA_STR("argument 1 of '{value}' must be an array, found {value}", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t456 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3159", 5), .m_message = VELA_STR("missing return: this function value returns {value}, but the end of its body can be reached", 91), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t457 = _t456;
     vela_push(_t1, &_t457, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t458 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3163", 5), .m_message = VELA_STR("argument 2 of '{value}' must be {value}, found {value}", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t458 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3160", 5), .m_message = VELA_STR("this function value returns {value}, so 'return' needs a value", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t459 = _t458;
     vela_push(_t1, &_t459, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t460 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3164", 5), .m_message = VELA_STR("the function given to tasks.each returns {value}, which would be lost; use tasks.map to collect the results", 107), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t460 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3161", 5), .m_message = VELA_STR("this function value does not return a value, so 'return' cannot have one", 72), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t461 = _t460;
     vela_push(_t1, &_t461, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t462 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3165", 5), .m_message = VELA_STR("the function given to tasks.map returns nothing, so there are no results to collect; use tasks.each", 99), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t462 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3162", 5), .m_message = VELA_STR("argument 1 of '{value}' must be an array, found {value}", 55), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t463 = _t462;
     vela_push(_t1, &_t463, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t464 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3166", 5), .m_message = VELA_STR("'{value}' has a mut parameter, so it cannot be used as a value", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t464 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3163", 5), .m_message = VELA_STR("argument 2 of '{value}' must be {value}, found {value}", 54), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t465 = _t464;
     vela_push(_t1, &_t465, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t466 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3167", 5), .m_message = VELA_STR("'{value}' uses whatever its parameter {value} uses, so it cannot be used as a value; call it from a closure instead", 115), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t466 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3164", 5), .m_message = VELA_STR("the function given to tasks.each returns {value}, which would be lost; use tasks.map to collect the results", 107), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t467 = _t466;
     vela_push(_t1, &_t467, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t468 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3168", 5), .m_message = VELA_STR("a function value has no mut parameters; remove `mut`", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t468 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3165", 5), .m_message = VELA_STR("the function given to tasks.map returns nothing, so there are no results to collect; use tasks.each", 99), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t469 = _t468;
     vela_push(_t1, &_t469, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t470 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3169", 5), .m_message = VELA_STR("{value} expects {value}argument{value}, got {value}", 51), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t470 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3166", 5), .m_message = VELA_STR("'{value}' has a mut parameter, so it cannot be used as a value", 62), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t471 = _t470;
     vela_push(_t1, &_t471, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t472 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3170", 5), .m_message = VELA_STR("{value} takes an integer, Float, Bool or Str, not {value}", 57), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t472 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3167", 5), .m_message = VELA_STR("'{value}' uses whatever its parameter {value} uses, so it cannot be used as a value; call it from a closure instead", 115), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t473 = _t472;
     vela_push(_t1, &_t473, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t474 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3171", 5), .m_message = VELA_STR("len takes a Str, an array or a map, not {value}", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t474 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3168", 5), .m_message = VELA_STR("a function value has no mut parameters; remove `mut`", 52), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t475 = _t474;
     vela_push(_t1, &_t475, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t476 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3172", 5), .m_message = VELA_STR("int takes an integer or a Float, found {value}", 46), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t476 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3169", 5), .m_message = VELA_STR("{value} expects {value}argument{value}, got {value}", 51), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t477 = _t476;
     vela_push(_t1, &_t477, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t478 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3173", 5), .m_message = VELA_STR("push needs an array, not {value}", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t478 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3170", 5), .m_message = VELA_STR("{value} takes an integer, Float, Bool or Str, not {value}", 57), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t479 = _t478;
     vela_push(_t1, &_t479, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t480 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3174", 5), .m_message = VELA_STR("{value} needs a map, not {value}", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
+    t_11diagnostics_Entry _t480 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3171", 5), .m_message = VELA_STR("len takes a Str, an array or a map, not {value}", 47), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t481 = _t480;
     vela_push(_t1, &_t481, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t482 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3200", 5), .m_message = VELA_STR("Invalid C declaration.", 22), .m_help = VELA_STR("Use a monomorphic extern declaration with a valid C symbol, fixed scalar parameters before any ..., and no contracts. Put generic logic and contracts in a Vela wrapper.", 168) };
+    t_11diagnostics_Entry _t482 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3172", 5), .m_message = VELA_STR("int takes an integer or a Float, found {value}", 46), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t483 = _t482;
     vela_push(_t1, &_t483, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t484 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3201", 5), .m_message = VELA_STR("An extern declaration requires uses unsafe.", 43), .m_help = VELA_STR("Declare uses unsafe on every extern. Call it from a function that propagates unsafe or an audited unsafe block.", 111) };
+    t_11diagnostics_Entry _t484 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3173", 5), .m_message = VELA_STR("push needs an array, not {value}", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t485 = _t484;
     vela_push(_t1, &_t485, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t486 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3202", 5), .m_message = VELA_STR("Unknown or parameterized C type.", 32), .m_help = VELA_STR("Import c and use a scalar alias or c.Ptr/c.Fn. C types take no type arguments. See vela guide for the LP64 ABI profile.", 119) };
+    t_11diagnostics_Entry _t486 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3174", 5), .m_message = VELA_STR("{value} needs a map, not {value}", 32), .m_help = VELA_STR("Make the declaration and its uses agree with the rule in the message. Check the inferred types with vela query type and the language rules with vela guide.", 155) };
     t_11diagnostics_Entry _t487 = _t486;
     vela_push(_t1, &_t487, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t488 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3203", 5), .m_message = VELA_STR("A C boundary requires compatible scalar types.", 46), .m_help = VELA_STR("Pass fixed-width integers, Bool, Float, c.Ptr or c.Fn. Pass aggregates through raw pointers with an audited wrapper.", 116) };
+    t_11diagnostics_Entry _t488 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3200", 5), .m_message = VELA_STR("Invalid C declaration.", 22), .m_help = VELA_STR("Use a monomorphic extern declaration with a valid C symbol, fixed scalar parameters before any ..., and no contracts. Put generic logic and contracts in a Vela wrapper.", 168) };
     t_11diagnostics_Entry _t489 = _t488;
     vela_push(_t1, &_t489, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t490 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3204", 5), .m_message = VELA_STR("A raw memory operation needs a scalar place or context.", 55), .m_help = VELA_STR("Write c.addr(mut value) for a mutable scalar address. Annotate c.load results with their exact scalar type.", 107) };
+    t_11diagnostics_Entry _t490 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3201", 5), .m_message = VELA_STR("An extern declaration requires uses unsafe.", 43), .m_help = VELA_STR("Declare uses unsafe on every extern. Call it from a function that propagates unsafe or an audited unsafe block.", 111) };
     t_11diagnostics_Entry _t491 = _t490;
     vela_push(_t1, &_t491, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t492 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3205", 5), .m_message = VELA_STR("Invalid C callback or extern function value.", 44), .m_help = VELA_STR("Use c.callback with a monomorphic top-level function taking immutable C-compatible scalars. Capturing closures require a separate context pointer and wrapper. Wrap extern calls to obtain ordinary Vela function values.", 217) };
+    t_11diagnostics_Entry _t492 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3202", 5), .m_message = VELA_STR("Unknown or parameterized C type.", 32), .m_help = VELA_STR("Import c and use a scalar alias or c.Ptr/c.Fn. C types take no type arguments. See vela guide for the LP64 ABI profile.", 119) };
     t_11diagnostics_Entry _t493 = _t492;
     vela_push(_t1, &_t493, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t494 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3210", 5), .m_message = VELA_STR("Invalid fixed array length.", 27), .m_help = VELA_STR("Use a nonnegative integer literal up to 4096 in [T; N]. Fixed arrays have inline value storage and cannot grow.", 111) };
+    t_11diagnostics_Entry _t494 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3203", 5), .m_message = VELA_STR("A C boundary requires compatible scalar types.", 46), .m_help = VELA_STR("Pass fixed-width integers, Bool, Float, c.Ptr or c.Fn. Pass aggregates through raw pointers with an audited wrapper.", 116) };
     t_11diagnostics_Entry _t495 = _t494;
     vela_push(_t1, &_t495, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t496 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3211", 5), .m_message = VELA_STR("A fixed array literal has the wrong element count.", 50), .m_help = VELA_STR("Provide exactly N elements for [T; N], including zero for [T; 0]. Different fixed lengths are different types.", 110) };
+    t_11diagnostics_Entry _t496 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3204", 5), .m_message = VELA_STR("A raw memory operation needs a scalar place or context.", 55), .m_help = VELA_STR("Write c.addr(mut value) for a mutable scalar address. Annotate c.load results with their exact scalar type.", 107) };
     t_11diagnostics_Entry _t497 = _t496;
     vela_push(_t1, &_t497, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t498 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3212", 5), .m_message = VELA_STR("Unsupported fixed array operation or recursive layout.", 54), .m_help = VELA_STR("Use indexing, len and iteration for fixed arrays. Recursive by-value fixed layouts require an explicit growable array indirection.", 130) };
+    t_11diagnostics_Entry _t498 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3205", 5), .m_message = VELA_STR("Invalid C callback or extern function value.", 44), .m_help = VELA_STR("Use c.callback with a monomorphic top-level function taking immutable C-compatible scalars. Capturing closures require a separate context pointer and wrapper. Wrap extern calls to obtain ordinary Vela function values.", 217) };
     t_11diagnostics_Entry _t499 = _t498;
     vela_push(_t1, &_t499, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t500 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3213", 5), .m_message = VELA_STR("Invalid memory primitive arguments or context.", 46), .m_help = VELA_STR("Reserve/fill produce growable arrays; reserve needs an expected array type. Byte reads/writes use [u8], with immutable Str also accepted for reads. Mutation requires mut.", 170) };
+    t_11diagnostics_Entry _t500 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3210", 5), .m_message = VELA_STR("Invalid fixed array length.", 27), .m_help = VELA_STR("Use a nonnegative integer literal up to 4096 in [T; N]. Fixed arrays have inline value storage and cannot grow.", 111) };
     t_11diagnostics_Entry _t501 = _t500;
     vela_push(_t1, &_t501, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t502 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3230", 5), .m_message = VELA_STR("Invalid module constant initializer.", 36), .m_help = VELA_STR("Use literals, constant references, operators, indexing, slices, arrays, maps or struct literals. Calls, closures, mutation and function values are not allowed. Initialize computed state inside a function.", 204) };
+    t_11diagnostics_Entry _t502 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3211", 5), .m_message = VELA_STR("A fixed array literal has the wrong element count.", 50), .m_help = VELA_STR("Provide exactly N elements for [T; N], including zero for [T; 0]. Different fixed lengths are different types.", 110) };
     t_11diagnostics_Entry _t503 = _t502;
     vela_push(_t1, &_t503, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t504 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3231", 5), .m_message = VELA_STR("Cyclic module constant dependency.", 34), .m_help = VELA_STR("A constant cannot refer to itself, directly or through other constants. Break the dependency cycle; forward references without a cycle are allowed.", 147) };
+    t_11diagnostics_Entry _t504 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3212", 5), .m_message = VELA_STR("Unsupported fixed array operation or recursive layout.", 54), .m_help = VELA_STR("Use indexing, len and iteration for fixed arrays. Recursive by-value fixed layouts require an explicit growable array indirection.", 130) };
     t_11diagnostics_Entry _t505 = _t504;
     vela_push(_t1, &_t505, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t506 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3232", 5), .m_message = VELA_STR("A module constant cannot be changed.", 36), .m_help = VELA_STR("Constants are immutable, including their fields and elements. Copy the value into let mut before assigning or passing mut; copy-on-write preserves the constant.", 160) };
+    t_11diagnostics_Entry _t506 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3213", 5), .m_message = VELA_STR("Invalid memory primitive arguments or context.", 46), .m_help = VELA_STR("Reserve/fill produce growable arrays; reserve needs an expected array type. Byte reads/writes use [u8], with immutable Str also accepted for reads. Mutation requires mut.", 170) };
     t_11diagnostics_Entry _t507 = _t506;
     vela_push(_t1, &_t507, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t508 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3233", 5), .m_message = VELA_STR("A constant is used where a function or another declaration is required.", 71), .m_help = VELA_STR("Read a constant by its name without parentheses. main must remain a function, and constant names must not collide with types.", 125) };
+    t_11diagnostics_Entry _t508 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3234", 5), .m_message = VELA_STR("interpolated expressions must have type Str, Bool, Float, or an integer type, found {value}", 91), .m_help = VELA_STR("Convert another value to Str first, for example with a function of your own, or interpolate its fields.", 103) };
     t_11diagnostics_Entry _t509 = _t508;
     vela_push(_t1, &_t509, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t510 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3220", 5), .m_message = VELA_STR("Unknown systems I/O type.", 25), .m_help = VELA_STR("Import sysio and use sysio.Handle for the low-level owning resource. Prefer the typed net wrappers for TCP/UDP.", 111) };
+    t_11diagnostics_Entry _t510 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3230", 5), .m_message = VELA_STR("Invalid module constant initializer.", 36), .m_help = VELA_STR("Use literals, constant references, operators, indexing, slices, arrays, maps or struct literals. Calls, closures, mutation and function values are not allowed. Initialize computed state inside a function.", 204) };
     t_11diagnostics_Entry _t511 = _t510;
     vela_push(_t1, &_t511, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t512 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4001", 5), .m_message = VELA_STR("'{value}' is already imported", 29), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
+    t_11diagnostics_Entry _t512 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3231", 5), .m_message = VELA_STR("Cyclic module constant dependency.", 34), .m_help = VELA_STR("A constant cannot refer to itself, directly or through other constants. Break the dependency cycle; forward references without a cycle are allowed.", 147) };
     t_11diagnostics_Entry _t513 = _t512;
     vela_push(_t1, &_t513, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t514 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4002", 5), .m_message = VELA_STR("package '{value}' has no main module: there is no file {value}", 62), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
+    t_11diagnostics_Entry _t514 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3232", 5), .m_message = VELA_STR("A module constant cannot be changed.", 36), .m_help = VELA_STR("Constants are immutable, including their fields and elements. Copy the value into let mut before assigning or passing mut; copy-on-write preserves the constant.", 160) };
     t_11diagnostics_Entry _t515 = _t514;
     vela_push(_t1, &_t515, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t516 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4003", 5), .m_message = VELA_STR("two different files would both be the module '{value}': {value} and {value}; rename one of them", 95), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
+    t_11diagnostics_Entry _t516 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3233", 5), .m_message = VELA_STR("A constant is used where a function or another declaration is required.", 71), .m_help = VELA_STR("Read a constant by its name without parentheses. main must remain a function, and constant names must not collide with types.", 125) };
     t_11diagnostics_Entry _t517 = _t516;
     vela_push(_t1, &_t517, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t518 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4004", 5), .m_message = VELA_STR("module '{value}' imports itself", 31), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
+    t_11diagnostics_Entry _t518 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E3220", 5), .m_message = VELA_STR("Unknown systems I/O type.", 25), .m_help = VELA_STR("Import sysio and use sysio.Handle for the low-level owning resource. Prefer the typed net wrappers for TCP/UDP.", 111) };
     t_11diagnostics_Entry _t519 = _t518;
     vela_push(_t1, &_t519, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t520 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4005", 5), .m_message = VELA_STR("import cycle: {value}; modules cannot import each other, directly or through others", 83), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
+    t_11diagnostics_Entry _t520 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4001", 5), .m_message = VELA_STR("'{value}' is already imported", 29), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
     t_11diagnostics_Entry _t521 = _t520;
     vela_push(_t1, &_t521, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t522 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4006", 5), .m_message = VELA_STR("cannot find module '{value}': there is no file {value}", 54), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
+    t_11diagnostics_Entry _t522 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4002", 5), .m_message = VELA_STR("package '{value}' has no main module: there is no file {value}", 62), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
     t_11diagnostics_Entry _t523 = _t522;
     vela_push(_t1, &_t523, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t524 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E5001", 5), .m_message = VELA_STR("internal error: formatting would change this file's meaning here; please report it", 82), .m_help = VELA_STR("The formatter refused to change the token stream. Keep the original source and report this compiler bug.", 104) };
+    t_11diagnostics_Entry _t524 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4003", 5), .m_message = VELA_STR("two different files would both be the module '{value}': {value} and {value}; rename one of them", 95), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
     t_11diagnostics_Entry _t525 = _t524;
     vela_push(_t1, &_t525, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t526 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7001", 5), .m_message = VELA_STR("A source file could not be read.", 32), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
+    t_11diagnostics_Entry _t526 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4004", 5), .m_message = VELA_STR("module '{value}' imports itself", 31), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
     t_11diagnostics_Entry _t527 = _t526;
     vela_push(_t1, &_t527, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t528 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7002", 5), .m_message = VELA_STR("A source file could not be read.", 32), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
+    t_11diagnostics_Entry _t528 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4005", 5), .m_message = VELA_STR("import cycle: {value}; modules cannot import each other, directly or through others", 83), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
     t_11diagnostics_Entry _t529 = _t528;
     vela_push(_t1, &_t529, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t530 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7003", 5), .m_message = VELA_STR("The package manifest or lockfile is invalid.", 44), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
+    t_11diagnostics_Entry _t530 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E4006", 5), .m_message = VELA_STR("cannot find module '{value}': there is no file {value}", 54), .m_help = VELA_STR("Check the import name, file path and visibility. Local modules live beside the importing program; package dependencies must be fetched with vela get.", 149) };
     t_11diagnostics_Entry _t531 = _t530;
     vela_push(_t1, &_t531, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t532 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7004", 5), .m_message = VELA_STR("'{value}' is {value} {value}.vl, which hides the package {value} from vela.mod; rename the file to use the package", 114), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
+    t_11diagnostics_Entry _t532 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E5001", 5), .m_message = VELA_STR("internal error: formatting would change this file's meaning here; please report it", 82), .m_help = VELA_STR("The formatter refused to change the token stream. Keep the original source and report this compiler bug.", 104) };
     t_11diagnostics_Entry _t533 = _t532;
     vela_push(_t1, &_t533, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t534 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7005", 5), .m_message = VELA_STR("'{value}' is {value} {value}.vl, which hides the standard module std/{value}.vl; rename the file to use the standard one", 120), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
+    t_11diagnostics_Entry _t534 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7001", 5), .m_message = VELA_STR("A source file could not be read.", 32), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
     t_11diagnostics_Entry _t535 = _t534;
     vela_push(_t1, &_t535, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t536 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7006", 5), .m_message = VELA_STR("'{value}' is called here with types that grow without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]])", 143), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
+    t_11diagnostics_Entry _t536 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7002", 5), .m_message = VELA_STR("A source file could not be read.", 32), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
     t_11diagnostics_Entry _t537 = _t536;
     vela_push(_t1, &_t537, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t538 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7007", 5), .m_message = VELA_STR("The package manifest or lockfile is invalid.", 44), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
+    t_11diagnostics_Entry _t538 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7003", 5), .m_message = VELA_STR("The package manifest or lockfile is invalid.", 44), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
     t_11diagnostics_Entry _t539 = _t538;
     vela_push(_t1, &_t539, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t540 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E6001", 5), .m_message = VELA_STR("The compiler could not read, build or run the requested input.", 62), .m_help = VELA_STR("Check the path, package manifest and toolchain named in the message.", 68) };
+    t_11diagnostics_Entry _t540 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7004", 5), .m_message = VELA_STR("'{value}' is {value} {value}.vl, which hides the package {value} from vela.mod; rename the file to use the package", 114), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
     t_11diagnostics_Entry _t541 = _t540;
     vela_push(_t1, &_t541, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t542 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E6002", 5), .m_message = VELA_STR("The compiler encountered an internal error.", 43), .m_help = VELA_STR("Report this compiler bug with the input and the complete message.", 65) };
+    t_11diagnostics_Entry _t542 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7005", 5), .m_message = VELA_STR("'{value}' is {value} {value}.vl, which hides the standard module std/{value}.vl; rename the file to use the standard one", 120), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
     t_11diagnostics_Entry _t543 = _t542;
     vela_push(_t1, &_t543, sizeof(t_11diagnostics_Entry));
-    t_11diagnostics_Entry _t544 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E6003", 5), .m_message = VELA_STR("The requested query or refactoring cannot be completed.", 55), .m_help = VELA_STR("Check its file position, arguments and the diagnostic in the response.", 70) };
+    t_11diagnostics_Entry _t544 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7006", 5), .m_message = VELA_STR("'{value}' is called here with types that grow without end, as generic functions that call each other with bigger types do (f[T] calling g[[T]])", 143), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
     t_11diagnostics_Entry _t545 = _t544;
     vela_push(_t1, &_t545, sizeof(t_11diagnostics_Entry));
-    vela_array * _t546 = _t1;
-    return _t546;
+    t_11diagnostics_Entry _t546 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E7007", 5), .m_message = VELA_STR("The package manifest or lockfile is invalid.", 44), .m_help = VELA_STR("Read the message for the file, declaration or dependency that failed. Correct it and run vela check again.", 106) };
+    t_11diagnostics_Entry _t547 = _t546;
+    vela_push(_t1, &_t547, sizeof(t_11diagnostics_Entry));
+    t_11diagnostics_Entry _t548 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E6001", 5), .m_message = VELA_STR("The compiler could not read, build or run the requested input.", 62), .m_help = VELA_STR("Check the path, package manifest and toolchain named in the message.", 68) };
+    t_11diagnostics_Entry _t549 = _t548;
+    vela_push(_t1, &_t549, sizeof(t_11diagnostics_Entry));
+    t_11diagnostics_Entry _t550 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E6002", 5), .m_message = VELA_STR("The compiler encountered an internal error.", 43), .m_help = VELA_STR("Report this compiler bug with the input and the complete message.", 65) };
+    t_11diagnostics_Entry _t551 = _t550;
+    vela_push(_t1, &_t551, sizeof(t_11diagnostics_Entry));
+    t_11diagnostics_Entry _t552 = (t_11diagnostics_Entry){ .m_code = VELA_STR("E6003", 5), .m_message = VELA_STR("The requested query or refactoring cannot be completed.", 55), .m_help = VELA_STR("Check its file position, arguments and the diagnostic in the response.", 70) };
+    t_11diagnostics_Entry _t553 = _t552;
+    vela_push(_t1, &_t553, sizeof(t_11diagnostics_Entry));
+    vela_array * _t554 = _t1;
+    return _t554;
 }
 /* vela: part */
 
 Option_Str f_11diagnostics_explain(vela_str v_code) {
-    // line 282
+    // line 286
     vela_array * _t2 = f_11diagnostics_all();
     vela_array * _t1 = _t2;
     for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
         t_11diagnostics_Entry v_e = ((t_11diagnostics_Entry *)_t1->data)[_t3];
-        // line 283
+        // line 287
         bool _t4 = vela_str_eq(v_e.m_code, v_code);
         if (_t4) {
-            // line 284
+            // line 288
             static const vela_str _t5[] = {{NULL, NULL, 0}, VELA_STR_INIT(": ", 2), {NULL, NULL, 0}, VELA_STR_INIT("\012\012", 2), {NULL, NULL, 0}};
             vela_str _t6[5];
             memcpy(_t6, _t5, sizeof _t6);
@@ -121289,7 +121428,7 @@ Option_Str f_11diagnostics_explain(vela_str v_code) {
         }
     }
     vela_array_release(_t1);
-    // line 287
+    // line 291
     Option_Str _t10 = (Option_Str){ .tag = Option_Str_None };
     Option_Str _t11 = _t10;
     return _t11;
