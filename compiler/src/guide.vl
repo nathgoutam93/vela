@@ -5,6 +5,7 @@ import files
 import index
 import interfaces
 import lexer
+import maps
 import modules
 import os
 import parser
@@ -120,17 +121,13 @@ pub fn reference(root: Str) -> Str uses fs, os {
                     os.eprint("vela: error: cannot generate guide from " + path + " [E6007]")
                     os.exit(1)
                 }
+                let mut public: [ast.FnDecl] = []
                 for f in parsed.program.fns {
                     if f.public {
-                        strings.add(mut out, index.signature(f) + "\n")
-                        for e in f.requires {
-                            strings.add(mut out, "  requires " + ast.expr_text(e) + "\n")
-                        }
-                        for e in f.ensures {
-                            strings.add(mut out, "  ensures " + ast.expr_text(e) + "\n")
-                        }
+                        push(mut public, f)
                     }
                 }
+                signatures(mut out, public)
             }
             Err(e) => {
                 os.eprint("vela: error: " + e + " [E6001]")
@@ -151,4 +148,165 @@ fn builtin(out: mut strings.Builder, module: Str, name: Str) {
     if len(info) == 2 {
         strings.add(mut out, info[0] + "\n")
     }
+}
+
+// The signatures of a module's public functions, with their contracts. A
+// family of four or more without contracts, the same but for integer widths
+// and `_le`/`_be` (buffers.read_u8_le ... read_i64_be), shows one member
+// and the pattern of the rest.
+fn signatures(out: mut strings.Builder, fns: [ast.FnDecl]) {
+    let mut keys: [Str] = []
+    let mut sigs: [Str] = []
+    let mut counts: Map[Str, Int] = [:]
+    for f in fns {
+        let sig = index.signature(f)
+        let mut key = ""
+        if len(f.requires) == 0 && len(f.ensures) == 0 {
+            key = pattern(sig)
+        }
+        push(mut sigs, sig)
+        push(mut keys, key)
+        if key != "" {
+            match maps.get(counts, key) {
+                Some(n) => counts[key] = n + 1
+                None => counts[key] = 1
+            }
+        }
+    }
+    let mut done: Map[Str, Bool] = [:]
+    for i in 0..len(fns) {
+        let key = keys[i]
+        if key != "" && counts[key] >= 4 && key != sigs[i] {
+            if maps.has(done, key) {
+                continue
+            }
+            done[key] = true
+            let mut shown = sigs[i]
+            let mut widths: [Str] = []
+            let mut orders: [Str] = []
+            for j in i..len(fns) {
+                if keys[j] == key {
+                    if contains(sigs[j], "u32") && !contains(shown, "u32") {
+                        shown = sigs[j]
+                    }
+                    for w in width_words(fns[j].name) {
+                        add_new(mut widths, w)
+                    }
+                    let n = fns[j].name
+                    if len(n) > 3 && (n[len(n) - 3..len(n)] == "_le" || n[len(n) - 3..len(n)] == "_be") {
+                        add_new(mut orders, n[len(n) - 2..len(n)])
+                    }
+                }
+            }
+            strings.add(mut out, shown + "\n")
+            let mut note = "  likewise " + key[7..len(key)] + ", W: " + spaced(widths)
+            if len(orders) > 0 {
+                note = note + "; E: " + spaced(orders)
+            }
+            strings.add(mut out, note + "\n")
+            continue
+        }
+        strings.add(mut out, sigs[i] + "\n")
+        for e in fns[i].requires {
+            strings.add(mut out, "  requires " + ast.expr_text(e) + "\n")
+        }
+        for e in fns[i].ensures {
+            strings.add(mut out, "  ensures " + ast.expr_text(e) + "\n")
+        }
+    }
+}
+
+// A signature with each integer width word (`u8` ... `i64`, alone or as a
+// part of a name between underscores) made W, and a `_le` or `_be` ending a
+// name made `_E`.
+fn pattern(sig: Str) -> Str {
+    let mut b = strings.builder()
+    let mut i = 0
+    for i < len(sig) {
+        if !word_byte(sig[i]) {
+            strings.add_byte(mut b, sig[i])
+            i = i + 1
+            continue
+        }
+        let start = i
+        for i < len(sig) && word_byte(sig[i]) {
+            i = i + 1
+        }
+        let parts = split_underscores(sig[start..i])
+        for k in 0..len(parts) {
+            if k > 0 {
+                strings.add_byte(mut b, '_')
+            }
+            if is_width(parts[k]) {
+                strings.add_byte(mut b, 'W')
+            } else if k == len(parts) - 1 && k > 0 && (parts[k] == "le" || parts[k] == "be") {
+                strings.add_byte(mut b, 'E')
+            } else {
+                strings.add(mut b, parts[k])
+            }
+        }
+    }
+    return strings.build(b)
+}
+
+fn word_byte(c: Byte) -> Bool {
+    return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_'
+}
+
+fn split_underscores(s: Str) -> [Str] {
+    let mut out: [Str] = []
+    let mut start = 0
+    for i in 0..len(s) + 1 {
+        if i == len(s) || s[i] == '_' {
+            push(mut out, s[start..i])
+            start = i + 1
+        }
+    }
+    return out
+}
+
+fn is_width(w: Str) -> Bool {
+    return w == "u8" || w == "i8" || w == "u16" || w == "i16" || w == "u32" || w == "i32" || w == "u64" || w == "i64"
+}
+
+fn width_words(name: Str) -> [Str] {
+    let mut out: [Str] = []
+    for part in split_underscores(name) {
+        if is_width(part) {
+            push(mut out, part)
+        }
+    }
+    return out
+}
+
+fn add_new(xs: mut [Str], x: Str) {
+    for y in xs {
+        if y == x {
+            return
+        }
+    }
+    push(mut xs, x)
+}
+
+fn spaced(xs: [Str]) -> Str {
+    let mut out = ""
+    for k in 0..len(xs) {
+        if k > 0 {
+            out = out + " "
+        }
+        out = out + xs[k]
+    }
+    return out
+}
+
+fn contains(s: Str, part: Str) -> Bool {
+    if len(part) > len(s) {
+        return false
+    }
+    for i in 0..len(s) - len(part) + 1 {
+        if s[i..i + len(part)] == part {
+            return true
+        }
+    }
+    return false
 }

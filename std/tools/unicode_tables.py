@@ -102,40 +102,28 @@ def runs(pred):
     return out
 
 
-# Records are written in strings, static data that costs nothing to compile
-# (a match or an array literal of thousands of entries takes seconds), with
-# numbers as fixed-width base-64 digits, so a record can be found by binary
-# search: 4 digits (24 bits) for a code point. A digit is the byte 48 + its
-# value ('0' to 'o'), in raw strings, as it can be a backslash.
-DIGITS = ''.join(chr(48 + v) for v in range(64))
-PER_PART = 64  # records in each string literal
-
-
-def num(n, width=4):
-    assert 0 <= n < 64 ** width
-    return ''.join(DIGITS[(n >> (6 * (width - 1 - k))) & 63] for k in range(width))
-
-
-def table(name, doc, records):
-    """A function returning the records' part k: `name(k) -> Str`."""
-    out = [doc, f'fn {name}(k: Int) -> Str {{', '    return match k {']
-    for k in range(0, len(records), PER_PART):
-        text = ''.join(records[k:k + PER_PART])
-        assert '"' not in text
-        out.append(f'        {k // PER_PART} => r"' + text + '"')
-    out += ['        _ => ""', '    }', '}', '']
+# The tables are module constants (TL-108): flat Int arrays, which compile to
+# static data and are built once, on first use.
+def const_array(name, doc, xs):
+    out = [doc, f'const {name}: [Int] = [']
+    for i in range(0, len(xs), 8):
+        out.append('    ' + ', '.join(f'{x:#x}' for x in xs[i:i + 8]) + (',' if i + 8 < len(xs) else ''))
+    out += [']', '']
     return out
 
 
-def range_table(name, doc, pred):
-    rs = runs(pred)
-    return table(name, doc, [num(lo) + num(hi) for lo, hi in rs]), len(rs)
+def flat_ranges(pred):
+    out = []
+    for lo, hi in runs(pred):
+        out += [lo, hi]
+    return out
 
 
 def fold_records(simple):
-    """Runs of code points each folding by the same offset ('d'), or pairs
-    where every even (odd) code point folds to the one after it and the
-    others to themselves ('e', 'o'), as in Latin Extended-A."""
+    """Runs of code points each folding by the same offset (kind 0), or
+    pairs where every even (1) or odd (2) code point folds to the one after
+    it and the others to themselves, as in Latin Extended-A: [first, last,
+    kind, offset] each."""
     keys = sorted(simple)
     out, i = [], 0
     while i < len(keys):
@@ -144,7 +132,7 @@ def fold_records(simple):
         while simple.get(p) == p + 1 and (p + 1) not in simple:
             p += 2
         if p - c >= 4:  # two pairs or more
-            out.append(num(c) + num(p - 1) + ('e' if c % 2 == 0 else 'o') + num(0x800000))
+            out += [c, p - 1, 1 if c % 2 == 0 else 2, 0]
             while i < len(keys) and keys[i] < p:
                 i += 1
             continue
@@ -152,7 +140,7 @@ def fold_records(simple):
         j = i
         while j + 1 < len(keys) and keys[j + 1] == keys[j] + 1 and simple[keys[j + 1]] - keys[j + 1] == d:
             j += 1
-        out.append(num(c) + num(keys[j]) + 'd' + num(d + 0x800000))
+        out += [c, keys[j], 0, d]
         i = j + 1
     return out
 
@@ -168,46 +156,36 @@ def generate(ucd):
     def word(cp):
         return cp in alpha or cat[cp] in ('Mn', 'Mc', 'Me', 'Nd', 'Pc') or cp in join
 
-    out = [MARKER, f'// Unicode {VERSION}. Records are fixed-width base-64 numbers (a digit is',
-           f'// the byte 48 + its value), {PER_PART} to a string.', '']
+    out = [MARKER, f'// Unicode {VERSION}.', '']
     out += ['// The version of Unicode the tables below are of.', 'fn unicode_version() -> Str {',
             f'    return "{VERSION}"', '}', '']
-    out += ['// The general categories, in the order of their numbers in category_runs.',
+    out += ['// The general categories, in the order of their numbers below.',
             'fn category_names() -> Str {', '    return "' + ''.join(CATEGORIES) + '"', '}', '']
-    runs_ = []
+    starts, numbers = [], []
     start = 0
     for cp in range(1, 0x110001):
         if cp == 0x110000 or cat[cp] != cat[start]:
-            runs_.append(num(start) + num(CATEGORIES.index(cat[start]), 1))
+            starts.append(start)
+            numbers.append(CATEGORIES.index(cat[start]))
             start = cp
-    out += ['// The category numbers of the first 256 code points, one digit each.',
-            'fn latin1_categories() -> Str {', '    return r"' + ''.join(num(CATEGORIES.index(cat[c]), 1) for c in range(256)) + '"',
-            '}', '']
-    out += table('category_runs', '// Runs of code points of one category: where each starts, and the\n'
-                 '// category\'s number; the next run starts where it ends.', runs_)
-    counts = [('category_count', len(runs_))]
-    for name, doc, pred in (('alphabetic_ranges', '// The ranges of code points with the Alphabetic property.', lambda c: c in alpha),
-                            ('white_space_ranges', '// The ranges of code points with the White_Space property.', lambda c: c in white),
-                            ('word_ranges', '// The ranges of word characters as UTS #18 defines \\w: Alphabetic, a\n'
-                             '// mark, a decimal digit, a connector punctuation or Join_Control.', word)):
-        lines, n = range_table(name, doc, pred)
-        out += lines
-        counts.append((name.replace('_ranges', '_count'), n))
-    folds = fold_records(simple)
-    out += table('fold_runs', '// Simple case folding (CaseFolding.txt\'s C and S mappings), in runs:\n'
-                 '// first, last, the kind (d: each by the offset; e or o: each even or\n'
-                 '// odd code point to the next one) and the offset + 2^23.', folds)
-    counts.append(('fold_count', len(folds)))
-    for name, n in counts:
-        out += [f'fn {name}() -> Int {{', f'    return {n}', '}', '']
+    out += const_array('LATIN1_CATEGORIES', '// The category numbers of the first 256 code points.',
+                       [CATEGORIES.index(cat[c]) for c in range(256)])
+    out += const_array('CATEGORY_STARTS', '// Runs of code points of one category: where each starts (the next\n'
+                       '// starts where it ends), and, in CATEGORY_NUMBERS, its category.', starts)
+    out += const_array('CATEGORY_NUMBERS', '// The category of each run in CATEGORY_STARTS.', numbers)
+    out += const_array('ALPHABETIC_RANGES', '// The code points with the Alphabetic property: [lo, hi, ...].', flat_ranges(lambda c: c in alpha))
+    out += const_array('WHITE_SPACE_RANGES', '// The code points with the White_Space property: [lo, hi, ...].', flat_ranges(lambda c: c in white))
+    out += const_array('WORD_RANGES', '// Word characters as UTS #18 defines \\w (Alphabetic, a mark, a decimal\n'
+                       '// digit, a connector punctuation or Join_Control): [lo, hi, ...].', flat_ranges(word))
+    out += const_array('FOLD_RUNS', '// Simple case folding (CaseFolding.txt\'s C and S mappings) in runs:\n'
+                       '// [first, last, kind, offset, ...]; kind 0: each by the offset, 1 or 2:\n'
+                       '// each even or odd code point to the next one.', fold_records(simple))
     full_records = []
     for cp in sorted(full):
-        to = full[cp] + [0] * (3 - len(full[cp]))
-        full_records.append(num(cp) + ''.join(num(x) for x in to))
-    out += table('full_folds', '// Code points whose full case folding is more than one (F mappings):\n'
-                 '// each, and the up to three it folds to (0 after the last).', full_records)
-    out += ['fn full_count() -> Int {', f'    return {len(full_records)}', '}']
-    return out
+        full_records += [cp] + full[cp] + [0] * (3 - len(full[cp]))
+    out += const_array('FULL_FOLDS', '// Code points whose full case folding is more than one (F mappings):\n'
+                       '// [cp, a, b, c, ...], 0 after the last.', full_records)
+    return [line for line in out][:-1]
 
 
 def main():

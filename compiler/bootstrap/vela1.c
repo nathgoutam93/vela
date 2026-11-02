@@ -8183,6 +8183,15 @@ vela_str f_5fixer_apply(vela_str, vela_array *);
 void f_5fixer_command(vela_str, vela_str, bool);
 vela_str f_5guide_reference(vela_str);
 void f_5guide_builtin(vela_array * *, vela_str, vela_str);
+void f_5guide_signatures(vela_array * *, vela_array *);
+vela_str f_5guide_pattern(vela_str);
+bool f_5guide_word_byte(uint8_t);
+vela_array * f_5guide_split_underscores(vela_str);
+bool f_5guide_is_width(vela_str);
+vela_array * f_5guide_width_words(vela_str);
+void f_5guide_add_new(vela_array * *, vela_str);
+vela_str f_5guide_spaced(vela_array *);
+bool f_5guide_contains(vela_str, vela_str);
 Result_Str_Array_6errors_CompileError f_6format_format(vela_str);
 vela_array * f_6format_without_final_semi(vela_array *);
 int64_t f_6format_first_difference(vela_array *, vela_array *);
@@ -75589,15 +75598,15 @@ vela_array * f_6layout_compact_helpers(t_6layout_Layout * v_l, int64_t v_t) {
 /* vela: part */
 
 int64_t f_5lists_smaller(int64_t v_a, int64_t v_b) {
-    // line 161
+    // line 175
     int64_t _t1 = v_a;
     bool _t2 = _t1 < v_b;
     if (_t2) {
-        // line 162
+        // line 176
         int64_t _t3 = v_a;
         return _t3;
     }
-    // line 164
+    // line 178
     int64_t _t4 = v_b;
     return _t4;
 }
@@ -121964,63 +121973,63 @@ void f_5fixer_command(vela_str v_path, vela_str v_root, bool v_dry) {
 /* vela: part */
 
 vela_str f_5guide_reference(vela_str v_root) {
-    // line 14
+    // line 15
     vela_array * _t1 = vela_array_new(&vela_type_byte, 64);
     vela_array * v_out = _t1;
-    // line 15
+    // line 16
     vela_unique(&v_out);
     vela_builder_add(v_out, VELA_STR("# Vela language reference\012", 26));
-    // line 16
-    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 17
-    vela_builder_add(v_out, VELA_STR("From compiler metadata.\012", 24));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 18
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("From compiler metadata.\012", 24));
     // line 19
-    vela_builder_add(v_out, VELA_STR("## Commands\012", 12));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 20
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("## Commands\012", 12));
     // line 21
-    vela_builder_add(v_out, VELA_STR("`vela check FILE` checks modules/imports; `check --json` emits stable `code`/`fix`. Edits: `file`, UTF-8 byte `start`/`end` (end excluded), replacement `text`, original `expected`. Apply each diagnostic's edits together, right to left. Empty fixes need review.\012", 261));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 22
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`vela check FILE` checks modules/imports; `check --json` emits stable `code`/`fix`. Edits: `file`, UTF-8 byte `start`/`end` (end excluded), replacement `text`, original `expected`. Apply each diagnostic's edits together, right to left. Empty fixes need review.\012", 261));
     // line 23
-    vela_builder_add(v_out, VELA_STR("`vela explain CODE` explains. `vela fix FILE` edits/rechecks local code; exit 1 means errors remain. `fix --dry-run` previews. Review effects/mutability; dependencies/std stay unchanged.\012", 187));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 24
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`vela explain CODE` explains. `vela fix FILE` edits/rechecks local code; exit 1 means errors remain. `fix --dry-run` previews. Review effects/mutability; dependencies/std stay unchanged.\012", 187));
     // line 25
-    vela_builder_add(v_out, VELA_STR("`vela run FILE ARGS...` runs; `vela build FILE -o EXE` builds; `vela test FILE [WORDS...]` runs matching local/imported tests. `vela fmt -w FILE...` formats; `-l` lists unformatted files. `vela query type|def|refs|complete FILE:LINE:COL` queries names; `vela query symbols FILE` lists declarations; `vela query unsafe FILE` audits wrappers/indirect/deferred unsafe paths; unknown targets are flagged. `query summary FILE`: API/effects/contracts; `query impact FILE[:LINE:COL]`: conservative dependents; `query coverage TARGET` gives possible tests, or measured entries with `--report REPORT` after `vela test --coverage REPORT FILE`. `vela rename FILE:LINE:COL NEW` renames across modules. Positions are 1-based bytes. `vela lsp` serves editors.\012", 746));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 26
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`vela run FILE ARGS...` runs; `vela build FILE -o EXE` builds; `vela test FILE [WORDS...]` runs matching local/imported tests. `vela fmt -w FILE...` formats; `-l` lists unformatted files. `vela query type|def|refs|complete FILE:LINE:COL` queries names; `vela query symbols FILE` lists declarations; `vela query unsafe FILE` audits wrappers/indirect/deferred unsafe paths; unknown targets are flagged. `query summary FILE`: API/effects/contracts; `query impact FILE[:LINE:COL]`: conservative dependents; `query coverage TARGET` gives possible tests, or measured entries with `--report REPORT` after `vela test --coverage REPORT FILE`. `vela rename FILE:LINE:COL NEW` renames across modules. Positions are 1-based bytes. `vela lsp` serves editors.\012", 746));
     // line 27
-    vela_builder_add(v_out, VELA_STR("Build uses C; run/test use native on Linux x86-64/macOS ARM64; `VELA_BACKEND=c|native` overrides. build accepts `--target aarch64-apple-darwin|x86_64-unknown-linux-gnu|x86_64-w64-windows-gnu|wasm32-wasi`; asm supports the first two. `VELA_CC`: C driver; `VELA_TARGET_CC`: explicit-target override (supports zig). `VELA_SYSROOT` and `VELA_CFLAGS` configure it. `VELA_ROOT`: runtime/std. `VELA_CACHE=off`: disable caches. `VELA_INCREMENTAL=1`: object reuse; `VELA_BUILD_REPORT=FILE`: cache JSON.\012", 494));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 28
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("Build uses C; run/test use native on Linux x86-64/macOS ARM64; `VELA_BACKEND=c|native` overrides. build accepts `--target aarch64-apple-darwin|x86_64-unknown-linux-gnu|x86_64-w64-windows-gnu|wasm32-wasi`; asm supports the first two. `VELA_CC`: C driver; `VELA_TARGET_CC`: explicit-target override (supports zig). `VELA_SYSROOT` and `VELA_CFLAGS` configure it. `VELA_ROOT`: runtime/std. `VELA_CACHE=off`: disable caches. `VELA_INCREMENTAL=1`: object reuse; `VELA_BUILD_REPORT=FILE`: cache JSON.\012", 494));
     // line 29
-    vela_builder_add(v_out, VELA_STR("build/run/test/asm accept `--debug`: source maps and Vela panic stacks. `VELA_PANIC=json` selects JSON failures. `vela profile [--json REPORT] FILE ARGS...` reports elapsed ns per function/category with instrumentation; workers overlap; needs clock.\012\012", 251));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 30
-    vela_builder_add(v_out, VELA_STR("Run/test/profile flags before FILE: `--allow unsafe`, `--allow fs:PATH`, `--deny EFFECT`. Unsafe needs allow; standalone builds unrestricted. Deny wins; fs roots narrow access. Unsupported policies fail closed. macOS deny-net forbids unsafe/subprocesses; restricted C needs Linux.\012\012", 282));
+    vela_builder_add(v_out, VELA_STR("build/run/test/asm accept `--debug`: source maps and Vela panic stacks. `VELA_PANIC=json` selects JSON failures. `vela profile [--json REPORT] FILE ARGS...` reports elapsed ns per function/category with instrumentation; workers overlap; needs clock.\012\012", 251));
     // line 31
-    vela_builder_add(v_out, VELA_STR("E7009: handle discarded Result or acknowledge with repeatable `let _ = call()`; fix never inserts it. `vela verify [--solver z3] [--reuse REPORT] [--build EXE] [--target TARGET] FILE` reports proved/refuted/unknown (exit 0/1/3); unknown checks stay. Evidence binds sources/target/compiler and is rechecked. `vela test --properties [--cases N] [--seed U64] [--size N] [--shrinks N] FILE` runs bounded contract samples, not proofs or ordinary test blocks. Both accept --json, --report REPORT, --timeout MS, --budget MS. Unsupported/effectful domains stay unknown; normal tests/coverage run separately. property.Generator: sample(Self,u64,Int)->u64; shrink(Self,u64)->[u64].\012\012", 673));
+    vela_builder_add(v_out, VELA_STR("Run/test/profile flags before FILE: `--allow unsafe`, `--allow fs:PATH`, `--deny EFFECT`. Unsafe needs allow; standalone builds unrestricted. Deny wins; fs roots narrow access. Unsupported policies fail closed. macOS deny-net forbids unsafe/subprocesses; restricted C needs Linux.\012\012", 282));
     // line 32
-    vela_builder_add(v_out, VELA_STR("## Syntax and values\012", 21));
+    vela_builder_add(v_out, VELA_STR("E7009: handle discarded Result or acknowledge with repeatable `let _ = call()`; fix never inserts it. `vela verify [--solver z3] [--reuse REPORT] [--build EXE] [--target TARGET] FILE` reports proved/refuted/unknown (exit 0/1/3); unknown checks stay. Evidence binds sources/target/compiler and is rechecked. `vela test --properties [--cases N] [--seed U64] [--size N] [--shrinks N] FILE` runs bounded contract samples, not proofs or ordinary test blocks. Both accept --json, --report REPORT, --timeout MS, --budget MS. Unsupported/effectful domains stay unknown; normal tests/coverage run separately. property.Generator: sample(Self,u64,Int)->u64; shrink(Self,u64)->[u64].\012\012", 673));
     // line 33
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("## Syntax and values\012", 21));
     // line 34
-    vela_builder_add(v_out, VELA_STR("Files use `.vl`; entry is `fn main()` with no arguments/result. Libraries need no main. Comments use `//`. Newlines end statements except after an operator. Put `{` on the signature/final-contract line. Parenthesize struct literals in if/for/match conditions. Calls use `module.function(value)` or `value.method()`.\012", 316));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 35
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("Files use `.vl`; entry is `fn main()` with no arguments/result. Libraries need no main. Comments use `//`. Newlines end statements except after an operator. Put `{` on the signature/final-contract line. Parenthesize struct literals in if/for/match conditions. Calls use `module.function(value)` or `value.method()`.\012", 316));
     // line 36
-    vela_builder_add(v_out, VELA_STR("`i8 i16 i32 i64 u8 u16 u32 u64` are fixed-width integers; Int=i64, Byte=u8 (0..255). Arithmetic/indexing panic on overflow/invalid indexes. Decimal, 0x hex and 0b binary literals allow separators/suffixes (255u8, 0xffff_ffffu32); unsuffixed integers infer context or Int. Signed minima/full u64 are supported. Byte literals: 'a', '\\n'. Width changes require explicit checked i8(x)..u64(x); int/byte remain aliases. Float is binary64 (1.5); float(n)/int(x) convert. Bool: true/false. Str is bytes with UTF-8 source literals and escapes \\n \\t \\r \\0 \\\\ \\\" \\u{e9}; raw r\"\\d+\", r#\"..\"# skip escapes. Unit: (). Import ints: checked_add/sub/mul/div/rem/neg return Option[T]; wrapping_* wrap modulo 2^width; saturating_* clamp. Division by zero panics except checked operations return None. ints.to_str covers all widths. &, |, ^, ~ preserve width. Left shifts discard high bits; signed right shifts sign-extend, unsigned zero-extend. Counts must be in 0..width or panic.\012", 964));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 37
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`i8 i16 i32 i64 u8 u16 u32 u64` are fixed-width integers; Int=i64, Byte=u8 (0..255). Arithmetic/indexing panic on overflow/invalid indexes. Decimal, 0x hex and 0b binary literals allow separators/suffixes (255u8, 0xffff_ffffu32); unsuffixed integers infer context or Int. Signed minima/full u64 are supported. Byte literals: 'a', '\\n'. Width changes require explicit checked i8(x)..u64(x); int/byte remain aliases. Float is binary64 (1.5); float(n)/int(x) convert. Bool: true/false. Str is bytes with UTF-8 source literals and escapes \\n \\t \\r \\0 \\\\ \\\" \\u{e9}; raw r\"\\d+\", r#\"..\"# skip escapes. Unit: (). Import ints: checked_add/sub/mul/div/rem/neg return Option[T]; wrapping_* wrap modulo 2^width; saturating_* clamp. Division by zero panics except checked operations return None. ints.to_str covers all widths. &, |, ^, ~ preserve width. Left shifts discard high bits; signed right shifts sign-extend, unsigned zero-extend. Counts must be in 0..width or panic.\012", 964));
     // line 38
-    vela_builder_add(v_out, VELA_STR("`+ - * / %` do arithmetic; `+` also joins two strings. `== != < <= > >=` compare; `&& || !` operate on Bool and short-circuit. Precedence, from tight to loose: calls/fields/index/`\?`, unary `- ! ~`, `* / %`, `+ -`, `<< >>`, `&`, `^`, `|`, comparisons, `&&`, `||`. There is no truthiness, ternary operator, increment operator or compound assignment. Write `n = n + 1`.\012", 368));
-    // line 39
     vela_builder_add(v_out, VELA_STR("\012", 1));
+    // line 39
+    vela_builder_add(v_out, VELA_STR("`+ - * / %` do arithmetic; `+` also joins two strings. `== != < <= > >=` compare; `&& || !` operate on Bool and short-circuit. Precedence, from tight to loose: calls/fields/index/`\?`, unary `- ! ~`, `* / %`, `+ -`, `<< >>`, `&`, `^`, `|`, comparisons, `&&`, `||`. There is no truthiness, ternary operator, increment operator or compound assignment. Write `n = n + 1`.\012", 368));
     // line 40
-    vela_builder_add(v_out, VELA_STR("Interfaces are structural generic bounds: `pub type Show = interface { fn show(value: Self) -> Str }`; `fn render[T: Show](value: T) -> Str { return value.show() }`. Extend interfaces with `interface: Eq + Show`; qualify imported bounds as `T: views.Show`. Define methods in the receiver type's module with `pub fn Widget.show(value: Widget) -> Str { ... }`. `value.show()` passes the receiver first; `Widget.show(value)` calls the same function. A normal module function taking the receiver first is also eligible. Function-valued fields take precedence. Cross-module calls require pub. Resolution is static; imports cannot add or override methods. Interface signatures have no bodies, contracts, method type parameters or mutable parameters; the first parameter is Self. Concrete fs/os/net/clock/unsafe effects are allowed. Interfaces are bounds, not runtime value types. Eq, Ord and Key are ordinary prelude interfaces; primitive implementations are intrinsic. Operators use eq and compare for custom types. Map keys use eq and hash; equal keys must have equal hashes, and implementations must obey comparison laws.\012", 1119));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 41
+    vela_builder_add(v_out, VELA_STR("Interfaces are structural generic bounds: `pub type Show = interface { fn show(value: Self) -> Str }`; `fn render[T: Show](value: T) -> Str { return value.show() }`. Extend interfaces with `interface: Eq + Show`; qualify imported bounds as `T: views.Show`. Define methods in the receiver type's module with `pub fn Widget.show(value: Widget) -> Str { ... }`. `value.show()` passes the receiver first; `Widget.show(value)` calls the same function. A normal module function taking the receiver first is also eligible. Function-valued fields take precedence. Cross-module calls require pub. Resolution is static; imports cannot add or override methods. Interface signatures have no bodies, contracts, method type parameters or mutable parameters; the first parameter is Self. Concrete fs/os/net/clock/unsafe effects are allowed. Interfaces are bounds, not runtime value types. Eq, Ord and Key are ordinary prelude interfaces; primitive implementations are intrinsic. Operators use eq and compare for custom types. Map keys use eq and hash; equal keys must have equal hashes, and implementations must obey comparison laws.\012", 1119));
+    // line 42
     static const vela_str _t2[] = {VELA_STR_INIT("```text\012", 8), {NULL, NULL, 0}, VELA_STR_INIT("```\012\012", 5)};
     vela_str _t3[3];
     memcpy(_t3, _t2, sizeof _t3);
@@ -122031,121 +122040,121 @@ vela_str f_5guide_reference(vela_str v_root) {
     vela_unique(&v_out);
     vela_builder_add(v_out, _t5);
     vela_str_release(_t5);
-    // line 42
-    vela_builder_add(v_out, VELA_STR("`let x = value` infers a type; `let x: Int = 1` annotates it. `let mut x = value` allows reassignment and changes to its fields/elements. Values have copy semantics: assignment, arguments, returns and closure captures copy logically. Arrays/maps/strings share storage until a change, then copy. Changing a copy never changes the original. String elements cannot be assigned. Struct fields use `x.field`.\012", 404));
     // line 43
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`let x = value` infers a type; `let x: Int = 1` annotates it. `let mut x = value` allows reassignment and changes to its fields/elements. Values have copy semantics: assignment, arguments, returns and closure captures copy logically. Arrays/maps/strings share storage until a change, then copy. Changing a copy never changes the original. String elements cannot be assigned. Struct fields use `x.field`.\012", 404));
     // line 44
-    vela_builder_add(v_out, VELA_STR("`[1, 2]` is an array `[Int]`. Annotate an empty array: `let xs: [Int] = []`. Indexes start at 0. `xs[a..b]` copies an array slice; `s[a..b]` shares immutable string bytes. Both exclude b; strings index to Byte and positions count bytes. `len(s)` counts bytes. `for x in xs` visits elements; `for i in 0..n` excludes n; use an explicit bound for an inclusive loop. In match patterns, `a..=b` includes b. `for condition { ... }` is a while loop; `for { ... }` repeats indefinitely. `if condition { ... } else if ... else { ... }` controls statements; use a match expression for conditional values.\012", 596));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 45
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`[1, 2]` is an array `[Int]`. Annotate an empty array: `let xs: [Int] = []`. Indexes start at 0. `xs[a..b]` copies an array slice; `s[a..b]` shares immutable string bytes. Both exclude b; strings index to Byte and positions count bytes. `len(s)` counts bytes. `for x in xs` visits elements; `for i in 0..n` excludes n; use an explicit bound for an inclusive loop. In match patterns, `a..=b` includes b. `for condition { ... }` is a while loop; `for { ... }` repeats indefinitely. `if condition { ... } else if ... else { ... }` controls statements; use a match expression for conditional values.\012", 596));
     // line 46
-    vela_builder_add(v_out, VELA_STR("A map is `Map[K, V]`; keys satisfy Key. Write `let mut m: Map[Str, Int] = [:]` or `[\"a\": 1]`. `m[key] = value` inserts/replaces; `m[key]` panics if absent. Use maps.get for optional lookup. `for key in maps.keys(m)` visits keys in insertion order. Maps and arrays are values: pass them with `mut` to change a caller's copy.\012", 324));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 47
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("A map is `Map[K, V]`; keys satisfy Key. Write `let mut m: Map[Str, Int] = [:]` or `[\"a\": 1]`. `m[key] = value` inserts/replaces; `m[key]` panics if absent. Use maps.get for optional lookup. `for key in maps.keys(m)` visits keys in insertion order. Maps and arrays are values: pass them with `mut` to change a caller's copy.\012", 324));
     // line 48
-    vela_builder_add(v_out, VELA_STR("## Functions, mutation and generics\012", 36));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 49
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("## Functions, mutation and generics\012", 36));
     // line 50
-    vela_builder_add(v_out, VELA_STR("`fn f(x: Int) -> Int { return x + 1 }` defines a function; omitting `->` means it returns nothing. Parameter types are required. Functions returning values must return on every path. Read-only parameters become mutable with `x: mut T`; callers write `f(mut x)`. Mutable arguments cannot overlap each other or concurrent reads; compute temporaries first. Mutable locals do not imply mutable parameters.\012", 402));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 51
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`fn f(x: Int) -> Int { return x + 1 }` defines a function; omitting `->` means it returns nothing. Parameter types are required. Functions returning values must return on every path. Read-only parameters become mutable with `x: mut T`; callers write `f(mut x)`. Mutable arguments cannot overlap each other or concurrent reads; compute temporaries first. Mutable locals do not imply mutable parameters.\012", 402));
     // line 52
-    vela_builder_add(v_out, VELA_STR("Function values have types such as `fn(Int) -> Int` and `fn(Str) -> Str uses fs`. Write `fn(x: Int) -> Int { return x * 2 }` or `fn(x) => x * 2`; parameter/result types can be inferred from context. Named functions are values; wrap built-ins in closures. Captures are immutable snapshots. Function values have no mut parameters.\012", 329));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 53
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("Function values have types such as `fn(Int) -> Int` and `fn(Str) -> Str uses fs`. Write `fn(x: Int) -> Int { return x * 2 }` or `fn(x) => x * 2`; parameter/result types can be inferred from context. Named functions are values; wrap built-ins in closures. Captures are immutable snapshots. Function values have no mut parameters.\012", 329));
     // line 54
-    vela_builder_add(v_out, VELA_STR("Generics use `fn identity[T](x: T) -> T { return x }` and `type Box[T] = struct { value: T }`. Type arguments are inferred from arguments and expected return types, not written at call sites: `let b: Box[Int] = Box { value: 1 }`. Bounds are `Eq` for equality, `Ord` for ordering, `Key` for map keys/hashable values; combine with `+`. For example `fn greater[T: Ord](a: T, b: T) -> T`. User-defined interfaces are also bounds.\012", 426));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 55
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("Generics use `fn identity[T](x: T) -> T { return x }` and `type Box[T] = struct { value: T }`. Type arguments are inferred from arguments and expected return types, not written at call sites: `let b: Box[Int] = Box { value: 1 }`. Bounds are `Eq` for equality, `Ord` for ordering, `Key` for map keys/hashable values; combine with `+`. For example `fn greater[T: Ord](a: T, b: T) -> T`. User-defined interfaces are also bounds.\012", 426));
     // line 56
-    vela_builder_add(v_out, VELA_STR("## Types, matching and errors\012", 30));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 57
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("## Types, matching and errors\012", 30));
     // line 58
-    vela_builder_add(v_out, VELA_STR("`type Point = struct { x: Int, y: Int }` defines a record; construct every field with `Point { x: 1, y: 2 }`. `type Shape = enum { Empty, Circle(Float), Pair(Int, Int) }` defines variants; construct `Shape.Empty` or `Shape.Circle(2.0)`. Payloads are positional. Variants can carry arrays, structs, other enums and recursive values.\012", 332));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 59
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`type Point = struct { x: Int, y: Int }` defines a record; construct every field with `Point { x: 1, y: 2 }`. `type Shape = enum { Empty, Circle(Float), Pair(Int, Int) }` defines variants; construct `Shape.Empty` or `Shape.Circle(2.0)`. Payloads are positional. Variants can carry arrays, structs, other enums and recursive values.\012", 332));
     // line 60
-    vela_builder_add(v_out, VELA_STR("`Option[T]` has `Some(T)` and `None`. `Result[T, E]` has `Ok(T)` and `Err(E)`. They are built in; annotate ambiguous constructors (`let r: Result[Int, Str] = Ok(1)`). A postfix `\?` unwraps Some/Ok and returns None/Err from the enclosing function, which must return a compatible Option/Result. It does not throw exceptions. Use explicit matches for deliberate conversion between error types.\012", 391));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 61
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`Option[T]` has `Some(T)` and `None`. `Result[T, E]` has `Ok(T)` and `Err(E)`. They are built in; annotate ambiguous constructors (`let r: Result[Int, Str] = Ok(1)`). A postfix `\?` unwraps Some/Ok and returns None/Err from the enclosing function, which must return a compatible Option/Result. It does not throw exceptions. Use explicit matches for deliberate conversion between error types.\012", 391));
     // line 62
-    vela_builder_add(v_out, VELA_STR("`match value { Some(x) => x, None => 0 }` is an expression; arms must agree in type and cover every case. A statement match may use blocks. `_` matches anything; names bind; variants destructure payloads. Literal and range patterns are supported. Put a fallback last. A bound variable is read-only. A new enum variant requires updating matches.\012", 345));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 63
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`match value { Some(x) => x, None => 0 }` is an expression; arms must agree in type and cover every case. A statement match may use blocks. `_` matches anything; names bind; variants destructure payloads. Literal and range patterns are supported. Put a fallback last. A bound variable is read-only. A new enum variant requires updating matches.\012", 345));
     // line 64
-    vela_builder_add(v_out, VELA_STR("## Modules and packages\012", 24));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 65
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("## Modules and packages\012", 24));
     // line 66
-    vela_builder_add(v_out, VELA_STR("`import text` loads local `text.vl`, otherwise std/dependencies. Use `text.trim(s)` or `geometry.Point`; names stay qualified. Private by default; `pub fn`/`pub type`/`pub const` export. Public APIs need public types. Local functions win over built-ins. No import cycles or duplicate declarations.\012", 298));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 67
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`import text` loads local `text.vl`, otherwise std/dependencies. Use `text.trim(s)` or `geometry.Point`; names stay qualified. Private by default; `pub fn`/`pub type`/`pub const` export. Public APIs need public types. Local functions win over built-ins. No import cycles or duplicate declarations.\012", 298));
     // line 68
-    vela_builder_add(v_out, VELA_STR("`vela new NAME` creates a program; `vela new --package NAME` creates a package. A `vela.mod` starts with `package NAME` and names dependencies with `use NAME SOURCE [REF]` (git/local). `stack 1G` enlarges main's stack. `vela get` fetches/pins in vela.lock; `get -u` updates. Builds never fetch. `json` is a package, not std: `vela get` it before `import json`.\012", 361));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 69
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`vela new NAME` creates a program; `vela new --package NAME` creates a package. A `vela.mod` starts with `package NAME` and names dependencies with `use NAME SOURCE [REF]` (git/local). `stack 1G` enlarges main's stack. `vela get` fetches/pins in vela.lock; `get -u` updates. Builds never fetch. `json` is a package, not std: `vela get` it before `import json`.\012", 361));
     // line 70
-    vela_builder_add(v_out, VELA_STR("`const NAME[: T] = expr`: immutable module value, initialized once on first read across tasks. Literals/references/operators only; no calls, mutation or cycles. Copy into `let mut` to change.\012\012", 193));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 71
-    vela_builder_add(v_out, VELA_STR("## Memory control\012\012", 19));
+    vela_builder_add(v_out, VELA_STR("`const NAME[: T] = expr`: immutable module value, initialized once on first read across tasks. Literals/references/operators only; no calls, mutation or cycles. Copy into `let mut` to change.\012\012", 193));
     // line 72
-    vela_builder_add(v_out, VELA_STR("`[T; N]` is a fixed-size inline value (N a literal in 0..4096), initialized from exactly N elements: `let mut pair: [Int; 2] = [1, 2]`. Copying it copies its elements logically; managed fields retain their owners. Indexing, mutation, len and iteration are checked. push is only for growable arrays. Fixed arrays cannot have recursive by-value layouts. Nonrecursive structs in growable arrays are already inline. There is no implicit growable-array conversion.\012\012", 461));
+    vela_builder_add(v_out, VELA_STR("## Memory control\012\012", 19));
     // line 73
-    vela_builder_add(v_out, VELA_STR("`import views` provides Slice[T] read snapshots. views.of/range retain array storage; get/length/sub/to_array access or copy them. views.text uses the existing Str view. Views can outlive a source variable and be returned or captured by tasks. Source mutation copies shared storage, preserving the view. `import buffers` provides Bytes, create/from_array/from_str/to_str, get/set/length/view, and signed/unsigned fixed-width reads/writes with le/be byte order. Width reads allow unaligned offsets and check the whole access. Raw Str-to-byte and byte-to-Str conversions copy; views do not.\012\012", 590));
+    vela_builder_add(v_out, VELA_STR("`[T; N]` is a fixed-size inline value (N a literal in 0..4096), initialized from exactly N elements: `let mut pair: [Int; 2] = [1, 2]`. Copying it copies its elements logically; managed fields retain their owners. Indexing, mutation, len and iteration are checked. push is only for growable arrays. Fixed arrays cannot have recursive by-value layouts. Nonrecursive structs in growable arrays are already inline. There is no implicit growable-array conversion.\012\012", 461));
     // line 74
-    vela_builder_add(v_out, VELA_STR("`import arenas` provides Arena[T] contiguous reusable storage and positional Slot[T] handles. create reserves capacity, alloc appends, get/set check index and generation, reset drops values and advances the generation, invalidating old slots. Arena copies keep ordinary snapshots; later writes/reset use copy-on-write. Slots are relative positions, never raw pointers: use them with the intended arena snapshot. Managed elements are released on reset/drop; there is no manual free.\012\012", 483));
+    vela_builder_add(v_out, VELA_STR("`import views` provides Slice[T] read snapshots. views.of/range retain array storage; get/length/sub/to_array access or copy them. views.text uses the existing Str view. Views can outlive a source variable and be returned or captured by tasks. Source mutation copies shared storage, preserving the view. `import buffers` provides Bytes, create/from_array/from_str/to_str, get/set/length/view, and signed/unsigned fixed-width reads/writes with le/be byte order. Width reads allow unaligned offsets and check the whole access. Raw Str-to-byte and byte-to-Str conversions copy; views do not.\012\012", 590));
     // line 75
-    vela_builder_add(v_out, VELA_STR("```vela\012import buffers\012import views\012import arenas\012fn main() {\012    let pair: [Int; 2] = [1, 2]\012    print(pair[1])\012    let mut bytes = buffers.create(8)\012    buffers.write_u32_be(mut bytes, 1, 0x12345678u32)\012    let saved = buffers.view(bytes, 1, 5)\012    buffers.set(mut bytes, 1, 0u8)\012    assert(saved.get(0) == 0x12u8)\012    let mut arena: arenas.Arena[Str] = arenas.create(4)\012    let slot = arenas.alloc(mut arena, \"value\")\012    assert(arenas.get(arena, slot) == \"value\")\012    arenas.reset(mut arena)\012}\012```\012\012", 503));
+    vela_builder_add(v_out, VELA_STR("`import arenas` provides Arena[T] contiguous reusable storage and positional Slot[T] handles. create reserves capacity, alloc appends, get/set check index and generation, reset drops values and advances the generation, invalidating old slots. Arena copies keep ordinary snapshots; later writes/reset use copy-on-write. Slots are relative positions, never raw pointers: use them with the intended arena snapshot. Managed elements are released on reset/drop; there is no manual free.\012\012", 483));
     // line 76
-    vela_builder_add(v_out, VELA_STR("## Calling C\012\012", 14));
+    vela_builder_add(v_out, VELA_STR("```vela\012import buffers\012import views\012import arenas\012fn main() {\012    let pair: [Int; 2] = [1, 2]\012    print(pair[1])\012    let mut bytes = buffers.create(8)\012    buffers.write_u32_be(mut bytes, 1, 0x12345678u32)\012    let saved = buffers.view(bytes, 1, 5)\012    buffers.set(mut bytes, 1, 0u8)\012    assert(saved.get(0) == 0x12u8)\012    let mut arena: arenas.Arena[Str] = arenas.create(4)\012    let slot = arenas.alloc(mut arena, \"value\")\012    assert(arenas.get(arena, slot) == \"value\")\012    arenas.reset(mut arena)\012}\012```\012\012", 503));
     // line 77
-    vela_builder_add(v_out, VELA_STR("`import c`: Int/UInt i32/u32; Short/UShort i16/u16; LongLong/ULongLong i64/u64; Char/SChar i8; UChar u8; Bool Bool; Double Float. Long/ULong follow C (32 bits on Windows/WASI, 64 on Linux/macOS); Size/SSize follow target pointers (32 on WASI, 64 elsewhere). c.Float uses binary32 at extern/callback boundaries and binary64 storage. c.Ptr/c.Fn are nominal non-owning target-sized pointers. WASI tasks are sequential; processes/sockets return unsupported errors.\012\012", 462));
+    vela_builder_add(v_out, VELA_STR("## Calling C\012\012", 14));
     // line 78
-    vela_builder_add(v_out, VELA_STR("Declare `extern fn name(args...) -> scalar uses unsafe`, optionally `= \"C_symbol\"`. Omit the result for C void; mut scalar parameters pass pointers. c.Float mut parameters use a binary32 temporary with copy-back. End variadic declarations with `...` after a fixed parameter; extra scalar arguments receive C default promotions. Put system libraries in vela.mod as `link z` or `link sqlite3`; `link ./libexample.a` resolves relative to the manifest. Dependencies contribute libraries too. Aggregates by value, capturing callbacks, generic externs and contracts need a wrapper.\012\012", 577));
+    vela_builder_add(v_out, VELA_STR("`import c`: Int/UInt i32/u32; Short/UShort i16/u16; LongLong/ULongLong i64/u64; Char/SChar i8; UChar u8; Bool Bool; Double Float. Long/ULong follow C (32 bits on Windows/WASI, 64 on Linux/macOS); Size/SSize follow target pointers (32 on WASI, 64 elsewhere). c.Float uses binary32 at extern/callback boundaries and binary64 storage. c.Ptr/c.Fn are nominal non-owning target-sized pointers. WASI tasks are sequential; processes/sockets return unsupported errors.\012\012", 462));
     // line 79
-    vela_builder_add(v_out, VELA_STR("An `unsafe { ... }` statement discharges only unsafe; other effects propagate. Check bounds, signatures, ownership, lifetimes and cleanup inside a safe wrapper. A deferred closure must declare or contain its own unsafe operations. c.data is a read-only borrow valid while its Str owner is alive and unchanged. c.cstr allocates a NUL-terminated copy (embedded NUL panics); free it. c.string/c.bytes return owned copies. c.load takes its scalar type from context; unaligned scalar loads/stores are supported. Offsets count bytes. Raw pointers carry no automatic owner or bounds. c.callback creates a C ABI thunk for a monomorphic top-level scalar function; C must obey its signature. Other C effects must also be declared honestly; Vela fakes do not intercept C.\012\012", 762));
+    vela_builder_add(v_out, VELA_STR("Declare `extern fn name(args...) -> scalar uses unsafe`, optionally `= \"C_symbol\"`. Omit the result for C void; mut scalar parameters pass pointers. c.Float mut parameters use a binary32 temporary with copy-back. End variadic declarations with `...` after a fixed parameter; extra scalar arguments receive C default promotions. Put system libraries in vela.mod as `link z` or `link sqlite3`; `link ./libexample.a` resolves relative to the manifest. Dependencies contribute libraries too. Aggregates by value, capturing callbacks, generic externs and contracts need a wrapper.\012\012", 577));
     // line 80
-    vela_builder_add(v_out, VELA_STR("```vela\012import c\012extern fn strlen(text: c.Ptr) -> c.Size uses unsafe\012fn length(text: Str) -> Int {\012    unsafe {\012        let pointer = c.cstr(text)\012        let size = strlen(pointer)\012        c.free(pointer)\012        return int(size)\012    }\012}\012fn main() { print(length(\"hello\")) }\012```\012\012", 281));
+    vela_builder_add(v_out, VELA_STR("An `unsafe { ... }` statement discharges only unsafe; other effects propagate. Check bounds, signatures, ownership, lifetimes and cleanup inside a safe wrapper. A deferred closure must declare or contain its own unsafe operations. c.data is a read-only borrow valid while its Str owner is alive and unchanged. c.cstr allocates a NUL-terminated copy (embedded NUL panics); free it. c.string/c.bytes return owned copies. c.load takes its scalar type from context; unaligned scalar loads/stores are supported. Offsets count bytes. Raw pointers carry no automatic owner or bounds. c.callback creates a C ABI thunk for a monomorphic top-level scalar function; C must obey its signature. Other C effects must also be declared honestly; Vela fakes do not intercept C.\012\012", 762));
     // line 81
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("```vela\012import c\012extern fn strlen(text: c.Ptr) -> c.Size uses unsafe\012fn length(text: Str) -> Int {\012    unsafe {\012        let pointer = c.cstr(text)\012        let size = strlen(pointer)\012        c.free(pointer)\012        return int(size)\012    }\012}\012fn main() { print(length(\"hello\")) }\012```\012\012", 281));
     // line 82
-    vela_builder_add(v_out, VELA_STR("## Effects, contracts, tests and concurrency\012", 45));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 83
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("## Effects, contracts, tests and concurrency\012", 45));
     // line 84
-    vela_builder_add(v_out, VELA_STR("Effects fs/os/net/clock cover files/processes/networking/time and propagate through calls/function values. Main/tests allow these; unsafe needs declaration/block. Printing/os.write are effect-free. `fn map[T, U](xs: [T], f: fn(T) -> U) -> [U] uses f` means the caller inherits the argument function's effects. A pure function parameter rejects effectful arguments.\012", 365));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 85
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("Effects fs/os/net/clock cover files/processes/networking/time and propagate through calls/function values. Main/tests allow these; unsafe needs declaration/block. Printing/os.write are effect-free. `fn map[T, U](xs: [T], f: fn(T) -> U) -> [U] uses f` means the caller inherits the argument function's effects. A pure function parameter rejects effectful arguments.\012", 365));
     // line 86
-    vela_builder_add(v_out, VELA_STR("Contracts follow signatures: `requires n >= 0`, `ensures result >= 0`. Clauses are Bool; unproved checks and observable calls/effects stay at runtime. In ensures, `result` is the return value and mut parameters hold final values. Failed contracts/assertions panic (101), outside Result. Compiler errors exit 1, bad CLI arguments 2, compiler defects 70.\012", 353));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 87
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("Contracts follow signatures: `requires n >= 0`, `ensures result >= 0`. Clauses are Bool; unproved checks and observable calls/effects stay at runtime. In ensures, `result` is the return value and mut parameters hold final values. Failed contracts/assertions panic (101), outside Result. Compiler errors exit 1, bad CLI arguments 2, compiler defects 70.\012", 353));
     // line 88
-    vela_builder_add(v_out, VELA_STR("Top-level `test \"description\" { ... }` uses assert(condition). Assert Result by matching Ok/Err; Result has no ==. Fakes: `with files = [\"data.txt\": \"contents\"] { ... }`, `with args = [\"program\", \"arg\"]`, `with env = [\"KEY\": \"value\"]`, `with stdin = \"input\\n\"`. Capture with `let mut out = strings.builder()` then `with stdout = mut out`. Other fakes: `with clock = [wall_ns, mono_ns]`, `with net = [net.reply(host, port, expected_write, response)]`, `with processes = [processes.reply(args, input, status, stdout, stderr)]`. Rows consumed once; unmatched/unconsumed rows panic. Socket copies alias; close rejects new calls; final release closes; active calls finish/time out. unicode validates UTF-8/scalars; io returns next state; http: plaintext HTTP/1.1 GET. Socket waits time out; DNS uses host resolution. Exits restore fakes; test runs library tests.\012", 858));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 89
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("Top-level `test \"description\" { ... }` uses assert(condition). Assert Result by matching Ok/Err; Result has no ==. Fakes: `with files = [\"data.txt\": \"contents\"] { ... }`, `with args = [\"program\", \"arg\"]`, `with env = [\"KEY\": \"value\"]`, `with stdin = \"input\\n\"`. Capture with `let mut out = strings.builder()` then `with stdout = mut out`. Other fakes: `with clock = [wall_ns, mono_ns]`, `with net = [net.reply(host, port, expected_write, response)]`, `with processes = [processes.reply(args, input, status, stdout, stderr)]`. Rows consumed once; unmatched/unconsumed rows panic. Socket copies alias; close rejects new calls; final release closes; active calls finish/time out. unicode validates UTF-8/scalars; io returns next state; http: plaintext HTTP/1.1 GET. Socket waits time out; DNS uses host resolution. Exits restore fakes; test runs library tests.\012", 858));
     // line 90
-    vela_builder_add(v_out, VELA_STR("`tasks.map(xs, f)` returns results in input order; `tasks.each(xs, f)` returns nothing. Both join and propagate f's effects. Captures copy. `tasks.workers()` reports the count; `VELA_THREADS` sets it. No shared mutable captures or async syntax.\012", 245));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 91
-    vela_builder_add(v_out, VELA_STR("\012", 1));
+    vela_builder_add(v_out, VELA_STR("`tasks.map(xs, f)` returns results in input order; `tasks.each(xs, f)` returns nothing. Both join and propagate f's effects. Captures copy. `tasks.workers()` reports the count; `VELA_THREADS` sets it. No shared mutable captures or async syntax.\012", 245));
     // line 92
-    vela_builder_add(v_out, VELA_STR("## Complete examples\012", 21));
-    // line 93
     vela_builder_add(v_out, VELA_STR("\012", 1));
+    // line 93
+    vela_builder_add(v_out, VELA_STR("## Complete examples\012", 21));
     // line 94
-    vela_builder_add(v_out, VELA_STR("```vela\012fn twice(x: Int) -> Int { return x * 2 }\012fn main() {\012    for x in [1, 2, 3] { print(twice(x)) }\012}\012test \"copies\" {\012    let a = [1, 2]\012    let mut b = a\012    b[0] = 9\012    assert(a[0] == 1 && b[0] == 9)\012}\012```\012\012```vela\012import files\012import text\012fn read_count(path: Str) -> Result[Int, Str] uses fs {\012    return Ok(len(text.lines(files.read(path)\?)))\012}\012fn main() {\012    match read_count(\"data.txt\") { Ok(n) => print(n), Err(e) => print(e) }\012}\012test \"fake filesystem\" {\012    with files = [\"data.txt\": \"one\\ntwo\\n\"] {\012        match read_count(\"data.txt\") { Ok(n) => assert(n == 2), Err(_) => assert(false) }\012    }\012    with files = [:] {\012        match read_count(\"missing\") { Ok(_) => assert(false), Err(e) => assert(len(e) > 0) }\012    }\012}\012```\012", 738));
+    vela_builder_add(v_out, VELA_STR("\012", 1));
     // line 95
-    vela_builder_add(v_out, VELA_STR("\012## Keywords (from the lexer)\012\012", 31));
+    vela_builder_add(v_out, VELA_STR("```vela\012fn twice(x: Int) -> Int { return x * 2 }\012fn main() {\012    for x in [1, 2, 3] { print(twice(x)) }\012}\012test \"copies\" {\012    let a = [1, 2]\012    let mut b = a\012    b[0] = 9\012    assert(a[0] == 1 && b[0] == 9)\012}\012```\012\012```vela\012import files\012import text\012fn read_count(path: Str) -> Result[Int, Str] uses fs {\012    return Ok(len(text.lines(files.read(path)\?)))\012}\012fn main() {\012    match read_count(\"data.txt\") { Ok(n) => print(n), Err(e) => print(e) }\012}\012test \"fake filesystem\" {\012    with files = [\"data.txt\": \"one\\ntwo\\n\"] {\012        match read_count(\"data.txt\") { Ok(n) => assert(n == 2), Err(_) => assert(false) }\012    }\012    with files = [:] {\012        match read_count(\"missing\") { Ok(_) => assert(false), Err(e) => assert(len(e) > 0) }\012    }\012}\012```\012", 738));
     // line 96
+    vela_builder_add(v_out, VELA_STR("\012## Keywords (from the lexer)\012\012", 31));
+    // line 97
     vela_array * _t7 = f_5lexer_keywords();
     vela_array * _t6 = _t7;
     vela_unique(&v_out);
     for (int64_t _t8 = 0; _t8 < _t6->len; _t8++) {
         t_5lexer_Kind v_k = ((t_5lexer_Kind *)_t6->data)[_t8];
-        // line 97
+        // line 98
         vela_str _t9 = f_5lexer_kind_name(v_k);
         vela_str _t10 = vela_str_concat(_t9, VELA_STR(" ", 1));
         vela_str_release(_t9);
@@ -122153,15 +122162,15 @@ vela_str f_5guide_reference(vela_str v_root) {
         vela_str_release(_t10);
     }
     vela_array_release(_t6);
-    // line 99
+    // line 100
     vela_unique(&v_out);
     vela_builder_add(v_out, VELA_STR("\012\012## Built-in functions (from the compiler index)\012\012```text\012", 59));
-    // line 100
+    // line 101
     vela_array * _t12 = f_7checker_prelude();
     vela_array * _t11 = _t12;
     for (int64_t _t13 = 0; _t13 < _t11->len; _t13++) {
         vela_str v_name = ((vela_str *)_t11->data)[_t13];
-        // line 101
+        // line 102
         vela_str _t14 = v_name;
         vela_str_retain(_t14);
         f_5guide_builtin(&v_out, VELA_STR("", 0), _t14);
@@ -122169,15 +122178,15 @@ vela_str f_5guide_reference(vela_str v_root) {
         vela_str_release(VELA_STR("", 0));
     }
     vela_array_release(_t11);
-    // line 103
+    // line 104
     vela_unique(&v_out);
     vela_builder_add(v_out, VELA_STR("```\012", 4));
-    // line 104
+    // line 105
     vela_array * _t16 = f_7modules_builtin_modules();
     vela_array * _t15 = _t16;
     for (int64_t _t17 = 0; _t17 < _t15->len; _t17++) {
         vela_str v_module = ((vela_str *)_t15->data)[_t17];
-        // line 105
+        // line 106
         static const vela_str _t18[] = {VELA_STR_INIT("\012### import ", 12), {NULL, NULL, 0}, VELA_STR_INIT("\012\012```text\012", 10)};
         vela_str _t19[3];
         memcpy(_t19, _t18, sizeof _t19);
@@ -122186,12 +122195,12 @@ vela_str f_5guide_reference(vela_str v_root) {
         vela_unique(&v_out);
         vela_builder_add(v_out, _t20);
         vela_str_release(_t20);
-        // line 106
+        // line 107
         vela_array * _t22 = f_7modules_builtin_functions(v_module);
         vela_array * _t21 = _t22;
         for (int64_t _t23 = 0; _t23 < _t21->len; _t23++) {
             vela_str v_name_2 = ((vela_str *)_t21->data)[_t23];
-            // line 107
+            // line 108
             vela_str _t24 = v_module;
             vela_str_retain(_t24);
             vela_str _t25 = v_name_2;
@@ -122201,49 +122210,49 @@ vela_str f_5guide_reference(vela_str v_root) {
             vela_str_release(_t24);
         }
         vela_array_release(_t21);
-        // line 109
+        // line 110
         vela_unique(&v_out);
         vela_builder_add(v_out, VELA_STR("```\012", 4));
     }
     vela_array_release(_t15);
-    // line 111
+    // line 112
     vela_unique(&v_out);
     vela_builder_add(v_out, VELA_STR("\012Each `import NAME` below is std/NAME.vl.\012", 42));
-    // line 112
+    // line 113
     vela_array * _t27 = f_7modules_std_modules();
     vela_array * _t26 = _t27;
-    vela_unique(&v_out);
     for (int64_t _t28 = 0; _t28 < _t26->len; _t28++) {
         vela_str v_module_2 = ((vela_str *)_t26->data)[_t28];
-        // line 113
+        // line 114
         static const vela_str _t29[] = {VELA_STR_INIT("\012## import ", 11), {NULL, NULL, 0}, VELA_STR_INIT("\012\012```text\012", 10)};
         vela_str _t30[3];
         memcpy(_t30, _t29, sizeof _t30);
         _t30[1] = v_module_2;
         vela_str _t31 = vela_str_join(_t30, 3);
+        vela_unique(&v_out);
         vela_builder_add(v_out, _t31);
         vela_str_release(_t31);
-        // line 114
+        // line 115
         vela_str _t32 = f_7modules_join(v_root, VELA_STR("std", 3));
         vela_str _t33 = vela_str_concat(v_module_2, VELA_STR(".vl", 3));
         vela_str _t34 = f_7modules_join(_t32, _t33);
         vela_str v_path = _t34;
         vela_str_release(_t33);
         vela_str_release(_t32);
-        // line 115
+        // line 116
         vela_str _t35 = VELA_STR("", 0);
         bool _t36 = vela_files_read(v_path, &_t35);
         Result_Str_Str _t37 = _t36 ? (Result_Str_Str){ .tag = Result_Str_Str_Ok, .as.m_Ok = { ._0 = _t35 } } : (Result_Str_Str){ .tag = Result_Str_Str_Err, .as.m_Err = { ._0 = _t35 } };
         if (_t37.tag == Result_Str_Str_Ok) {
             vela_str v_source = _t37.as.m_Ok._0;
             vela_str_retain(v_source);
-            // line 117
+            // line 118
             t_5lexer_Lexed _t38 = f_5lexer_tokenize(v_source);
             t_5lexer_Lexed v_tokens = _t38;
-            // line 118
+            // line 119
             t_6parser_Parsed _t39 = f_6parser_parse(v_tokens.m_tokens, 0);
             t_6parser_Parsed v_parsed = _t39;
-            // line 119
+            // line 120
             int64_t _t40 = v_tokens.m_errors->len;
             int64_t _t41 = _t40;
             bool _t42 = _t41 > 0;
@@ -122255,7 +122264,7 @@ vela_str f_5guide_reference(vela_str v_root) {
                 _t43 = _t46;
             }
             if (_t43) {
-                // line 120
+                // line 121
                 static const vela_str _t47[] = {VELA_STR_INIT("vela: error: cannot generate guide from ", 40), {NULL, NULL, 0}, VELA_STR_INIT(" [E6007]", 8)};
                 vela_str _t48[3];
                 memcpy(_t48, _t47, sizeof _t48);
@@ -122263,103 +122272,77 @@ vela_str f_5guide_reference(vela_str v_root) {
                 vela_str _t49 = vela_str_join(_t48, 3);
                 vela_eprint_str(_t49);
                 vela_str_release(_t49);
-                // line 121
-                vela_os_exit(1, "compiler/src/guide.vl:121:24");
+                // line 122
+                vela_os_exit(1, "compiler/src/guide.vl:122:24");
             }
-            // line 123
-            vela_array * _t51 = v_parsed.m_program.m_fns;
-            vela_array_retain(_t51);
-            vela_array * _t50 = _t51;
-            for (int64_t _t52 = 0; _t52 < _t50->len; _t52++) {
-                t_3ast_FnDecl v_f = ((t_3ast_FnDecl *)_t50->data)[_t52];
-                // line 124
+            // line 124
+            vela_array * _t50 = vela_array_new(vt_t_3ast_FnDecl(), 0);
+            vela_array * v_public = _t50;
+            // line 125
+            vela_array * _t52 = v_parsed.m_program.m_fns;
+            vela_array_retain(_t52);
+            vela_array * _t51 = _t52;
+            vela_unique(&v_public);
+            for (int64_t _t53 = 0; _t53 < _t51->len; _t53++) {
+                t_3ast_FnDecl v_f = ((t_3ast_FnDecl *)_t51->data)[_t53];
+                // line 126
                 if (v_f.m_public) {
-                    // line 125
-                    vela_str _t53 = f_5index_signature(v_f);
-                    vela_str _t54 = vela_str_concat(_t53, VELA_STR("\012", 1));
-                    vela_str_release(_t53);
-                    vela_builder_add(v_out, _t54);
-                    vela_str_release(_t54);
-                    // line 126
-                    vela_array * _t56 = v_f.m_requires;
-                    vela_array_retain(_t56);
-                    vela_array * _t55 = _t56;
-                    for (int64_t _t57 = 0; _t57 < _t55->len; _t57++) {
-                        t_3ast_Expr v_e = ((t_3ast_Expr *)_t55->data)[_t57];
-                        // line 127
-                        static const vela_str _t58[] = {VELA_STR_INIT("  requires ", 11), {NULL, NULL, 0}, VELA_STR_INIT("\012", 1)};
-                        vela_str _t59[3];
-                        memcpy(_t59, _t58, sizeof _t59);
-                        vela_str _t60 = f_3ast_expr_text(v_e);
-                        _t59[1] = _t60;
-                        vela_str _t61 = vela_str_join(_t59, 3);
-                        vela_str_release(_t59[1]);
-                        vela_builder_add(v_out, _t61);
-                        vela_str_release(_t61);
-                    }
-                    vela_array_release(_t55);
-                    // line 129
-                    vela_array * _t63 = v_f.m_ensures;
-                    vela_array_retain(_t63);
-                    vela_array * _t62 = _t63;
-                    for (int64_t _t64 = 0; _t64 < _t62->len; _t64++) {
-                        t_3ast_Expr v_e_2 = ((t_3ast_Expr *)_t62->data)[_t64];
-                        // line 130
-                        static const vela_str _t65[] = {VELA_STR_INIT("  ensures ", 10), {NULL, NULL, 0}, VELA_STR_INIT("\012", 1)};
-                        vela_str _t66[3];
-                        memcpy(_t66, _t65, sizeof _t66);
-                        vela_str _t67 = f_3ast_expr_text(v_e_2);
-                        _t66[1] = _t67;
-                        vela_str _t68 = vela_str_join(_t66, 3);
-                        vela_str_release(_t66[1]);
-                        vela_builder_add(v_out, _t68);
-                        vela_str_release(_t68);
-                    }
-                    vela_array_release(_t62);
+                    // line 127
+                    t_3ast_FnDecl _t54 = v_f;
+                    rc_retain_t_3ast_FnDecl(_t54);
+                    t_3ast_FnDecl _t55 = _t54;
+                    vela_push(v_public, &_t55, sizeof(t_3ast_FnDecl));
                 }
             }
-            vela_array_release(_t50);
+            vela_array_release(_t51);
+            // line 130
+            vela_array * _t56 = v_public;
+            vela_array_retain(_t56);
+            f_5guide_signatures(&v_out, _t56);
+            vela_array_release(_t56);
+            vela_array_release(v_public);
             rc_release_t_6parser_Parsed(v_parsed);
             rc_release_t_5lexer_Lexed(v_tokens);
             vela_str_release(v_source);
         } else {
-            vela_str v_e_3 = _t37.as.m_Err._0;
-            vela_str_retain(v_e_3);
-            // line 136
-            static const vela_str _t69[] = {VELA_STR_INIT("vela: error: ", 13), {NULL, NULL, 0}, VELA_STR_INIT(" [E6001]", 8)};
-            vela_str _t70[3];
-            memcpy(_t70, _t69, sizeof _t70);
-            _t70[1] = v_e_3;
-            vela_str _t71 = vela_str_join(_t70, 3);
-            vela_eprint_str(_t71);
-            vela_str_release(_t71);
-            // line 137
-            vela_os_exit(1, "compiler/src/guide.vl:137:20");
-            vela_str_release(v_e_3);
+            vela_str v_e = _t37.as.m_Err._0;
+            vela_str_retain(v_e);
+            // line 133
+            static const vela_str _t57[] = {VELA_STR_INIT("vela: error: ", 13), {NULL, NULL, 0}, VELA_STR_INIT(" [E6001]", 8)};
+            vela_str _t58[3];
+            memcpy(_t58, _t57, sizeof _t58);
+            _t58[1] = v_e;
+            vela_str _t59 = vela_str_join(_t58, 3);
+            vela_eprint_str(_t59);
+            vela_str_release(_t59);
+            // line 134
+            vela_os_exit(1, "compiler/src/guide.vl:134:20");
+            vela_str_release(v_e);
         }
         rc_release_Result_Str_Str(_t37);
-        // line 140
+        // line 137
+        vela_unique(&v_out);
         vela_builder_add(v_out, VELA_STR("```\012", 4));
         vela_str_release(v_path);
     }
     vela_array_release(_t26);
-    // line 142
-    vela_str _t72 = vela_builder_build(v_out);
-    vela_str _t73 = _t72;
+    // line 139
+    vela_str _t60 = vela_builder_build(v_out);
+    vela_str _t61 = _t60;
     vela_array_release(v_out);
-    return _t73;
+    return _t61;
 }
 /* vela: part */
 
 void f_5guide_builtin(vela_array * * v_out, vela_str v_module, vela_str v_name) {
-    // line 146
+    // line 143
     vela_str _t1 = v_name;
     vela_str_retain(_t1);
     vela_str v_full = _t1;
-    // line 147
+    // line 144
     bool _t2 = !vela_str_eq(v_module, VELA_STR("", 0));
     if (_t2) {
-        // line 148
+        // line 145
         static const vela_str _t3[] = {{NULL, NULL, 0}, VELA_STR_INIT(".", 1), {NULL, NULL, 0}};
         vela_str _t4[3];
         memcpy(_t4, _t3, sizeof _t4);
@@ -122369,16 +122352,16 @@ void f_5guide_builtin(vela_array * * v_out, vela_str v_module, vela_str v_name) 
         vela_str_release(v_full);
         v_full = _t5;
     }
-    // line 150
+    // line 147
     vela_array * _t6 = f_5index_builtin_info(v_full);
     vela_array * v_info = _t6;
-    // line 151
+    // line 148
     int64_t _t7 = v_info->len;
     int64_t _t8 = _t7;
     bool _t9 = _t8 == 2;
     if (_t9) {
-        // line 152
-        vela_str _t10 = *(vela_str *)vela_at(v_info, 0, sizeof(vela_str), "compiler/src/guide.vl:152:34");
+        // line 149
+        vela_str _t10 = *(vela_str *)vela_at(v_info, 0, sizeof(vela_str), "compiler/src/guide.vl:149:34");
         vela_str _t11 = vela_str_concat(_t10, VELA_STR("\012", 1));
         vela_unique(&(*v_out));
         vela_builder_add((*v_out), _t11);
@@ -122386,6 +122369,713 @@ void f_5guide_builtin(vela_array * * v_out, vela_str v_module, vela_str v_name) 
     }
     vela_array_release(v_info);
     vela_str_release(v_full);
+}
+/* vela: part */
+
+void f_5guide_signatures(vela_array * * v_out, vela_array * v_fns) {
+    // line 158
+    vela_array * _t1 = vela_array_new(&vela_type_str, 0);
+    vela_array * v_keys = _t1;
+    // line 159
+    vela_array * _t2 = vela_array_new(&vela_type_str, 0);
+    vela_array * v_sigs = _t2;
+    // line 160
+    vela_map * _t3 = vela_map_new(&vela_type_str, &vela_type_int);
+    vela_map * v_counts = _t3;
+    // line 161
+    vela_array * _t5 = v_fns;
+    vela_array_retain(_t5);
+    vela_array * _t4 = _t5;
+    vela_unique(&v_sigs);
+    vela_unique(&v_keys);
+    vela_unique_map(&v_counts);
+    for (int64_t _t6 = 0; _t6 < _t4->len; _t6++) {
+        t_3ast_FnDecl v_f = ((t_3ast_FnDecl *)_t4->data)[_t6];
+        // line 162
+        vela_str _t7 = f_5index_signature(v_f);
+        vela_str v_sig = _t7;
+        // line 163
+        vela_str v_key = VELA_STR("", 0);
+        // line 164
+        int64_t _t8 = v_f.m_requires->len;
+        int64_t _t9 = _t8;
+        bool _t10 = _t9 == 0;
+        bool _t11 = _t10;
+        if (_t11) {
+            int64_t _t12 = v_f.m_ensures->len;
+            int64_t _t13 = _t12;
+            bool _t14 = _t13 == 0;
+            _t11 = _t14;
+        }
+        if (_t11) {
+            // line 165
+            vela_str _t15 = f_5guide_pattern(v_sig);
+            vela_str_release(v_key);
+            v_key = _t15;
+        }
+        // line 167
+        vela_str _t16 = v_sig;
+        vela_str_retain(_t16);
+        vela_str _t17 = _t16;
+        vela_push(v_sigs, &_t17, sizeof(vela_str));
+        // line 168
+        vela_str _t18 = v_key;
+        vela_str_retain(_t18);
+        vela_str _t19 = _t18;
+        vela_push(v_keys, &_t19, sizeof(vela_str));
+        // line 169
+        bool _t20 = !vela_str_eq(v_key, VELA_STR("", 0));
+        if (_t20) {
+            // line 170
+            vela_str _t22 = v_key;
+            int64_t *_t21 = vela_map_find(v_counts, &_t22);
+            Option_Int _t23;
+            if (_t21) {
+                _t23 = (Option_Int){ .tag = Option_Int_Some, .as.m_Some = { ._0 = *_t21 } };
+            } else {
+                _t23 = (Option_Int){ .tag = Option_Int_None };
+            }
+            if (_t23.tag == Option_Int_Some) {
+                int64_t v_n = _t23.as.m_Some._0;
+                // line 171
+                int64_t _t24 = v_n;
+                int64_t _t25 = vela_add(_t24, 1, "compiler/src/guide.vl:171:44");
+                vela_str _t26 = v_key;
+                vela_str_retain(_t26);
+                vela_str _t27 = _t26;
+                int64_t _t28 = _t25;
+                vela_map_set(v_counts, &_t27, &_t28);
+            } else {
+                // line 172
+                vela_str _t29 = v_key;
+                vela_str_retain(_t29);
+                vela_str _t30 = _t29;
+                int64_t _t31 = 1;
+                vela_map_set(v_counts, &_t30, &_t31);
+            }
+        }
+        vela_str_release(v_key);
+        vela_str_release(v_sig);
+    }
+    vela_array_release(_t4);
+    // line 176
+    vela_map * _t32 = vela_map_new(&vela_type_str, &vela_type_bool);
+    vela_map * v_done = _t32;
+    // line 177
+    int64_t _t33 = v_fns->len;
+    int64_t _t34 = _t33;
+    vela_unique_map(&v_done);
+    vela_unique(&(*v_out));
+    for (int64_t _t35 = 0; _t35 < _t34; _t35++) {
+        int64_t v_i = _t35;
+        // line 178
+        vela_str _t36 = *(vela_str *)vela_at(v_keys, v_i, sizeof(vela_str), "compiler/src/guide.vl:178:23");
+        vela_str_retain(_t36);
+        vela_str v_key_2 = _t36;
+        // line 179
+        bool _t37 = !vela_str_eq(v_key_2, VELA_STR("", 0));
+        bool _t38 = _t37;
+        if (_t38) {
+            vela_str _t40 = v_key_2;
+            int64_t _t39 = *(int64_t *)vela_map_at(v_counts, &_t40, "compiler/src/guide.vl:179:31");
+            int64_t _t41 = _t39;
+            bool _t42 = _t41 >= 4;
+            _t38 = _t42;
+        }
+        bool _t43 = _t38;
+        if (_t43) {
+            vela_str _t44 = *(vela_str *)vela_at(v_sigs, v_i, sizeof(vela_str), "compiler/src/guide.vl:179:56");
+            bool _t45 = !vela_str_eq(v_key_2, _t44);
+            _t43 = _t45;
+        }
+        if (_t43) {
+            // line 180
+            vela_str _t47 = v_key_2;
+            uint64_t _t48;
+            bool *_t46 = vela_map_find_hashed(v_done, &_t47, &_t48);
+            vela_map *_t49 = v_done;
+            bool _t50 = _t46 != NULL;
+            if (_t50) {
+                // line 181
+                vela_str_release(v_key_2);
+                continue;
+            }
+            // line 183
+            if (v_done == _t49 && _t46) {
+                *_t46 = true;
+            } else {
+                vela_str _t51 = v_key_2;
+                bool _t52 = true;
+                vela_map_set_found(v_done, _t49, _t46, _t48, &_t51, &_t52);
+            }
+            // line 184
+            vela_str _t53 = *(vela_str *)vela_at(v_sigs, v_i, sizeof(vela_str), "compiler/src/guide.vl:184:33");
+            vela_str_retain(_t53);
+            vela_str v_shown = _t53;
+            // line 185
+            vela_array * _t54 = vela_array_new(&vela_type_str, 0);
+            vela_array * v_widths = _t54;
+            // line 186
+            vela_array * _t55 = vela_array_new(&vela_type_str, 0);
+            vela_array * v_orders = _t55;
+            // line 187
+            int64_t _t56 = v_fns->len;
+            int64_t _t57 = _t56;
+            for (int64_t _t58 = v_i; _t58 < _t57; _t58++) {
+                int64_t v_j = _t58;
+                // line 188
+                vela_str _t59 = *(vela_str *)vela_at(v_keys, v_j, sizeof(vela_str), "compiler/src/guide.vl:188:24");
+                bool _t60 = vela_str_eq(_t59, v_key_2);
+                if (_t60) {
+                    // line 189
+                    vela_str _t61 = *(vela_str *)vela_at(v_sigs, v_j, sizeof(vela_str), "compiler/src/guide.vl:189:37");
+                    bool _t62 = f_5guide_contains(_t61, VELA_STR("u32", 3));
+                    bool _t63 = _t62;
+                    if (_t63) {
+                        bool _t64 = f_5guide_contains(v_shown, VELA_STR("u32", 3));
+                        bool _t65 = !_t64;
+                        _t63 = _t65;
+                    }
+                    if (_t63) {
+                        // line 190
+                        vela_str _t66 = *((vela_str *)v_sigs->data + v_j);
+                        vela_str_retain(_t66);
+                        vela_str_release(v_shown);
+                        v_shown = _t66;
+                    }
+                    // line 192
+                    t_3ast_FnDecl _t68 = *(t_3ast_FnDecl *)vela_at(v_fns, v_j, sizeof(t_3ast_FnDecl), "compiler/src/guide.vl:192:45");
+                    vela_array * _t69 = f_5guide_width_words(_t68.m_name);
+                    vela_array * _t67 = _t69;
+                    for (int64_t _t70 = 0; _t70 < _t67->len; _t70++) {
+                        vela_str v_w = ((vela_str *)_t67->data)[_t70];
+                        // line 193
+                        vela_str _t71 = v_w;
+                        vela_str_retain(_t71);
+                        f_5guide_add_new(&v_widths, _t71);
+                        vela_str_release(_t71);
+                    }
+                    vela_array_release(_t67);
+                    // line 195
+                    t_3ast_FnDecl _t72 = *((t_3ast_FnDecl *)v_fns->data + v_j);
+                    vela_str _t73 = _t72.m_name;
+                    vela_str_retain(_t73);
+                    vela_str v_n_2 = _t73;
+                    // line 196
+                    int64_t _t74 = v_n_2.len;
+                    int64_t _t75 = _t74;
+                    bool _t76 = _t75 > 3;
+                    bool _t77 = _t76;
+                    if (_t77) {
+                        int64_t _t78 = v_n_2.len;
+                        int64_t _t79 = _t78;
+                        int64_t _t80 = (_t79 - 3);
+                        int64_t _t81 = v_n_2.len;
+                        vela_str _t82 = vela_slice(v_n_2, _t80, _t81, "compiler/src/guide.vl:196:40");
+                        bool _t83 = vela_str_eq(_t82, VELA_STR("_le", 3));
+                        bool _t84 = _t83;
+                        if (!_t84) {
+                            int64_t _t85 = v_n_2.len;
+                            int64_t _t86 = _t85;
+                            int64_t _t87 = (_t86 - 3);
+                            int64_t _t88 = v_n_2.len;
+                            vela_str _t89 = vela_slice(v_n_2, _t87, _t88, "compiler/src/guide.vl:196:74");
+                            bool _t90 = vela_str_eq(_t89, VELA_STR("_be", 3));
+                            _t84 = _t90;
+                            vela_str_release(_t89);
+                        }
+                        _t77 = _t84;
+                        vela_str_release(_t82);
+                    }
+                    if (_t77) {
+                        // line 197
+                        int64_t _t91 = v_n_2.len;
+                        int64_t _t92 = _t91;
+                        int64_t _t93 = (_t92 - 2);
+                        int64_t _t94 = v_n_2.len;
+                        vela_str _t95 = vela_slice(v_n_2, _t93, _t94, "compiler/src/guide.vl:197:46");
+                        f_5guide_add_new(&v_orders, _t95);
+                        vela_str_release(_t95);
+                    }
+                    vela_str_release(v_n_2);
+                }
+            }
+            // line 201
+            vela_str _t96 = vela_str_concat(v_shown, VELA_STR("\012", 1));
+            vela_builder_add((*v_out), _t96);
+            vela_str_release(_t96);
+            // line 202
+            static const vela_str _t97[] = {VELA_STR_INIT("  likewise ", 11), {NULL, NULL, 0}, VELA_STR_INIT(", W: ", 5), {NULL, NULL, 0}};
+            vela_str _t98[4];
+            memcpy(_t98, _t97, sizeof _t98);
+            int64_t _t99 = v_key_2.len;
+            vela_str _t100 = vela_slice(v_key_2, 7, _t99, "compiler/src/guide.vl:202:47");
+            _t98[1] = _t100;
+            vela_str _t101 = f_5guide_spaced(v_widths);
+            _t98[3] = _t101;
+            vela_str _t102 = vela_str_join(_t98, 4);
+            vela_str_release(_t98[1]);
+            vela_str_release(_t98[3]);
+            vela_str v_note = _t102;
+            // line 203
+            int64_t _t103 = v_orders->len;
+            int64_t _t104 = _t103;
+            bool _t105 = _t104 > 0;
+            if (_t105) {
+                // line 204
+                static const vela_str _t106[] = {{NULL, NULL, 0}, VELA_STR_INIT("; E: ", 5), {NULL, NULL, 0}};
+                vela_str _t107[3];
+                memcpy(_t107, _t106, sizeof _t107);
+                _t107[0] = v_note;
+                vela_str _t108 = f_5guide_spaced(v_orders);
+                _t107[2] = _t108;
+                vela_str _t109 = vela_str_join(_t107, 3);
+                vela_str_release(_t107[2]);
+                vela_str_release(v_note);
+                v_note = _t109;
+            }
+            // line 206
+            vela_str _t110 = vela_str_concat(v_note, VELA_STR("\012", 1));
+            vela_builder_add((*v_out), _t110);
+            vela_str_release(_t110);
+            // line 207
+            vela_str_release(v_note);
+            vela_array_release(v_orders);
+            vela_array_release(v_widths);
+            vela_str_release(v_shown);
+            vela_str_release(v_key_2);
+            continue;
+        }
+        // line 209
+        vela_str _t111 = *(vela_str *)vela_at(v_sigs, v_i, sizeof(vela_str), "compiler/src/guide.vl:209:34");
+        vela_str _t112 = vela_str_concat(_t111, VELA_STR("\012", 1));
+        vela_builder_add((*v_out), _t112);
+        vela_str_release(_t112);
+        // line 210
+        t_3ast_FnDecl _t114 = *(t_3ast_FnDecl *)vela_at(v_fns, v_i, sizeof(t_3ast_FnDecl), "compiler/src/guide.vl:210:21");
+        vela_array * _t115 = _t114.m_requires;
+        vela_array_retain(_t115);
+        vela_array * _t113 = _t115;
+        for (int64_t _t116 = 0; _t116 < _t113->len; _t116++) {
+            t_3ast_Expr v_e = ((t_3ast_Expr *)_t113->data)[_t116];
+            // line 211
+            static const vela_str _t117[] = {VELA_STR_INIT("  requires ", 11), {NULL, NULL, 0}, VELA_STR_INIT("\012", 1)};
+            vela_str _t118[3];
+            memcpy(_t118, _t117, sizeof _t118);
+            vela_str _t119 = f_3ast_expr_text(v_e);
+            _t118[1] = _t119;
+            vela_str _t120 = vela_str_join(_t118, 3);
+            vela_str_release(_t118[1]);
+            vela_builder_add((*v_out), _t120);
+            vela_str_release(_t120);
+        }
+        vela_array_release(_t113);
+        // line 213
+        t_3ast_FnDecl _t122 = *((t_3ast_FnDecl *)v_fns->data + v_i);
+        vela_array * _t123 = _t122.m_ensures;
+        vela_array_retain(_t123);
+        vela_array * _t121 = _t123;
+        for (int64_t _t124 = 0; _t124 < _t121->len; _t124++) {
+            t_3ast_Expr v_e_2 = ((t_3ast_Expr *)_t121->data)[_t124];
+            // line 214
+            static const vela_str _t125[] = {VELA_STR_INIT("  ensures ", 10), {NULL, NULL, 0}, VELA_STR_INIT("\012", 1)};
+            vela_str _t126[3];
+            memcpy(_t126, _t125, sizeof _t126);
+            vela_str _t127 = f_3ast_expr_text(v_e_2);
+            _t126[1] = _t127;
+            vela_str _t128 = vela_str_join(_t126, 3);
+            vela_str_release(_t126[1]);
+            vela_builder_add((*v_out), _t128);
+            vela_str_release(_t128);
+        }
+        vela_array_release(_t121);
+        vela_str_release(v_key_2);
+    }
+    vela_map_release(v_done);
+    vela_map_release(v_counts);
+    vela_array_release(v_sigs);
+    vela_array_release(v_keys);
+}
+/* vela: part */
+
+vela_str f_5guide_pattern(vela_str v_sig) {
+    // line 223
+    vela_array * _t1 = vela_array_new(&vela_type_byte, 64);
+    vela_array * v_b = _t1;
+    // line 224
+    int64_t v_i = 0;
+    // line 225
+    vela_unique(&v_b);
+    for (;;) {
+        int64_t _t2 = v_i;
+        int64_t _t3 = v_sig.len;
+        bool _t4 = _t2 < _t3;
+        bool _t5 = _t4;
+        if (!_t5) break;
+        // line 226
+        uint8_t _t6 = vela_byte_at(v_sig, v_i, "compiler/src/guide.vl:226:26");
+        bool _t7 = f_5guide_word_byte(_t6);
+        bool _t8 = !_t7;
+        if (_t8) {
+            // line 227
+            uint8_t _t9 = v_sig.data[v_i];
+            uint8_t _t10 = _t9;
+            vela_push(v_b, &_t10, 1);
+            // line 228
+            int64_t _t11 = v_i;
+            int64_t _t12 = (_t11 + 1);
+            v_i = _t12;
+            // line 229
+            continue;
+        }
+        // line 231
+        int64_t v_start = v_i;
+        // line 232
+        for (;;) {
+            int64_t _t13 = v_i;
+            int64_t _t14 = v_sig.len;
+            bool _t15 = _t13 < _t14;
+            bool _t16 = _t15;
+            if (_t16) {
+                uint8_t _t17 = v_sig.data[v_i];
+                bool _t18 = f_5guide_word_byte(_t17);
+                _t16 = _t18;
+            }
+            bool _t19 = _t16;
+            if (!_t19) break;
+            // line 233
+            int64_t _t20 = v_i;
+            int64_t _t21 = (_t20 + 1);
+            v_i = _t21;
+        }
+        // line 235
+        vela_str _t22 = vela_slice(v_sig, v_start, v_i, "compiler/src/guide.vl:235:42");
+        vela_array * _t23 = f_5guide_split_underscores(_t22);
+        vela_array * v_parts = _t23;
+        vela_str_release(_t22);
+        // line 236
+        int64_t _t24 = v_parts->len;
+        int64_t _t25 = _t24;
+        for (int64_t _t26 = 0; _t26 < _t25; _t26++) {
+            int64_t v_k = _t26;
+            // line 237
+            int64_t _t27 = v_k;
+            bool _t28 = _t27 > 0;
+            if (_t28) {
+                // line 238
+                uint8_t _t29 = 95;
+                vela_push(v_b, &_t29, 1);
+            }
+            // line 240
+            vela_str _t30 = *((vela_str *)v_parts->data + v_k);
+            bool _t31 = f_5guide_is_width(_t30);
+            if (_t31) {
+                // line 241
+                uint8_t _t32 = 87;
+                vela_push(v_b, &_t32, 1);
+            } else {
+                int64_t _t33 = v_k;
+                int64_t _t34 = v_parts->len;
+                int64_t _t35 = _t34;
+                int64_t _t36 = (_t35 - 1);
+                bool _t37 = _t33 == _t36;
+                bool _t38 = _t37;
+                if (_t38) {
+                    int64_t _t39 = v_k;
+                    bool _t40 = _t39 > 0;
+                    _t38 = _t40;
+                }
+                bool _t41 = _t38;
+                if (_t41) {
+                    vela_str _t42 = *((vela_str *)v_parts->data + v_k);
+                    bool _t43 = vela_str_eq(_t42, VELA_STR("le", 2));
+                    bool _t44 = _t43;
+                    if (!_t44) {
+                        vela_str _t45 = *((vela_str *)v_parts->data + v_k);
+                        bool _t46 = vela_str_eq(_t45, VELA_STR("be", 2));
+                        _t44 = _t46;
+                    }
+                    _t41 = _t44;
+                }
+                if (_t41) {
+                    // line 243
+                    uint8_t _t47 = 69;
+                    vela_push(v_b, &_t47, 1);
+                } else {
+                    // line 245
+                    vela_str _t48 = *((vela_str *)v_parts->data + v_k);
+                    vela_builder_add(v_b, _t48);
+                }
+            }
+        }
+        vela_array_release(v_parts);
+    }
+    // line 249
+    vela_str _t49 = vela_builder_build(v_b);
+    vela_str _t50 = _t49;
+    vela_array_release(v_b);
+    return _t50;
+}
+/* vela: part */
+
+bool f_5guide_word_byte(uint8_t v_c) {
+    // line 253
+    uint8_t _t1 = v_c;
+    bool _t2 = _t1 >= 97;
+    bool _t3 = _t2;
+    if (_t3) {
+        uint8_t _t4 = v_c;
+        bool _t5 = _t4 <= 122;
+        _t3 = _t5;
+    }
+    bool _t6 = _t3;
+    if (!_t6) {
+        uint8_t _t7 = v_c;
+        bool _t8 = _t7 >= 65;
+        bool _t9 = _t8;
+        if (_t9) {
+            uint8_t _t10 = v_c;
+            bool _t11 = _t10 <= 90;
+            _t9 = _t11;
+        }
+        _t6 = _t9;
+    }
+    bool _t12 = _t6;
+    if (!_t12) {
+        uint8_t _t13 = v_c;
+        bool _t14 = _t13 >= 48;
+        bool _t15 = _t14;
+        if (_t15) {
+            uint8_t _t16 = v_c;
+            bool _t17 = _t16 <= 57;
+            _t15 = _t17;
+        }
+        _t12 = _t15;
+    }
+    bool _t18 = _t12;
+    if (!_t18) {
+        uint8_t _t19 = v_c;
+        bool _t20 = _t19 == 95;
+        _t18 = _t20;
+    }
+    bool _t21 = _t18;
+    return _t21;
+}
+/* vela: part */
+
+vela_array * f_5guide_split_underscores(vela_str v_s) {
+    // line 257
+    vela_array * _t1 = vela_array_new(&vela_type_str, 0);
+    vela_array * v_out = _t1;
+    // line 258
+    int64_t v_start = 0;
+    // line 259
+    int64_t _t2 = v_s.len;
+    int64_t _t3 = _t2;
+    int64_t _t4 = (_t3 + 1);
+    int64_t _t5 = _t4;
+    vela_unique(&v_out);
+    for (int64_t _t6 = 0; _t6 < _t5; _t6++) {
+        int64_t v_i = _t6;
+        // line 260
+        int64_t _t7 = v_i;
+        int64_t _t8 = v_s.len;
+        bool _t9 = _t7 == _t8;
+        bool _t10 = _t9;
+        if (!_t10) {
+            uint8_t _t11 = v_s.data[v_i];
+            uint8_t _t12 = _t11;
+            bool _t13 = _t12 == 95;
+            _t10 = _t13;
+        }
+        if (_t10) {
+            // line 261
+            vela_str _t14 = vela_slice(v_s, v_start, v_i, "compiler/src/guide.vl:261:28");
+            vela_str _t15 = _t14;
+            vela_push(v_out, &_t15, sizeof(vela_str));
+            // line 262
+            int64_t _t16 = v_i;
+            int64_t _t17 = (_t16 + 1);
+            v_start = _t17;
+        }
+    }
+    // line 265
+    vela_array * _t18 = v_out;
+    vela_array_retain(_t18);
+    vela_array * _t19 = _t18;
+    vela_array_release(v_out);
+    return _t19;
+}
+/* vela: part */
+
+bool f_5guide_is_width(vela_str v_w) {
+    // line 269
+    bool _t1 = vela_str_eq(v_w, VELA_STR("u8", 2));
+    bool _t2 = _t1;
+    if (!_t2) {
+        bool _t3 = vela_str_eq(v_w, VELA_STR("i8", 2));
+        _t2 = _t3;
+    }
+    bool _t4 = _t2;
+    if (!_t4) {
+        bool _t5 = vela_str_eq(v_w, VELA_STR("u16", 3));
+        _t4 = _t5;
+    }
+    bool _t6 = _t4;
+    if (!_t6) {
+        bool _t7 = vela_str_eq(v_w, VELA_STR("i16", 3));
+        _t6 = _t7;
+    }
+    bool _t8 = _t6;
+    if (!_t8) {
+        bool _t9 = vela_str_eq(v_w, VELA_STR("u32", 3));
+        _t8 = _t9;
+    }
+    bool _t10 = _t8;
+    if (!_t10) {
+        bool _t11 = vela_str_eq(v_w, VELA_STR("i32", 3));
+        _t10 = _t11;
+    }
+    bool _t12 = _t10;
+    if (!_t12) {
+        bool _t13 = vela_str_eq(v_w, VELA_STR("u64", 3));
+        _t12 = _t13;
+    }
+    bool _t14 = _t12;
+    if (!_t14) {
+        bool _t15 = vela_str_eq(v_w, VELA_STR("i64", 3));
+        _t14 = _t15;
+    }
+    bool _t16 = _t14;
+    return _t16;
+}
+/* vela: part */
+
+vela_array * f_5guide_width_words(vela_str v_name) {
+    // line 273
+    vela_array * _t1 = vela_array_new(&vela_type_str, 0);
+    vela_array * v_out = _t1;
+    // line 274
+    vela_array * _t3 = f_5guide_split_underscores(v_name);
+    vela_array * _t2 = _t3;
+    vela_unique(&v_out);
+    for (int64_t _t4 = 0; _t4 < _t2->len; _t4++) {
+        vela_str v_part = ((vela_str *)_t2->data)[_t4];
+        // line 275
+        bool _t5 = f_5guide_is_width(v_part);
+        if (_t5) {
+            // line 276
+            vela_str _t6 = v_part;
+            vela_str_retain(_t6);
+            vela_str _t7 = _t6;
+            vela_push(v_out, &_t7, sizeof(vela_str));
+        }
+    }
+    vela_array_release(_t2);
+    // line 279
+    vela_array * _t8 = v_out;
+    vela_array_retain(_t8);
+    vela_array * _t9 = _t8;
+    vela_array_release(v_out);
+    return _t9;
+}
+/* vela: part */
+
+void f_5guide_add_new(vela_array * * v_xs, vela_str v_x) {
+    // line 283
+    vela_array * _t2 = (*v_xs);
+    vela_array_retain(_t2);
+    vela_array * _t1 = _t2;
+    for (int64_t _t3 = 0; _t3 < _t1->len; _t3++) {
+        vela_str v_y = ((vela_str *)_t1->data)[_t3];
+        // line 284
+        bool _t4 = vela_str_eq(v_y, v_x);
+        if (_t4) {
+            // line 285
+            vela_array_release(_t1);
+            return;
+        }
+    }
+    vela_array_release(_t1);
+    // line 288
+    vela_str _t5 = v_x;
+    vela_str_retain(_t5);
+    vela_unique(&(*v_xs));
+    vela_str _t6 = _t5;
+    vela_push((*v_xs), &_t6, sizeof(vela_str));
+}
+/* vela: part */
+
+vela_str f_5guide_spaced(vela_array * v_xs) {
+    // line 292
+    vela_str v_out = VELA_STR("", 0);
+    // line 293
+    int64_t _t1 = v_xs->len;
+    int64_t _t2 = _t1;
+    for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
+        int64_t v_k = _t3;
+        // line 294
+        int64_t _t4 = v_k;
+        bool _t5 = _t4 > 0;
+        if (_t5) {
+            // line 295
+            vela_str _t6 = vela_str_concat(v_out, VELA_STR(" ", 1));
+            vela_str_release(v_out);
+            v_out = _t6;
+        }
+        // line 297
+        vela_str _t7 = *((vela_str *)v_xs->data + v_k);
+        vela_str _t8 = vela_str_concat(v_out, _t7);
+        vela_str_release(v_out);
+        v_out = _t8;
+    }
+    // line 299
+    vela_str _t9 = v_out;
+    vela_str_retain(_t9);
+    vela_str _t10 = _t9;
+    vela_str_release(v_out);
+    return _t10;
+}
+/* vela: part */
+
+bool f_5guide_contains(vela_str v_s, vela_str v_part) {
+    // line 303
+    int64_t _t1 = v_part.len;
+    int64_t _t2 = _t1;
+    int64_t _t3 = v_s.len;
+    bool _t4 = _t2 > _t3;
+    if (_t4) {
+        // line 304
+        bool _t5 = false;
+        return _t5;
+    }
+    // line 306
+    int64_t _t6 = v_s.len;
+    int64_t _t7 = _t6;
+    int64_t _t8 = v_part.len;
+    int64_t _t9 = (_t7 - _t8);
+    int64_t _t10 = _t9;
+    int64_t _t11 = (_t10 + 1);
+    int64_t _t12 = _t11;
+    for (int64_t _t13 = 0; _t13 < _t12; _t13++) {
+        int64_t v_i = _t13;
+        // line 307
+        int64_t _t14 = v_i;
+        int64_t _t15 = v_part.len;
+        int64_t _t16 = (_t14 + _t15);
+        vela_str _t17 = vela_slice(v_s, v_i, _t16, "compiler/src/guide.vl:307:13");
+        bool _t18 = vela_str_eq(_t17, v_part);
+        if (_t18) {
+            // line 308
+            bool _t19 = true;
+            vela_str_release(_t17);
+            return _t19;
+        }
+        vela_str_release(_t17);
+    }
+    // line 311
+    bool _t20 = false;
+    return _t20;
 }
 /* vela: part */
 
@@ -173296,7 +173986,7 @@ int64_t f_5types_named_index__5types_FieldInfo(vela_array * v_values, vela_str v
 /* vela: part */
 
 vela_array * f_5lists_sort__Int(vela_array * v_xs) {
-    // line 168
+    // line 182
     vela_array * _t1 = f_5lists_in_order__Int_Int(v_xs, v_xs);
     vela_array * _t2 = _t1;
     return _t2;
@@ -173304,36 +173994,36 @@ vela_array * f_5lists_sort__Int(vela_array * v_xs) {
 /* vela: part */
 
 vela_array * f_5lists_order__Int(vela_array * v_keys) {
-    // line 126
+    // line 140
     int64_t _t1 = v_keys->len;
     int64_t v_n = _t1;
-    // line 127
+    // line 141
     vela_array * _t2 = vela_array_new(&vela_type_int, 0);
     vela_array * v_idx = _t2;
-    // line 128
+    // line 142
     int64_t _t3 = v_n;
     vela_unique(&v_idx);
     for (int64_t _t4 = 0; _t4 < _t3; _t4++) {
         int64_t v_i = _t4;
-        // line 129
+        // line 143
         int64_t _t5 = v_i;
         vela_push(v_idx, &_t5, sizeof(int64_t));
     }
-    // line 131
+    // line 145
     vela_array * _t6 = v_idx;
     vela_array_retain(_t6);
     vela_array * v_spare = _t6;
-    // line 132
+    // line 146
     int64_t v_width = 1;
-    // line 133
+    // line 147
     for (;;) {
         int64_t _t7 = v_width;
         bool _t8 = _t7 < v_n;
         bool _t9 = _t8;
         if (!_t9) break;
-        // line 134
+        // line 148
         int64_t v_lo = 0;
-        // line 135
+        // line 149
         vela_unique(&v_spare);
         unsigned char *_t10 = v_spare->data;
         int64_t _t10n = v_spare->len;
@@ -173342,27 +174032,27 @@ vela_array * f_5lists_order__Int(vela_array * v_keys) {
             bool _t12 = _t11 < v_n;
             bool _t13 = _t12;
             if (!_t13) break;
-            // line 136
+            // line 150
             int64_t _t14 = v_lo;
             int64_t _t15 = (_t14 + v_width);
             int64_t _t16 = f_5lists_smaller(_t15, v_n);
             int64_t v_mid = _t16;
-            // line 137
+            // line 151
             int64_t _t17 = v_lo;
             int64_t _t18 = 2;
             int64_t _t19 = (_t18 * v_width);
             int64_t _t20 = (_t17 + _t19);
             int64_t _t21 = f_5lists_smaller(_t20, v_n);
             int64_t v_hi = _t21;
-            // line 138
+            // line 152
             int64_t v_i_2 = v_lo;
-            // line 139
+            // line 153
             int64_t v_j = v_mid;
-            // line 140
+            // line 154
             int64_t _t22 = v_hi;
             for (int64_t _t23 = v_lo; _t23 < _t22; _t23++) {
                 int64_t v_k = _t23;
-                // line 142
+                // line 156
                 int64_t _t24 = v_i_2;
                 bool _t25 = _t24 < v_mid;
                 bool _t26 = _t25;
@@ -173371,11 +174061,11 @@ vela_array * f_5lists_order__Int(vela_array * v_keys) {
                     bool _t28 = _t27 >= v_hi;
                     bool _t29 = _t28;
                     if (!_t29) {
-                        int64_t _t31 = *(int64_t *)vela_at(v_idx, v_j, sizeof(int64_t), "std/lists.vl:142:53");
-                        int64_t _t30 = *(int64_t *)vela_at(v_keys, _t31, sizeof(int64_t), "std/lists.vl:142:49");
+                        int64_t _t31 = *(int64_t *)vela_at(v_idx, v_j, sizeof(int64_t), "std/lists.vl:156:53");
+                        int64_t _t30 = *(int64_t *)vela_at(v_keys, _t31, sizeof(int64_t), "std/lists.vl:156:49");
                         int64_t _t32 = _t30;
-                        int64_t _t34 = *(int64_t *)vela_at(v_idx, v_i_2, sizeof(int64_t), "std/lists.vl:142:68");
-                        int64_t _t33 = *(int64_t *)vela_at(v_keys, _t34, sizeof(int64_t), "std/lists.vl:142:64");
+                        int64_t _t34 = *(int64_t *)vela_at(v_idx, v_i_2, sizeof(int64_t), "std/lists.vl:156:68");
+                        int64_t _t33 = *(int64_t *)vela_at(v_keys, _t34, sizeof(int64_t), "std/lists.vl:156:64");
                         bool _t35 = _t32 == _t33;
                         bool _t36 = _t32 < _t33;
                         int64_t _t37 = (_t35 ? 0 : (_t36 ? -1 : 1));
@@ -173386,49 +174076,49 @@ vela_array * f_5lists_order__Int(vela_array * v_keys) {
                     _t26 = _t29;
                 }
                 if (_t26) {
-                    // line 143
-                    int64_t _t40 = *(int64_t *)vela_at(v_idx, v_i_2, sizeof(int64_t), "std/lists.vl:143:35");
-                    int64_t *_t41 = (int64_t *)vela_at_in(_t10, _t10n, v_k, sizeof(int64_t), "std/lists.vl:143:26");
+                    // line 157
+                    int64_t _t40 = *(int64_t *)vela_at(v_idx, v_i_2, sizeof(int64_t), "std/lists.vl:157:35");
+                    int64_t *_t41 = (int64_t *)vela_at_in(_t10, _t10n, v_k, sizeof(int64_t), "std/lists.vl:157:26");
                     *_t41 = _t40;
-                    // line 144
+                    // line 158
                     int64_t _t42 = v_i_2;
                     int64_t _t43 = (_t42 + 1);
                     v_i_2 = _t43;
                 } else {
-                    // line 146
-                    int64_t _t44 = *(int64_t *)vela_at(v_idx, v_j, sizeof(int64_t), "std/lists.vl:146:35");
-                    int64_t *_t45 = (int64_t *)vela_at_in(_t10, _t10n, v_k, sizeof(int64_t), "std/lists.vl:146:26");
+                    // line 160
+                    int64_t _t44 = *(int64_t *)vela_at(v_idx, v_j, sizeof(int64_t), "std/lists.vl:160:35");
+                    int64_t *_t45 = (int64_t *)vela_at_in(_t10, _t10n, v_k, sizeof(int64_t), "std/lists.vl:160:26");
                     *_t45 = _t44;
-                    // line 147
+                    // line 161
                     int64_t _t46 = v_j;
                     int64_t _t47 = (_t46 + 1);
                     v_j = _t47;
                 }
             }
-            // line 150
+            // line 164
             v_lo = v_hi;
         }
-        // line 152
+        // line 166
         vela_array * _t48 = v_spare;
         vela_array_retain(_t48);
         vela_array * v_done = _t48;
-        // line 153
+        // line 167
         vela_array * _t49 = v_idx;
         vela_array_retain(_t49);
         vela_array_release(v_spare);
         v_spare = _t49;
-        // line 154
+        // line 168
         vela_array * _t50 = v_done;
         vela_array_retain(_t50);
         vela_array_release(v_idx);
         v_idx = _t50;
-        // line 155
+        // line 169
         int64_t _t51 = v_width;
         int64_t _t52 = (_t51 * 2);
         v_width = _t52;
         vela_array_release(v_done);
     }
-    // line 157
+    // line 171
     vela_array * _t53 = v_idx;
     vela_array_retain(_t53);
     vela_array * _t54 = _t53;
@@ -173439,19 +174129,19 @@ vela_array * f_5lists_order__Int(vela_array * v_keys) {
 /* vela: part */
 
 vela_array * f_5lists_repeat__u32(uint32_t v_x, int64_t v_n) {
-    // line 57
+    // line 71
     vela_array * _t1 = vela_array_new(&vela_type_u32, 0);
     vela_array * v_out = _t1;
-    // line 58
+    // line 72
     int64_t _t2 = v_n;
     vela_unique(&v_out);
     for (int64_t _t3 = 0; _t3 < _t2; _t3++) {
         int64_t v__ = _t3;
-        // line 59
+        // line 73
         uint32_t _t4 = v_x;
         vela_push(v_out, &_t4, sizeof(uint32_t));
     }
-    // line 61
+    // line 75
     vela_array * _t5 = v_out;
     vela_array_retain(_t5);
     vela_array * _t6 = _t5;
@@ -173461,30 +174151,30 @@ vela_array * f_5lists_repeat__u32(uint32_t v_x, int64_t v_n) {
 /* vela: part */
 
 vela_array * f_5lists_in_order__Int_Int(vela_array * v_xs, vela_array * v_keys) {
-    // line 178
+    // line 192
     int64_t _t1 = v_keys->len;
     int64_t _t2 = _t1;
     int64_t _t3 = v_xs->len;
     bool _t4 = _t2 == _t3;
     if (!_t4) {
-        vela_assert_failed_values("std/lists.vl:178:5", "assertion", "len(keys) == len(xs)", vela_from_int((int64_t)_t2), vela_from_int((int64_t)_t3), false);
+        vela_assert_failed_values("std/lists.vl:192:5", "assertion", "len(keys) == len(xs)", vela_from_int((int64_t)_t2), vela_from_int((int64_t)_t3), false);
     }
-    // line 179
+    // line 193
     vela_array * _t5 = vela_array_new(&vela_type_int, 0);
     vela_array * v_out = _t5;
-    // line 180
+    // line 194
     vela_array * _t7 = f_5lists_order__Int(v_keys);
     vela_array * _t6 = _t7;
     vela_unique(&v_out);
     for (int64_t _t8 = 0; _t8 < _t6->len; _t8++) {
         int64_t v_i = ((int64_t *)_t6->data)[_t8];
-        // line 181
-        int64_t _t9 = *(int64_t *)vela_at(v_xs, v_i, sizeof(int64_t), "std/lists.vl:181:25");
+        // line 195
+        int64_t _t9 = *(int64_t *)vela_at(v_xs, v_i, sizeof(int64_t), "std/lists.vl:195:25");
         int64_t _t10 = _t9;
         vela_push(v_out, &_t10, sizeof(int64_t));
     }
     vela_array_release(_t6);
-    // line 183
+    // line 197
     vela_array * _t11 = v_out;
     vela_array_retain(_t11);
     vela_array * _t12 = _t11;

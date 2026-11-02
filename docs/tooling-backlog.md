@@ -2128,9 +2128,9 @@ No additional CI workflow run was requested or launched for reconciliation.
   passing C/native full-suite path is unchanged. These are compile checks,
   not native foreign-host or kernel-policy execution acceptance.
 
-### TL-081: Custom sanitizer flags replace the runner's warning policy
+### TL-081: Custom sanitizer flags replaced the runner's warning policy
 
-- **Status:** workaround documented; an additive flag interface is deferred.
+- **Status:** resolved: `run_tests.py --cflags=FLAGS`.
 - **2026-10-31 reconciliation:** The runner still uses `env.setdefault` for VELA_CFLAGS.
   The documented STRICT_CFLAGS-plus-sanitizer workaround remains valid; an additive flag
   interface is deferred.
@@ -2159,6 +2159,15 @@ No additional CI workflow run was requested or launched for reconciliation.
   122 passes with no failures/skips. Both normal suites pass 312/312. The
   original failed invocation remains embedded in
   `bench/results/2026-10-26-network-validation.json`.
+- **Resolution (post-M30):** `run_tests.py --cflags="FLAGS"` appends C flags
+  to `STRICT_CFLAGS`, as `--sanitize` and `--tsan` do, so its exceptions for
+  legal Vela constructs stay. Setting `VELA_CFLAGS` still replaces the
+  policy, as before. `docs/contributing.md` says so.
+- **Verified:** `tests/run/concat_empty.vl` passes with
+  `--cflags=-Wshadow`, and fails with
+  `VELA_CFLAGS="-Wall -Wextra -Werror -Wshadow -pedantic"` (the original
+  reproducer). `--cflags="-fsanitize=undefined -fno-sanitize-recover=all"`
+  runs as an added UBSan selection.
 
 ### TL-082: Native string loops reload immutable parameter metadata
 
@@ -3282,6 +3291,11 @@ No additional CI workflow run was requested or launched for reconciliation.
   on every call: `ranges` with 16,000 Ints was 1.4 MB of C. The tables went
   into string literals (static data) with a decoder, which a `const` would
   have made unnecessary.
+- **Follow-up:** with constants implemented, `std/unicode`'s tables are
+  `const` arrays. Lookups are about 3 times faster than the string records
+  (0.104 s rather than 0.292 s through C for 786,432 lookups of each
+  kind), and builds are no slower
+  (`bench/results/2026-10-30-unicode-tables.md`).
 
 - **Resolution:** contextual `const NAME[: Type] = initializer` and `pub const`
   declare immutable module values without reserving `const` as an identifier.
@@ -3319,9 +3333,9 @@ No additional CI workflow run was requested or launched for reconciliation.
   probe hangs). An empty TSan executable built with `cc -x c -fsanitize=thread`
   exits with SIGSEGV, so no TSan pass is claimed either.
 
-### TL-109: Growable arrays have no pop in the safe language
+### TL-109: Growable arrays had no pop in the safe language
 
-- **Status:** deferred API proposal; no safe prelude pop is implemented.
+- **Status:** resolved: `lists.pop`.
 - **2026-10-31 reconciliation:** `pop(mut xs)` still fails with E3155 (and E3096).
   `memory.truncate` is now documented in the generated guide. Only safe pop/prelude
   convenience API work remains deferred; the port workaround remains in place.
@@ -3336,6 +3350,18 @@ No additional CI workflow run was requested or launched for reconciliation.
 - **Proposed improvement:** `pop(mut xs) -> Option[T]` and a documented
   truncate in the prelude.
 - **Verify:** the port's stacks use them.
+- **Resolution (post-M30):** `lists.pop(mut xs) -> Option[T]` removes and
+  returns the last element in constant time, through `memory.truncate`.
+  It is in `std/lists` rather than the prelude because prelude names
+  cannot be defined by a program (E3020: "'len' is a built-in function
+  and cannot be redefined"), so a prelude `pop` would break any program
+  with a `pop` of its own, which `docs/compatibility.md` forbids.
+  `memory.truncate` remains the documented truncate.
+- **Verified:** `std/lists.vl`'s test "pop takes the last element"
+  (copies keep their elements, an empty array gives None, Str elements),
+  on both backends. Two million push/pop pairs run in about 0.07 s
+  natively. The markdown port keeps its count of live entries, which
+  avoids even the truncate.
 
 ### TL-110: Appending to a Str field copies the whole Str
 
@@ -3924,6 +3950,29 @@ No additional CI workflow run was requested or launched for reconciliation.
   compatible additions through `tests/fixtures/language_extensions.json`.
   M30 acceptance now passes both the frozen baseline and current extensions,
   including its document, diagnostic, query, evidence and property checks.
+
+### TL-126: The generated guide had no room left in its budget
+
+- **Status:** resolved.
+- **Discovery:** post-M30, after TL-125 (interpolation) and TL-108
+  (constants).
+- **Evidence (observed):** `vela guide` was 31,998 bytes against the
+  32,000-byte budget that `tests/m17_test.py`, `m20`-`m23` and `m30`
+  enforce; any new std function or language note would fail them. Those
+  tests also pin exact strings (`pub fn read_u32_le`, `memory.reserve`,
+  `pub fn sort[T: Ord]`), so dropping signature prefixes was not
+  possible.
+- **Impact:** every library or language addition had to trim unrelated
+  guide text first.
+- **Resolution:** the guide prints a family of four or more public
+  functions without contracts, identical but for integer widths and a
+  `_le`/`_be` suffix, as one member and its pattern
+  (`read_W_E(data: Bytes, offset: Int) -> W, W: u8 i8 ... i64; E: le be`).
+  It keeps the `u32` member's full signature. Only `std/buffers`'
+  32 endian functions collapse; no information is dropped. The guide is
+  30,544 bytes with `lists.pop` added (1,456 bytes free).
+- **Verification:** the guide-budget milestone tests (m17, m20-m23, m30)
+  pass; a diff of the guide shows only the buffers lines changed.
 
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
