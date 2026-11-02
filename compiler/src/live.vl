@@ -158,3 +158,125 @@ pub fn crosses(iv: Intervals, v: Int) -> Bool {
     }
     return iv.calls[e] - iv.calls[s + 1] > 0
 }
+
+// Lifetime holes (TL-098): stretches of a value's interval where nothing
+// reads or sets it and that hold a whole loop deeper than where control
+// leaves them, so its register can serve other values there; the value is
+// stored once after it is set and loaded again where control comes back. Only a value set once (or a
+// parameter) has them: its home stays right without a store at every
+// setting. A hole ends at the value's end, or right before a label that is
+// not the header of a loop going on past it (a reload there would run at
+// every turn), or at an instruction that does not fall through.
+// holes[v]: [first, last, ...] positions, in order.
+pub fn holes(f: ir.Func, iv: Intervals) -> [[Int]] {
+    let n = len(f.classes)
+    let count = len(f.insts)
+    let mut out: [[Int]] = []
+    for _ in 0..n { push(mut out, []) }
+    let mut sets: [Int] = []
+    for _ in 0..n { push(mut sets, 0) }
+    let mut refs: [[Int]] = []
+    for _ in 0..n { push(mut refs, []) }
+    for r in f.params { push(mut refs[r], 0) }
+    let mut label_at: Map[Int, Int] = [:]
+    for i in 0..count {
+        if f.insts[i].op == ir.Op.Label { label_at[f.insts[i].imm] = i + 1 }
+    }
+    let mut edges: [[Int]] = []
+    let mut header_end: Map[Int, Int] = [:]  // a loop header's position: where its loop's last jump back is
+    for i in 0..count {
+        let inst = f.insts[i]
+        let p = i + 1
+        for u in ir.reads(inst) {
+            let rs = refs[u]
+            if len(rs) == 0 || rs[len(rs) - 1] != p { push(mut refs[u], p) }
+        }
+        if inst.dst >= 0 {
+            sets[inst.dst] = sets[inst.dst] + 1
+            let rs = refs[inst.dst]
+            if len(rs) == 0 || rs[len(rs) - 1] != p { push(mut refs[inst.dst], p) }
+        }
+        if inst.op == ir.Op.Jump || inst.op == ir.Op.Branch || inst.op == ir.Op.BranchCmp {
+            let mut ts = [inst.imm]
+            if inst.op == ir.Op.Branch { push(mut ts, inst.imm2) }
+            for t in ts {
+                let h = label_at[t]
+                if h <= p {
+                    push(mut edges, [h, p])
+                    if !maps.has(header_end, h) || header_end[h] < p { header_end[h] = p }
+                }
+            }
+        }
+    }
+    // depth[p]: how many loops position p is in.
+    let mut depth: [Int] = []
+    for _ in 0..count + 3 { push(mut depth, 0) }
+    for edge in edges {
+        depth[edge[0]] = depth[edge[0]] + 1
+        depth[edge[1] + 1] = depth[edge[1] + 1] - 1
+    }
+    for q in 1..count + 3 { depth[q] = depth[q] + depth[q - 1] }
+    let mut params: Map[Int, Bool] = [:]
+    for r in f.params { params[r] = true }
+    for v in 0..n {
+        let once = sets[v] == 1 && !maps.has(params, v) || sets[v] == 0 && maps.has(params, v)
+        let s = iv.start[v]
+        let e = iv.end[v]
+        if !once || e <= s + 1 || len(refs[v]) == 0 { continue }
+        let rs = refs[v]
+        let mut found: [Int] = []
+        for k in 0..len(rs) {
+            let g0 = rs[k] + 1
+            let mut g1 = e
+            let tail = k + 1 == len(rs)
+            if !tail { g1 = rs[k + 1] - 1 }
+            if g1 < g0 { continue }
+            let mut y = g1
+            if !tail {
+                // The latest end whose next position is a label that is not
+                // a loop header going on past it, or after an instruction
+                // that does not fall through.
+                y = -1
+                let mut q = g1
+                for q >= g0 && y < 0 {
+                    let op = f.insts[q - 1].op
+                    let next = f.insts[q].op  // position q + 1: the instruction after
+                    let header = maps.has(header_end, q + 1) && header_end[q + 1] > q
+                    if next == ir.Op.Label && !header || op == ir.Op.Jump || op == ir.Op.Ret || op == ir.Op.Unreachable { y = q }
+                    q = q - 1
+                }
+                if y < 0 { continue }
+            }
+            // It must hold a whole loop deeper than every place control
+            // leaves it for the rest of the interval, where the value is
+            // reloaded: else a reload runs as often as the hole's code.
+            let mut deepest = -1
+            for edge in edges {
+                if edge[0] >= g0 && edge[1] <= y && depth[edge[0]] > deepest { deepest = depth[edge[0]] }
+            }
+            let mut exits = 0
+            for q in g0..y + 1 {
+                for t in jump_labels(f.insts[q - 1]) {
+                    let tp = label_at[t]
+                    if (tp < g0 || tp > y) && tp >= s && tp <= e && depth[tp] > exits { exits = depth[tp] }
+                }
+            }
+            let last = f.insts[y - 1].op
+            if y + 1 <= e && last != ir.Op.Jump && last != ir.Op.Branch && last != ir.Op.Ret && last != ir.Op.Unreachable && depth[y + 1] > exits {
+                exits = depth[y + 1]
+            }
+            if deepest > exits {
+                push(mut found, g0)
+                push(mut found, y)
+            }
+        }
+        out[v] = found
+    }
+    return out
+}
+
+fn jump_labels(i: ir.Inst) -> [Int] {
+    if i.op == ir.Op.Jump || i.op == ir.Op.BranchCmp { return [i.imm] }
+    if i.op == ir.Op.Branch { return [i.imm, i.imm2] }
+    return []
+}
