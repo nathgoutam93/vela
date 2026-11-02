@@ -1,0 +1,12 @@
+// out: length=3; raw=3
+// out: nested=inner=2
+// out: bytes=125/123/39/92
+// out: raw=}/"/{
+// out: closure=7
+fn main() {
+    print(f"length={len("abc")}; raw={len(r"abc")}")
+    print(f"nested={f"inner={1 + 1}"}")
+    print(f"bytes={'}'}/{'{'}/{'\''}/{'\\'}")
+    print(f"raw={r##"}/"/{"##}")
+    print(f"closure={(fn() -> Int { return 7 })()}")
+}

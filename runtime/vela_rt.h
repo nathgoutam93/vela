@@ -151,6 +151,13 @@ extern const vela_type vela_type_str;
 extern const vela_type vela_type_array;
 extern const vela_type vela_type_map;
 
+// Module constants: initialize the registry before user code. Each initializer
+// runs at most once; begin returns a borrowed cached value or NULL to initialize.
+void vela_constants_init(int64_t count);
+void *vela_constant_begin(int64_t id, int64_t size);
+void vela_constant_end(int64_t id, const vela_type *type, const void *value);
+
+
 // Fixed arrays are inline homogeneous structs; byte offsets address real
 // members, and generated static assertions verify the contiguous layout.
 void *vela_fixed_array_at(void *base, int64_t i, int64_t length, int64_t size, const char *loc);
@@ -349,6 +356,7 @@ typedef struct vela_array {
 } vela_array;
 
 vela_array *vela_array_new(const vela_type *elem, int64_t cap);
+vela_array *vela_array_from(const vela_type *elem, const void *data, int64_t count);
 
 static inline void vela_array_retain(vela_array *a) {
     VELA_PROFILE_SCOPE("ref counting");

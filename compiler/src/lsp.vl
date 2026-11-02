@@ -431,6 +431,7 @@ fn references(s: mut Server, params: json.Json) -> json.Json uses fs, os {
 // The editor's numbers for kinds of completion.
 fn completion_kind(kind: Str) -> Int {
     return match kind {
+        "constant" => 21
         "function" => 3
         "field" => 5
         "type" => 22
@@ -556,6 +557,7 @@ fn location(s: Server, file: Str, line: Int, col: Int, n: Int) -> json.Json {
 // The editor's numbers for kinds of symbol.
 fn symbol_kind(kind: Str) -> Int {
     return match kind {
+        "constant" => 14
         "struct" => 23
         "interface" => 11
         "method" => 6

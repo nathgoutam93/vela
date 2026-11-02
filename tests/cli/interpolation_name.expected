@@ -1,0 +1,9 @@
+{
+  "name": "count",
+  "kind": "local",
+  "def": {
+    "file": "interpolation_name.vl",
+    "line": 3,
+    "col": 9
+  }
+}

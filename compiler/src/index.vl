@@ -213,7 +213,10 @@ fn declare_fn(b: mut Builder, id: Int) {
     let m = b.k.modules[f.module]
     let mut kind = "function"
     let mut detail = signature(f.decl)
-    if f.is_test {
+    if f.decl.constant {
+        kind = "constant"
+        detail = constant_signature(b.k, id)
+    } else if f.is_test {
         kind = "test"
         detail = f.decl.name
     } else {
@@ -391,10 +394,22 @@ pub fn builtin_info_for(name: Str, target: Str) -> [Str] {
 }
 
 // `fn name[T: Ord](a: Int, b: mut [Str]) -> Str uses fs`, as written.
+pub fn constant_signature(k: checker.Checked, id: Int) -> Str {
+    let f = k.fns[id]
+    let mut prefix = "const "
+    if f.decl.public { prefix = "pub const " }
+    return prefix + f.decl.name + ": " + types.show(k.table, f.result, k.modules[f.module].name)
+}
+
 pub fn signature(f: ast.FnDecl) -> Str {
     let mut s = strings.builder()
     if f.public {
         strings.add(mut s, "pub ")
+    }
+    if f.constant {
+        strings.add(mut s, "const " + f.name)
+        match f.result { Some(t) => strings.add(mut s, ": " + ast.type_text(t)), None => {} }
+        return strings.build(s)
     }
     if f.foreign != "" { strings.add(mut s, "extern ") }
     strings.add(mut s, "fn " + f.name + type_params_text(f.type_params) + "(")
@@ -794,7 +809,9 @@ fn function(b: mut Builder, id: Int) {
     let d = f.decl
     if !f.is_test {
         let def = b.defs[b.fns[id]]
-        add_use(mut b, def.line, def.col, def.name, b.fns[id], "")
+        let mut value_type = ""
+        if d.constant { value_type = show(b, f.result) }
+        add_use(mut b, def.line, def.col, def.name, b.fns[id], value_type)
         if def.col != d.col {
             let mut owner = ""
             for i in 0..len(d.name) { if d.name[i] == '.' { owner = d.name[0..i]; break } }
@@ -1058,6 +1075,9 @@ fn expr(b: mut Builder, e: ast.Expr) {
         ast.ExprKind.Try(x) => expr(mut b, x)
         ast.ExprKind.MutArg(x) => expr(mut b, x)
         ast.ExprKind.Slice(obj, lo, hi) => exprs(mut b, [obj, lo, hi])
+        ast.ExprKind.Interpolate(parts) => {
+            for hole in ast.interpolation_holes(parts) { expr(mut b, hole) }
+        }
         ast.ExprKind.ArrayLit(xs) => exprs(mut b, xs)
         ast.ExprKind.MapLit(entries) => {
             for en in entries {
@@ -1099,6 +1119,7 @@ fn expr(b: mut Builder, e: ast.Expr) {
 fn name_use(b: mut Builder, e: ast.Expr, name: Str) {
     match b.k.refs[e.id] {
         checker.Ref.Local(l) => add_use(mut b, e.line, e.col, name, local_def(mut b, l), show(b, b.k.locals[l].ty))
+        checker.Ref.Constant(id) => add_use(mut b, e.line, e.col, name, b.fns[id], show(b, b.k.ty[e.id]))
         checker.Ref.Function(id) => add_use(mut b, e.line, e.col, name, b.fns[id], show(b, b.k.ty[e.id]))
         checker.Ref.Variant(t, vi) => add_use(mut b, e.line, e.col, name, variant_def(mut b, t, vi, name), show(b, t))
         _ => {}
@@ -1173,6 +1194,11 @@ fn qualifier(b: mut Builder, callee: ast.Expr, enum: Int) {
 
 fn field(b: mut Builder, e: ast.Expr, obj: ast.Expr, name: Str) {
     match b.k.refs[e.id] {
+        checker.Ref.Constant(id) => {
+            add_use(mut b, e.line, e.col, name, b.fns[id], show(b, b.k.ty[e.id]))
+            qualifier(mut b, e, -1)
+            return
+        }
         checker.Ref.Variant(t, vi) => {
             add_use(mut b, e.line, e.col, name, variant_def(mut b, t, vi, name), show(b, t))
             qualifier(mut b, e, t)
@@ -1252,7 +1278,9 @@ pub fn symbols(program: ast.Program) -> [Symbol] {
         push(mut out, s)
     }
     for f in program.fns {
-        push(mut out, sym(f.name, "function", signature(f), f.line, f.col, f.body.end_line, f.body.end_col + 1))
+        let mut kind = "function"
+        if f.constant { kind = "constant" }
+        push(mut out, sym(f.name, kind, signature(f), f.line, f.col, f.body.end_line, f.body.end_col + 1))
     }
     for t in program.tests {
         push(mut out, sym("test " + ast.quote(t.name), "test", "", t.line, t.col, t.body.end_line, t.body.end_col + 1))

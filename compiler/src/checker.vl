@@ -48,6 +48,7 @@ pub type Ref = enum {
     NoRef
     Local(Int)
     Function(Int)
+    Constant(Int)  // immutable module value, implemented by a once initializer
     Builtin(Str)  // "print", "maps.get", ...
     Variant(Int, Int)  // the enum's type, the variant's index
     Indirect  // a call through a function value
@@ -126,6 +127,7 @@ type BoundUse = struct { module: Int, line: Int, col: Int, owner: Str, param: In
 type KeyUse = struct { module: Int, line: Int, col: Int, actual: Int }
 
 type Checker = struct {
+    const_states: Map[Int, Int]  // 1 while checking dependencies, 2 when checked
     target: Str
     library: Bool
     unsafe_depth: Int
@@ -195,6 +197,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
         push(mut literal, 0)
     }
     let mut c = Checker {
+        const_states: [:],
         target: target, library: for_tests, unsafe_depth: 0, escaped: [:], signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, generic_uses: [], loops: [],
@@ -501,6 +504,9 @@ fn program(c: mut Checker, for_tests: Bool) {
             report(mut c, use.line, use.col, "E3026", key_failure(c, use.actual))
         }
     }
+    for id in 0..len(c.fns) {
+        if c.fns[id].decl.constant { check_constant(mut c, id) }
+    }
     for k in 0..len(c.order) {
         c.current = c.order[k]
         let program = c.modules[c.current].program
@@ -733,7 +739,7 @@ fn signatures(c: mut Checker) {
         })
         let id = len(c.fns) - 1
         validate_foreign(mut c, id)
-        if f.public {
+        if f.public && !f.constant {
             for p in f.params {
                 exposes(mut c, p.ty, "function '" + f.name + "'")
             }
@@ -748,6 +754,8 @@ fn signatures(c: mut Checker) {
             let first = c.fns[module_fns(c)[f.name]].decl
             report(mut c, f.line, f.col, "E3021", "function '" + f.name + "' is already defined at " +
                 strings.from_int(first.line) + ":" + strings.from_int(first.col))
+        } else if f.constant && maps.has(module_types(c), f.name) {
+            report(mut c, f.line, f.col, "E3233", "constant '" + f.name + "' has the same name as a type")
         } else if !taken(mut c, f.name, f.line, f.col, "function") {
             c.modules[m].fns[f.name] = id
         }
@@ -766,6 +774,7 @@ fn signatures(c: mut Checker) {
             }
         }
         let f = ast.FnDecl {
+            constant: false,
             name: "test " + ast.quote(t.name), foreign: "", variadic: false, type_params: [], params: [], result: None, effects: [], effects_line: 0,
             effects_col: 0, requires: [], ensures: [], body: t.body, line: t.line, col: t.col, public: false,
         }
@@ -988,8 +997,109 @@ fn new_local(c: mut Checker, name: Str, ty: Int, kind: Str, line: Int, col: Int)
     return len(c.locals) - 1
 }
 
+// Infer constants depth first, including forward references. No user calls,
+// closures, mutation or effects can run while a constant is initialized.
+fn check_constant(c: mut Checker, id: Int) -> Int {
+    if maps.has(c.const_states, id) {
+        if c.const_states[id] == 1 {
+            let f = c.fns[id].decl
+            report(mut c, f.line, f.col, "E3231", "constant '" + f.name + "' depends on itself through its initializer")
+            return types.ERROR()
+        }
+        return c.fns[id].result
+    }
+    c.const_states[id] = 1
+    let old_module = c.current
+    let old_fn = c.current_fn
+    let old_undefined = c.undefined
+    c.current = c.fns[id].module
+    c.current_fn = id
+    c.undefined = []
+    let f = c.fns[id].decl
+    let e = ast.const_value(f)
+    if f.name == "main" { report(mut c, f.line, f.col, "E3233", "main must be a function, not a constant") }
+    // Preflight syntax before ordinary inference, so forbidden calls cannot
+    // change checking state or request effects in a declaration context.
+    if const_syntax(mut c, e) {
+        match f.result {
+            Some(_) => check_expr(mut c, e, c.fns[id].result, msg("constant '" + f.name + "' must be " + show(c, c.fns[id].result) + ", found ", ""))
+            None => c.fns[id].result = value(mut c, e)
+        }
+        const_refs(mut c, e)
+        if f.public { expose_constant(mut c, c.fns[id].result, f) }
+    } else { c.fns[id].result = types.ERROR() }
+    c.const_states[id] = 2
+    c.current = old_module
+    c.current_fn = old_fn
+    c.undefined = old_undefined
+    return c.fns[id].result
+}
+
+fn expose_constant(c: mut Checker, t: Int, f: ast.FnDecl) {
+    if t < 0 { return }
+    let info = types.get(c.table, t)
+    if (info.tag == types.Tag.Struct || info.tag == types.Tag.Enum) && info.module == c.modules[c.current].name && !info.public {
+        report(mut c, f.line, f.col, "E3014", "pub constant '" + f.name + "' uses the private type '" + info.name + "'; declare it with 'pub type " + info.name + "'")
+    }
+    for a in info.args { expose_constant(mut c, a, f) }
+}
+
+fn const_syntax(c: mut Checker, e: ast.Expr) -> Bool {
+    let mut children: [ast.Expr] = []
+    match e.kind {
+        ast.ExprKind.IntLit(_) => {}, ast.ExprKind.FixedIntLit(_, _, _) => {}, ast.ExprKind.FloatLit(_) => {},
+        ast.ExprKind.ByteLit(_) => {}, ast.ExprKind.BoolLit(_) => {}, ast.ExprKind.StrLit(_) => {}, ast.ExprKind.UnitLit => {},
+        ast.ExprKind.Name(_) => {}, ast.ExprKind.Field(obj, _) => children = [obj],
+        ast.ExprKind.Unary(_, x) => children = [x], ast.ExprKind.Binary(_, a, b) => children = [a, b],
+        ast.ExprKind.ArrayLit(xs) => children = xs,
+        ast.ExprKind.MapLit(entries) => { for en in entries { push(mut children, en.key); push(mut children, en.value) } },
+        ast.ExprKind.StructLit(_, _, fields) => { for field in fields { push(mut children, field.value) } },
+        ast.ExprKind.Interpolate(parts) => children = ast.interpolation_holes(parts),
+        ast.ExprKind.Index(a, b) => children = [a, b], ast.ExprKind.Slice(a, b, d) => children = [a, b, d],
+        _ => { report_at(mut c, e, "E3230", "a constant initializer must use literals, constant references, and operators; calls, closures and mutation are not allowed"); return false }
+    }
+    let mut valid = true
+    for child in children { if !const_syntax(mut c, child) { valid = false } }
+    return valid
+}
+
+fn const_refs(c: mut Checker, e: ast.Expr) {
+    match c.refs[e.id] {
+        Ref.Method(_, _) => report_at(mut c, e, "E3230", "a constant initializer cannot call user-defined comparison methods")
+        _ => {}
+    }
+    let t = c.ty[e.id]
+    if t >= 0 && types.is_map(c.table, t) && !intrinsic(c.table, types.get(c.table, t).args[0], "Key") {
+        report_at(mut c, e, "E3230", "constant maps require intrinsic keys; user-defined Key methods are function calls")
+    }
+    match e.kind {
+        ast.ExprKind.Name(_) => {
+            match c.refs[e.id] {
+                Ref.Function(_) => report_at(mut c, e, "E3230", "a constant initializer cannot contain a function value")
+                _ => {}
+            }
+        }
+        ast.ExprKind.Field(obj, _) => {
+            match c.refs[e.id] {
+                Ref.Function(_) => report_at(mut c, e, "E3230", "a constant initializer cannot contain a function value")
+                Ref.Constant(_) => {}
+                _ => const_refs(mut c, obj)
+            }
+        }
+        ast.ExprKind.Unary(_, x) => const_refs(mut c, x)
+        ast.ExprKind.Binary(_, a, b) => { const_refs(mut c, a); const_refs(mut c, b) }
+        ast.ExprKind.ArrayLit(xs) => { for x in xs { const_refs(mut c, x) } }
+        ast.ExprKind.MapLit(entries) => { for en in entries { const_refs(mut c, en.key); const_refs(mut c, en.value) } }
+        ast.ExprKind.StructLit(_, _, fields) => { for field in fields { const_refs(mut c, field.value) } }
+        ast.ExprKind.Interpolate(parts) => { for x in ast.interpolation_holes(parts) { const_refs(mut c, x) } }
+        ast.ExprKind.Index(a, b) => { const_refs(mut c, a); const_refs(mut c, b) }
+        ast.ExprKind.Slice(a, b, d) => { const_refs(mut c, a); const_refs(mut c, b); const_refs(mut c, d) }
+        _ => {}
+    }
+}
+
 fn function(c: mut Checker, id: Int) {
-    if c.fns[id].decl.foreign != "" { return }
+    if c.fns[id].decl.foreign != "" || c.fns[id].decl.constant { return }
     c.unsafe_depth = 0
     c.current_fn = id
     c.undefined = []
@@ -1334,9 +1444,12 @@ fn module_fn(c: mut Checker, line: Int, col: Int, module: Int, name: Str) -> Ref
         }
         Some(f) => {
             if !c.fns[f].decl.public {
-                private(mut c, line, col, module, "function", name)
+                let mut kind = "function"
+                if c.fns[f].decl.constant { kind = "constant" }
+                private(mut c, line, col, module, kind, name)
                 return Ref.NoRef
             }
+            if c.fns[f].decl.constant { return Ref.Constant(f) }
             return Ref.Function(f)
         }
     }
@@ -1561,7 +1674,7 @@ fn condition(c: mut Checker, cond: ast.Expr, word: Str) {
 fn assign(c: mut Checker, target: ast.Expr, v: ast.Expr) {
     match target.kind {
         ast.ExprKind.Name(name) => {
-            if maps.has(module_fns(c), name) && lookup_local(c, name) < 0 {
+            if maps.has(module_fns(c), name) && lookup_local(c, name) < 0 && !c.fns[module_fns(c)[name]].decl.constant {
                 report_at(mut c, target, "E3056", "cannot assign to function '" + name + "'")
                 value(mut c, v)
                 return
@@ -1622,6 +1735,17 @@ fn place(c: mut Checker, target: ast.Expr, verb: Str) -> Int {
         return types.ERROR()
     }
     let ty = infer(mut c, target)
+    let mut constant_part = target
+    for {
+        match c.refs[constant_part.id] {
+            Ref.Constant(id) => {
+                report_at(mut c, constant_part, "E3232", "cannot " + verb + " constant '" + c.fns[id].decl.name + "'; copy it into a 'let mut' first")
+                return ty
+            }
+            _ => {}
+        }
+        match inner_object(constant_part) { Some(obj) => constant_part = obj, None => break }
+    }
     if is_field(target) {
         match c.refs[target.id] {
             Ref.Variant(_, _) => {
@@ -1645,6 +1769,7 @@ fn place(c: mut Checker, target: ast.Expr, verb: Str) -> Int {
         }
     }
     match c.refs[root.id] {
+        Ref.Constant(id) => report_at(mut c, root, "E3232", "cannot " + verb + " constant '" + c.fns[id].decl.name + "'; copy it into a 'let mut' first")
         Ref.Local(id) => {
             let l = c.locals[id]
             if captured(c, id) {
@@ -2067,7 +2192,10 @@ fn resolve(c: mut Checker, e: ast.Expr, name: Str) -> Ref {
         return Ref.Local(local)
     }
     match maps.get(module_fns(c), name) {
-        Some(f) => return Ref.Function(f)
+        Some(f) => {
+            if c.fns[f].decl.constant { return Ref.Constant(f) }
+            return Ref.Function(f)
+        }
         None => {}
     }
     if maps.has(c.modules[c.current].imports, name) {
@@ -2268,6 +2396,20 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
         ast.ExprKind.ByteLit(_) => return types.BYTE()
         ast.ExprKind.BoolLit(_) => return types.BOOL()
         ast.ExprKind.StrLit(_) => return types.STR()
+        ast.ExprKind.Interpolate(parts) => {
+            for part in parts {
+                match part {
+                    ast.InterpolationPart.Hole(hole) => {
+                        let t = value(mut c, hole)
+                        if t != types.STR() && t != types.BOOL() && t != types.FLOAT() && !types.is_integer(t) {
+                            report_at(mut c, hole, "E3101", "interpolated expressions must have type Str, Bool, Float, or an integer type")
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            return types.STR()
+        }
         ast.ExprKind.UnitLit => return types.UNIT()
         ast.ExprKind.Closure(params, result, body, _) => return closure(mut c, e, params, result, body, expected)
         ast.ExprKind.Name(name) => {
@@ -2277,6 +2419,7 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
                     capture(mut c, id)
                     return c.locals[id].ty
                 }
+                Ref.Constant(id) => { c.refs[e.id] = Ref.Constant(id); return check_constant(mut c, id) }
                 Ref.Function(id) => return fn_value(mut c, e, id, name, expected)
                 _ => return types.ERROR()
             }
@@ -2680,6 +2823,7 @@ fn field(c: mut Checker, e: ast.Expr, obj: ast.Expr, name: Str, expected: Int) -
                 "wrap it in a function of your own")
         } else if maps.has(m.fns, name) {
             match module_fn(mut c, e.line, e.col, module, name) {
+                Ref.Constant(id) => { c.refs[e.id] = Ref.Constant(id); return check_constant(mut c, id) }
                 Ref.Function(id) => return fn_value(mut c, e, id, m.name + "." + name, expected)
                 _ => return types.ERROR()
             }
@@ -3247,6 +3391,7 @@ fn accesses(c: Checker, e: ast.Expr, reads: mut [Path], changes: mut [Path]) {
         ast.ExprKind.Index(obj, _) => parts = [obj]
         ast.ExprKind.Try(x) => parts = [x]
         ast.ExprKind.Slice(obj, lo, hi) => parts = [obj, lo, hi]
+        ast.ExprKind.Interpolate(segments) => parts = ast.interpolation_holes(segments)
         ast.ExprKind.ArrayLit(xs) => parts = xs
         ast.ExprKind.MapLit(entries) => {
             for en in entries {
@@ -3378,6 +3523,11 @@ fn call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], expecte
             }
             construct(mut c, e, args, enum, vi, show(c, enum) + "." + types.get(c.table, enum).variants[vi].name)
             return enum
+        }
+        Ref.Constant(id) => {
+            report_at(mut c, callee, "E3233", "constant '" + c.fns[id].decl.name + "' is a value, not a function")
+            for a in args { infer(mut c, a) }
+            return types.ERROR()
         }
         Ref.Function(id) => return known_call(mut c, e, id, written(callee), args, expected)
         Ref.Local(id) => {
@@ -3613,7 +3763,7 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
                 return Ref.NoRef
             }
             match maps.get(module_fns(c), name) {
-                Some(f) => return Ref.Function(f)
+                Some(f) => { if c.fns[f].decl.constant { return Ref.Constant(f) }; return Ref.Function(f) }
                 None => {}
             }
             if is_prelude(name) || is_builtin_variant(name) {

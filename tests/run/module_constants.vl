@@ -1,0 +1,71 @@
+// out: 42
+// out: hello world
+// out: 1
+// out: 99
+// out: first
+// out: changed
+// out: 1.5
+// out: 255
+// out: true
+// out: 7
+// out: -128
+// out: 18446744073709551615
+// out: original/8
+// out: 1/9
+// out: 1.5
+import tasks
+type Config = struct { name: Str, counts: [Int] }
+const CONFIG = Config { name: "original", counts: [8, 9] }
+const FIXED: [Int; 2] = [1, 2]
+const RATIO: Float = 3 / 2
+const ENABLED = true
+const BYTE: u8 = 255
+const NONE: Option[Int] = None
+const UNIT = ()
+const ANSWER = BASE + 2
+const BASE: Int = 40
+const TEXT = "hello" + " world"
+const VALUES = [1, 2, 3]
+const LOOKUP: Map[Str, [Str]] = ["x": ["first", "second"]]
+const FRACTIONS: [Float] = [1, 1.5, 2]
+const BYTES: [u8] = [0u8, 255u8]
+const SIGNED = [-128i8, 127i8]
+const UNSIGNED = [0u64, 18446744073709551615u64]
+const FLAGS = [false, true]
+const EMPTY: [Int] = []
+const EMPTY_MAP: Map[Int, Str] = [:]
+fn const(n: Int) -> Int { return n }
+fn main() {
+    print(ANSWER)
+    print(TEXT)
+    let mut xs = VALUES
+    xs[0] = 99
+    print(VALUES[0])
+    print(xs[0])
+    let mut map = LOOKUP
+    map["x"][0] = "changed"
+    print(LOOKUP["x"][0])
+    print(map["x"][0])
+    print(FRACTIONS[1])
+    print(BYTES[1])
+    print(FLAGS[1])
+    assert(len(EMPTY) == 0 && len(EMPTY_MAP) == 0)
+    let results = tasks.map([1, 2, 3, 4], fn(n: Int) => ANSWER + n)
+    assert(results[0] == 43 && results[3] == 46)
+    let const = const(7)
+    print(const)
+    print(SIGNED[0])
+    print(UNSIGNED[1])
+    let mut config = CONFIG
+    config.name = "copy"
+    config.counts[0] = 0
+    print(f"{CONFIG.name}/{CONFIG.counts[0]}")
+    let mut fixed = FIXED
+    fixed[0] = 9
+    print(f"{FIXED[0]}/{fixed[0]}")
+    print(RATIO)
+    assert(ENABLED && BYTE == 255u8)
+    match NONE { None => assert(true), Some(_) => assert(false) }
+    let unit = UNIT
+}
+test "constants in tests" { assert(ANSWER == 42 && TEXT == "hello world") }

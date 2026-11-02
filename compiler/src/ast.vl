@@ -39,6 +39,7 @@ pub type ExprKind = enum {
     ByteLit(Int)
     BoolLit(Bool)
     StrLit(Str)
+    Interpolate([InterpolationPart])
     UnitLit
     Name(Str)
     Unary(Str, Expr)  // "-" or "!"
@@ -57,6 +58,11 @@ pub type ExprKind = enum {
     // result type if written, the body (for `=>`, one return of the
     // expression), and whether it was written with `=>`
     Closure([ClosureParam], Option[TypeName], Block, Bool)
+}
+
+pub type InterpolationPart = enum {
+    Text(Str)
+    Hole(Expr)
 }
 
 pub type ClosureParam = struct {
@@ -168,6 +174,7 @@ pub type TypeParam = struct {
 }
 
 pub type FnDecl = struct {
+    constant: Bool  // a module const, normalized to a zero-argument initializer
     name: Str
     foreign: Str  // C symbol, or empty for a Vela function
     variadic: Bool
@@ -235,6 +242,27 @@ pub type Program = struct {
     tests: [TestDecl]
 }
 
+// Constants keep the source initializer as the sole return of their body.
+pub fn const_value(f: FnDecl) -> Expr {
+    match f.body.stmts[0].kind {
+        StmtKind.Return(value) => { match value { Some(e) => return e, None => {} } }
+        _ => {}
+    }
+    return Expr { kind: ExprKind.UnitLit, line: f.line, col: f.col, id: -1 }
+}
+
+// Flat literal arrays can be emitted as data instead of initialization code.
+pub fn literal_table(values: [Expr]) -> Bool {
+    for e in values {
+        match e.kind {
+            ExprKind.IntLit(_) => {}, ExprKind.FixedIntLit(_, _, _) => {}, ExprKind.FloatLit(_) => {},
+            ExprKind.ByteLit(_) => {}, ExprKind.BoolLit(_) => {}, ExprKind.StrLit(_) => {}, ExprKind.UnitLit => {},
+            _ => return false
+        }
+    }
+    return len(values) > 0
+}
+
 // Whether `e` has a `mut` argument in it, which may change variables.
 pub fn has_mut(e: Expr) -> Bool {
     return match e.kind {
@@ -246,12 +274,25 @@ pub fn has_mut(e: Expr) -> Bool {
         ExprKind.Index(a, b) => has_mut(a) || has_mut(b)
         ExprKind.Try(x) => has_mut(x)
         ExprKind.Slice(a, b, c) => has_mut(a) || has_mut(b) || has_mut(c)
+        ExprKind.Interpolate(parts) => any_mut(interpolation_holes(parts))
         ExprKind.ArrayLit(xs) => any_mut(xs)
         ExprKind.MapLit(entries) => entries_mut(entries)
         ExprKind.StructLit(_, _, fields) => fields_mut(fields)
         ExprKind.Match(x, arms) => has_mut(x) || arms_mut(arms)
         _ => false  // a closure's body does not run here
     }
+}
+
+// Hole expressions in evaluation order, shared by semantic traversals and joins.
+pub fn interpolation_holes(parts: [InterpolationPart]) -> [Expr] {
+    let mut holes: [Expr] = []
+    for part in parts {
+        match part {
+            InterpolationPart.Hole(e) => push(mut holes, e)
+            InterpolationPart.Text(_) => {}
+        }
+    }
+    return holes
 }
 
 fn any_mut(es: [Expr]) -> Bool {
@@ -325,7 +366,13 @@ pub fn dump(program: Program) -> Str {
         push(mut items, sx_type_decl(t))
     }
     for f in program.fns {
-        push(mut items, sx_fn(f))
+        if f.constant {
+            let mut parts = [atom("const"), atom(f.name)]
+            if f.public { parts = [atom("pub"), atom("const"), atom(f.name)] }
+            match f.result { Some(t) => push(mut parts, atom(type_text(t))), None => {} }
+            push(mut parts, sx_expr(const_value(f)))
+            push(mut items, list(parts))
+        } else { push(mut items, sx_fn(f)) }
     }
     for t in program.tests {
         push(mut items, list([atom("test"), atom(quote(t.name)), sx_block(t.body)]))
@@ -625,6 +672,7 @@ fn sx_expr(e: Expr) -> Sx {
             return atom("false")
         }
         ExprKind.StrLit(s) => return atom(quote(s))
+        ExprKind.Interpolate(_) => return atom(expr_text(e))
         ExprKind.UnitLit => return atom("()")
         ExprKind.Name(name) => return atom(name)
         ExprKind.Unary(op, x) => return list([atom(op), sx_expr(x)])
@@ -868,6 +916,29 @@ pub fn expr_text(e: Expr) -> Str {
             return "false"
         }
         ExprKind.StrLit(s) => return quote(s)
+        ExprKind.Interpolate(parts) => {
+            let mut b = strings.builder()
+            strings.add(mut b, "f\"")
+            for part in parts {
+                match part {
+                    InterpolationPart.Text(s) => {
+                        for c in s {
+                            if c == '{' {
+                                strings.add(mut b, "{{")
+                            } else if c == '}' {
+                                strings.add(mut b, "}}")
+                            } else {
+                                let escaped = unescape(c)
+                                if escaped == "" { strings.add_byte(mut b, c) } else { strings.add(mut b, escaped) }
+                            }
+                        }
+                    }
+                    InterpolationPart.Hole(x) => strings.add(mut b, "{" + expr_text(x) + "}")
+                }
+            }
+            strings.add_byte(mut b, '"')
+            return strings.build(b)
+        }
         ExprKind.UnitLit => return "()"
         ExprKind.Name(name) => return name
         ExprKind.Unary(op, x) => return op + operand(x, 30)

@@ -1,0 +1,7 @@
+// command: query unsafe
+import c
+fn hidden() -> Int {
+    unsafe { let p = c.alloc(1); c.free(p) }
+    return 7
+}
+fn main() { print(f"{hidden()}") }

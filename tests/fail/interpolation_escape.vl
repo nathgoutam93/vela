@@ -1,0 +1,4 @@
+// err: interpolation_escape.vl:3:11: error: a \u escape is written \u{HEX}, as in \u{e9} [E1007]
+fn main() {
+    print(f"\u")
+}

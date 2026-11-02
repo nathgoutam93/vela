@@ -1,0 +1,8 @@
+// out: 42
+// err: interpolation_range.vl:4:38: panic: division by zero
+// exit: 101
+fn divide(n: Int) -> Int { return 42 / n }
+fn main() {
+    print(divide(1))
+    print(f"{divide(0)}")
+}

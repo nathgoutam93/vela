@@ -1,0 +1,5 @@
+// command: query refs FILE:4:14
+fn main() {
+    let count = 3
+    print(f"{count}")
+}

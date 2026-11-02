@@ -1,0 +1,5 @@
+// command: rename FILE:3:9 total
+fn main() {
+    let count = 3
+    print(f"{count}")
+}

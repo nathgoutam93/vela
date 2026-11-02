@@ -1,0 +1,17 @@
+{
+  "format": "vela.language.extensions",
+  "version": 1,
+  "constructs": {
+    "ExprKind.Interpolate": {
+      "section": "source-and-tokens",
+      "program": "tests/run/interpolation.vl"
+    }
+  },
+  "features": {
+    "module_constants": {
+      "section": "module-constants",
+      "program": "tests/run/module_constants.vl"
+    }
+  },
+  "contextual_words": ["const"]
+}

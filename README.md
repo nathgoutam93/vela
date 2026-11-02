@@ -4,10 +4,11 @@ Vela is a small, self-hosted systems language with static types, explicit
 effects, and value semantics. The compiler is written in Vela and produces
 C or native assembly.
 
-The project has a locally validated **1.0 candidate**. Foreign native-host,
-agent-evaluation, and tokenizer acceptance remain open; see the
-[roadmap](docs/roadmap-after-m18.md) and
-[validation backlog](docs/tooling-backlog.md#outstanding-validation).
+The project has a validated **1.0 candidate** on macOS and a retained Linux
+snapshot. Native Windows, agent trials, actual tokenizer counting, and
+specific kernel/debugger acceptance cases remain open. See the
+[reconciliation](docs/backlog-reconciliation.md), [roadmap](docs/roadmap-after-m18.md)
+and [validation backlog](docs/tooling-backlog.md#outstanding-validation).
 
 ## Start here
 

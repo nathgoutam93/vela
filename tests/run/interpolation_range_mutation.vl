@@ -1,0 +1,11 @@
+// out: 42
+// err: interpolation_range_mutation.vl:8:18: panic: division by zero
+// exit: 101
+fn reset(n: mut Int) -> Int { n = 0; return n }
+fn main() {
+    let mut n = 1
+    for i in 0..2 {
+        print(42 / n)
+        let changed = f"{reset(mut n)}"
+    }
+}

@@ -1,5 +1,10 @@
 # M30: Specification and compatibility
 
+Later status: the [2026-10-31 reconciliation](../backlog-reconciliation.md)
+credits retained Linux execution and debugger evidence and narrows the
+remaining acceptance. Pending labels below describe milestone-era evidence;
+consult the reconciliation and current backlog for current status.
+
 M30 records the implemented language as a **1.0 candidate** and adds a
 compatibility baseline. The final 1.0 release remains pending inherited
 native-host and agent/model validation. This work follows the

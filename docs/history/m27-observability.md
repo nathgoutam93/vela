@@ -1,5 +1,10 @@
 # M27: Debugging and observability
 
+Later status: the [2026-10-31 reconciliation](../backlog-reconciliation.md)
+credits retained Linux execution and debugger evidence and narrows the
+remaining acceptance. Pending labels below describe milestone-era evidence;
+consult the reconciliation and current backlog for current status.
+
 Status: implemented and locally validated; foreign native-host acceptance
 remains open. Work proceeds at the user's request while native hosts are unavailable. M26 remains open at
 VAL-001/VAL-004/VAL-005; proceeding does not waive those checks. M27 foreign

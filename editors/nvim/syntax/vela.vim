@@ -4,6 +4,7 @@ if exists("b:current_syntax")
 endif
 
 syn keyword velaKeyword fn let mut if else match for in return break continue type import pub test uses with
+syn match velaKeyword "\<const\>\ze\s\+\h\w*\s*[:=]"
 syn keyword velaContract requires ensures
 syn keyword velaStructure struct enum
 syn keyword velaBoolean true false

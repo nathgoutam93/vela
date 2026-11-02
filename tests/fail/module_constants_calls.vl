@@ -1,0 +1,8 @@
+// err: module_constants_calls.vl:5:15: error: a constant initializer must use literals, constant references, and operators; calls, closures and mutation are not allowed [E3230]
+// err: module_constants_calls.vl:6:16: error: a constant initializer must use literals, constant references, and operators; calls, closures and mutation are not allowed [E3230]
+// err: module_constants_calls.vl:7:18: error: a constant initializer cannot contain a function value [E3230]
+fn compute() -> Int { return 7 }
+const VALUE = compute()
+const ACTION = fn() => 1
+const FUNCTION = compute
+fn main() { print("done") }

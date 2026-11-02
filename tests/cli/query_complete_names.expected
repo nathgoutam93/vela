@@ -14,6 +14,12 @@
       "doc": "How many there are."
     },
     {
+      "name": "const",
+      "kind": "keyword",
+      "detail": "const",
+      "doc": null
+    },
+    {
       "name": "continue",
       "kind": "keyword",
       "detail": "continue",

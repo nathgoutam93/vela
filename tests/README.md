@@ -42,6 +42,12 @@ It discovers golden fixtures and module tests, and explicitly registers the
 Python integration scripts. Register a new integration script there so it
 runs in the default suite.
 
+The M30 compatibility corpus and its digests remain frozen. Current compatible
+language additions are listed separately in `tests/fixtures/language_extensions.json`,
+with specification sections and active executable fixtures. Module constant
+acceptance is in `module_constants_test.py`, including concurrent first reads,
+copy-on-write, imports, semantic queries and a 16,000-element literal table.
+
 The runner also tests `compiler/src/main.vl`, examples, and standard-library/package
 modules containing test blocks. Milestone-named tests are still required
 regressions; moving their documentation into history does not retire them.

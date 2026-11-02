@@ -46,3 +46,25 @@ The [contributor guide](../docs/contributing.md) explains seed updates and
 bootstrap checks; the [test guide](../tests/README.md) explains regression
 coverage. Use the [history index](../docs/history/README.md) for implementation
 rationale as needed.
+
+## Built-in modules
+
+The compiler registers these modules directly; they do not have source files
+under `std/`:
+
+| Module | Purpose |
+| --- | --- |
+| `sysio`, `clock` | System I/O and clocks; runtime operations are described in [sysops.vl](src/sysops.vl) and implemented in `runtime/`. |
+| `memory` | Memory operations. |
+| `maps` | Map operations. |
+| `files` | File operations. |
+| `os` | Operating-system operations. |
+| `strings` | String construction and conversion. |
+| `tasks` | Task operations. |
+| `math` | Math functions. |
+| `ints` | Integer helpers. |
+| `c` | C foreign-function interface. |
+
+The registry and each module's built-in function names are in
+[modules.vl](src/modules.vl). Other standard modules, such as `net` and
+`processes`, are Vela source files under `std/` and may wrap built-in modules.
