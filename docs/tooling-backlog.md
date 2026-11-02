@@ -2774,8 +2774,8 @@ No additional CI workflow run was requested or launched for reconciliation.
 
 ### TL-098: x86-64 kept rcx and rdx out of register allocation
 
-- **Status:** resolved rcx/rdx allocation; additional register-pressure
-  optimizations are deferred proposals.
+- **Status:** resolved rcx/rdx allocation and lifetime holes (post-M30);
+  allocating rax, r11 or rbp remains a deferred proposal.
 - **2026-10-31 reconciliation:** The original allocation change and its regression fix
   are resolved. Whole-interval allocation remains in use; live-range
   splitting/frame-pointer proposals are deferred, with no fresh SHA-256 profile or spill
@@ -2850,6 +2850,47 @@ No additional CI workflow run was requested or launched for reconciliation.
   a store on loop entry, reloads on the loop's exits (edge-split moves), and
   the emitter taking a location per position rather than per value: a
   redesign of x64.vl's allocator and emitter contract.
+- **Lifetime holes (post-M30, after TL-129):** implemented without changing
+  the emitter's one-location-per-value contract.
+  - `live.holes`: a value set once (or a parameter) has a hole in a gap
+    between its references that holds a whole loop deeper than every place
+    control leaves the gap for the rest of its interval. A hole ends at the
+    interval's end, before a label that is not a loop header going on past
+    it, or after an instruction that does not fall through, so every reload
+    is at a label.
+  - `x64.vl` `allocate`: with no register free, an interval ending inside an
+    active hole takes the owner's register before a victim is spilled. A
+    borrower does not lend in turn; lent and borrowed registers are not
+    spill victims. Values keep one register outside their holes.
+  - The emitter stores an owner whose hole lent its register to a home slot
+    once after it is set, and reloads it at the labels the hole jumps or
+    falls to. Those labels are not jump-threaded, and an assertion checks
+    that no peephole spans a reload.
+  - Two first versions were worse and were changed. Preferring lent
+    registers over free ones paid for stores and reloads where nothing was
+    short of registers, and a hole ending at its loop's back edge reloaded
+    at every turn: fasta +12%, arena_trees +9% instructions. Holes that only
+    held a call (caller-save splitting, as in the rejected trial) were
+    dropped too.
+- **Verified (lifetime holes):**
+  - `bench/compare.py --backend native --runs 15` against `c8948c1`:
+    sha256 1.593x -> 1.486x C, fannkuch 1.396x -> 1.276x, varints 1.256x ->
+    1.210x, nbody 1.156x -> 1.144x; self-translation 0.879 s and 0.875 s.
+    Instructions (callgrind): sha256 290M -> 285M, fannkuch 199M -> 197M,
+    the others within 0.1%. The compression loop keeps three of its eight
+    working variables on the stack, from five: the loop's own values
+    (eight working variables, the counter, temporaries, two arrays' data
+    and lengths, the bound) outnumber the 12 allocatable registers. Using
+    rax, r11 or rbp for values is the remaining lever.
+  - `tests/run/lifetime_holes.vl`: values around a busy loop through a
+    break, an early return from inside it, a continue of the outer loop and
+    a loop that does not run; holes are taken there (stores and reloads in
+    its assembly).
+  - Native, C, `VELA_OPT=0` native, native ASan/UBSan and TSan pass (388);
+    6,000 differential programs (`--start 130000` and `--start 9000`, which
+    includes seed 9125, `--count 1500` each) agree; CommonMark, toml-test,
+    Rust regex and the Unicode tables pass natively. Both fixed points
+    hold. arm64 has its own allocator (`regalloc.vl`) and is unchanged.
 
 ### TL-099: Back-end agreement was checked only by hand-written fixtures
 

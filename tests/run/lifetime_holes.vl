@@ -1,0 +1,98 @@
+// Values set once and used around a busy loop but not in it lend their
+// registers to the loop's values (x86-64 lifetime holes, TL-098): they are
+// stored after they are set and reloaded where control leaves the loop.
+// Each must keep its value through a break, an early return, a continue of
+// the outer loop, and a loop that does not run.
+// out: 8318970
+// out: -1
+// out: 350
+// out: 850
+import strings
+
+fn churn(data: [Int], n: Int) -> Int {
+    let base = data[0] * 3
+    let scale = data[1] + 7
+    let half = float(data[2]) * 0.5
+    let mut total = base
+    for round in 0..n {
+        total = total + base * round
+        if round % 5 == 4 {
+            continue
+        }
+        let mut a = round + 1
+        let mut b = round * 3 + 2
+        let mut c = round ^ 5
+        let mut d = 7 - round
+        let mut e = round * round
+        let mut f = 11
+        let mut g = round + 13
+        let mut h = 17
+        let mut i = 0
+        for i < 20 {
+            a = a + b * i
+            b = b ^ c
+            c = c + d
+            d = d - e % 7
+            e = e + f
+            f = f ^ g
+            g = g + h
+            h = h + a % 3
+            if a > 100000 {
+                break
+            }
+            i = i + 1
+        }
+        total = total + a + b + c + d + e + f + g + h + scale
+        if total < -1000000000 {
+            return -1
+        }
+    }
+    return total + int(half) + base + scale
+}
+
+// An early return from inside the busy loop.
+fn early(data: [Int]) -> Int {
+    let keep = data[0] + data[1]
+    let mut x = 0
+    for j in 0..1000 {
+        let mut y = j
+        let mut z = j * 2
+        let mut w = j * 3
+        for k in 0..10 {
+            y = y + z
+            z = z ^ w
+            w = w + k
+            if y > 40 && j == data[2] {
+                return -1
+            }
+        }
+        x = x + y + z + w + keep
+    }
+    return x
+}
+
+// The busy loop never runs, and the value is used after it.
+fn never(data: [Int], n: Int) -> Int {
+    let keep = data[0] * 10
+    let mut s = 0
+    for round in 0..n {
+        s = s + keep
+        for q in 0..n - n {
+            s = s + q * round
+        }
+        s = s + keep
+    }
+    return s + keep
+}
+
+fn main() {
+    let data = [5, 9, 13]
+    print(strings.from_int(churn(data, 300)))
+    print(strings.from_int(early(data)))
+    print(strings.from_int(never(data, 3)))
+    let mut t = 0
+    for r in 0..10 {
+        t = t + never([r, 0, 0], 2) / 5
+    }
+    print(strings.from_int(t + early([1, 1, 1]) * 0 + 400))
+}

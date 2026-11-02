@@ -59,6 +59,9 @@ type Out = struct {
     files: Map[Str, Int]
     saved: [Str]  // callee-saved registers pushed
     threads: Map[Int, Int]  // labels whose block only jumps: where it jumps to, in the end
+    homes: [Int]  // where a value with holes keeps its copy: [rbp - home], or 0
+    stores: Map[Int, [Int]]  // after instruction k: the values with holes it sets
+    reloads: Map[Int, [Int]]  // at label k: the values to load back from home
 }
 
 pub fn program(p: ir.Program) -> Str {
@@ -262,7 +265,7 @@ fn borrow_ok(scratch: [[Bool]], v: Int, r: Str) -> Bool {
     return true
 }
 
-fn allocate(f: ir.Func) -> [Loc] {
+fn allocate(f: ir.Func) -> Alloc {
     let n = len(f.classes)
     // Calls that do not return (a failed check's report) keep no value alive,
     // so they do not force values into callee-saved registers.
@@ -301,35 +304,62 @@ fn allocate(f: ir.Func) -> [Loc] {
         push(mut starts, iv.start[v])
     }
     let order = lists.order(starts)
-    let mut free_caller = ["r10"]
-    let mut free_args = ["r9", "r8", "rsi", "rdi"]
-    let mut free_borrowed = ["rcx", "rdx"]
-    let mut free_callee = ["r15", "r14", "r13", "r12", "rbx"]
-    let mut free_float = ["xmm14", "xmm13", "xmm12", "xmm11", "xmm10", "xmm9", "xmm8"]
+    let hl = live.holes(f, iv)
+    let mut pool = Pool {
+        caller: ["r10"], args: ["r9", "r8", "rsi", "rdi"], borrowed: ["rcx", "rdx"], callee: ["r15", "r14", "r13", "r12", "rbx"],
+        float: ["xmm14", "xmm13", "xmm12", "xmm11", "xmm10", "xmm9", "xmm8"],
+        lend_reg: [], lend_limit: [], lend_owner: [], lend_borrower: [], lend_hole: [],
+    }
+    let mut next_hole: [Int] = []
+    let mut used: [[Bool]] = []  // used[v][j]: whether v's hole j lent its register
+    for v in 0..n {
+        push(mut next_hole, 0)
+        let mut u: [Bool] = []
+        for _ in 0..len(hl[v]) / 2 { push(mut u, false) }
+        push(mut used, u)
+    }
     let mut active: [Int] = []
     for k in order {
         let v = candidates[k]
-        // Free the registers of intervals that ended.
+        let at = iv.start[v]
+        // Free the registers of intervals that ended. An owner ending in a
+        // hole it lends gets its register back when the hole is over.
         let mut still: [Int] = []
         for a in active {
-            if iv.end[a] < iv.start[v] {
-                let r = locs[a].reg
-                if f.classes[a] == ir.FLOAT() {
-                    push(mut free_float, r)
-                } else if is_arg_reg(r) {
-                    push(mut free_args, r)
-                } else if r == "rcx" || r == "rdx" {
-                    push(mut free_borrowed, r)
-                } else if is_callee_saved(r) {
-                    push(mut free_callee, r)
-                } else {
-                    push(mut free_caller, r)
-                }
+            if iv.end[a] < at {
+                if lending(pool, a) < 0 { give_back(mut pool, f.classes[a] == ir.FLOAT(), locs[a].reg, a) }
             } else {
                 push(mut still, a)
             }
         }
         active = still
+        // Holes that are over: their borrowers have all ended.
+        let mut j = 0
+        for j < len(pool.lend_reg) {
+            if pool.lend_limit[j] < at {
+                let owner = pool.lend_owner[j]
+                let r = pool.lend_reg[j]
+                drop_lend(mut pool, j)
+                if iv.end[owner] < at { give_back(mut pool, f.classes[owner] == ir.FLOAT(), r, owner) }
+            } else {
+                j = j + 1
+            }
+        }
+        // Holes that have begun lend their owners' registers to intervals
+        // that end inside them. A borrower does not lend in turn.
+        for a in active {
+            if locs[a].kind != 0 || lending(pool, a) >= 0 || borrowing(pool, a) >= 0 { continue }
+            let hs = hl[a]
+            for next_hole[a] * 2 < len(hs) && hs[next_hole[a] * 2 + 1] < at { next_hole[a] = next_hole[a] + 1 }
+            let h = next_hole[a]
+            if h * 2 < len(hs) && hs[h * 2] <= at {
+                push(mut pool.lend_reg, locs[a].reg)
+                push(mut pool.lend_limit, hs[h * 2 + 1])
+                push(mut pool.lend_owner, a)
+                push(mut pool.lend_borrower, -1)
+                push(mut pool.lend_hole, h)
+            }
+        }
         let cross = live.crosses(iv, v)
         let mut got = ""
         // The register of the operand the instruction setting v reads,
@@ -339,10 +369,12 @@ fn allocate(f: ir.Func) -> [Loc] {
             let d = f.insts[fd - 1]
             if d.dst == v && d.a >= 0 && shares_operand(d.op) {
                 let a = d.a
+                let lent = borrowing(pool, a)
                 if locs[a].kind == 0 && iv.end[a] == fd && f.classes[a] == f.classes[v] &&
                     (!cross || is_callee_saved(locs[a].reg)) && (eligible[v] || !is_arg_reg(locs[a].reg)) &&
-                    borrow_ok(scratch, v, locs[a].reg) {
+                    borrow_ok(scratch, v, locs[a].reg) && lending(pool, a) < 0 && (lent < 0 || pool.lend_limit[lent] >= iv.end[v]) {
                     got = locs[a].reg
+                    if lent >= 0 { pool.lend_borrower[lent] = v }
                     let mut kept: [Int] = []
                     for x in active {
                         if x != a {
@@ -356,38 +388,49 @@ fn allocate(f: ir.Func) -> [Loc] {
         if got != "" {
             // taken over from the operand
         } else if f.classes[v] == ir.FLOAT() {
-            if !cross && len(free_float) > 0 {
-                got = free_float[len(free_float) - 1]
-                free_float = free_float[0..len(free_float) - 1]
+            if !cross && len(pool.float) > 0 {
+                got = pool.float[len(pool.float) - 1]
+                pool.float = pool.float[0..len(pool.float) - 1]
             }
-        } else if eligible[v] && len(free_args) > 0 {
-            got = free_args[len(free_args) - 1]
-            free_args = free_args[0..len(free_args) - 1]
-        } else if borrowable(free_borrowed, scratch, v) != "" {
-            got = borrowable(free_borrowed, scratch, v)
+        } else if eligible[v] && len(pool.args) > 0 {
+            got = pool.args[len(pool.args) - 1]
+            pool.args = pool.args[0..len(pool.args) - 1]
+        } else if borrowable(pool.borrowed, scratch, v) != "" {
+            got = borrowable(pool.borrowed, scratch, v)
             let mut rest: [Str] = []
-            for r in free_borrowed {
+            for r in pool.borrowed {
                 if r != got {
                     push(mut rest, r)
                 }
             }
-            free_borrowed = rest
-        } else if !cross && len(free_caller) > 0 {
-            got = free_caller[len(free_caller) - 1]
-            free_caller = free_caller[0..len(free_caller) - 1]
-        } else if len(free_callee) > 0 {
-            got = free_callee[len(free_callee) - 1]
-            free_callee = free_callee[0..len(free_callee) - 1]
+            pool.borrowed = rest
+        } else if !cross && len(pool.caller) > 0 {
+            got = pool.caller[len(pool.caller) - 1]
+            pool.caller = pool.caller[0..len(pool.caller) - 1]
+        } else if len(pool.callee) > 0 {
+            got = pool.callee[len(pool.callee) - 1]
+            pool.callee = pool.callee[0..len(pool.callee) - 1]
+        }
+        if got == "" {
+            // No register free: one a hole lends, if v fits in the hole. Its
+            // owner is then stored and reloaded around the hole.
+            let l = lendable(pool, f, iv, v, cross, eligible, scratch)
+            if l >= 0 {
+                got = pool.lend_reg[l]
+                pool.lend_borrower[l] = v
+                used[pool.lend_owner[l]][pool.lend_hole[l]] = true
+            }
         }
         if got == "" && !(f.classes[v] == ir.FLOAT() && cross) {
             // Take the register of the cheapest interval to spill (loop-weighted
             // uses over length, live.vl), if it is cheaper than this one; ties go
             // to the interval that ends last. Spilling the longest interval
             // instead would evict a hot loop's state before its temporaries.
+            // Registers lent or borrowed through a hole stay where they are.
             let mut victim = -1
             for a in active {
                 if f.classes[a] != f.classes[v] || cross && !is_callee_saved(locs[a].reg) || !eligible[v] && is_arg_reg(locs[a].reg) ||
-                    !borrow_ok(scratch, v, locs[a].reg) {
+                    !borrow_ok(scratch, v, locs[a].reg) || lending(pool, a) >= 0 || borrowing(pool, a) >= 0 {
                     continue
                 }
                 if victim < 0 || iv.cost[a] < iv.cost[victim] || iv.cost[a] == iv.cost[victim] && iv.end[a] > iv.end[victim] {
@@ -413,7 +456,119 @@ fn allocate(f: ir.Func) -> [Loc] {
             push(mut active, v)
         }
     }
-    return locs
+    // The holes the emitter must store and reload around: those that lent
+    // the register.
+    let mut needed: [[Int]] = []
+    for v in 0..n {
+        let mut h: [Int] = []
+        if locs[v].kind == 0 {
+            let hs = hl[v]
+            for j in 0..len(hs) / 2 {
+                if used[v][j] {
+                    push(mut h, hs[j * 2])
+                    push(mut h, hs[j * 2 + 1])
+                }
+            }
+        }
+        push(mut needed, h)
+    }
+    return Alloc { locs: locs, holes: needed }
+}
+
+// The registers free for allocation, and those lent by holes: the owner,
+// the hole's last position, and who has it (-1: nobody yet).
+type Pool = struct {
+    caller: [Str]
+    args: [Str]
+    borrowed: [Str]
+    callee: [Str]
+    float: [Str]
+    lend_reg: [Str]
+    lend_limit: [Int]
+    lend_owner: [Int]
+    lend_borrower: [Int]
+    lend_hole: [Int]
+}
+
+type Alloc = struct {
+    locs: [Loc]
+    holes: [[Int]]  // each value's holes the emitter stores and reloads around
+}
+
+// The lending a value's hole is doing, or -1.
+fn lending(pool: Pool, v: Int) -> Int {
+    for j in 0..len(pool.lend_owner) {
+        if pool.lend_owner[j] == v { return j }
+    }
+    return -1
+}
+
+// The lending a value has its register from, or -1.
+fn borrowing(pool: Pool, v: Int) -> Int {
+    for j in 0..len(pool.lend_borrower) {
+        if pool.lend_borrower[j] == v { return j }
+    }
+    return -1
+}
+
+fn drop_lend(pool: mut Pool, j: Int) {
+    let mut regs: [Str] = []
+    let mut limits: [Int] = []
+    let mut owners: [Int] = []
+    let mut borrowers: [Int] = []
+    let mut holes: [Int] = []
+    for k in 0..len(pool.lend_reg) {
+        if k != j {
+            push(mut regs, pool.lend_reg[k])
+            push(mut limits, pool.lend_limit[k])
+            push(mut owners, pool.lend_owner[k])
+            push(mut borrowers, pool.lend_borrower[k])
+            push(mut holes, pool.lend_hole[k])
+        }
+    }
+    pool.lend_reg = regs
+    pool.lend_limit = limits
+    pool.lend_owner = owners
+    pool.lend_borrower = borrowers
+    pool.lend_hole = holes
+}
+
+// Register r, which `who` had, back to its lending or to the free ones.
+fn give_back(pool: mut Pool, float: Bool, r: Str, who: Int) {
+    let j = borrowing(pool, who)
+    if j >= 0 {
+        pool.lend_borrower[j] = -1
+        return
+    }
+    if float {
+        push(mut pool.float, r)
+    } else if is_arg_reg(r) {
+        push(mut pool.args, r)
+    } else if r == "rcx" || r == "rdx" {
+        push(mut pool.borrowed, r)
+    } else if is_callee_saved(r) {
+        push(mut pool.callee, r)
+    } else {
+        push(mut pool.caller, r)
+    }
+}
+
+// A lent register v may have: its interval ends in the hole, and the
+// register suits it as a free one would. -1 if none.
+fn lendable(pool: Pool, f: ir.Func, iv: live.Intervals, v: Int, cross: Bool, eligible: [Bool], scratch: [[Bool]]) -> Int {
+    let float = f.classes[v] == ir.FLOAT()
+    for j in 0..len(pool.lend_reg) {
+        let r = pool.lend_reg[j]
+        if pool.lend_borrower[j] >= 0 || pool.lend_limit[j] < iv.end[v] || (f.classes[pool.lend_owner[j]] == ir.FLOAT()) != float {
+            continue
+        }
+        if float {
+            if !cross { return j }
+        } else if (!cross || is_callee_saved(r)) && (eligible[v] || !is_arg_reg(r)) && borrow_ok(scratch, v, r) {
+            return j
+        }
+    }
+    return -1
 }
 
 // ---- Registers' names ----
@@ -683,7 +838,8 @@ fn stack_bytes(f: ir.Func, i: ir.Inst) -> Int {
 }
 
 fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, Int]) -> [Str] {
-    let mut locs = allocate(f)
+    let alloc = allocate(f)
+    let mut locs = alloc.locs
     let mut saved: [Str] = []
     for r in ["rbx", "r12", "r13", "r14", "r15"] {
         for l in locs {
@@ -708,6 +864,18 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
             locs[v].off = slot_off[locs[v].off]
         }
     }
+    // A value with holes keeps a copy at home, stored once after it is set
+    // and loaded back at the labels control reaches from a hole.
+    let mut homes: [Int] = []
+    for v in 0..len(locs) {
+        if len(alloc.holes[v]) > 0 {
+            at = at + 8
+            push(mut homes, at)
+        } else {
+            push(mut homes, 0)
+        }
+    }
+    let around = hole_moves(f, alloc)
     let mut out_bytes = 0
     for i in f.insts {
         if is_call(i.op) {
@@ -720,7 +888,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
     let total = align_up(at + out_bytes, 16)
     let mut o = Out {
         lines: [], fid: fid, locs: locs, classes: f.classes, stubs: [], stub_count: 0, labels: 0, doubles: doubles, saved: saved, files: files,
-        threads: jump_threads(f),
+        threads: jump_threads(f, around.stops), homes: homes, stores: around.stores, reloads: around.reloads,
     }
     push(mut o.lines, "")
     push(mut o.lines, "    .p2align 4")
@@ -765,6 +933,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
             stack = stack + 8
         }
     }
+    for p in f.params { store_home(mut o, p) }
     let mut reads: [Int] = []
     for _ in 0..len(f.classes) {
         push(mut reads, 0)
@@ -1666,95 +1835,112 @@ fn body(o: mut Out, f: ir.Func, seq: [Int], skips: Map[Int, Bool], reads: [Int],
     let mut p = 0
     for p < len(seq) {
         let k = seq[p]
-        if k < 0 {
-            push(mut o.lines, ir_label(o, cold_id(-k - 2)) + ":")
+        // Values reloaded here: after the label, or before an instruction
+        // that only a hole falls into.
+        let reload = k >= 0 && maps.has(o.reloads, k)
+        if reload && f.insts[k].op == ir.Op.Label {
+            instruction(mut o, f, f.insts[k], label_after(f, seq, p))
+            for v in o.reloads[k] { load_home(mut o, v) }
             p = p + 1
             continue
         }
-        let i = f.insts[k]
-        if i.op == ir.Op.BranchCmp && maps.has(skips, k) {
-            compare(mut o, i)
-            emit(mut o, "j" + negated(branch_suffix(i.sym)) + " " + ir_label(o, cold_id(k)))
-            p = p + 1
-            continue
+        if reload {
+            for v in o.reloads[k] { load_home(mut o, v) }
         }
-        if i.op == ir.Op.Branch && maps.has(skips, k) {
-            // Its true target is written next; false goes to the cold block.
-            let mut b = i
-            b.imm2 = cold_id(k)
-            instruction(mut o, f, b, i.imm)
-            p = p + 1
-            continue
+        let next = step(mut o, f, seq, p, skips, reads, known)
+        for x in p + 1..next {
+            assert(seq[x] < 0 || !maps.has(o.reloads, seq[x]))  // no peephole joins over a reload
         }
-        let folded = indexed(mut o, f, seq, p, reads)
-        if folded > 0 {
-            p = p + folded
-            continue
-        }
-        let scaled = scaled_add(mut o, f, seq, p, reads)
-        if scaled > 0 {
-            p = p + scaled
-            continue
-        }
-        if i.op == ir.Op.Load && i.imm2 == 4 && reads[i.dst] == 1 && p + 1 < len(seq) && seq[p + 1] == k + 1 &&
-            zero32(f.insts[k + 1], i.dst) {
-            let e = f.insts[k + 1]
-            let d = result_reg(o, e.dst)
-            emit(mut o, "mov " + low32(d) + ", " + mem(mut o, i.a, i.imm, 4, "r11"))
-            set(mut o, e.dst, d)
-            p = p + 2
-            continue
-        }
-        if i.op == ir.Op.FLoad && reads[i.dst] == 1 && p + 1 < len(seq) && seq[p + 1] == k + 1 &&
-            float_operand(mut o, i, f.insts[k + 1]) {
-            p = p + 2
-            continue
-        }
-        let rotating = rotate(mut o, f, k, reads, known)
-        if rotating > 0 {
-            p = p + rotating
-            continue
-        }
-        if i.dst >= 0 && reads[i.dst] == 1 && k + 1 < len(f.insts) && narrow(mut o, i, f.insts[k + 1]) {
-            p = p + 2
-            continue
-        }
-        // A comparison only a branch right after it reads: one cmp and jump.
-        if k + 1 < len(f.insts) && fusable(i) && f.insts[k + 1].op == ir.Op.Branch && f.insts[k + 1].a == i.dst &&
-            reads[i.dst] == 1 {
-            let mut b = f.insts[k + 1]
-            let mut next = label_after(f, seq, p + 1)
-            if maps.has(skips, k + 1) {
-                b.imm2 = cold_id(k + 1)
-                next = b.imm
-            }
-            fused(mut o, i, b, next)
-            p = p + 2
-            continue
-        }
-        if i.op == ir.Op.RcDec && reads[i.dst] == 1 {
-            // Constants between them are written where they are used: no code.
-            let mut q = p + 1
-            for q < len(seq) && seq[q] == seq[q - 1] + 1 && f.insts[seq[q]].op == ir.Op.Const && o.locs[f.insts[seq[q]].dst].kind == 2 {
-                q = q + 1
-            }
-            if q < len(seq) && seq[q] == seq[q - 1] + 1 && !maps.has(skips, seq[q]) && rc_branch(mut o, i, f.insts[seq[q]]) {
-                p = q + 1
-                continue
+        // Values with holes set by what was just written: their copy at home.
+        for x in p..next {
+            if seq[x] >= 0 && maps.has(o.stores, seq[x]) {
+                for v in o.stores[seq[x]] { store_home(mut o, v) }
             }
         }
-        // A compare and branch, then a jump, then the branch's own target:
-        // one jump on the opposite condition.
-        if i.op == ir.Op.BranchCmp && p + 1 < len(seq) && seq[p + 1] == k + 1 && f.insts[k + 1].op == ir.Op.Jump &&
-            target(o, label_after(f, seq, p + 1)) == target(o, i.imm) && target(o, f.insts[k + 1].imm) != target(o, i.imm) {
-            compare(mut o, i)
-            emit(mut o, "j" + negated(branch_suffix(i.sym)) + " " + ir_label(o, target(o, f.insts[k + 1].imm)))
-            p = p + 2
-            continue
-        }
-        instruction(mut o, f, i, label_after(f, seq, p))
-        p = p + 1
+        p = next
     }
+}
+
+// Writes the instruction at seq[p], with those a peephole joins to it, and
+// returns the position after them.
+fn step(o: mut Out, f: ir.Func, seq: [Int], p: Int, skips: Map[Int, Bool], reads: [Int], known: [Bool]) -> Int {
+    let k = seq[p]
+    if k < 0 {
+        push(mut o.lines, ir_label(o, cold_id(-k - 2)) + ":")
+        return p + 1
+    }
+    let i = f.insts[k]
+    if i.op == ir.Op.BranchCmp && maps.has(skips, k) {
+        compare(mut o, i)
+        emit(mut o, "j" + negated(branch_suffix(i.sym)) + " " + ir_label(o, cold_id(k)))
+        return p + 1
+    }
+    if i.op == ir.Op.Branch && maps.has(skips, k) {
+        // Its true target is written next; false goes to the cold block.
+        let mut b = i
+        b.imm2 = cold_id(k)
+        instruction(mut o, f, b, i.imm)
+        return p + 1
+    }
+    let folded = indexed(mut o, f, seq, p, reads)
+    if folded > 0 {
+        return p + folded
+    }
+    let scaled = scaled_add(mut o, f, seq, p, reads)
+    if scaled > 0 {
+        return p + scaled
+    }
+    if i.op == ir.Op.Load && i.imm2 == 4 && reads[i.dst] == 1 && p + 1 < len(seq) && seq[p + 1] == k + 1 &&
+        zero32(f.insts[k + 1], i.dst) {
+        let e = f.insts[k + 1]
+        let d = result_reg(o, e.dst)
+        emit(mut o, "mov " + low32(d) + ", " + mem(mut o, i.a, i.imm, 4, "r11"))
+        set(mut o, e.dst, d)
+        return p + 2
+    }
+    if i.op == ir.Op.FLoad && reads[i.dst] == 1 && p + 1 < len(seq) && seq[p + 1] == k + 1 &&
+        float_operand(mut o, i, f.insts[k + 1]) {
+        return p + 2
+    }
+    let rotating = rotate(mut o, f, k, reads, known)
+    if rotating > 0 {
+        return p + rotating
+    }
+    if i.dst >= 0 && reads[i.dst] == 1 && k + 1 < len(f.insts) && narrow(mut o, i, f.insts[k + 1]) {
+        return p + 2
+    }
+    // A comparison only a branch right after it reads: one cmp and jump.
+    if k + 1 < len(f.insts) && fusable(i) && f.insts[k + 1].op == ir.Op.Branch && f.insts[k + 1].a == i.dst &&
+        reads[i.dst] == 1 {
+        let mut b = f.insts[k + 1]
+        let mut next = label_after(f, seq, p + 1)
+        if maps.has(skips, k + 1) {
+            b.imm2 = cold_id(k + 1)
+            next = b.imm
+        }
+        fused(mut o, i, b, next)
+        return p + 2
+    }
+    if i.op == ir.Op.RcDec && reads[i.dst] == 1 {
+        // Constants between them are written where they are used: no code.
+        let mut q = p + 1
+        for q < len(seq) && seq[q] == seq[q - 1] + 1 && f.insts[seq[q]].op == ir.Op.Const && o.locs[f.insts[seq[q]].dst].kind == 2 {
+            q = q + 1
+        }
+        if q < len(seq) && seq[q] == seq[q - 1] + 1 && !maps.has(skips, seq[q]) && rc_branch(mut o, i, f.insts[seq[q]]) {
+            return q + 1
+        }
+    }
+    // A compare and branch, then a jump, then the branch's own target:
+    // one jump on the opposite condition.
+    if i.op == ir.Op.BranchCmp && p + 1 < len(seq) && seq[p + 1] == k + 1 && f.insts[k + 1].op == ir.Op.Jump &&
+        target(o, label_after(f, seq, p + 1)) == target(o, i.imm) && target(o, f.insts[k + 1].imm) != target(o, i.imm) {
+        compare(mut o, i)
+        emit(mut o, "j" + negated(branch_suffix(i.sym)) + " " + ir_label(o, target(o, f.insts[k + 1].imm)))
+        return p + 2
+    }
+    instruction(mut o, f, i, label_after(f, seq, p))
+    return p + 1
 }
 
 // A release whose result only the branch right after it tests against 0
@@ -1964,11 +2150,12 @@ fn fusable(i: ir.Inst) -> Bool {
 
 // By label: where a block that only jumps (after any labels) leads in the
 // end, so branches to it go there directly (jump threading).
-fn jump_threads(f: ir.Func) -> Map[Int, Int] {
+fn jump_threads(f: ir.Func, stops: Map[Int, Bool]) -> Map[Int, Int] {
     let mut direct: Map[Int, Int] = [:]
     let n = len(f.insts)
     for k in 0..n {
-        if f.insts[k].op != ir.Op.Label {
+        // A label that reloads values does more than jump.
+        if f.insts[k].op != ir.Op.Label || maps.has(stops, f.insts[k].imm) {
             continue
         }
         let mut j = k + 1
@@ -1992,6 +2179,91 @@ fn jump_threads(f: ir.Func) -> Map[Int, Int] {
         }
     }
     return out
+}
+
+type Moves = struct {
+    stores: Map[Int, [Int]]
+    reloads: Map[Int, [Int]]
+    stops: Map[Int, Bool]  // the labels with reloads
+}
+
+// Where values with holes are stored (after the instruction setting them;
+// a parameter at the entry) and reloaded: at each label in the interval but
+// outside its holes that a hole jumps to or falls into. live.holes ends a
+// hole that falls through right before a label, or at the interval's end.
+fn hole_moves(f: ir.Func, alloc: Alloc) -> Moves {
+    let iv = live.intervals(f, true)
+    let mut label_pos: Map[Int, Int] = [:]
+    for k in 0..len(f.insts) {
+        if f.insts[k].op == ir.Op.Label { label_pos[f.insts[k].imm] = k + 1 }
+    }
+    let mut out = Moves { stores: [:], reloads: [:], stops: [:] }
+    for v in 0..len(alloc.holes) {
+        let hs = alloc.holes[v]
+        if len(hs) == 0 { continue }
+        if iv.def_at[v] >= 0 { add_move(mut out.stores, iv.def_at[v], v) }
+        let mut at: [Int] = []  // reload positions
+        for j in 0..len(hs) / 2 {
+            for q in hs[j * 2]..hs[j * 2 + 1] + 1 {
+                for t in targets(f.insts[q - 1]) {
+                    let tp = label_pos[t]
+                    if tp >= iv.start[v] && tp <= iv.end[v] && !in_hole(hs, tp) { push(mut at, tp) }
+                }
+            }
+            let y = hs[j * 2 + 1]
+            let op = f.insts[y - 1].op
+            let falls = op != ir.Op.Jump && op != ir.Op.Branch && op != ir.Op.Ret && op != ir.Op.Unreachable
+            if falls && y + 1 <= iv.end[v] && !in_hole(hs, y + 1) { push(mut at, y + 1) }
+        }
+        for tp in at {
+            add_move(mut out.reloads, tp - 1, v)
+            if f.insts[tp - 1].op == ir.Op.Label { out.stops[f.insts[tp - 1].imm] = true }
+        }
+    }
+    return out
+}
+
+// The labels an instruction can go to.
+fn targets(i: ir.Inst) -> [Int] {
+    if i.op == ir.Op.Jump || i.op == ir.Op.BranchCmp { return [i.imm] }
+    if i.op == ir.Op.Branch { return [i.imm, i.imm2] }
+    return []
+}
+
+fn in_hole(hs: [Int], p: Int) -> Bool {
+    for j in 0..len(hs) / 2 {
+        if p >= hs[j * 2] && p <= hs[j * 2 + 1] { return true }
+    }
+    return false
+}
+
+fn add_move(m: mut Map[Int, [Int]], k: Int, v: Int) {
+    let mut list: [Int] = []
+    match maps.get(m, k) { Some(l) => list = l, None => {} }
+    for x in list {
+        if x == v { return }
+    }
+    push(mut list, v)
+    m[k] = list
+}
+
+// v's copy at home, after it is set.
+fn store_home(o: mut Out, v: Int) {
+    if o.homes[v] == 0 { return }
+    if o.classes[v] == ir.FLOAT() {
+        emit(mut o, "movsd qword ptr [rbp - " + num(o.homes[v]) + "], " + o.locs[v].reg)
+    } else {
+        emit(mut o, "mov qword ptr [rbp - " + num(o.homes[v]) + "], " + o.locs[v].reg)
+    }
+}
+
+// v back in its register from home.
+fn load_home(o: mut Out, v: Int) {
+    if o.classes[v] == ir.FLOAT() {
+        emit(mut o, "movsd " + o.locs[v].reg + ", qword ptr [rbp - " + num(o.homes[v]) + "]")
+    } else {
+        emit(mut o, "mov " + o.locs[v].reg + ", qword ptr [rbp - " + num(o.homes[v]) + "]")
+    }
 }
 
 fn target(o: Out, l: Int) -> Int {
