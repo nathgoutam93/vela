@@ -4077,6 +4077,72 @@ No additional CI workflow run was requested or launched for reconciliation.
     runs give medians of 0.329 and 0.332 s, so this is layout noise, not
     work added.
 
+### TL-129: Native code's remaining 1.2-1.4x on binarytrees, fasta, mandelbrot, fannkuch and varints
+
+- **Status:** diagnosed; fixes not started.
+- **Discovery:** post-M30, profiling pass after TL-128 on Linux x86-64. Each
+  benchmark built with `VELA_BACKEND=native` and `VELA_BACKEND=c`
+  (`build/vela build bench/NAME/main.vl`) and run under
+  `valgrind --tool=callgrind` (`--dump-instr=yes` for per-instruction cost).
+- **Evidence (observed, instructions native / C):**
+
+  | Benchmark (argument) | Native | C | Where the difference is |
+  | --- | ---: | ---: | --- |
+  | fasta (1000000) | 779M | 556M | `random_fasta`'s search loop |
+  | binarytrees (14) | 593M | 425M | box allocation, freeing, `make` |
+  | mandelbrot (800) | 339M | 276M | the escape-time loop |
+  | fannkuch (9) | 211M | 168M | `main`; `vela_array_unique` |
+  | varints (65536 8) | 133M | 96M | `parse`'s byte loop |
+
+  - **Box allocation is a call.** binarytrees makes 3.2M calls each to
+    `vela_native_box_alloc` (14 instructions a call) and
+    `vela_native_box_free` (19), and 1.6M to `vela_native_bounded` (12):
+    about 125M of the 168M difference. Through C, `vela_box_alloc`,
+    `vela_box_free` and `vela_bounded` are inline. Their pools and the
+    visit depth are thread-local, and native code has no thread-local
+    access; arm64 Mach-O would need TLV descriptors, so this is a larger
+    change than x86-64's `%fs` offsets.
+  - **A reference-count release is materialized, then tested.** `RcDec`
+    sets a byte with `sete`, extends it, and the following branch compares
+    it with 0 again, instead of branching on the flags.
+  - **Loop invariants are not hoisted.** In fasta's
+    `for i < m - 1 && r >= cum[i]`, every iteration recomputes `m - 1` and
+    reloads `cum`'s length and data. `loop_fields` (`compiler/src/opt.vl`)
+    keeps fields in registers only through pointers it knows are readable
+    (a parameter's place, a slot) or that the header reads; an array value
+    is never NULL, but the IR does not record which registers hold one.
+    Pure arithmetic on invariant registers is not hoisted at all.
+  - **Copies and spills.** mandelbrot's loop has two `movapd` copies for
+    `zr = tr; zi = ti`, and reads the constants 2.0 and 4.0 from stack
+    slots: they live across the function's calls, so they are spilled for
+    the whole function (TL-098). varints' loop copies before `and`, `shl`
+    and `imul`, and keeps `checksum` in a slot.
+  - **A loop with `break` is not rotated:** mandelbrot's inner loop tests
+    at the top and jumps back from the bottom.
+  - **fannkuch** calls `vela_array_unique` 725,763 times natively against
+    362,880 through C (one per permutation). The arrays copied are the
+    same (`vela_array_new` costs the same); the extra calls find the array
+    already unique, about 10M instructions.
+  - **Small:** a constant constructor's tag is stored, reloaded and tested
+    (`Tree.Leaf` boxing in `make`); every runtime call sets `eax` for
+    variadic functions, though no runtime function is variadic.
+- **Impact:** native code stays 1.2-1.4x the C backend on allocation-heavy,
+  search-loop and Float-loop code, though both share the IR's semantics.
+- **Workaround:** build through C (`vela build` defaults to it).
+- **Proposed improvements, most general and cheapest first:**
+  1. Branch on `RcDec`'s flags when its result only feeds a branch.
+  2. Record registers holding array or string values in the IR, so
+     `loop_fields` can keep their length and data in registers; hoist pure
+     operations on loop-invariant registers.
+  3. Rotate loops that contain `break`.
+  4. Find which `vela_array_unique` call in fannkuch C hoists or omits.
+  5. Live-range splitting and copy coalescing (TL-098).
+  6. Inline box pools natively, through a thread-local IR operation on
+     both targets (arm64 needs testing on macOS).
+- **Verification:** the callgrind counts above, per benchmark, and
+  `bench/compare.py --backend native`; the native suites and differential
+  tests for each change.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;
