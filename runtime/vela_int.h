@@ -5,16 +5,26 @@
 __extension__ typedef __int128 vela_i128;
 __extension__ typedef unsigned __int128 vela_u128;
 
-static inline uint64_t vela_fixed_mask(int bits) {
+// These take the operation, width and mode as constants from generated
+// code, and are only cheap once inlined and folded: gcc otherwise keeps the
+// whole general case out of line, a call per u32 xor or shift (sha256 ran
+// ten times slower than C). Inlining them is required, not a hint.
+#if defined(__GNUC__) || defined(__clang__)
+#define VELA_FIXED_INLINE static inline __attribute__((always_inline))
+#else
+#define VELA_FIXED_INLINE static inline
+#endif
+
+VELA_FIXED_INLINE uint64_t vela_fixed_mask(int bits) {
     return bits == 64 ? UINT64_MAX : (UINT64_C(1) << bits) - 1;
 }
-static inline uint64_t vela_fixed_normalize(uint64_t a, int bits, bool sign) {
+VELA_FIXED_INLINE uint64_t vela_fixed_normalize(uint64_t a, int bits, bool sign) {
     uint64_t mask = vela_fixed_mask(bits);
     a &= mask;
     if (sign && bits < 64 && (a & (UINT64_C(1) << (bits - 1)))) a |= ~mask;
     return a;
 }
-static inline int64_t vela_fixed_signed(uint64_t a, int bits) {
+VELA_FIXED_INLINE int64_t vela_fixed_signed(uint64_t a, int bits) {
     a = vela_fixed_normalize(a, bits, true);
     int64_t result;
     memcpy(&result, &a, sizeof result);
@@ -23,7 +33,7 @@ static inline int64_t vela_fixed_signed(uint64_t a, int bits) {
 
 // op: add, sub, mul, div, rem, neg, and, or, xor, not, shl, shr.
 // mode: panic, optional, wrapping, saturating. Optional failures set *ok.
-static inline uint64_t vela_fixed_inline(uint64_t a, uint64_t b, int bits, bool sign,
+VELA_FIXED_INLINE uint64_t vela_fixed_inline(uint64_t a, uint64_t b, int bits, bool sign,
                                           int op, int mode, const char *loc, bool *ok) {
     const uint64_t mask = vela_fixed_mask(bits);
     a &= mask;
@@ -90,7 +100,7 @@ static inline uint64_t vela_fixed_inline(uint64_t a, uint64_t b, int bits, bool 
     return (uint64_t)r & mask;
 }
 
-static inline uint64_t vela_fixed_cast_inline(uint64_t value, int from_bits, bool from_sign,
+VELA_FIXED_INLINE uint64_t vela_fixed_cast_inline(uint64_t value, int from_bits, bool from_sign,
                                                int bits, bool sign, const char *loc) {
     uint64_t a = value & vela_fixed_mask(from_bits);
     bool negative = from_sign && vela_fixed_signed(a, from_bits) < 0;
