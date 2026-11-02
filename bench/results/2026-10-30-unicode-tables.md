@@ -153,3 +153,22 @@ receiver method, which generated code calls for a map key's hash and eq.
 
 The native compiler, built by itself, loses about 7,000 of its 1.82
 million lines of assembly.
+
+## Follow-up: tables as module constants (TL-108)
+
+With module constants (TL-108), the tables are flat `const` Int arrays,
+which compile to static data and are built once, on first use, instead of
+base-64 records in string literals with a decoder. Measured on the same
+host, with a program doing 786,432 category, `has(cp, "Word")` and
+`simple_fold` lookups each, and a program calling `unicode.category` once:
+
+| | String records | Constants |
+| --- | ---: | ---: |
+| lookups, C / native | 0.292 / 0.266 s | 0.104 / 0.084 s |
+| build, C / native | 0.191 / 0.098 s | 0.150 / 0.096 s |
+| binary, C / native | 179 / 191 KB | 207 / 207 KB |
+
+The binary is 28 KB larger, as the tables hold 8-byte Ints rather than
+characters. `tests/unicode_test.py` agrees on all 1,114,112 categories and
+every folding on both backends. CommonMark passes 652/652 and the Rust
+regex tests 906/906.

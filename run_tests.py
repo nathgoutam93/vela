@@ -8,6 +8,11 @@
                                                also fails a test that leaks memory
     python3 run_tests.py --tsan                build with ThreadSanitizer, which
                                                fails a test with a data race
+    python3 run_tests.py --cflags="-fsanitize=undefined"
+                                               more C flags, added to the runner's
+                                               warning policy rather than replacing
+                                               it, as VELA_CFLAGS would (TL-081);
+                                               write it with `=`, as flags start with -
     python3 run_tests.py --compiler "./vela1"  any other compiler
 
 build/vela is made from the seed by `sh compiler/bootstrap/bootstrap.sh`.
@@ -460,6 +465,7 @@ def main() -> int:
     ap.add_argument("--sanitize", action="store_true",
                     help="build with AddressSanitizer and UBSan; leaks fail the test")
     ap.add_argument("--tsan", action="store_true", help="build with ThreadSanitizer; data races fail the test")
+    ap.add_argument("--cflags", default="", metavar="FLAGS", help="C flags added to the warning policy, not replacing it")
     ap.add_argument("--backend", choices=["c", "native"],
                     help="compile every program with this backend (VELA_BACKEND); by default `vela build` uses C "
                          "and `vela run` and `vela test` the native backend")
@@ -484,6 +490,8 @@ def main() -> int:
     env = dict(os.environ)
     env["VELA_TEST_JOBS"] = str(args.jobs)
     env.setdefault("VELA_CFLAGS", STRICT_CFLAGS)
+    if args.cflags:
+        env["VELA_CFLAGS"] += " " + args.cflags
     if args.sanitize:
         env["VELA_CFLAGS"] += SANITIZE_CFLAGS
         env["ASAN_OPTIONS"] = "detect_leaks=1"

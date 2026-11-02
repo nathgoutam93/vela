@@ -16,6 +16,11 @@ sh compiler/bootstrap/bootstrap.sh
 python3 run_tests.py --backend c --jobs 4
 ```
 
+`--sanitize` (ASan, UBSan and leak checks) and `--tsan` add their flags to
+the runner's warning policy; `--cflags="..."` adds other C flags the same way.
+Setting `VELA_CFLAGS` instead replaces that policy, whose exceptions keep
+legal Vela code warning-free.
+
 The first command checks the C bootstrap fixed point. To build the native
 compiler and check its fixed point too:
 
