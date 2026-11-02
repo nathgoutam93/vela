@@ -2830,6 +2830,26 @@ No additional CI workflow run was requested or launched for reconciliation.
   `tests/run/x64_wide_constant_store.vl` is the reduced program: it crashes
   with the compiler before the fix and passes on both backends at both
   optimization settings.
+- **Diagnosis (post-M30, Linux x86-64, observed):** an allocation dump of
+  sha256's `digest` shows that the five spilled working variables of the
+  compression loop do not cross any call. At a position inside that
+  loop, 11 values hold the 12 allocatable registers. Among them are
+  block-loop values whose deepest use is the message-schedule loop (data
+  and array pointers, in r10, r12 and r15), live through the compression
+  loop without being used in it. The working variables were assigned when
+  no register was free, and a linear-scan decision is never revisited, so
+  they stay on the stack even after r13 frees.
+- **Rejected trial:** caller-save splitting. A value crossing calls only at
+  a lower loop depth than its uses may take r10 or an argument register,
+  stored before each such call and reloaded after. It was correct
+  (same outputs), but changed no benchmark: native geometric mean 1.253x
+  before, 1.259x after, sha256 1.572x and 1.584x, within this host's noise
+  (TL-085). Not kept.
+- **Remaining (unchanged):** sha256 needs intervals with lifetime holes, so
+  a value gives up its register in a loop where it is not used. That means
+  a store on loop entry, reloads on the loop's exits (edge-split moves), and
+  the emitter taking a location per position rather than per value: a
+  redesign of x64.vl's allocator and emitter contract.
 
 ### TL-099: Back-end agreement was checked only by hand-written fixtures
 
@@ -3973,6 +3993,35 @@ No additional CI workflow run was requested or launched for reconciliation.
   30,544 bytes with `lists.pop` added (1,456 bytes free).
 - **Verification:** the guide-budget milestone tests (m17, m20-m23, m30)
   pass; a diff of the guide shows only the buffers lines changed.
+
+### TL-127: Fixed-width arithmetic through C was a call per operation under gcc
+
+- **Status:** resolved.
+- **Discovery:** post-M30, measuring before TL-098 work on Linux x86-64
+  (gcc 13.3): `python3 bench/run.py --languages c vela vela-native`.
+- **Evidence (observed):** sha256 built through the C backend took 1.826 s
+  against 0.174 s for its C reference (10.5x), and 0.279 s natively.
+  Callgrind put 47% of its instructions in `vela_fixed_inline.constprop.0`.
+  This is the generic helper every fixed-width operation is emitted as,
+  with the operation, width, signedness and mode as constants. It is cheap
+  only once inlined and folded, and gcc kept it out of line. Each `u32`
+  xor, shift or wrapping add was a call through every branch.
+  The same holds at every merge back to `4f3450a` (1.88-2.20 s), so it is
+  not a recent regression. The retained after-M2x reports showing
+  sha256 near C are not Linux gcc results.
+- **Impact:** the release backend was 10x slower than C on fixed-width
+  integer code (hashes, checksums, varints) under gcc, while the native
+  backend was not.
+- **Resolution:** `vela_fixed_inline`, `vela_fixed_cast_inline` and the
+  helpers they use are `always_inline` under gcc and clang
+  (`VELA_FIXED_INLINE` in `runtime/vela_int.h`), so the constants fold.
+- **Verified:**
+  - sha256 through C takes 0.257 s (1.46x C, the same output), and varints
+    went from 1.37x to 1.17x C. The C backend's geometric mean against C
+    went from 1.34 to 1.11 over the 12 benchmarks.
+  - The compiler's own build through C takes the same time (20.3 s against
+    20.1 s).
+  - The C suite passes, also under ASan/UBSan.
 
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
