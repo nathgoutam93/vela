@@ -2774,8 +2774,8 @@ No additional CI workflow run was requested or launched for reconciliation.
 
 ### TL-098: x86-64 kept rcx and rdx out of register allocation
 
-- **Status:** resolved rcx/rdx allocation and lifetime holes (post-M30);
-  allocating rax, r11 or rbp remains a deferred proposal.
+- **Status:** resolved rcx/rdx allocation, lifetime holes and rbp
+  allocation (post-M30); allocating rax and r11 was tried and rejected.
 - **2026-10-31 reconciliation:** The original allocation change and its regression fix
   are resolved. Whole-interval allocation remains in use; live-range
   splitting/frame-pointer proposals are deferred, with no fresh SHA-256 profile or spill
@@ -2891,6 +2891,44 @@ No additional CI workflow run was requested or launched for reconciliation.
     includes seed 9125, `--count 1500` each) agree; CommonMark, toml-test,
     Rust regex and the Unicode tables pass natively. Both fixed points
     hold. arm64 has its own allocator (`regalloc.vl`) and is unchanged.
+- **rbp (post-M30):** outside debug and profile builds (observed mode, which
+  keeps rbp as the frame pointer and emits CFI for debuggers and
+  profilers), the frame is addressed above rsp, which does not move between
+  the prologue and the epilogue, and rbp is a callee-saved register taken
+  after rbx and r12-r15. Without the push of rbp the frame below the entry's
+  return address is 8 past a multiple of 16, so rsp stays aligned at calls.
+  - Instructions (callgrind, native, the same output): binarytrees 556M ->
+    535M, arena_trees 309M -> 295M (shorter prologues of small recursive
+    functions), varints 132.5M -> 131.4M, nbody 364.9M -> 363.4M, fannkuch
+    196.6M -> 196.3M; fasta, mandelbrot, sha256, crc32 and spectralnorm
+    unchanged. sha256's `digest` uses rbp, but not in its compression loop.
+  - Time (`bench/compare.py --backend native` against `1d4b772`): the
+    geometric mean against C was 1.136x before and 1.113x after over 9 runs
+    of the twelve; over 21 runs of binarytrees, fasta, wordfreq, sha256 and
+    varints, 1.294x and 1.300x, each within 3% either way (binarytrees
+    1.191x -> 1.153x, varints 1.207x -> 1.237x). Self-translation 0.95x and
+    1.00x in the two runs. The fewer instructions do not show as time beyond
+    this host's noise (TL-085); frame operands through rsp take a SIB byte.
+  - Tradeoff: a release native binary has no frame pointer and no CFI, so
+    gdb and `perf -g` cannot unwind it by frame pointer, as with gcc's
+    default `-O2`. Debug and profile builds are unchanged.
+  - `tests/stack_overflow_test.py` (native at both optimization settings),
+    M26 target checks, M27 observation checks and M29 native cache and
+    real-program checks pass.
+- **Rejected trial: values in rax and r11.** The function was written once
+  without them, recording which instructions' code wrote rax or r11; values
+  whose intervals held none of those, crossed no call and were not
+  parameters could then have them; the function was written again and
+  checked (a value in one overwritten while read or live, or set earlier in
+  the same peephole step, lost it and the function was written once more).
+  It was correct (all suites, the same outputs) but only short temporaries
+  qualified: in a busy loop the emitter uses r11 for every spilled operand,
+  so no long-lived value fits. sha256 went from 285.2M to 287.4M
+  instructions, its compression loop spilling four working variables
+  instead of three; every other benchmark ran the same instructions as with
+  rbp alone. Not kept. Letting long-lived values have them would need the
+  emitter to pick its scratch per instruction from the registers free
+  there.
 
 ### TL-099: Back-end agreement was checked only by hand-written fixtures
 
