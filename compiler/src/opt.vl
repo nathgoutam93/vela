@@ -57,6 +57,7 @@ pub fn optimize_with(p: ir.Program, limit: Int, rounds: Int) -> ir.Program {
         }
     }
     for i in 0..len(funcs) {
+        funcs[i] = hoist_invariants(funcs[i])
         let kept = loop_fields(funcs[i])
         if len(kept.classes) != len(funcs[i].classes) { funcs[i] = simplify(kept) }
         funcs[i] = compact_slots(forward_destinations(hoist_floats(rotate_loops(build_in_place(funcs[i])))))
@@ -583,6 +584,111 @@ fn build_in_place(f: ir.Func) -> ir.Func {
     return out
 }
 
+// Whether hoisting i out of a loop cannot fault or read changing memory:
+// pure, not a load, and not a division (by a divisor the loop may test).
+fn hoistable(op: ir.Op) -> Bool {
+    return pure(op) && op != ir.Op.Load && op != ir.Op.FLoad && op != ir.Op.Div && op != ir.Op.Rem
+}
+
+// Loop-invariant code motion: an instruction in a loop that computes the
+// same value at every iteration, `m - 1` in `for i < m - 1`, is computed
+// once before the loop. It must be hoistable, its register set only there
+// and read on the loop's own path (not only by an early return or a
+// panic), and what it reads set once before the loop or by another such
+// instruction. The loop must be entered only by falling into its header,
+// so what goes before the header runs before every entry. An instruction
+// goes before the outermost loop it is invariant in; those going before one
+// header keep their order, which their dependences follow. The header's
+// test then comes first, so `rotate_loops` can rotate it.
+fn hoist_invariants(f: ir.Func) -> ir.Func {
+    let n = len(f.insts)
+    let mut label_at: Map[Int, Int] = [:]
+    let mut jumps: [Int] = []  // positions of instructions that can jump
+    for k in 0..n {
+        if f.insts[k].op == ir.Op.Label { label_at[f.insts[k].imm] = k }
+        if len(targets(f.insts[k])) > 0 { push(mut jumps, k) }
+    }
+    let defs = def_counts(f)
+    let mut defined: [Int] = []  // where each register set once is set; -1 for parameters
+    for _ in f.classes { push(mut defined, -1) }
+    for k in 0..n {
+        if f.insts[k].dst >= 0 { defined[f.insts[k].dst] = k }
+    }
+    // Positions in straight-line runs that end by returning or failing: an
+    // early exit or a panic, which hoisting would keep alive through the
+    // whole loop for a path rarely taken.
+    let mut cold: [Bool] = []
+    for _ in 0..n { push(mut cold, false) }
+    let mut start = 0
+    for k in 0..n {
+        let op = f.insts[k].op
+        if op == ir.Op.Label { start = k }
+        if op == ir.Op.Ret || op == ir.Op.Unreachable {
+            for c in start..k + 1 { cold[c] = true }
+        }
+        if ir.ends_block(op) || op == ir.Op.BranchCmp || op == ir.Op.Branch { start = k + 1 }
+    }
+    let mut dest: [Int] = []  // the header each instruction moves before, or -1
+    for _ in 0..n { push(mut dest, -1) }
+    let mut moved = false
+    for e in jumps {
+        let mut h = -1
+        for t in targets(f.insts[e]) {
+            if maps.has(label_at, t) && label_at[t] <= e { h = label_at[t] }
+        }
+        if h < 0 || h > 0 && ir.ends_block(f.insts[h - 1].op) { continue }
+        let mut entered = false
+        for k in jumps {
+            if k >= h && k <= e { continue }
+            for t in targets(f.insts[k]) {
+                if maps.has(label_at, t) && label_at[t] >= h && label_at[t] <= e { entered = true }
+            }
+        }
+        if entered { continue }
+        let mut inside: Map[Int, Bool] = [:]  // registers hoisted from this loop
+        let mut wanted: Map[Int, Bool] = [:]  // registers the loop's own path reads
+        for k in h + 1..e + 1 {
+            if !cold[k] {
+                for r in ir.reads(f.insts[k]) { wanted[r] = true }
+            }
+        }
+        for k in h + 1..e {
+            let i = f.insts[k]
+            if i.dst < 0 || cold[k] || !hoistable(i.op) || defs[i.dst] != 1 || !maps.has(wanted, i.dst) { continue }
+            let mut steady = true
+            for r in ir.reads(i) {
+                if !(defs[r] == 1 && defined[r] < h || maps.has(inside, r)) { steady = false }
+            }
+            if !steady { continue }
+            inside[i.dst] = true
+            if dest[k] < 0 || h < dest[k] {
+                dest[k] = h
+                moved = true
+            }
+        }
+    }
+    if !moved { return f }
+    let mut before: Map[Int, [Int]] = [:]  // header: the instructions going before it
+    for k in 0..n {
+        if dest[k] >= 0 {
+            let mut list: [Int] = []
+            match maps.get(before, dest[k]) { Some(l) => list = l, None => {} }
+            push(mut list, k)
+            before[dest[k]] = list
+        }
+    }
+    let mut out = f
+    out.insts = []
+    for k in 0..n {
+        match maps.get(before, k) {
+            Some(list) => { for x in list { push(mut out.insts, f.insts[x]) } }
+            None => {}
+        }
+        if dest[k] < 0 { push(mut out.insts, f.insts[k]) }
+    }
+    return out
+}
+
 fn boundary(i: ir.Inst) -> Bool {
     return i.op == ir.Op.Label || ir.ends_block(i.op) || i.op == ir.Op.BranchCmp
 }
@@ -1021,6 +1127,7 @@ fn rotate_loops(f: ir.Func) -> ir.Func {
     }
     let mut out = f
     let mut body: Map[Int, Int] = [:]  // header label: the label after its test
+    let mut copied = false  // a header's test and jump copied to its loop's end
     let mut insts: [ir.Inst] = []
     for k in 0..len(f.insts) {
         let i = f.insts[k]
@@ -1028,7 +1135,16 @@ fn rotate_loops(f: ir.Func) -> ir.Func {
         if i.op == ir.Op.Jump && maps.has(label_at, i.imm) && label_at[i.imm] < k && label_at[i.imm] + 1 < len(f.insts) {
             let check = f.insts[label_at[i.imm] + 1]
             let opposite = inverse(check.sym)
-            if check.op == ir.Op.BranchCmp && opposite != "" && check.a >= 0 && check.b >= 0 &&
+            let after = label_at[i.imm] + 2
+            if check.op == ir.Op.BranchCmp && check.a >= 0 && check.b >= 0 && after < len(f.insts) && f.insts[after].op == ir.Op.Jump &&
+                maps.has(label_at, check.imm) && label_at[check.imm] > after {
+                // `branch.cmp c, body; jump exit`: the same test and jump at
+                // the end, so the loop goes on with one taken branch.
+                push(mut insts, check)
+                push(mut insts, f.insts[after])
+                rotated = true
+                copied = true
+            } else if check.op == ir.Op.BranchCmp && opposite != "" && check.a >= 0 && check.b >= 0 &&
                 f.classes[check.a] != ir.FLOAT() && f.classes[check.b] != ir.FLOAT() {
                 if !maps.has(body, i.imm) { body[i.imm] = ir.label(mut out) }
                 let mut back = check
@@ -1041,7 +1157,10 @@ fn rotate_loops(f: ir.Func) -> ir.Func {
         }
         if !rotated { push(mut insts, i) }
     }
-    if len(body) == 0 { return f }
+    if len(body) == 0 {
+        if copied { out.insts = insts }
+        return out
+    }
     // The new labels, right after their headers' tests.
     out.insts = []
     for k in 0..len(insts) {

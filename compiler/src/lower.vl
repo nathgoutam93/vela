@@ -1608,6 +1608,12 @@ fn param_local(g: mut Low, lid: Int, t: Int, mutable: Bool) {
         g.fs.locals[lid] = place
     } else {
         g.fs.locals[lid] = reg_val(p, t)
+        // An immutable array parameter is lent for the whole call: neither
+        // this function nor its callees can change or move its elements, so
+        // its data and length are read once (and dropped if never used).
+        if types.is_array(g.k.table, t) && !maps.has(g.k.escaped, lid) {
+            g.fs.cached[lid] = Cached { data: load(mut g, p, 32, 8), length: load(mut g, p, 8, 8) }
+        }
     }
 }
 
@@ -2079,11 +2085,16 @@ fn hoist_unique(g: mut Low, loop: ast.Stmt) {
         if !is_array_like(g, t) && !types.is_map(g.k.table, t) { continue }
         let p = g.fs.locals[id]
         let mut kind = "array"; if types.is_map(g.k.table, t) { kind = "map" }
+        // Already unique (one reference, one thread): nothing to call, as
+        // in `writable`.
+        let unique = label(mut g)
+        branch_cmp(mut g, "eq", load(mut g, scalar(mut g, p), 0, 8), konst(mut g, 1), unique)
         let pointer = address(mut g, in_memory_copy(mut g, p))
         // For a scalar local, uniqueness writes through a temporary and is
         // copied back. Mut parameters already reside at their caller's place.
         ccall(mut g, "vela_" + kind + "_unique", [pointer], [ir.KIND_INT()], ir.RET_NONE(), -1)
         if !p.mem { emit(mut g, ir.inst(ir.Op.Move, p.reg, load(mut g, pointer, 0, 8), -1, 0)) }
+        place_label(mut g, unique)
         g.fs.hoisted[id] = true
         if types.is_array(g.k.table, t) && !maps.has(grows, id) { let a = scalar(mut g, p); g.fs.cached[id] = Cached { data: load(mut g, a, 32, 8), length: load(mut g, a, 8, 8) } }
     }
