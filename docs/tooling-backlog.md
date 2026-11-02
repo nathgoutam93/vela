@@ -4023,6 +4023,60 @@ No additional CI workflow run was requested or launched for reconciliation.
     20.1 s).
   - The C suite passes, also under ASan/UBSan.
 
+### TL-128: Native code looked a counted key up twice and sliced strings by call
+
+- **Status:** resolved.
+- **Discovery:** post-M30, after TL-098's diagnosis, on Linux x86-64:
+  `python3 bench/compare.py --backend native` put wordfreq at 1.77x C,
+  knucleotide at 1.35x and fannkuch at 1.37x.
+- **Evidence (observed, callgrind):**
+  - wordfreq ran 252M instructions natively against 122M through C. Its
+    `match maps.get(m, k) { Some(n) => m[k] = n + 1, None => m[k] = 1 }`
+    searched the map a second time for the write, which the C backend's
+    M18 fusion avoids. Each `s[a..b]` was a call to `vela_str_slice`.
+  - knucleotide spent its time in that same second lookup.
+  - fannkuch's loops jumped to a label holding only another jump, and
+    indexed with `imul` then `add` where one `lea` does.
+- **Impact:** counting with a map, the commonest map loop, cost twice the
+  hashing natively; string slicing paid a call per slice.
+- **Resolution (`compiler/src/lower.vl`, `compiler/src/x64.vl`):**
+  - A `match maps.get(m, k)` on a local map and an unchanging key, whose
+    arms each assign `m[k]` a call-free value or do nothing, keeps the
+    lookup's slot. The write stores into the slot inline when the map is
+    still the one looked in and the key was found, and otherwise calls
+    `vela_map_set_found`. The map is snapshotted at the lookup, so a
+    copy-on-write between them takes the call.
+  - String slices check their bounds and build the view inline.
+  - Labels whose block is only a jump are threaded, including in the
+    branch-over-jump peephole; a multiply by 1, 2, 4 or 8 read once and
+    followed by an add is one `lea`.
+- **Verified:**
+  - `tests/run/map_counting.vl` covers the fusion, including a COW copy
+    between lookup and write. The first version wrote into the shared map
+    there (the snapshot was the variable's own register). `slice_edges`,
+    `panic_slice_end` and `panic_slice_negative` cover the inline slice.
+  - Native, C, `VELA_OPT=0` native, ASan/UBSan on both backends and TSan
+    pass (386); 3,000 differential programs (`--start 110000 --count 1500`)
+    agree; CommonMark 652/652, toml-test, Rust regex 906/906 and the
+    Unicode tables pass natively. Both bootstrap fixed points hold.
+  - `bench/compare.py --backend native --runs 7` against `c86e8c8`:
+
+    | Benchmark | Before / C | After / C |
+    | --- | ---: | ---: |
+    | wordfreq | 1.768x | 1.261x |
+    | knucleotide | 1.349x | 0.864x |
+    | fannkuch | 1.373x | 1.278x |
+    | binarytrees | 1.340x | 1.255x |
+    | varints | 1.370x | 1.239x |
+    | geometric mean (12) | 1.247x | 1.155x |
+    | self-translation | 0.985 s | 0.896 s |
+
+  - sha256 read 1.73x to 1.81x in that run. It executes the same
+    instructions before and after (4,570M, callgrind); its code differs
+    by two `lea`s, one inverted branch and loop padding. 50 interleaved
+    runs give medians of 0.329 and 0.332 s, so this is layout noise, not
+    work added.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;
