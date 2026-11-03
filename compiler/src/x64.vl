@@ -9,7 +9,7 @@
 // ends last, which then lives on the stack instead (is spilled).
 //
 // - An interval with a call inside it takes a callee-saved register (rbx,
-//   r12 to r15, and rbp when it does not hold the frame), which calls keep; one without may also take r10. A Float
+//   r12 to r15), which calls keep; one without may also take r10. A Float
 //   takes xmm8 to xmm14 when no call is inside it, and the stack when one
 //   is: C keeps no xmm register across calls. A call that does not return
 //   (a failed check's report) is not counted as inside an interval.
@@ -20,13 +20,11 @@
 //   overwrites a value still needed. xmm15 is the Float scratch register.
 // - A register set once to a constant, a slot's address or a symbol's is
 //   not kept anywhere: each use writes the constant or the address itself
-//   (rematerialization), and a slot's address becomes a frame operand.
+//   (rematerialization), and a slot's address becomes [rbp - n].
 //
-// The frame: the callee-saved registers used, then the IR's slots and the
-// spilled values, then the arguments of calls that go on the stack, with rsp
-// a multiple of 16 at every call. Debug and profile builds push rbp first
-// and address the frame below it; others address it above rsp, which does
-// not move between the prologue and the epilogue, and allocate rbp.
+// The frame: rbp, the callee-saved registers used, then the IR's slots
+// and the spilled values, then the arguments of calls that go on the
+// stack, with rsp a multiple of 16 at every call.
 import bits
 import debug_info
 import ir
@@ -38,7 +36,7 @@ import text
 
 // Where an IR register's value is.
 type Loc = struct {
-    kind: Int  // 0 a machine register, 1 spilled to the frame at off (frame_ref), 2 the constant off, 3 slot at frame offset off, 4 the symbol's address, 5 nowhere
+    kind: Int  // 0 a machine register, 1 spilled to [rbp - off], 2 the constant off, 3 slot at [rbp - off], 4 the symbol's address, 5 nowhere
     reg: Str
     off: Int
     sym: Str
@@ -61,11 +59,9 @@ type Out = struct {
     files: Map[Str, Int]
     saved: [Str]  // callee-saved registers pushed
     threads: Map[Int, Int]  // labels whose block only jumps: where it jumps to, in the end
-    homes: [Int]  // where a value with holes keeps its copy: frame offset, or 0
+    homes: [Int]  // where a value with holes keeps its copy: [rbp - home], or 0
     stores: Map[Int, [Int]]  // after instruction k: the values with holes it sets
     reloads: Map[Int, [Int]]  // at label k: the values to load back from home
-    fp: Bool  // rbp holds the frame (debug and profile builds); else it is allocated
-    frame: Int  // the frame's bytes below the entry's return address (no rbp) or below rbp
 }
 
 pub fn program(p: ir.Program) -> Str {
@@ -154,7 +150,7 @@ fn shares_operand(op: ir.Op) -> Bool {
 }
 
 fn is_callee_saved(r: Str) -> Bool {
-    return r == "rbx" || r == "r12" || r == "r13" || r == "r14" || r == "r15" || r == "rbp"
+    return r == "rbx" || r == "r12" || r == "r13" || r == "r14" || r == "r15"
 }
 
 fn is_arg_reg(r: Str) -> Bool {
@@ -269,7 +265,7 @@ fn borrow_ok(scratch: [[Bool]], v: Int, r: Str) -> Bool {
     return true
 }
 
-fn allocate(f: ir.Func, fp: Bool) -> Alloc {
+fn allocate(f: ir.Func) -> Alloc {
     let n = len(f.classes)
     // Calls that do not return (a failed check's report) keep no value alive,
     // so they do not force values into callee-saved registers.
@@ -310,7 +306,7 @@ fn allocate(f: ir.Func, fp: Bool) -> Alloc {
     let order = lists.order(starts)
     let hl = live.holes(f, iv)
     let mut pool = Pool {
-        caller: ["r10"], args: ["r9", "r8", "rsi", "rdi"], borrowed: ["rcx", "rdx"], callee: callee_regs(fp),
+        caller: ["r10"], args: ["r9", "r8", "rsi", "rdi"], borrowed: ["rcx", "rdx"], callee: ["r15", "r14", "r13", "r12", "rbx"],
         float: ["xmm14", "xmm13", "xmm12", "xmm11", "xmm10", "xmm9", "xmm8"],
         lend_reg: [], lend_limit: [], lend_owner: [], lend_borrower: [], lend_hole: [],
     }
@@ -479,15 +475,6 @@ fn allocate(f: ir.Func, fp: Bool) -> Alloc {
     return Alloc { locs: locs, holes: needed }
 }
 
-// The callee-saved registers values may have, taken from the end: rbp last,
-// and only when it does not hold the frame.
-fn callee_regs(fp: Bool) -> [Str] {
-    if fp {
-        return ["r15", "r14", "r13", "r12", "rbx"]
-    }
-    return ["rbp", "r15", "r14", "r13", "r12", "rbx"]
-}
-
 // The registers free for allocation, and those lent by holes: the owner,
 // the hole's last position, and who has it (-1: nobody yet).
 type Pool = struct {
@@ -594,7 +581,6 @@ fn low8(r: Str) -> Str {
         "rdx" => "dl"
         "rsi" => "sil"
         "rdi" => "dil"
-        "rbp" => "bpl"
         _ => r + "b"
     }
 }
@@ -607,14 +593,13 @@ fn low32(r: Str) -> Str {
         "rdx" => "edx"
         "rsi" => "esi"
         "rdi" => "edi"
-        "rbp" => "ebp"
         _ => r + "d"
     }
 }
 
 fn low16(r: Str) -> Str {
     return match r {
-        "rax" => "ax", "rbx" => "bx", "rcx" => "cx", "rdx" => "dx", "rsi" => "si", "rdi" => "di", "rbp" => "bp", _ => r + "w",
+        "rax" => "ax", "rbx" => "bx", "rcx" => "cx", "rdx" => "dx", "rsi" => "si", "rdi" => "di", _ => r + "w",
     }
 }
 
@@ -674,13 +659,8 @@ fn ir_label(o: Out, n: Int) -> Str {
     return ".L" + num(o.fid) + "_" + num(n)
 }
 
-// A frame offset's operand: below rbp, or with no frame pointer, above rsp,
-// which stays put between the prologue and the epilogue.
-fn frame_ref(o: Out, off: Int) -> Str {
-    if o.fp {
-        return "[rbp - " + num(off) + "]"
-    }
-    return "[rsp + " + num(o.frame - off) + "]"
+fn frame_ref(off: Int) -> Str {
+    return "[rbp - " + num(off) + "]"
 }
 
 // An operand for reading the integer register v: a machine register, a
@@ -692,7 +672,7 @@ fn src(o: mut Out, v: Int, scratch: Str) -> Str {
         return l.reg
     }
     if l.kind == 1 {
-        return "qword ptr " + frame_ref(o, l.off)
+        return "qword ptr " + frame_ref(l.off)
     }
     if l.kind == 2 {
         if fits32(l.off) {
@@ -702,7 +682,7 @@ fn src(o: mut Out, v: Int, scratch: Str) -> Str {
         return scratch
     }
     if l.kind == 3 {
-        emit(mut o, "lea " + scratch + ", " + frame_ref(o, l.off))
+        emit(mut o, "lea " + scratch + ", " + frame_ref(l.off))
         return scratch
     }
     if l.kind == 4 {
@@ -743,7 +723,7 @@ fn set(o: mut Out, v: Int, r: Str) {
             emit(mut o, "mov " + l.reg + ", " + r)
         }
     } else if l.kind == 1 {
-        emit(mut o, "mov qword ptr " + frame_ref(o, l.off) + ", " + r)
+        emit(mut o, "mov qword ptr " + frame_ref(l.off) + ", " + r)
     }
 }
 
@@ -761,7 +741,7 @@ fn fsrc(o: Out, v: Int) -> Str {
     if l.kind == 0 {
         return l.reg
     }
-    return "qword ptr " + frame_ref(o, l.off)
+    return "qword ptr " + frame_ref(l.off)
 }
 
 fn fin_reg(o: mut Out, v: Int, scratch: Str) -> Str {
@@ -780,7 +760,7 @@ fn fset(o: mut Out, v: Int, r: Str) {
             emit(mut o, "movapd " + l.reg + ", " + r)
         }
     } else if l.kind == 1 {
-        emit(mut o, "movsd qword ptr " + frame_ref(o, l.off) + ", " + r)
+        emit(mut o, "movsd qword ptr " + frame_ref(l.off) + ", " + r)
     }
 }
 
@@ -788,7 +768,7 @@ fn fset(o: mut Out, v: Int, r: Str) {
 fn mem(o: mut Out, base: Int, off: Int, size: Int, scratch: Str) -> Str {
     let l = o.locs[base]
     if l.kind == 3 {
-        return ptr_word(size) + frame_ref(o, l.off - off)
+        return ptr_word(size) + frame_ref(l.off - off)
     }
     if l.kind == 4 {
         return ptr_word(size) + "[rip + " + l.sym + " + " + num(off) + "]"
@@ -857,15 +837,11 @@ fn stack_bytes(f: ir.Func, i: ir.Inst) -> Int {
     return bytes
 }
 
-// One function's assembly. Debug and profile builds keep rbp as the frame
-// pointer, for debuggers and profilers; others address the frame through
-// rsp and allocate rbp like the other callee-saved registers.
 fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, Int]) -> [Str] {
-    let fp = len(files) > 0
-    let alloc = allocate(f, fp)
+    let alloc = allocate(f)
     let mut locs = alloc.locs
     let mut saved: [Str] = []
-    for r in ["rbx", "r12", "r13", "r14", "r15", "rbp"] {
+    for r in ["rbx", "r12", "r13", "r14", "r15"] {
         for l in locs {
             if l.kind == 0 && l.reg == r {
                 push(mut saved, r)
@@ -909,15 +885,10 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
             }
         }
     }
-    // rsp is a multiple of 16 at every call: with rbp pushed, the frame below
-    // it is; without, the entry's rsp is 8 past one, and so is the frame.
-    let mut total = align_up(at + out_bytes, 16)
-    if !fp {
-        total = align_up(at + out_bytes + 8, 16) - 8
-    }
+    let total = align_up(at + out_bytes, 16)
     let mut o = Out {
         lines: [], fid: fid, locs: locs, classes: f.classes, stubs: [], stub_count: 0, labels: 0, doubles: doubles, saved: saved, files: files,
-        threads: jump_threads(f, around.stops), homes: homes, stores: around.stores, reloads: around.reloads, fp: fp, frame: total,
+        threads: jump_threads(f, around.stops), homes: homes, stores: around.stores, reloads: around.reloads,
     }
     push(mut o.lines, "")
     push(mut o.lines, "    .p2align 4")
@@ -928,12 +899,10 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
     push(mut o.lines, f.name + ":")
     let debug = len(files) > 0
     if debug { emit(mut o, ".loc 1 0 0"); emit(mut o, ".cfi_startproc") }
-    if fp {
-        emit(mut o, "push rbp")
-        if debug { emit(mut o, ".cfi_def_cfa_offset 16"); emit(mut o, ".cfi_offset rbp, -16") }
-        emit(mut o, "mov rbp, rsp")
-        if debug { emit(mut o, ".cfi_def_cfa_register rbp") }
-    }
+    emit(mut o, "push rbp")
+    if debug { emit(mut o, ".cfi_def_cfa_offset 16"); emit(mut o, ".cfi_offset rbp, -16") }
+    emit(mut o, "mov rbp, rsp")
+    if debug { emit(mut o, ".cfi_def_cfa_register rbp") }
     for k in 0..len(saved) {
         emit(mut o, "push " + saved[k])
         if debug { emit(mut o, ".cfi_offset " + saved[k] + ", -" + num(24 + k * 8)) }
@@ -951,7 +920,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
                 fset(mut o, p, "xmm" + num(nf))
                 nf = nf + 1
             } else {
-                emit(mut o, "movsd xmm15, qword ptr " + incoming(o, stack))
+                emit(mut o, "movsd xmm15, qword ptr [rbp + " + num(stack) + "]")
                 fset(mut o, p, "xmm15")
                 stack = stack + 8
             }
@@ -959,7 +928,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
             set(mut o, p, int_arg(ni))
             ni = ni + 1
         } else {
-            emit(mut o, "mov rax, qword ptr " + incoming(o, stack))
+            emit(mut o, "mov rax, qword ptr [rbp + " + num(stack) + "]")
             set(mut o, p, "rax")
             stack = stack + 8
         }
@@ -986,11 +955,7 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
     o.lines = main_lines
     push(mut o.lines, ".LR" + num(fid) + ":")
     if debug { emit(mut o, ".cfi_remember_state") }
-    if !fp {
-        if total - 8 * len(saved) > 0 {
-            emit(mut o, "add rsp, " + num(total - 8 * len(saved)))
-        }
-    } else if len(saved) > 0 {
+    if len(saved) > 0 {
         emit(mut o, "lea rsp, [rbp - " + num(8 * len(saved)) + "]")
     } else {
         emit(mut o, "mov rsp, rbp")
@@ -1000,10 +965,8 @@ fn function(f: ir.Func, fid: Int, doubles: mut Map[Str, Str], files: Map[Str, In
         emit(mut o, "pop " + saved[i])
         i = i - 1
     }
-    if fp {
-        emit(mut o, "pop rbp")
-        if debug { emit(mut o, ".cfi_def_cfa rsp, 8"); emit(mut o, ".cfi_restore rbp") }
-    }
+    emit(mut o, "pop rbp")
+    if debug { emit(mut o, ".cfi_def_cfa rsp, 8"); emit(mut o, ".cfi_restore rbp") }
     emit(mut o, "ret")
     if debug { emit(mut o, ".cfi_restore_state") }
     for line in cold_lines {
@@ -1081,7 +1044,7 @@ fn instruction(o: mut Out, f: ir.Func, i0: ir.Inst, next0: Int) {
                         emit(mut o, "mov " + o.locs[i.dst].reg + ", " + num(i.imm))
                     }
                 } else {
-                    emit(mut o, "mov qword ptr " + frame_ref(o, o.locs[i.dst].off) + ", " + num(i.imm))
+                    emit(mut o, "mov qword ptr " + frame_ref(o.locs[i.dst].off) + ", " + num(i.imm))
                 }
             } else {
                 emit(mut o, "movabs rax, " + num(i.imm))
@@ -1096,7 +1059,7 @@ fn instruction(o: mut Out, f: ir.Func, i0: ir.Inst, next0: Int) {
             if op == ir.Op.SymAddr {
                 emit(mut o, "lea rax, [rip + " + i.sym + "]")
             } else {
-                emit(mut o, "lea rax, " + frame_ref(o, slot_offset(f, o, i.imm)))
+                emit(mut o, "lea rax, " + frame_ref(slot_offset(f, o, i.imm)))
             }
             set(mut o, i.dst, "rax")
         }
@@ -1658,7 +1621,7 @@ fn operand32(o: mut Out, v: Int, scratch: Str) -> Str {
         return num(l.off)
     }
     if l.kind == 1 {
-        return "dword ptr " + frame_ref(o, l.off)
+        return "dword ptr " + frame_ref(l.off)
     }
     return low32(in_reg(mut o, v, scratch))
 }
@@ -2284,31 +2247,22 @@ fn add_move(m: mut Map[Int, [Int]], k: Int, v: Int) {
     m[k] = list
 }
 
-// The incoming stack argument `stack` bytes past rbp's place: [rbp + 16]
-// is the first.
-fn incoming(o: Out, stack: Int) -> Str {
-    if o.fp {
-        return "[rbp + " + num(stack) + "]"
-    }
-    return "[rsp + " + num(o.frame + stack - 8) + "]"
-}
-
 // v's copy at home, after it is set.
 fn store_home(o: mut Out, v: Int) {
     if o.homes[v] == 0 { return }
     if o.classes[v] == ir.FLOAT() {
-        emit(mut o, "movsd qword ptr " + frame_ref(o, o.homes[v]) + ", " + o.locs[v].reg)
+        emit(mut o, "movsd qword ptr [rbp - " + num(o.homes[v]) + "], " + o.locs[v].reg)
     } else {
-        emit(mut o, "mov qword ptr " + frame_ref(o, o.homes[v]) + ", " + o.locs[v].reg)
+        emit(mut o, "mov qword ptr [rbp - " + num(o.homes[v]) + "], " + o.locs[v].reg)
     }
 }
 
 // v back in its register from home.
 fn load_home(o: mut Out, v: Int) {
     if o.classes[v] == ir.FLOAT() {
-        emit(mut o, "movsd " + o.locs[v].reg + ", qword ptr " + frame_ref(o, o.homes[v]))
+        emit(mut o, "movsd " + o.locs[v].reg + ", qword ptr [rbp - " + num(o.homes[v]) + "]")
     } else {
-        emit(mut o, "mov " + o.locs[v].reg + ", qword ptr " + frame_ref(o, o.homes[v]))
+        emit(mut o, "mov " + o.locs[v].reg + ", qword ptr [rbp - " + num(o.homes[v]) + "]")
     }
 }
 

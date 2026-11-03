@@ -4,11 +4,12 @@
     .p2align 4
     .type f_count, @function
 f_count:
+    push rbp
+    mov rbp, rsp
     push rbx
     push r12
     push r13
     push r14
-    sub rsp, 8
     mov r10, rdi
     cmp r10, 0
     jle .L0_0
@@ -55,11 +56,12 @@ f_count:
     mov rax, rbx
     jmp .LR0
 .LR0:
-    add rsp, 8
+    lea rsp, [rbp - 32]
     pop r14
     pop r13
     pop r12
     pop rbx
+    pop rbp
     ret
 .L0_0:
     mov rax, 0
@@ -85,7 +87,8 @@ f_count:
     .p2align 4
     .type f_main, @function
 f_main:
-    sub rsp, 8
+    push rbp
+    mov rbp, rsp
     mov rdi, 0
     call f_count
     mov r10, rax
@@ -99,7 +102,8 @@ f_main:
     call vela_print_int@PLT
     jmp .LR1
 .LR1:
-    add rsp, 8
+    mov rsp, rbp
+    pop rbp
     ret
 .LP1_1:
     lea rdi, [rip + .Lc1]
@@ -119,7 +123,10 @@ f_main:
     .globl main
     .type main, @function
 main:
+    push rbp
+    mov rbp, rsp
     push rbx
+    sub rsp, 8
     mov r10, rdi
     mov rbx, rsi
     mov rdi, r10
@@ -137,7 +144,9 @@ main:
     mov rax, 0
     jmp .LR2
 .LR2:
+    lea rsp, [rbp - 8]
     pop rbx
+    pop rbp
     ret
 .LP2_1:
     lea rdi, [rip + .Lc1]
