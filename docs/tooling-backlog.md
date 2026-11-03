@@ -2774,8 +2774,8 @@ No additional CI workflow run was requested or launched for reconciliation.
 
 ### TL-098: x86-64 kept rcx and rdx out of register allocation
 
-- **Status:** resolved rcx/rdx allocation, lifetime holes and rbp
-  allocation (post-M30); allocating rax and r11 was tried and rejected.
+- **Status:** resolved rcx/rdx allocation and lifetime holes (post-M30);
+  allocating rbp, and rax and r11, were tried and not kept.
 - **2026-10-31 reconciliation:** The original allocation change and its regression fix
   are resolved. Whole-interval allocation remains in use; live-range
   splitting/frame-pointer proposals are deferred, with no fresh SHA-256 profile or spill
@@ -2891,9 +2891,9 @@ No additional CI workflow run was requested or launched for reconciliation.
     includes seed 9125, `--count 1500` each) agree; CommonMark, toml-test,
     Rust regex and the Unicode tables pass natively. Both fixed points
     hold. arm64 has its own allocator (`regalloc.vl`) and is unchanged.
-- **rbp (post-M30):** outside debug and profile builds (observed mode, which
-  keeps rbp as the frame pointer and emits CFI for debuggers and
-  profilers), the frame is addressed above rsp, which does not move between
+- **Trial not kept: rbp (post-M30).** Outside debug and profile builds
+  (observed mode, which keeps rbp as the frame pointer and emits CFI for
+  debuggers and profilers), the frame is addressed above rsp, which does not move between
   the prologue and the epilogue, and rbp is a callee-saved register taken
   after rbx and r12-r15. Without the push of rbp the frame below the entry's
   return address is 8 past a multiple of 16, so rsp stays aligned at calls.
@@ -2914,7 +2914,12 @@ No additional CI workflow run was requested or launched for reconciliation.
     default `-O2`. Debug and profile builds are unchanged.
   - `tests/stack_overflow_test.py` (native at both optimization settings),
     M26 target checks, M27 observation checks and M29 native cache and
-    real-program checks pass.
+    real-program checks passed, as did every suite and 6,000 differential
+    programs.
+  - Not kept (`311b28d`, reverted): fewer instructions with no time gain
+    measurable on this host did not justify losing frame-pointer unwinding
+    of release binaries. Reconsider with a quieter benchmark host, or with
+    CFI emitted for release builds.
 - **Rejected trial: values in rax and r11.** The function was written once
   without them, recording which instructions' code wrote rax or r11; values
   whose intervals held none of those, crossed no call and were not
