@@ -86,6 +86,21 @@ static void check_count(int64_t n) {
 
 _Thread_local vela_pool vela_pools;
 
+// How many boxes each size class's list may keep, as vela_box_free checks:
+// read by native code that frees boxes inline (x64.vl). Under a sanitizer
+// none, so every box goes back to free() for the sanitizer to see.
+#define VELA_POOL_LIMIT(c) (VELA_POOL_BYTES / (int64_t)(((c) + 1) * 8))
+#ifdef VELA_SANITIZED
+const int64_t vela_pool_limits[VELA_POOL_CLASSES] = {0};
+#else
+const int64_t vela_pool_limits[VELA_POOL_CLASSES] = {
+    VELA_POOL_LIMIT(0), VELA_POOL_LIMIT(1), VELA_POOL_LIMIT(2), VELA_POOL_LIMIT(3),
+    VELA_POOL_LIMIT(4), VELA_POOL_LIMIT(5), VELA_POOL_LIMIT(6), VELA_POOL_LIMIT(7),
+    VELA_POOL_LIMIT(8), VELA_POOL_LIMIT(9), VELA_POOL_LIMIT(10), VELA_POOL_LIMIT(11),
+    VELA_POOL_LIMIT(12), VELA_POOL_LIMIT(13), VELA_POOL_LIMIT(14), VELA_POOL_LIMIT(15),
+};
+#endif
+
 _Thread_local int64_t vela_visit_depth;
 _Thread_local int64_t vela_visit_waiting;
 typedef struct vela_visit {

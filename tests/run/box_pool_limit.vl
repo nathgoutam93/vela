@@ -1,0 +1,51 @@
+// Boxes of one size class go back to their thread's list when freed, up to
+// a limit (vela_rt.h's pools; x64 does this inline), and to free() past
+// it; allocation takes from the list until it is empty, then from malloc.
+// A Chain node is a 128-byte box (the count, the tag, the next box and
+// thirteen Ints), the largest pooled size, whose list keeps 262144 boxes:
+// dropping 300000 overflows it, and building 300000 again empties it.
+// out: 300000 44999850000
+// out: 300000 45000150000
+// out: 10 1
+import strings
+
+type Chain = enum {
+    End
+    Link(Chain, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+}
+
+fn build(n: Int, base: Int) -> Chain {
+    let mut c = Chain.End
+    for i in 0..n {
+        let v = base + i
+        c = Chain.Link(c, v, v, v, v, v, v, v, v, v, v, v, v, v)
+    }
+    return c
+}
+
+// How many links, and the sum of their first Ints.
+fn walk(c: Chain) -> [Int] {
+    let mut count = 0
+    let mut sum = 0
+    let mut at = c
+    for {
+        match at {
+            Chain.End => return [count, sum]
+            Chain.Link(next, a, _, _, _, _, _, _, _, _, _, _, _, m) => {
+                count = count + 1
+                sum = sum + a + m - a
+                at = next
+            }
+        }
+    }
+    return [count, sum]
+}
+
+fn main() {
+    let first = walk(build(300000, 0))
+    print(strings.from_int(first[0]) + " " + strings.from_int(first[1]))
+    let second = walk(build(300000, 1))
+    print(strings.from_int(second[0]) + " " + strings.from_int(second[1]))
+    let small = walk(build(10, 0))
+    print(strings.from_int(small[0]) + " " + strings.from_int(small[1] / 45))
+}
