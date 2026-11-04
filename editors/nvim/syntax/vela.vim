@@ -15,7 +15,7 @@ syn match velaNumber "\<\d\+\(\.\d\+\)\=\([eE][+-]\=\d\+\)\=\>"
 syn match velaEscape contained "\\[nrt0\\\"']"
 syn match velaEscape contained "\\u{\x\{1,6}}"
 syn region velaString start=+"+ skip=+\\\\\|\\"+ end=+"+ contains=velaEscape
-syn region velaRawString start=+\<r\z(#*)"+ end=+"\z1+ oneline
+syn region velaRawString start=+\<r\z(#*\)"+ end=+"\z1+ oneline
 syn match velaByte "'\(\\.\|[^\\']\)'" contains=velaEscape
 syn keyword velaTodo contained TODO FIXME XXX
 syn match velaComment "//.*$" contains=velaTodo
