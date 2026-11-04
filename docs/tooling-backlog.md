@@ -3570,6 +3570,23 @@ No additional CI workflow run was requested or launched for reconciliation.
   independent M2 identification. Different source/input snapshots prevent an A/B speedup
   claim; vectorization remains a hypothesis. The performance gap remains open.
 
+- **2026-11-05 arm64 run after PR #29:** first execution of the arm64 output
+  with loop-invariant hoisting, the new loop rotation, array-parameter caching
+  and the inline copy-on-write check, at `dac4af8` on macOS ARM64 (`uname`
+  reports T8112). `python3 bench/run.py --languages c vela vela-native --runs 5`
+  gives a native/C geometric mean of **1.277** and Vela through C/C of 1.01, and
+  every output matched C. The same twelve programs measured 1.393 at `5450b14`
+  ([release parity](../bench/results/2026-10-26-native-release-parity.json)).
+  Those are different commits on different days, not a controlled A/B, so this
+  does not attribute the change to PR #29. Native/C by program, 2026-10-26 then
+  now: varints 2.57/2.05, arena_trees 1.27/1.17, nbody 1.34/1.30, spectralnorm
+  0.87/0.84, fannkuch 1.46/1.51, binarytrees 0.70/0.76, mandelbrot 1.42/1.41,
+  fasta 1.49/1.43, knucleotide 1.87/1.41, wordfreq 1.76/1.10, sha256 1.50/1.51,
+  crc32 1.31/1.31. Largest improvements: wordfreq, knucleotide and varints.
+  fannkuch and binarytrees moved the other way, by an amount not separated from
+  noise here. The `bench/markdown_compare.py` ratio this entry tracks was not
+  rerun, so the markdown gap remains open and unmeasured at this commit.
+
 - **Discovery:** post-M30 comparison of the markdown package with cmark
   ([report](../bench/results/2026-10-28-markdown-cmark-macos.md)).
 - **Evidence (observed):** on an Apple M2, `python3 bench/markdown_compare.py
@@ -4296,6 +4313,47 @@ No additional CI workflow run was requested or launched for reconciliation.
     (over the class's 262144 limit, so frees reach free()) and builds them
     again (emptying the list, so allocation reaches malloc), on both
     backends and under ASan/UBSan and TSan.
+
+### TL-130: The Neovim syntax file errors on every Vela buffer, and only hosts with nvim see it
+
+- **Status:** syntax error resolved by `8b6093f`; the visibility proposal below is
+  deferred.
+- **Discovery:** post-M30 arm64 validation on macOS ARM64 with Neovim 0.12.5,
+  2026-11-05 at `dac4af8`. Not related to the arm64 backend or the optimizer:
+  the failure is identical with `--backend native`, `VELA_OPT=0 --backend
+  native` and `--backend c`.
+- **Evidence (observed):** `python3 run_tests.py --backend native --jobs 4` ends
+  `389 passed, 1 failed, 0 skipped`, and the failure is `tests/nvim_test.lua`:
+  `editors/nvim/syntax/vela.vim, line 18: Vim(syntax):E54: Unmatched \(`. Line
+  18, `start=+\<r\z(#*)"+`, opens a group with `\z(` and closes it with a bare
+  `)`. `git log -S` shows the pattern arrived in `b51e22c` (TL-122). Opening any
+  `.vl` file reproduces the error, outside the harness too:
+  `nvim --headless --clean --cmd "set rtp^=$PWD/editors/nvim" -c "edit a.vl" -c "qa!"`.
+- **Why it went unnoticed (observed):** `run_tests.py` adds `tests/nvim_test.lua`
+  only when `shutil.which("nvim")` finds it, so a host with nvim runs 390 tests
+  and one without runs 389. `.github/workflows/platforms.yml` does not mention
+  nvim. Suspected, not verified: no CI job runs this test, and a host without
+  nvim gets no sign that it was left out.
+- **Impact:** Neovim users get an error on opening a Vela file. Because the test
+  stops at that first `edit`, none of its later diagnostic and language server
+  checks run on `main`. Any host with nvim sees a failing suite regardless of
+  the state of the compiler.
+- **Workaround:** uninstall or hide `nvim` from `PATH` for suite runs, or ignore
+  this one failure. Editing, the language server and the compiler are unaffected
+  apart from the error above.
+- **Resolution:** `8b6093f` changes line 18 to `start=+\<r\z(#*\)"+`.
+- **Proposed improvement (deferred, not part of the fix):** make the editor test
+  visible where it cannot run (a reported skip, or nvim in one CI job).
+- **Validation (2026-11-05, base `dac4af8`, macOS ARM64, Neovim 0.12.5):** before
+  the change, `python3 run_tests.py --backend native nvim_test` ended `0 passed,
+  1 failed`. After it, the same filter ended `1 passed, 0 failed` with `--backend
+  native`, `VELA_OPT=0 --backend native` and `--backend c`, and `python3
+  run_tests.py --backend native --jobs 4` ended `390 passed, 0 failed, 0 skipped`.
+  The full suite was not rerun with `VELA_OPT=0` or `--backend c`. With the same
+  change on a copy of `editors/nvim`, `synID` reported `velaRawString` for
+  `r#"has "quotes" inside"#` and `r"plain"` and `velaString` for `"normal"`.
+- **Verify:** on a host with nvim, `python3 run_tests.py nvim_test` passes, and
+  the full suite reports 390 tests rather than 389.
 
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
