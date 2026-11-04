@@ -313,6 +313,7 @@ typedef struct vela_pool {
 } vela_pool;
 
 extern _Thread_local vela_pool vela_pools;
+extern const int64_t vela_pool_limits[VELA_POOL_CLASSES];
 
 static inline void *vela_box_alloc(size_t size) {
     VELA_PROFILE_SCOPE("allocation");

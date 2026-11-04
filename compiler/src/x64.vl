@@ -1986,6 +1986,72 @@ fn rc_branch(o: mut Out, i: ir.Inst, b: ir.Inst) -> Bool {
     return true
 }
 
+// A box of one of the pools' size classes (vela_box_alloc and vela_box_free
+// in vela_rt.h): taken from or given back to this thread's list for its
+// size inline, with the call left for an empty list or a full one. A
+// sanitizer's runtime keeps every limit at 0, so its lists stay empty and
+// every box goes through malloc and free. This is a call as far as
+// registers go: values live across it are in callee-saved registers, so
+// rax, rcx, rdx and r11 are free here. vela_pools is free[16] then
+// count[16]; its address is the thread pointer (fs:0) plus its offset
+// (initial-exec TLS).
+fn box_pool(o: mut Out, i: ir.Inst) -> Bool {
+    let alloc = i.sym == "vela_native_box_alloc" && len(i.args) == 1
+    let release = i.sym == "vela_native_box_free" && len(i.args) == 2
+    if !alloc && !release {
+        return false
+    }
+    let sized = i.args[len(i.args) - 1]
+    if o.locs[sized].kind != 2 || o.locs[sized].off < 1 || (o.locs[sized].off - 1) / 8 >= 16 {
+        return false
+    }
+    let size = o.locs[sized].off
+    let head = num(8 * ((size - 1) / 8))
+    let count = num(128 + 8 * ((size - 1) / 8))
+    let slow = local_label(mut o)
+    let done = local_label(mut o)
+    if release {
+        let p = src(mut o, i.args[0], "rax")
+        if p != "rax" {
+            emit(mut o, "mov rax, " + p)
+        }
+    }
+    emit(mut o, "mov r11, qword ptr fs:[0]")
+    emit(mut o, "add r11, qword ptr [rip + vela_pools@gottpoff]")
+    if alloc {
+        emit(mut o, "mov rax, qword ptr [r11 + " + head + "]")
+        emit(mut o, "test rax, rax")
+        emit(mut o, "je " + slow)
+        emit(mut o, "mov rcx, qword ptr [rax]")
+        emit(mut o, "mov qword ptr [r11 + " + head + "], rcx")
+        emit(mut o, "dec qword ptr [r11 + " + count + "]")
+        push(mut o.lines, done + ":")
+        push(mut o.stubs, slow + ":")
+        push(mut o.stubs, "    mov rdi, " + num(size))
+        push(mut o.stubs, "    call vela_native_box_alloc@PLT")
+        push(mut o.stubs, "    jmp " + done)
+        if i.dst >= 0 {
+            set(mut o, i.dst, "rax")
+        }
+        return true
+    }
+    emit(mut o, "mov rcx, qword ptr [r11 + " + count + "]")
+    emit(mut o, "cmp rcx, qword ptr [rip + vela_pool_limits + " + head + "]")
+    emit(mut o, "jge " + slow)
+    emit(mut o, "mov rdx, qword ptr [r11 + " + head + "]")
+    emit(mut o, "mov qword ptr [rax], rdx")
+    emit(mut o, "mov qword ptr [r11 + " + head + "], rax")
+    emit(mut o, "inc rcx")
+    emit(mut o, "mov qword ptr [r11 + " + count + "], rcx")
+    push(mut o.lines, done + ":")
+    push(mut o.stubs, slow + ":")
+    push(mut o.stubs, "    mov rdi, rax")
+    push(mut o.stubs, "    mov rsi, " + num(size))
+    push(mut o.stubs, "    call vela_native_box_free@PLT")
+    push(mut o.stubs, "    jmp " + done)
+    return true
+}
+
 // A Float load only the arithmetic right after it reads: the arithmetic
 // reads the memory itself (subsd xmm1, qword ptr [rax + 8]). Addition and
 // multiplication take the loaded value on either side.
@@ -2388,6 +2454,9 @@ fn copy(o: mut Out, a: Int, b: Int, size: Int) {
 // A call: the arguments where the convention wants them, then the call,
 // then the result where the IR wants it.
 fn call(o: mut Out, f: ir.Func, i: ir.Inst) {
+    if i.op == ir.Op.CCall && box_pool(mut o, i) {
+        return
+    }
     let mut ni = 0
     let mut nf = 0
     let mut stack = 0
