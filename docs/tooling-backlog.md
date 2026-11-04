@@ -4163,7 +4163,8 @@ No additional CI workflow run was requested or launched for reconciliation.
 
 ### TL-129: Native code's remaining 1.2-1.4x on binarytrees, fasta, mandelbrot, fannkuch and varints
 
-- **Status:** partly resolved: proposals 1-4 below; 5 (TL-098) and 6 deferred.
+- **Status:** partly resolved: proposals 1-4 and 6 (x86-64) below; 5 is
+  TL-098.
 - **Discovery:** post-M30, profiling pass after TL-128 on Linux x86-64. Each
   benchmark built with `VELA_BACKEND=native` and `VELA_BACKEND=c`
   (`build/vela build bench/NAME/main.vl`) and run under
@@ -4266,6 +4267,35 @@ No additional CI workflow run was requested or launched for reconciliation.
     hoisted values take the five callee-saved registers its calls need.
     That is TL-098 (live-range splitting), not a regression: fasta's total
     fell.
+- **Resolution (6, x86-64):** `x64.vl` `box_pool` writes the pool fast paths
+  of `vela_box_alloc` and `vela_box_free` (vela_rt.h) for a
+  `vela_native_box_alloc` or `vela_native_box_free` call whose size is a
+  pooled class (up to 128 bytes): pop the thread's list for that size, or
+  push onto it while its count is under the limit. `vela_pools` is reached
+  through the thread pointer and its initial-exec TLS offset (the linker
+  relaxes it to a constant offset from `fs:0` in an executable). The calls
+  stay, out of line, for an empty or full list. The IR, lowering and the
+  arm64 backend are unchanged, so arm64 still calls. The limits come from a
+  runtime table, `vela_pool_limits`, all zeros under a sanitizer, so
+  sanitized programs still malloc and free every box.
+  - Inlining `vela_bounded`'s depth check as well saved 1.5M of 496M
+    instructions on binarytrees (the thread-local address is recomputed
+    after the visit's call) and was not kept.
+- **Verified (6):**
+  - binarytrees (14): 556M -> 496M instructions natively, the same output;
+    programs without boxes (arena_trees, fannkuch, fasta) are unchanged.
+  - Time (`bench/compare.py --backend native --runs 21` against `c124433`):
+    binarytrees 1.311x -> 1.239x C. arena_trees, whose instructions are
+    unchanged, read 0.888x -> 0.799x in the same run: this host's noise
+    (TL-085) is that large, so the instruction counts are the evidence.
+  - Native, C, `VELA_OPT=0` native, ASan/UBSan on both backends and TSan
+    pass (389); 3,000 differential programs (`--start 150000`) agree; the
+    stack-overflow checks, M26, M27 and M29, CommonMark, toml-test and Rust
+    regex pass. Both fixed points hold.
+  - `tests/run/box_pool_limit.vl` builds and drops 300000 128-byte boxes
+    (over the class's 262144 limit, so frees reach free()) and builds them
+    again (emptying the list, so allocation reaches malloc), on both
+    backends and under ASan/UBSan and TSan.
 
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
