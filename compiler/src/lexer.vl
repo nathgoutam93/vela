@@ -70,6 +70,7 @@ pub type Kind = enum {
     Tilde
     Shl
     Shr
+    AssignOp  // `+=`, `<<=` and the rest; the text says which (M31)
 }
 
 pub type Token = struct {
@@ -145,6 +146,7 @@ pub fn kind_name(k: Kind) -> Str {
         Kind.Tilde => "~"
         Kind.Shl => "<<"
         Kind.Shr => ">>"
+        Kind.AssignOp => "op="
     }
 }
 
@@ -854,6 +856,15 @@ fn byte_literal(lx: mut Lexer) {
     add(mut lx, Kind.Byte, shown, start, strings.build(b))
 }
 
+// `+=` through `>>=`: an operator and `=`, one token (M31).
+fn is_assign_op(op: Str) -> Bool {
+    return match op {
+        "+=" => true, "-=" => true, "*=" => true, "/=" => true, "%=" => true,
+        "&=" => true, "|=" => true, "^=" => true, "<<=" => true, ">>=" => true,
+        _ => false
+    }
+}
+
 fn operator(lx: mut Lexer, c: Int) {
     let end3 = lx.pos + 3
     if end3 <= len(lx.src) && lx.src[lx.pos..end3] == "..=" {
@@ -861,8 +872,18 @@ fn operator(lx: mut Lexer, c: Int) {
         lx.pos = lx.pos + 3
         return
     }
+    if end3 <= len(lx.src) && is_assign_op(lx.src[lx.pos..end3]) {
+        add(mut lx, Kind.AssignOp, lx.src[lx.pos..end3], lx.pos, "")
+        lx.pos = lx.pos + 3
+        return
+    }
     if lx.pos + 2 <= len(lx.src) {
         let two = lx.src[lx.pos..lx.pos + 2]
+        if is_assign_op(two) {
+            add(mut lx, Kind.AssignOp, two, lx.pos, "")
+            lx.pos = lx.pos + 2
+            return
+        }
         match operator2(two) {
             Some(k) => {
                 add(mut lx, k, two, lx.pos, "")

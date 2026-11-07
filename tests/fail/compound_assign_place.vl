@@ -1,0 +1,8 @@
+// err: compound_assign_place.vl:3:9: error: '+=' changes a place: a variable, a field or an index, such as `total += x` [E2029]
+fn main() {
+    f() += 1
+}
+
+fn f() -> Int {
+    return 1
+}

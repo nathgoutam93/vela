@@ -1,0 +1,9 @@
+// err: if_expression_both_leave.vl:3:13: error: both branches of this 'if' leave it, so it has no value; write it as a statement [E3236]
+fn f(n: Int) -> Int {
+    let x = if n > 0 { return 1 } else { return 2 }
+    return x
+}
+
+fn main() {
+    print(f(1))
+}

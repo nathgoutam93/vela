@@ -1843,42 +1843,169 @@ fn arm_value(a: ast.Arm) -> ast.Expr {
     match a.body {
         ast.ArmBody.Value(e) => return e
         ast.ArmBody.Do(_) => {}
+        ast.ArmBody.Valued(_, value) => {
+            match value {
+                Some(e) => return e
+                None => {}
+            }
+        }
     }
     return ast.Expr { kind: ast.ExprKind.UnitLit, line: 0, col: 0, id: 0 }  // not reached
+}
+
+// Whether an arm's value is a block that leaves instead (M31).
+fn arm_leaves(a: ast.Arm) -> Bool {
+    match a.body {
+        ast.ArmBody.Valued(_, value) => {
+            match value {
+                Some(_) => return false
+                None => return true
+            }
+        }
+        _ => return false
+    }
+}
+
+// Check the statements of a block arm (M31), in their own scope, which stays
+// open for the arm's value; the caller pops it.
+fn arm_statements(c: mut Checker, a: ast.Arm) {
+    push_scope(mut c, [:])
+    match a.body {
+        ast.ArmBody.Valued(b, value) => {
+            for inner in b.stmts {
+                stmt(mut c, inner)
+            }
+            match value {
+                Some(_) => {}
+                None => {
+                    if !leaves_block(c, b) {
+                        report(mut c, b.end_line, b.end_col, "E3235", "this block gives a value, so it must end with " +
+                            "an expression, or leave with return, break or continue")
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+// Whether a block never ends normally: its last statement returns, breaks,
+// continues, or does not come back (M31).
+fn leaves_block(c: Checker, b: ast.Block) -> Bool {
+    let n = len(b.stmts)
+    return n > 0 && leaves(c, b.stmts[n - 1])
+}
+
+fn leaves(c: Checker, s: ast.Stmt) -> Bool {
+    match s.kind {
+        ast.StmtKind.Break => return true
+        ast.StmtKind.Continue => return true
+        ast.StmtKind.Block(b) => return leaves_block(c, b)
+        ast.StmtKind.If(_, then, otherwise) => {
+            match otherwise {
+                ast.Else.NoElse => return false
+                ast.Else.ElseBlock(b) => return leaves_block(c, then) && leaves_block(c, b)
+                ast.Else.ElseIf(s2) => return leaves_block(c, then) && leaves(c, s2)
+            }
+        }
+        ast.StmtKind.MatchStmt(_, arms) => {
+            for a in arms {
+                match a.body {
+                    ast.ArmBody.Do(body) => {
+                        if !leaves(c, body) {
+                            return false
+                        }
+                    }
+                    _ => return false
+                }
+            }
+            return len(arms) > 0
+        }
+        _ => return terminates(c, s)
+    }
 }
 
 // Check a match: its patterns, each arm's body, and that the arms cover
 // every value without a useless one. Returns the type of a match
 // expression whose first arm decides (Infer).
 fn match_arms(c: mut Checker, scrutinee: ast.Expr, arms: [ast.Arm], line: Int, col: Int, body: MatchBody) -> Int {
-    let t = value(mut c, scrutinee)
+    // An `if` with a value (M31) is a match of its condition.
+    let mut sugar = ""
+    if len(arms) > 0 {
+        sugar = arms[0].sugar
+    }
+    let branches = sugar == "if"
+    let mut t = types.BOOL()
+    if branches {
+        condition(mut c, scrutinee, "if")
+    } else {
+        t = value(mut c, scrutinee)
+    }
     let mut patterns_ok = t != types.ERROR()
     let mut first = -3  // no arm seen yet
+    let mut values = 0  // arms with a value, not a block that leaves
+    let mut this_arm = "this arm is "
+    let mut first_arm = ", but the first arm is "
+    if branches {
+        this_arm = "this branch is "
+        first_arm = ", but the first branch is "
+    }
     for a in arms {
         let mut bindings: Map[Str, Int] = [:]
         let ok = pattern(mut c, a.pattern, t, mut bindings)
         patterns_ok = patterns_ok && ok
         push_scope(mut c, bindings)
+        match a.guard {
+            Some(g) => check_expr(mut c, g, types.BOOL(), msg("a match guard is a condition, so it must be Bool, but this is ", ""))
+            None => {}
+        }
+        arm_statements(mut c, a)
+        if !arm_leaves(a) {
+            values = values + 1
+        }
         match body {
             MatchBody.Statements => {
                 match a.body {
                     ast.ArmBody.Do(s) => stmt(mut c, s)
                     ast.ArmBody.Value(e) => infer(mut c, e)
+                    ast.ArmBody.Valued(_, _) => {}
                 }
             }
-            MatchBody.Check(want, m) => check_expr(mut c, arm_value(a), want, m)
+            MatchBody.Check(want, m) => {
+                if !arm_leaves(a) {
+                    check_expr(mut c, arm_value(a), want, m)
+                }
+            }
             MatchBody.Infer => {
-                if first == -3 {
+                if arm_leaves(a) {
+                    // no value to agree with
+                } else if first == -3 {
                     first = value(mut c, arm_value(a))
                 } else {
-                    check_expr(mut c, arm_value(a), first, msg("this arm is ", ", but the first arm is " + show(c, first)))
+                    check_expr(mut c, arm_value(a), first, msg(this_arm, first_arm + show(c, first)))
                 }
             }
         }
-        pop_scope(mut c)
+        pop_scope(mut c)  // the block arm's statements
+        pop_scope(mut c)  // the bindings
     }
-    if patterns_ok {
+    if sugar == "let" {
+        let_coverage(mut c, arms, t, patterns_ok)
+    } else if patterns_ok && sugar != "let-bind" {
+        // A "let-bind" match takes a part out of a value its "let" match already matched.
         coverage(mut c, arms, t, line, col)
+    }
+    match body {
+        MatchBody.Statements => {}
+        _ => {
+            if values == 0 && len(arms) > 0 {
+                if branches {
+                    report(mut c, line, col, "E3236", "both branches of this 'if' leave it, so it has no value; write it as a statement")
+                } else {
+                    report(mut c, line, col, "E3236", "every arm of this match leaves it, so it has no value; write it as a statement")
+                }
+            }
+        }
     }
     if first == -3 {
         return types.ERROR()
@@ -1886,28 +2013,178 @@ fn match_arms(c: mut Checker, scrutinee: ast.Expr, arms: [ast.Arm], line: Int, c
     return first
 }
 
+// A guarded arm (M31) is checked for being reachable, but does not count
+// toward covering: its guard may be false.
 fn coverage(c: mut Checker, arms: [ast.Arm], t: Int, line: Int, col: Int) {
     let mut rows: [[match_check.SPat]] = []
+    let mut guarded = false
     for a in arms {
-        let row = [simplify(c, a.pattern)]
-        match match_check.useful(c.table, rows, row, [t]) {
-            None => report(mut c, a.pattern.line, a.pattern.col, "E3066",
-                "this arm can never match: the arms above it cover every value it would")
-            Some(_) => {}
+        let top = top_alternatives(a.pattern)
+        let mut useful_any = false
+        let mut all_rows: [match_check.SPat] = []
+        let mut seen = rows  // the arms before, and this arm's earlier alternatives
+        for alt in top {
+            let mut useful_alt = false
+            for x in simplify_all(c, alt) {
+                match match_check.useful(c.table, seen, [x], [t]) {
+                    Some(_) => useful_alt = true
+                    None => {}
+                }
+                push(mut seen, [x])
+                push(mut all_rows, x)
+            }
+            if useful_alt {
+                useful_any = true
+            } else if len(top) > 1 {
+                report(mut c, alt.line, alt.col, "E3237",
+                    "this alternative can never match: the arms and alternatives before it cover every value it would")
+            }
         }
-        push(mut rows, row)
+        if !useful_any && len(top) <= 1 {
+            report(mut c, a.pattern.line, a.pattern.col, "E3066",
+                "this arm can never match: the arms above it cover every value it would")
+        }
+        match a.guard {
+            Some(_) => guarded = true
+            None => {
+                for x in all_rows {
+                    push(mut rows, [x])
+                }
+            }
+        }
+    }
+    let mut note = ""
+    if guarded {
+        note = "; guarded arms do not count, since their conditions may be false"
     }
     match match_check.useful(c.table, rows, [match_check.SPat.Wild], [t]) {
         Some(missing) => {
             let example = match_check.render(c.table, missing[0], t, c.modules[c.current].name)
             if example == "_" {
                 report(mut c, line, col, "E3067", "match is not exhaustive: add a '_' arm for the " + show(c, t) +
-                    " values not listed")
+                    " values not listed" + note)
             } else {
-                report(mut c, line, col, "E3068", "match is not exhaustive: " + example + " is not covered")
+                report(mut c, line, col, "E3068", "match is not exhaustive: " + example + " is not covered" + note)
             }
         }
         None => {}
+    }
+}
+
+// `let PATTERN = value else { ... }` (M31): its match has the pattern's arm
+// and, with `else`, a `_` arm for the else block, which must leave.
+fn let_coverage(c: mut Checker, arms: [ast.Arm], t: Int, patterns_ok: Bool) {
+    if len(arms) > 1 {
+        match arms[1].body {
+            ast.ArmBody.Do(s) => {
+                match s.kind {
+                    ast.StmtKind.Block(b) => {
+                        if !leaves_block(c, b) {
+                            report(mut c, b.end_line, b.end_col, "E3243", "the 'else' block of a `let` runs when the pattern " +
+                                "does not match, so it must leave: end it with return, break or continue")
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    if !patterns_ok {
+        return
+    }
+    let mut rows: [[match_check.SPat]] = []
+    for x in simplify_all(c, arms[0].pattern) {
+        push(mut rows, [x])
+    }
+    match match_check.useful(c.table, rows, [match_check.SPat.Wild], [t]) {
+        Some(missing) => {
+            if len(arms) == 1 {
+                let example = match_check.render(c.table, missing[0], t, c.modules[c.current].name)
+                report(mut c, arms[0].pattern.line, arms[0].pattern.col, "E3241", "this pattern does not match every " +
+                    show(c, t) + ", such as " + example + "; add `else { ... }` for the others")
+            }
+        }
+        None => {
+            if len(arms) > 1 {
+                report(mut c, arms[1].line, arms[1].col, "E3242", "this pattern matches every " + show(c, t) +
+                    " value, so the 'else' block can never run; remove it")
+            }
+        }
+    }
+}
+
+// The alternatives of an or-pattern, or the pattern itself.
+fn top_alternatives(p: ast.Pattern) -> [ast.Pattern] {
+    match p.kind {
+        ast.PatternKind.Or(alternatives) => return alternatives
+        _ => return [p]
+    }
+}
+
+// Every combination of the parts' alternatives, one row of sub-patterns each.
+fn combinations(c: Checker, parts: [ast.Pattern]) -> [[match_check.SPat]] {
+    let mut combos: [[match_check.SPat]] = [[]]
+    for a in parts {
+        let mut next: [[match_check.SPat]] = []
+        for x in simplify_all(c, a) {
+            for prefix in combos {
+                let mut row = prefix
+                push(mut row, x)
+                push(mut next, row)
+            }
+        }
+        combos = next
+    }
+    return combos
+}
+
+// A pattern as the usefulness algorithm sees it, one row per way it can
+// match: an or-pattern (M31), anywhere inside, gives one for each alternative.
+fn simplify_all(c: Checker, p: ast.Pattern) -> [match_check.SPat] {
+    match p.kind {
+        ast.PatternKind.Or(alternatives) => {
+            let mut out: [match_check.SPat] = []
+            for alt in alternatives {
+                for x in simplify_all(c, alt) {
+                    push(mut out, x)
+                }
+            }
+            return out
+        }
+        ast.PatternKind.Struct(_, _, _, _) => {
+            let mut out: [match_check.SPat] = []
+            for subs in combinations(c, record_parts(c, p)) {
+                push(mut out, match_check.SPat.Ctor(match_check.Key.Record, subs))
+            }
+            return out
+        }
+        ast.PatternKind.Variant(_, _, _, _, args) => {
+            match c.refs[p.id] {
+                Ref.Variant(_, v) => {
+                    // Every combination of the payloads' alternatives.
+                    let mut combos: [[match_check.SPat]] = [[]]
+                    for a in args {
+                        let mut next: [[match_check.SPat]] = []
+                        for x in simplify_all(c, a) {
+                            for prefix in combos {
+                                let mut row = prefix
+                                push(mut row, x)
+                                push(mut next, row)
+                            }
+                        }
+                        combos = next
+                    }
+                    let mut out: [match_check.SPat] = []
+                    for subs in combos {
+                        push(mut out, match_check.SPat.Ctor(match_check.Key.Variant(v), subs))
+                    }
+                    return out
+                }
+                _ => return [match_check.SPat.Wild]
+            }
+        }
+        _ => return [simplify(c, p)]
     }
 }
 
@@ -1945,7 +2222,30 @@ fn simplify(c: Checker, p: ast.Pattern) -> match_check.SPat {
                 _ => return match_check.SPat.Wild
             }
         }
+        ast.PatternKind.Or(_) => return match_check.SPat.Wild  // simplify_all expands it
+        ast.PatternKind.Struct(_, _, _, _) => return simplify_all(c, p)[0]
     }
+}
+
+// A struct pattern's fields in declaration order, `_` for those not named.
+fn record_parts(c: Checker, p: ast.Pattern) -> [ast.Pattern] {
+    let mut out: [ast.Pattern] = []
+    match p.kind {
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            let t = c.ty[p.id]
+            for fd in types.get(c.table, t).fields {
+                let mut sub = ast.Pattern { kind: ast.PatternKind.Wild, line: p.line, col: p.col, id: p.id }
+                for f in fields {
+                    if f.name == fd.name {
+                        sub = f.pattern
+                    }
+                }
+                push(mut out, sub)
+            }
+        }
+        _ => {}
+    }
+    return out
 }
 
 fn literal_value(e: ast.Expr) -> Int {
@@ -1987,6 +2287,28 @@ fn pattern(c: mut Checker, p: ast.Pattern, t: Int, bindings: mut Map[Str, Int]) 
             }
             return ok
         }
+        ast.PatternKind.Or(alternatives) => {
+            let mut ok = true
+            for alt in alternatives {
+                let mut own: Map[Str, Int] = [:]
+                let alt_ok = pattern(mut c, alt, t, mut own)
+                ok = ok && alt_ok
+                let names = maps.keys(own)
+                if len(names) > 0 {
+                    report(mut c, alt.line, alt.col, "E3238", "an alternative in a '|' pattern cannot bind names, but this one binds '" +
+                        names[0] + "'; match it in an arm of its own")
+                    ok = false
+                }
+            }
+            return ok
+        }
+        ast.PatternKind.Struct(_, _, _, _) => {
+            if struct_pattern(mut c, p, t, mut bindings) {
+                return true
+            }
+            bind_quietly(mut c, p, mut bindings)
+            return false
+        }
         ast.PatternKind.Variant(_, _, _, _, _) => {
             if variant_pattern(mut c, p, t, mut bindings) {
                 return true
@@ -1997,6 +2319,87 @@ fn pattern(c: mut Checker, p: ast.Pattern, t: Int, bindings: mut Map[Str, Int]) 
             return false
         }
     }
+}
+
+// `Name { field: pattern, .. }` (M31): every field named, unless `..` ends it.
+fn struct_pattern(c: mut Checker, p: ast.Pattern, t: Int, bindings: mut Map[Str, Int]) -> Bool {
+    let mut module = ""
+    let mut name = ""
+    let mut fields: [ast.FieldPattern] = []
+    let mut rest = false
+    match p.kind {
+        ast.PatternKind.Struct(m, n, fs, r) => {
+            module = m
+            name = n
+            fields = fs
+            rest = r
+        }
+        _ => {}
+    }
+    let mut written = name
+    let mut found = -1
+    if module != "" {
+        written = module + "." + name
+        let m = module_in_type(mut c, p.line, p.col, module)
+        if m < 0 {
+            return false
+        }
+        found = module_type(mut c, p.line, p.col, m, name)
+        if found < 0 {
+            return false
+        }
+    } else {
+        match maps.get(module_types(c), name) {
+            Some(id) => found = id
+            None => {}
+        }
+    }
+    if found < 0 {
+        report(mut c, p.line, p.col, "E3125", "unknown type '" + name + "'")
+        return false
+    }
+    if !types.is_struct(c.table, found) || types.is_fixed(c.table, found) {
+        report(mut c, p.line, p.col, "E3239", "'" + written + "' is not a struct; match an enum by its variants, as in " +
+            written + ".Variant")
+        return false
+    }
+    let instance_of = types.is_generic(c.table, found) && t >= 0 && types.get(c.table, t).origin == found
+    if t != found && !instance_of {
+        if t != types.ERROR() {
+            report(mut c, p.line, p.col, "E3075", "pattern " + written + " { ... } matches " + show(c, found) +
+                " values, but the value being matched is " + show(c, t))
+        }
+        return false
+    }
+    c.ty[p.id] = t  // for the usefulness check's view of it
+    let mut ok = true
+    let mut seen: Map[Str, Bool] = [:]
+    for f in fields {
+        let fi = types.field_index(c.table, t, f.name)
+        if maps.has(seen, f.name) {
+            report(mut c, f.line, f.col, "E3127", "field '" + f.name + "' is given twice")
+            ok = false
+            continue
+        }
+        if fi < 0 {
+            report(mut c, f.line, f.col, "E3128", "'" + show(c, t) + "' has no field '" + f.name + "'")
+            ok = false
+            continue
+        }
+        seen[f.name] = true
+        let sub_ok = pattern(mut c, f.pattern, types.get(c.table, t).fields[fi].ty, mut bindings)
+        ok = ok && sub_ok
+    }
+    if !rest {
+        for fd in types.get(c.table, t).fields {
+            if !maps.has(seen, fd.name) {
+                report(mut c, p.line, p.col, "E3240", "this pattern does not mention field '" + fd.name + "' of '" + show(c, t) +
+                    "'; match it with `" + fd.name + ": _`, or end the pattern with `..`")
+                return false
+            }
+        }
+    }
+    return ok
 }
 
 fn variant_pattern(c: mut Checker, p: ast.Pattern, t: Int, bindings: mut Map[Str, Int]) -> Bool {
@@ -2155,6 +2558,11 @@ fn bind_quietly(c: mut Checker, p: ast.Pattern, bindings: mut Map[Str, Int]) {
         ast.PatternKind.Variant(_, _, _, _, args) => {
             for sub in args {
                 bind_quietly(mut c, sub, mut bindings)
+            }
+        }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            for f in fields {
+                bind_quietly(mut c, f.pattern, mut bindings)
             }
         }
         _ => {}
@@ -4463,6 +4871,7 @@ fn terminates(c: Checker, s: ast.Stmt) -> Bool {
                         }
                     }
                     ast.ArmBody.Value(_) => return false
+                    ast.ArmBody.Valued(_, _) => return false
                 }
             }
             return true

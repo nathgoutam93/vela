@@ -14,6 +14,7 @@ pub type Key = enum {
     Bool(Bool)
     Str(Str)
     Interval(Int, Int)  // lo and hi, both included
+    Record  // a struct's one constructor, its fields in order (M31)
 }
 
 pub type SPat = enum {
@@ -52,7 +53,25 @@ fn same_key(a: Key, b: Key) -> Bool {
                 _ => return false
             }
         }
+        Key.Record => {
+            match b {
+                Key.Record => return true
+                _ => return false
+            }
+        }
     }
+}
+
+fn field_types(table: types.Table, t: Int) -> [Int] {
+    let mut out: [Int] = []
+    for f in types.get(table, t).fields {
+        push(mut out, f.ty)
+    }
+    return out
+}
+
+fn is_record(table: types.Table, t: Int) -> Bool {
+    return t >= 0 && types.is_struct(table, t) && !types.is_fixed(table, t)
 }
 
 fn int_min() -> Int {
@@ -87,6 +106,9 @@ fn constructors(table: types.Table, t: Int) -> Option[[Ctor]] {
         let none: [Int] = []
         return Some([Ctor { key: Key.Bool(true), payload: none }, Ctor { key: Key.Bool(false), payload: none }])
     }
+    if is_record(table, t) {
+        return Some([Ctor { key: Key.Record, payload: field_types(table, t) }])
+    }
     return None
 }
 
@@ -96,6 +118,12 @@ fn payload_types(table: types.Table, t: Int, k: Key) -> [Int] {
         Key.Variant(i) => {
             if types.is_enum(table, t) {
                 return types.get(table, t).variants[i].payload
+            }
+            return none
+        }
+        Key.Record => {
+            if is_record(table, t) {
+                return field_types(table, t)
             }
             return none
         }
@@ -371,6 +399,24 @@ pub fn render(table: types.Table, p: SPat, t: Int, viewpoint: Str) -> Str {
                     return "false"
                 }
                 Key.Str(_) => return "_"
+                Key.Record => {
+                    // `Point { x: 0, y: _ }`, naming a generic struct without its arguments
+                    let mut s = t
+                    if types.get(table, t).origin >= 0 {
+                        s = types.get(table, t).origin
+                    }
+                    let fields = types.get(table, t).fields
+                    let mut b = strings.builder()
+                    strings.add(mut b, types.show(table, s, viewpoint) + " { ")
+                    for j in 0..len(args) {
+                        if j > 0 {
+                            strings.add(mut b, ", ")
+                        }
+                        strings.add(mut b, fields[j].name + ": " + render(table, args[j], fields[j].ty, viewpoint))
+                    }
+                    strings.add(mut b, " }")
+                    return strings.build(b)
+                }
                 Key.Variant(i) => {
                     let v = types.get(table, t).variants[i]
                     let mut name = v.name

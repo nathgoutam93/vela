@@ -110,7 +110,13 @@ fn stmt(g: mut Graph, s: ast.Stmt) {
 }
 fn visit_arms(g: mut Graph, e: ast.Expr, arms: [ast.Arm]) {
     expr(mut g, e)
-    for arm in arms { match arm.body { ast.ArmBody.Value(e) => expr(mut g, e), ast.ArmBody.Do(s) => stmt(mut g, s) } }
+    for arm in arms {
+        match arm.guard { Some(c) => expr(mut g, c), None => {} }
+        match arm.body {
+            ast.ArmBody.Value(e) => expr(mut g, e), ast.ArmBody.Do(s) => stmt(mut g, s),
+            ast.ArmBody.Valued(b, v) => { block(mut g, b); match v { Some(e) => expr(mut g, e), None => {} } }
+        }
+    }
 }
 fn method(g: mut Graph, receiver: Int, name: Str) {
     let direct = checker.method(g.k, receiver, name)

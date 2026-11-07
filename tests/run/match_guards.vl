@@ -1,0 +1,98 @@
+// Match guards and `|` alternatives (M31). A false guard tries the next
+// arm; a guarded arm does not count toward covering every value.
+// out: big circle
+// out: circle
+// out: square 2
+// out: rect 2x3
+// out: point
+// out: point
+// out: line
+// out: small small medium medium negative large
+// out: yes 5 2
+// out: value
+// out: one other three other
+// out: 1 0 3 0
+type Shape = enum { Circle(Int), Rect(Int, Int), Dot, Line(Int) }
+
+fn size(s: Shape) -> Str {
+    return match s {
+        Shape.Circle(r) if r > 10 => "big circle",
+        Shape.Circle(_) => "circle",
+        Shape.Rect(w, h) if w == h => f"square {w}",
+        Shape.Rect(w, h) => f"rect {w}x{h}",
+        Shape.Dot | Shape.Line(0) => "point",
+        Shape.Line(_) => "line",
+    }
+}
+
+fn kind(n: Int) -> Str {
+    return match n {
+        0 | 1 | 2 => "small",
+        3..=9 | 100 => "medium",
+        x if x < 0 => "negative",
+        _ => "large",
+    }
+}
+
+// Enough literal arms for the literal switches (TL-107); a guard among them
+// must still be tested (TL-131).
+fn word(s: Str, allow: Bool) -> Str {
+    return match s {
+        "1" => "one",
+        "2" if allow => "two",
+        "3" => "three",
+        "4" => "four",
+        "5" => "five",
+        "6" => "six",
+        "7" => "seven",
+        "8" => "eight",
+        "9" => "nine",
+        _ => "other",
+    }
+}
+
+fn digit(n: Int, allow: Bool) -> Int {
+    return match n {
+        1 => 1,
+        2 if allow => 2,
+        3 => 3,
+        4 => 4,
+        5 => 5,
+        6 => 6,
+        7 => 7,
+        8 => 8,
+        9 => 9,
+        _ => 0,
+    }
+}
+
+fn counted(n: mut Int) -> Bool {
+    n += 1
+    return true
+}
+
+fn main() {
+    for s in [Shape.Circle(20), Shape.Circle(1), Shape.Rect(2, 2), Shape.Rect(2, 3), Shape.Dot, Shape.Line(0), Shape.Line(4)] {
+        print(size(s))
+    }
+    let mut kinds: [Str] = []
+    for n in [0, 2, 5, 100, -3, 50] {
+        push(mut kinds, kind(n))
+    }
+    print(f"{kinds[0]} {kinds[1]} {kinds[2]} {kinds[3]} {kinds[4]} {kinds[5]}")
+    // Guards run in order, once each, until one holds.
+    let mut count = 0
+    match 5 {
+        x if counted(mut count) && x > 10 => print("no"),
+        x if counted(mut count) => print(f"yes {x} {count}"),
+        _ => print("never"),
+    }
+    let o: Option[Str] = Some("value")
+    match o {
+        Some(v) if len(v) > 100 => print("huge"),
+        Some(v) => print(v),
+        None => print("none"),
+    }
+    print(f"{word("1", false)} {word("2", false)} {word("3", false)} {word("10", true)}")
+    print(f"{digit(1, false)} {digit(2, false)} {digit(3, false)} {digit(10, true)}")
+}

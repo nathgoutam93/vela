@@ -99,10 +99,27 @@ pub type PatternKind = enum {
     // module or "", enum or "" (for Some, None, Ok, Err), variant,
     // whether it has parentheses, and the patterns inside them
     Variant(Str, Str, Str, Bool, [Pattern])
+    Or([Pattern])  // `A | B` (M31): two or more alternatives, binding no names
+    // `module.Name { field: pattern, name, .. }` (M31): module or "", the
+    // struct, its fields as written, and whether `..` ends it
+    Struct(Str, Str, [FieldPattern], Bool)
+}
+
+// `x: pattern` in a struct pattern; `x` alone is `x: x`.
+pub type FieldPattern = struct {
+    name: Str
+    pattern: Pattern
+    line: Int
+    col: Int
 }
 
 pub type Arm = struct {
     pattern: Pattern
+    guard: Option[Expr]  // `PATTERN if condition =>` (M31)
+    // What the parser made this arm's match from (M31), for its diagnostics:
+    // "" a match; "if" an `if` with a value; "let" `let PATTERN = value
+    // else { ... }`; "let-bind" taking one name out of a value already matched.
+    sugar: Str
     body: ArmBody
     line: Int  // the `=>`
     col: Int
@@ -111,6 +128,11 @@ pub type Arm = struct {
 pub type ArmBody = enum {
     Value(Expr)  // in a match expression
     Do(Stmt)  // in a match statement: a block or a statement
+    // In a match expression (M31), `=> { statements; value }`: the block's
+    // statements before its last, and the last, an expression, as the arm's
+    // value; None when the last statement is not an expression, so the block
+    // must end by returning, breaking or continuing.
+    Valued(Block, Option[Expr])
 }
 
 pub type Stmt = struct {
@@ -324,6 +346,14 @@ fn fields_mut(fields: [FieldInit]) -> Bool {
 
 fn arms_mut(arms: [Arm]) -> Bool {
     for a in arms {
+        match a.guard {
+            Some(g) => {
+                if has_mut(g) {
+                    return true
+                }
+            }
+            None => {}
+        }
         match a.body {
             ArmBody.Value(e) => {
                 if has_mut(e) {
@@ -331,6 +361,7 @@ fn arms_mut(arms: [Arm]) -> Bool {
                 }
             }
             ArmBody.Do(_) => return true
+            ArmBody.Valued(_, _) => return true
         }
     }
     return false
@@ -618,13 +649,28 @@ fn sx_stmt(s: Stmt) -> Sx {
 fn sx_match(scrutinee: Expr, arms: [Arm]) -> Sx {
     let mut items = [atom("match"), sx_expr(scrutinee)]
     for a in arms {
-        let body = match a.body {
-            ArmBody.Value(e) => sx_expr(e)
-            ArmBody.Do(s) => sx_stmt(s)
+        let body = sx_arm_body(a.body)
+        match a.guard {
+            Some(g) => push(mut items, list([atom("=>"), sx_pattern(a.pattern), list([atom("if"), sx_expr(g)]), body]))
+            None => push(mut items, list([atom("=>"), sx_pattern(a.pattern), body]))
         }
-        push(mut items, list([atom("=>"), sx_pattern(a.pattern), body]))
     }
     return list(items)
+}
+
+fn sx_arm_body(body: ArmBody) -> Sx {
+    match body {
+        ArmBody.Value(e) => return sx_expr(e)
+        ArmBody.Do(s) => return sx_stmt(s)
+        ArmBody.Valued(b, value) => {
+            let mut parts = [atom("value-block"), sx_block(b)]
+            match value {
+                Some(v) => push(mut parts, sx_expr(v))
+                None => {}
+            }
+            return list(parts)
+        }
+    }
 }
 
 fn sx_pattern(p: Pattern) -> Sx {
@@ -645,6 +691,23 @@ fn sx_pattern(p: Pattern) -> Sx {
             let mut items = [atom(name)]
             for x in args {
                 push(mut items, sx_pattern(x))
+            }
+            return list(items)
+        }
+        PatternKind.Or(alternatives) => {
+            let mut items = [atom("|")]
+            for x in alternatives {
+                push(mut items, sx_pattern(x))
+            }
+            return list(items)
+        }
+        PatternKind.Struct(module, name, fields, rest) => {
+            let mut items = [atom(qualified(module, name))]
+            for f in fields {
+                push(mut items, list([atom(f.name), sx_pattern(f.pattern)]))
+            }
+            if rest {
+                push(mut items, atom(".."))
             }
             return list(items)
         }

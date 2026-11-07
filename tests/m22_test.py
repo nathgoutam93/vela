@@ -225,8 +225,12 @@ def tooling(c,work,env):
     command(c,env,'query','symbols',p)
     guide=command(c,env,'guide').stdout
     assert len(guide.encode())<=32000,len(guide.encode())
-    for text in ('[T; N]','import views','import buffers','import arenas','memory.reserve','pub fn read_u32_le'):
+    for text in ('[T; N]','import views','import buffers','import arenas'):
         assert text in guide,text
+    # Module signatures are in `vela guide --all` (M31).
+    full=command(c,env,'guide','--all').stdout
+    for text in ('memory.reserve','pub fn read_u32_le'):
+        assert text in full,text
 
 
 def main():

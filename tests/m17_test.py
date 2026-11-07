@@ -197,14 +197,17 @@ def guide_and_install(c: Checks):
     # Same bytes/4 budget as M16's baseline; fail when the reference grows.
     assert len(guide.encode()) <= 8000 * 4, len(guide.encode())
     assert 'Assert Result by matching Ok/Err' in guide and 'Err(e) => assert(len(e) > 0)' in guide
+    # Module signatures are in `vela guide --all` (M31).
+    full = c.run('guide', '--all').stdout
+    assert full.startswith(guide.rsplit('\nModule signatures:', 1)[0])
     for module in ('maps', 'files', 'os', 'strings', 'tasks', 'math', 'bytes', 'lists', 'text'):
-        assert 'import ' + module in guide
+        assert 'import ' + module in full
     for i, source in enumerate(re.findall(r'```vela\n(.*?)```', guide, re.S)):
         path = c.write(f'guide/example{i}.vl', source)
         c.run('check', str(path))
         c.run('test', str(path))
     # The std section is generated from installed declarations, including contracts.
-    assert 'pub fn sort[T: Ord]' in guide and 'requires' in guide
+    assert 'pub fn sort[T: Ord]' in full and 'requires' in full
     out = c.base / 'prepared'
     prepare(task_dir('04-rpn'), out, c.compiler, 'guide')
     installed = out / '_vela'
@@ -213,6 +216,7 @@ def guide_and_install(c: Checks):
     assert (installed / 'bin/vela').read_bytes()[:2] != b'#!'
     env = {**c.env, 'PATH': str(installed / 'bin') + os.pathsep + c.env['PATH']}
     assert c.run('guide', cwd=out, env=env, executable='vela').stdout == guide
+    assert c.run('guide', '--all', cwd=out, env=env, executable='vela').stdout == full
     path = c.write('prepared/main.vl', 'import text\nfn main() { print(text.trim(" yes ")) }\n')
     assert c.run('run', str(path), cwd=out, env=env, executable='vela').stdout == 'yes\n'
     links = c.base / 'links'

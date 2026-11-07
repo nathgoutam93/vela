@@ -995,9 +995,20 @@ fn match_arms(b: mut Builder, scrutinee: ast.Expr, arms: [ast.Arm]) {
     expr(mut b, scrutinee)
     for a in arms {
         pattern(mut b, a.pattern)
+        match a.guard {
+            Some(g) => expr(mut b, g)
+            None => {}
+        }
         match a.body {
             ast.ArmBody.Value(e) => expr(mut b, e)
             ast.ArmBody.Do(s) => stmt(mut b, s)
+            ast.ArmBody.Valued(body, value) => {
+                block(mut b, body)
+                match value {
+                    Some(e) => expr(mut b, e)
+                    None => {}
+                }
+            }
         }
     }
 }
@@ -1023,6 +1034,34 @@ fn pattern(b: mut Builder, p: ast.Pattern) {
             }
             for a in args {
                 pattern(mut b, a)
+            }
+        }
+        ast.PatternKind.Or(alternatives) => {
+            for a in alternatives {
+                pattern(mut b, a)
+            }
+        }
+        ast.PatternKind.Struct(module, name, fields, _) => {
+            // As a struct literal (M31): the type, and each field written `field: pattern`.
+            let t = b.k.ty[p.id]
+            let mut n = 0
+            if module != "" {
+                module_part(mut b, module, p.line, p.col)
+                n = 1
+            }
+            if t >= 0 && types.is_struct(b.k.table, t) {
+                qualified_part(mut b, p.line, p.col, n, name, decl_def(b, t))
+                for f in fields {
+                    let fi = types.field_index(b.k.table, t, f.name)
+                    // In shorthand `x`, the field's name is also the binding's.
+                    let shorthand = f.pattern.line == f.line && f.pattern.col == f.col
+                    if fi >= 0 && !shorthand {
+                        add_use(mut b, f.line, f.col, f.name, member(b, t, fi), show(b, types.get(b.k.table, t).fields[fi].ty))
+                    }
+                }
+            }
+            for f in fields {
+                pattern(mut b, f.pattern)
             }
         }
         _ => {}

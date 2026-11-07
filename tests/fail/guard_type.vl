@@ -1,0 +1,7 @@
+// err: guard_type.vl:4:14: error: a match guard is a condition, so it must be Bool, but this is Int [E3093]
+fn main() {
+    match 1 {
+        n if n => print(n),
+        _ => print(0),
+    }
+}

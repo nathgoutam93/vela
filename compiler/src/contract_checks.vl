@@ -66,6 +66,7 @@ fn returned_bound(k: checker.Checked, id: Int) -> Bound {
             if !scalar(k, subject) || !types.is_integer(k.ty[subject.id]) { return absent() }
             let mut out = absent()
             for arm in arms {
+                match arm.guard { Some(_) => return absent(), None => {} }  // a guard can reject the arm (M31)
                 match arm.pattern.kind { ast.PatternKind.Wild => {}, ast.PatternKind.Lit(x) => { if !literal(k, x).ok { return absent() } }, _ => return absent() }
                 let mut b = absent(); match arm.body { ast.ArmBody.Value(x) => b = literal(k, x), _ => {} }
                 if !b.ok { return absent() }; if !out.ok { out = b } else { if b.lo < out.lo { out.lo = b.lo }; if b.hi > out.hi { out.hi = b.hi } }

@@ -1,0 +1,8 @@
+// err: block_arm_no_value.vl:4:26: error: this block gives a value, so it must end with an expression, or leave with return, break or continue [E3235]
+fn main() {
+    let x = match 1 {
+        1 => { let y = 2 },
+        _ => 2,
+    }
+    print(x)
+}

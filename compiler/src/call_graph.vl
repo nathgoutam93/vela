@@ -82,7 +82,16 @@ fn stmt(g: mut Graph, s: ast.Stmt) {
         ast.StmtKind.With(items, b) => { for item in items { expr(mut g, item.value) }; block(mut g, b) }, _ => {}
     }
 }
-fn arms(g: mut Graph, e: ast.Expr, values: [ast.Arm]) { expr(mut g, e); for arm in values { match arm.body { ast.ArmBody.Value(e) => expr(mut g, e), ast.ArmBody.Do(s) => stmt(mut g, s) } } }
+fn arms(g: mut Graph, e: ast.Expr, values: [ast.Arm]) {
+    expr(mut g, e)
+    for arm in values {
+        match arm.guard { Some(c) => expr(mut g, c), None => {} }
+        match arm.body {
+            ast.ArmBody.Value(e) => expr(mut g, e), ast.ArmBody.Do(s) => stmt(mut g, s),
+            ast.ArmBody.Valued(b, v) => { block(mut g, b); match v { Some(e) => expr(mut g, e), None => {} } }
+        }
+    }
+}
 fn method(g: mut Graph, t: Int, name: Str) {
     let direct = checker.method(g.k, t, name); if direct.fn_id >= 0 { edge(mut g, g.owner, direct.fn_id); return }
     if !types.is_param(g.k.table, t) { return }; let mut found = false

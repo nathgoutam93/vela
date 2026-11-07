@@ -1432,9 +1432,20 @@ fn taken_in_stmt(g: Low, s: ast.Stmt, out: mut Map[Int, Bool]) {
 
 fn taken_in_arms(g: Low, arms: [ast.Arm], out: mut Map[Int, Bool]) {
     for a in arms {
+        match a.guard {
+            Some(e) => taken_in_expr(g, e, mut out)
+            None => {}
+        }
         match a.body {
             ast.ArmBody.Value(e) => taken_in_expr(g, e, mut out)
             ast.ArmBody.Do(s) => taken_in_stmt(g, s, mut out)
+            ast.ArmBody.Valued(b, value) => {
+                taken_in_block(g, b, mut out)
+                match value {
+                    Some(e) => taken_in_expr(g, e, mut out)
+                    None => {}
+                }
+            }
         }
     }
 }
@@ -2212,6 +2223,10 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
             tests(mut g, a.pattern, v, t, next)
         }
         push_frame(mut g, "arm")
+        let mut guard: Option[ast.Expr] = None
+        if next >= 0 {
+            guard = a.guard  // the checker makes the last arm unguarded
+        }
         for bound in bindings(mut g, a.pattern, v, t) {
             if borrowed && !maps.has(g.fs.taken, bound.local) {
                 // Immutable scrutinees stay alive throughout the arm. A
@@ -2222,6 +2237,19 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
                 let p = declare(mut g, bound.local, bound.path)
                 retain(mut g, local_ty(g, bound.local), p)
             }
+        }
+        match guard {
+            Some(cond) => {
+                // A false guard (M31) releases the bindings and tries the next arm.
+                let pass = label(mut g)
+                let reject = label(mut g)
+                branch_on(mut g, cond, pass, reject)
+                place_label(mut g, reject)
+                release_frame(mut g, g.fs.frames[len(g.fs.frames) - 1])
+                jump(mut g, next)
+                place_label(mut g, pass)
+            }
+            None => {}
         }
         if result.reg < 0 {
             match a.body {
@@ -2235,13 +2263,28 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
                         _ => stmt(mut g, s)
                     }
                 }
-                ast.ArmBody.Value(_) => {}
+                _ => {}
             }
         } else {
             match a.body {
                 ast.ArmBody.Value(e) => {
                     let c = consume(mut g, expr(mut g, e))
                     put_place(mut g, result, c)
+                }
+                ast.ArmBody.Valued(b, value) => {
+                    // A block arm (M31): its statements, then its value.
+                    for inner in b.stmts {
+                        stmt(mut g, inner)
+                    }
+                    match value {
+                        Some(e) => {
+                            if !g.fs.dead {
+                                let c = consume(mut g, expr(mut g, e))
+                                put_place(mut g, result, c)
+                            }
+                        }
+                        None => {}
+                    }
                 }
                 ast.ArmBody.Do(_) => {}
             }
@@ -2290,7 +2333,7 @@ fn counting(g: Low, scrutinee: ast.Expr, arms: [ast.Arm]) -> [Int] {
         }
         _ => return []
     }
-    if map < 0 || key < 0 || maps.has(g.k.escaped, map) {
+    if map < 0 || key < 0 || maps.has(g.k.escaped, map) || codegen.has_guard(arms) {
         return []
     }
     for a in arms {
@@ -2440,6 +2483,27 @@ fn tests(g: mut Low, p: ast.Pattern, path: Val, t: Int, fail: Int) {
                 tests(mut g, args[i], payload(mut g, path, enum, vi, i), v.payload[i], fail)
             }
         }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            // `Point { x: 0, .. }` (M31): the named fields' tests.
+            for f in fields {
+                let ft = types.get(g.k.table, t).fields[types.field_index(g.k.table, t, f.name)].ty
+                tests(mut g, f.pattern, field_value(mut g, path, t, f.name), ft, fail)
+            }
+        }
+        ast.PatternKind.Or(alternatives) => {
+            // `A | B` (M31): each alternative but the last goes to the next on
+            // failure; one that matches skips the rest.
+            let matched = label(mut g)
+            let n = len(alternatives)
+            for i in 0..n - 1 {
+                let next = label(mut g)
+                tests(mut g, alternatives[i], path, t, next)
+                jump(mut g, matched)
+                place_label(mut g, next)
+            }
+            tests(mut g, alternatives[n - 1], path, t, fail)
+            place_label(mut g, matched)
+        }
     }
 }
 
@@ -2569,6 +2633,14 @@ fn bindings(g: mut Low, p: ast.Pattern, path: Val, t: Int) -> [Binding] {
             for i in 0..len(args) {
                 let inner = payload(mut g, path, r[0], r[1], i)
                 for b in bindings(mut g, args[i], inner, v.payload[i]) {
+                    push(mut out, b)
+                }
+            }
+        }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            for f in fields {
+                let ft = types.get(g.k.table, t).fields[types.field_index(g.k.table, t, f.name)].ty
+                for b in bindings(mut g, f.pattern, field_value(mut g, path, t, f.name), ft) {
                     push(mut out, b)
                 }
             }
