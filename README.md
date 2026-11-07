@@ -6,9 +6,11 @@ C or native assembly.
 
 The project has a validated **1.0 candidate** on macOS and a retained Linux
 snapshot. Native Windows, agent trials, actual tokenizer counting, and
-specific kernel/debugger acceptance cases remain open. See the
-[reconciliation](docs/backlog-reconciliation.md), [roadmap](docs/roadmap-after-m18.md)
-and [validation backlog](docs/tooling-backlog.md#outstanding-validation).
+specific kernel/debugger acceptance cases remain open. The final 1.0 release
+is [deferred](docs/design-baseline-to-1.0.md) until milestones M31-M35 revise
+the language. See the [reconciliation](docs/backlog-reconciliation.md),
+[roadmap](docs/roadmap-after-m18.md) and
+[validation backlog](docs/tooling-backlog.md#outstanding-validation).
 
 ## Start here
 
