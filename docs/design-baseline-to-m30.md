@@ -1,5 +1,9 @@
 # Design baseline through M30
 
+Later decision: the [2026-11-07 baseline](design-baseline-to-1.0.md) defers
+the final 1.0 release until M31-M35 deliver a bounded set of proposals, and
+extends this freeze to everything else until 1.0.
+
 Decision: 2026-10-25. Following the agent-safety design review, accept the
 bounded details below into M28-M30, then freeze further architectural scope
 until M30 is achieved. These are delivery requirements, not implemented
@@ -109,7 +113,9 @@ runtime reflection, macros or arbitrary compiler plugins.
 - Runtime reflection, a new metaprogramming system, or a new effect calculus.
 
 These require a separate design decision after M30. They are not new
-milestones or prerequisites for completing the current plan.
+milestones or prerequisites for completing the current plan. Proposals
+recorded for that decision are in
+[language-proposals-after-m30.md](language-proposals-after-m30.md).
 
 ## Current behavior evidence
 

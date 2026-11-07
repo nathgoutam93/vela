@@ -3,7 +3,10 @@
 Policy revision: **1.0 candidate, M30**. This defines the intended 1.x
 contract without declaring that final 1.0 release acceptance has completed.
 The [language specification](specification.md), [agent JSON contracts](agent-json.md)
-and retained conformance corpus form its checked baseline.
+and retained conformance corpus form its checked baseline. The 1.x
+guarantee begins at the final 1.0 release, which is deferred until M31-M35;
+until then the candidate corpus may be revised only as recorded in the
+[2026-11-07 decision](design-baseline-to-1.0.md#the-candidate-corpus).
 
 ## Source compatibility
 

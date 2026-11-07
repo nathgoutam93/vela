@@ -11,7 +11,8 @@ reference material.
 | Work on the compiler | [Compiler map](../compiler/README.md) and [test guide](../tests/README.md) |
 | Integrate an agent or editor | [Agent JSON contracts](agent-json.md) and [editor setup](../editors/README.md) |
 | Check compatibility and release promises | [Compatibility policy](compatibility.md) |
-| Choose milestone work | [Roadmap](roadmap-after-m18.md) and [accepted design baseline](design-baseline-to-m30.md) |
+| Choose milestone work | [Roadmap](roadmap-after-m18.md), the [accepted design baseline](design-baseline-to-m30.md) and its [amendment to 1.0](design-baseline-to-1.0.md) |
+| Consider language changes | [Recorded proposals](language-proposals-after-m30.md); only those scheduled in M31-M35 are authorized |
 | Check known issues or remaining acceptance | [Current reconciliation](backlog-reconciliation.md) and [tooling backlog](tooling-backlog.md#outstanding-validation) |
 | Understand how a feature was implemented | [Milestone walkthrough index](history/README.md) |
 | Reproduce measurements | [Benchmarks](../bench/README.md) and [agent evaluation](../evaluation/README.md) |

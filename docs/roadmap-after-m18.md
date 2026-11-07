@@ -50,6 +50,15 @@ New ownership/linear/typestate/refinement type systems and runtime reflection
 are outside this delivery scope; proposals wait until after M30. This does
 not defer existing platform, verification, debugging or validation work.
 
+## Design baseline from M30 to 1.0
+
+The [2026-11-07 decision](design-baseline-to-1.0.md) defers the final 1.0
+release: M31-M35 deliver a bounded set of the
+[recorded proposals](language-proposals-after-m30.md) first, including the
+two that would be breaking after 1.0 (typed std errors and non-copyable
+handles). The freeze continues for everything else until 1.0. M30 remains
+the current candidate baseline until these milestones revise it.
+
 ## Order and what each needs
 
 ```
@@ -66,7 +75,13 @@ M26 platforms .................. M23 M25
 M27 debugging .................. M25 M26
 M28 verification ............... M19 M20
 M29 scale ...................... M21 M23 M25
-M30 1.0 ........................ all of the above
+M30 1.0 candidate .............. all of the above
+M31 expressions and patterns ... M30
+M32 derived conformances ....... M30
+M33 mutable receivers .......... M30
+M34 typed errors ............... M32 M33
+M35 resources .................. M33 M34
+1.0 release .................... M31-M35, then the release gates
 ```
 
 M17, M19 and M20 can go in any order among themselves; M17 is first
@@ -300,6 +315,8 @@ both bootstrap fixed points and local regression checks. See
 not close the remaining agent/tokenizer, Windows, kernel-edge and debugger
 acceptance gaps or declare a final 1.0 release. Automatic push/PR workflows are temporarily
 paused at the user's request; platform jobs remain manually dispatchable.
+The [2026-11-07 decision](design-baseline-to-1.0.md) defers the final release
+until M31-M35; the candidate remains the current baseline until then.
 
 **Needs:** everything above.
 
@@ -318,10 +335,123 @@ SDK is required. See the [baseline](design-baseline-to-m30.md#m30-specify-the-ag
 Fixtures also check the documented agent-facing JSON contracts and generated
 guide. The architecture freeze remains in force throughout delivery to M30.
 
+## Before 1.0: M31-M35
+
+Accepted by the [2026-11-07 decision](design-baseline-to-1.0.md), which also
+sets the acceptance every milestone shares (fixed points, both suites,
+back-end agreement, unchanged performance gates, specification, guide,
+explanations and conformance mappings). Each milestone writes its detailed
+design before implementation. Settle the guide budget before M31.
+
+## M31: Expressions and patterns
+
+**Status:** planned.
+
+**Needs:** M30.
+
+**What gets built:** `if`/`else` and blocks as expressions with a final
+value; match guards; or-patterns; struct patterns; `let PATTERN = value else
+{ ... }`; compound assignment with the checked semantics of the spelled-out
+form; explicit type arguments at call sites; one comparison operand's type
+inferred from the other. See [LP-001](language-proposals-after-m30.md#lp-001-control-flow-is-statement-oriented)
+and [LP-010](language-proposals-after-m30.md#lp-010-smaller-inference-and-text-rough-edges).
+
+**Concepts:** Expression-oriented syntax, exhaustiveness with guards, desugaring.
+
+**Done when:** Every form has specification text and conformance fixtures on
+both backends; a guarded arm never counts toward exhaustiveness; `x += 1`
+panics on overflow exactly as `x = x + 1`; the forms observed as E2020/E2001
+in the audit are accepted.
+
+## M32: Derived conformances
+
+**Status:** planned.
+
+**Needs:** M30.
+
+**What gets built:** structs and enums whose fields all meet Eq, Key or Ord
+meet them automatically unless they define their own method or opt out; a
+prelude Show interface used by `print` and string interpolation; prelude
+methods on Option and Result. See [LP-002](language-proposals-after-m30.md#lp-002-no-derived-equality-hashing-ordering-or-text-form)
+and [LP-006](language-proposals-after-m30.md#lp-006-option-and-result-have-no-methods).
+
+**Concepts:** Derived instances, coherence with user-defined methods, law-preserving generation.
+
+**Done when:** `==` works on Result and plain structs; derived hashing gives
+working map keys; property tests check the Eq/Ord/Key laws on derived
+implementations; `f"{value}"` uses Show; the `reject_result_equality.vl`
+corpus change is recorded as the decision requires.
+
+## M33: Mutable receivers
+
+**Status:** planned.
+
+**Needs:** M30.
+
+**What gets built:** qualified methods with `mut` receivers, called as
+`value.method()` on a mutable place; non-escaping closures that may change
+captured locals, while escaping closures keep immutable snapshots. See
+[LP-003](language-proposals-after-m30.md#lp-003-mutation-is-confined-to-free-functions-and-statements).
+
+**Concepts:** In-out parameters, escape analysis, exclusivity of mutable access.
+
+**Done when:** `s.push(x)` works on a user type; existing overlap rules
+(E3144) cover receivers; a closure summing into a local is accepted only
+where it cannot escape; value-copy behavior is unchanged in the corpus.
+
+## M34: Typed errors
+
+**Status:** planned.
+
+**Needs:** M32 (Show for errors) and M33 (`mut Self` for readers and writers).
+
+**What gets built:** an error-conversion interface used by `?`; typed std
+errors in place of `Str`; `io.Reader`/`Writer` redesigned with `mut Self`
+and effects taken from the implementation (`uses R`). See
+[LP-004](language-proposals-after-m30.md#lp-004-standard-library-errors-are-all-str)
+and [LP-005](language-proposals-after-m30.md#lp-005-interfaces-are-closed-effect-fixed-and-static-only).
+
+**Concepts:** Error modeling, conversion at propagation, effect polymorphism under monomorphization.
+
+**Done when:** every fallible std and package API returns a typed error; each
+error variant is reachable through an effect fake; a generic copy from a
+memory reader is effect-free; examples, packages and the compiler build with
+the new signatures.
+
+## M35: Resources
+
+**Status:** planned; its move and drop design needs review before implementation.
+
+**Needs:** M33 (consuming receivers) and M34 (typed `close` errors).
+
+**What gets built:** `defer`, and non-copyable handle types that move on
+assignment and are consumed by methods such as `close`. See
+[LP-008](language-proposals-after-m30.md#lp-008-resource-handles-alias-under-value-semantics).
+Decide at the start whether a single mid-level IR (LP-101) comes first.
+
+**Concepts:** Affine types, deterministic cleanup, move semantics beside copy-on-write.
+
+**Done when:** use after move or close is a compile error; every exit path
+drops a handle exactly once under ASan; effect fakes still intercept the new
+handles; no copy of a handle aliases another.
+
+## 1.0 release
+
+**Needs:** M31-M35.
+
+Revise the specification, compatibility policy and guide; reconcile the
+corpus; rerun both fixed points and all suites; complete VAL-002 through
+VAL-006 on the revised language; write the release record.
+
 ## What is not in it yet
 
-- A garbage collector or ownership types: value semantics with reference
-  counting stays the memory model; M22 adds control inside it.
+- A garbage collector or general ownership types: value semantics with
+  reference counting stays the memory model; M22 adds control inside it, and
+  M35 adds only non-copyable resource handles.
 - Async I/O: M23's networking blocks, and `tasks` gives concurrency; an
   event loop can come after M29 if real programs need it.
 - A package registry: packages stay git repositories (M14).
+
+Language and compiler proposals recorded after M30 are in
+[language-proposals-after-m30.md](language-proposals-after-m30.md). Only those
+scheduled in M31-M35 are authorized; the rest wait until after 1.0.
