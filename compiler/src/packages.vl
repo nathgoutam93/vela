@@ -651,7 +651,7 @@ fn resolve(dep: Dep, old: Map[Str, Locked]) -> Result[Str, Str] uses os {
     let mut listing = ""
     match os.output(["git", "ls-remote", "--", repository(dep.source), dep.ref]) {
         Ok(out) => listing = out
-        Err(e) => return Err("cannot look up " + dep.ref + " in " + dep.source + ": " + e)
+        Err(e) => return Err("cannot look up " + dep.ref + " in " + dep.source + ": " + f"{e}")
     }
     match commit_of(listing, dep.ref) {
         Some(c) => return Ok(c)
@@ -711,12 +711,12 @@ fn fetch(name: Str, source: Str, commit: Str) -> Result[Str, Str] uses fs, os {
                         strings.from_int(code))
                 }
             }
-            Err(e) => return Err("cannot fetch '" + name + "': " + e)
+            Err(e) => return Err("cannot fetch '" + name + "': " + f"{e}")
         }
     }
     match files.write(fetched_marker(dir), source + " " + commit + "\n") {
         Ok(_) => return Ok(dir)
-        Err(e) => return Err(e)
+        Err(e) => return Err(f"{e}")
     }
 }
 

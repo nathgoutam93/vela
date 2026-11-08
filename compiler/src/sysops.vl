@@ -33,5 +33,5 @@ pub fn signature(module: Str, name: Str) -> Str {
     let mut out = module + "." + name + "("
     let ps = params(name)
     for i in 0..len(ps) { if i > 0 { out = out + ", " }; out = out + type_text(ps[i]) }
-    return out + ") -> Result[" + type_text(result(name)) + ", Str] uses " + effect(name)
+    return out + ") -> Result[" + type_text(result(name)) + ", IoError] uses " + effect(name)
 }

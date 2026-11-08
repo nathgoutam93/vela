@@ -201,7 +201,7 @@ fn execute(exe: Str, test_index: Int, index: Int, target: Str, options: capabili
     let mut event = Event { kind: "unknown", diagnostic: json.null(), stdout: "", stderr: "", reason: "execution did not complete" }
     let command = [os.executable(), "__vela-property-run-v1", words_json(options.allow), words_json(options.deny), exe, num(test_index), num(index)]
     match processes.communicate(command, "", 262144, timeout) {
-        Err(e) => { event.reason = e; return event }
+        Err(e) => { event.reason = f"{e}"; return event }
         Ok(output) => {
             event.stdout = output.stdout; event.stderr = output.stderr
             if output.status == 0 { event.kind = "passed"; event.reason = "contract call completed"; return event }

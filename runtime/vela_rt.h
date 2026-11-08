@@ -579,7 +579,8 @@ void vela_builder_add(vela_array *b, vela_str s);
 void vela_builder_add_int(vela_array *b, int64_t n);
 vela_str vela_builder_build(vela_array *b);
 vela_str vela_from_int(int64_t n);
-vela_str vela_str_quote(vela_str s);  // as a string literal, for Show inside a value
+vela_str vela_str_quote(vela_str s);
+int64_t vela_take_error_kind(void);  // the IoKind of the last failure a built-in reported (M34)  // as a string literal, for Show inside a value
 vela_str vela_from_uint(uint64_t n);
 void vela_print_uint(uint64_t n);
 void vela_eprint_uint(uint64_t n);

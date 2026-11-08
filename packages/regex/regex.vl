@@ -62,14 +62,14 @@ pub type Match = struct {
 // ---- Searching ----
 
 // The pattern compiled, or a message saying what is wrong with it.
-pub fn compile(pattern: Str) -> Result[Regex, Str] {
-    let mut p = Parser { text: pattern, pos: 0, error: "", groups: 1, names: [""], flags: Flags { i: false, unicode: true, m: false, s: false, u: false, x: false, r: false }, depth: 0 }
+pub fn compile(pattern: Str) -> Result[Regex, ParseError] {
+    let mut p = Parser { text: pattern, pos: 0, error: "", error_at: 0, groups: 1, names: [""], flags: Flags { i: false, unicode: true, m: false, s: false, u: false, x: false, r: false }, depth: 0 }
     let tree = alternation(mut p)
     if p.error == "" && p.pos < len(pattern) {
         fail(mut p, "unmatched ')'")
     }
     if p.error != "" {
-        return Err(p.error)
+        return Err(ParseError { message: p.error, offset: p.error_at })
     }
     let mut c = Compiler { program: [], error: "", reverse: false }
     emit(mut c, Inst { op: SAVE(), a: 0, b: 0, ranges: [] })
@@ -77,13 +77,13 @@ pub fn compile(pattern: Str) -> Result[Regex, Str] {
     emit(mut c, Inst { op: SAVE(), a: 1, b: 0, ranges: [] })
     emit(mut c, Inst { op: MATCH(), a: 0, b: 0, ranges: [] })
     if c.error != "" {
-        return Err(c.error)
+        return Err(ParseError { message: c.error, offset: len(pattern) })
     }
     let mut r = Compiler { program: [], error: "", reverse: true }
     gen(mut r, tree)
     emit(mut r, Inst { op: MATCH(), a: 0, b: 0, ranges: [] })
     if r.error != "" {
-        return Err(r.error)
+        return Err(ParseError { message: r.error, offset: len(pattern) })
     }
     let mut re = Regex { pattern: pattern, ops: [], xs: [], ys: [], sets: [], rops: [], rxs: [], rys: [], rsets: [], looks: false, uword: false, cuts: [], groups: p.groups, names: p.names,
         first: first_bytes(c.program), prefix: literal_prefix(c.program), anchored: starts_anchored(c.program) }
@@ -113,7 +113,7 @@ pub fn must(pattern: Str) -> Regex {
     match compile(pattern) {
         Ok(re) => return re
         Err(e) => {
-            assert(e == "")
+            assert(e.message == "")
             return Regex { pattern: "", ops: [], xs: [], ys: [], sets: [], rops: [], rxs: [], rys: [], rsets: [], looks: false, uword: false, cuts: [], groups: 0, names: [], first: [], prefix: "",
                 anchored: false }
         }
@@ -388,6 +388,7 @@ type Parser = struct {
     text: Str
     pos: Int
     error: Str
+    error_at: Int  // its byte offset (M34: ParseError.offset)
     groups: Int
     names: [Str]
     flags: Flags
@@ -400,6 +401,7 @@ fn max_depth() -> Int {
 
 fn fail(p: mut Parser, message: Str) {
     if p.error == "" {
+        p.error_at = p.pos
         p.error = "regex error at offset " + strings.from_int(p.pos) + ": " + message
     }
 }
@@ -2701,7 +2703,7 @@ fn spans(re: Regex, text: Str) -> Str {
 fn error_of(pattern: Str) -> Str {
     match compile(pattern) {
         Ok(_) => return "compiled"
-        Err(e) => return e
+        Err(e) => return e.message
     }
 }
 

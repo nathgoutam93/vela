@@ -1,0 +1,47 @@
+// `?` converts errors (M34): into the one variant of the function's error
+// enum that holds the error, or into a Str error through Show.
+// out: Ok(42)
+// out: Err(AppError.Io(cannot read : no such file))
+// out: Err("cannot read : no such file")
+// out: Ok("42")
+// out: Err("Code.NotNumber")
+// out: true
+// out: IoKind.Timeout
+// out: socket is closed
+type AppError = enum { Io(IoError), Parse(ParseError), Bad(Str) }
+type Code = enum { NotNumber, TooBig }
+
+fn read(name: Str) -> Result[Str, IoError] {
+    if name == "" { return Err(IoError { kind: IoKind.NotFound, message: "cannot read : no such file" }) }
+    return Ok("42")
+}
+fn parse(s: Str) -> Result[Int, ParseError] {
+    if s == "x" { return Err(ParseError { message: "not a number", offset: 0 }) }
+    return Ok(42)
+}
+fn load(name: Str) -> Result[Int, AppError] {
+    let text = read(name)?
+    return Ok(parse(text)?)
+}
+fn plain(name: Str) -> Result[Str, Str] {
+    return Ok(read(name)?)
+}
+fn coded(s: Str) -> Result[Int, Code] {
+    if s == "" { return Err(Code.NotNumber) }
+    return Ok(1)
+}
+fn coded_text(s: Str) -> Result[Int, Str] { return Ok(coded(s)?) }
+
+fn main() {
+    print(load("a"))
+    print(load(""))
+    print(plain(""))
+    print(plain("a"))
+    print(coded_text(""))
+    match load("") {
+        Err(AppError.Io(e)) => print(e.kind == IoKind.NotFound)
+        _ => print("other")
+    }
+    print(IoKind.Timeout)
+    print(IoError { kind: IoKind.Closed, message: "socket is closed" })
+}

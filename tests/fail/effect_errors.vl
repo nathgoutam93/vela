@@ -16,14 +16,14 @@
 import files
 import os
 
-fn read(path: Str) -> Result[Str, Str] {
+fn read(path: Str) -> Result[Str, IoError] {
     return files.read(path)
 }
 
 fn first(path: Str) -> Str uses fs {
     match read(path) {
         Ok(t) => return t
-        Err(e) => return e
+        Err(e) => return e.message
     }
 }
 

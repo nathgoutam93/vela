@@ -325,7 +325,7 @@ fn walk_parts(w: mut Walk, e: ast.Expr) {
             expr(mut w, obj)
             expr(mut w, i)
         }
-        ast.ExprKind.Try(x) => expr(mut w, x)
+        ast.ExprKind.Try(x) => expr(mut w, checker.try_source(w.k, e, x))
         ast.ExprKind.MutArg(x) => expr(mut w, x)
         ast.ExprKind.Slice(obj, lo, hi) => exprs(mut w, [obj, lo, hi])
         ast.ExprKind.Interpolate(parts) => {

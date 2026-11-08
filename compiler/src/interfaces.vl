@@ -12,8 +12,15 @@ pub fn source() -> Str {
 // digit (checker.hidden_tokens), which no program can write: `hid_Array` and
 // `hid_Map` own the array and map methods, and `hid_show`/`hid_hash` are the
 // built-ins derived code uses to write, hash and compare a part of a value.
+// The error types are M34's; hid_convert is what `?` calls to convert an error.
 pub fn methods() -> Str {
-    return "pub fn Option.is_some[T](value: Option[T]) -> Bool { return match value { Some(_) => true, None => false } }\n" +
+    return "pub type IoKind = enum { NotFound, PermissionDenied, AlreadyExists, Timeout, Closed, Invalid, Other }\n" +
+        "pub type IoError = struct { kind: IoKind, message: Str }\n" +
+        "pub type ParseError = struct { message: Str, offset: Int }\n" +
+        "pub fn IoError.show(e: IoError) -> Str { return e.message }\n" +
+        "pub fn ParseError.show(e: ParseError) -> Str { return e.message }\n" +
+        "fn hid_convert[T, E, F](r: Result[T, E]) -> Result[T, F] { return match r { Ok(x) => Ok(x), Err(e) => Err(hid_into(e)) } }\n" +
+        "pub fn Option.is_some[T](value: Option[T]) -> Bool { return match value { Some(_) => true, None => false } }\n" +
         "pub fn Option.is_none[T](value: Option[T]) -> Bool { return match value { Some(_) => false, None => true } }\n" +
         "pub fn Option.unwrap_or[T](value: Option[T], default: T) -> T { return match value { Some(x) => x, None => default } }\n" +
         "pub fn Option.map[T, U](value: Option[T], f: scoped fn(T) -> U) -> Option[U] uses f {\n" +

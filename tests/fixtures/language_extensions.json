@@ -67,6 +67,22 @@
     "scoped_parameters": {
       "section": "functions-generics-and-interfaces",
       "program": "tests/run/scoped_closures.vl"
+    },
+    "try_conversion": {
+      "section": "statements-and-matching",
+      "program": "tests/run/try_conversion.vl"
+    },
+    "typed_errors": {
+      "section": "statements-and-matching",
+      "program": "tests/cli/error_kinds.vl"
+    },
+    "interface_mut_self": {
+      "section": "functions-generics-and-interfaces",
+      "program": "tests/run/io_copy.vl"
+    },
+    "uses_type_parameter": {
+      "section": "effects-contracts-and-tests",
+      "program": "tests/run/io_copy.vl"
     }
   },
   "contextual_words": [

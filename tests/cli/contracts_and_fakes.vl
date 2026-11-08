@@ -14,7 +14,7 @@ import files
 import os
 import strings
 
-fn load(path: Str) -> Result[Str, Str] uses fs {
+fn load(path: Str) -> Result[Str, IoError] uses fs {
     return files.read(path)
 }
 

@@ -1,0 +1,8 @@
+// err: reader_not_mutable.vl:5:12: error: cannot change parameter 'r'; declare it as `r: mut R` to change the caller's value, or copy it into a `let mut` [E3062]
+import io
+
+fn first[R: io.Reader](r: R) -> Result[Str, IoError] uses R {
+    return r.read(1)
+}
+
+fn main() {}

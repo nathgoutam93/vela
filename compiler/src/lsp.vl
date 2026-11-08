@@ -95,7 +95,7 @@ fn read_message() -> Incoming uses os {
     }
     match json.parse(body) {
         Ok(j) => return Incoming.Message(j)
-        Err(e) => return Incoming.Bad("the message is not JSON: " + e)
+        Err(e) => return Incoming.Bad(f"the message is not JSON: {e}")
     }
 }
 

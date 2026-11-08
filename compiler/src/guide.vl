@@ -70,7 +70,7 @@ fn generate(root: Str, all: Bool) -> Str uses fs, os {
     strings.add(mut out, "\n")
     strings.add(mut out, "`type Point = struct { x: Int, y: Int }` defines a record; construct every field with `Point { x: 1, y: 2 }`. `type Shape = enum { Empty, Circle(Float), Pair(Int, Int) }` defines variants; construct `Shape.Empty` or `Shape.Circle(2.0)`. Payloads are positional. Variants can carry arrays, structs, other enums and recursive values.\n")
     strings.add(mut out, "\n")
-    strings.add(mut out, "`Option[T]` has `Some(T)` and `None`. `Result[T, E]` has `Ok(T)` and `Err(E)`. They are built in; annotate ambiguous constructors (`let r: Result[Int, Str] = Ok(1)`). A postfix `?` unwraps Some/Ok and returns None/Err from the enclosing function, which must return a compatible Option/Result. It does not throw exceptions. Use explicit matches for deliberate conversion between error types.\n")
+    strings.add(mut out, "`Option[T]` has `Some(T)` and `None`. `Result[T, E]` has `Ok(T)` and `Err(E)`. They are built in; annotate ambiguous constructors (`let r: Result[Int, Str] = Ok(1)`). A postfix `?` unwraps Some/Ok and returns None/Err from the enclosing function, which must return a compatible Option/Result. It does not throw exceptions. `?` converts an error into the caller's enum variant holding it (`type AppError = enum { Io(IoError), Parse(ParseError) }`) or into a Str error by show; otherwise use map_err. Fallible std APIs return the prelude's `IoError { kind: IoKind, message: Str }` (kinds NotFound, PermissionDenied, AlreadyExists, Timeout, Closed, Invalid, Other) or `ParseError { message: Str, offset: Int }`; their show is the message, so `print(e)` and `f\"{e}\"` print it. io.Reader/Writer take `mut Self`: `fn copy[R: io.Reader, W: io.Writer](r: mut R, w: mut W, limit: Int) uses R, W` uses only what R and W use.\n")
     strings.add(mut out, "\n")
     strings.add(mut out, "`match value { Some(x) => x, None => 0 }` is an expression; arms must agree in type and cover every case. A statement match may use blocks. `_` matches anything; names bind; variants destructure payloads. Literal and range patterns are supported. `A | B` alternatives bind no names. `Point { x, y: 0 }` names every field, or ends with `..`. `p if cond =>` guards an arm; guarded arms do not count toward covering. Block arms: `=> { let y = f(x); y + 1 }`. Put a fallback last. A bound variable is read-only. A new enum variant requires updating matches. `let Some(v) = o else { return }` binds or leaves; `let Point { x, y } = p` destructures.\n")
     strings.add(mut out, "\n")
@@ -147,7 +147,7 @@ fn generate(root: Str, all: Bool) -> Str uses fs, os {
                 signatures(mut out, public)
             }
             Err(e) => {
-                os.eprint("vela: error: " + e + " [E6001]")
+                os.eprint("vela: error: " + f"{e}" + " [E6001]")
                 os.exit(1)
             }
         }

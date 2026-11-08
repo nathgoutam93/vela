@@ -53,6 +53,7 @@ for day-to-day work.
 | [M31](m31-expressions.md) | Expressions and patterns |
 | [M32](m32-derived-conformances.md) | Derived conformances |
 | [M33](m33-mutable-receivers.md) | Mutable receivers |
+| [M34](m34-typed-errors.md) | Typed errors |
 | [Next performance round](performance-next-round.md) | implementation, review and results |
 | [tooling-followup-before-m30](tooling-followup-before-m30.md) | Tooling follow-up before M30 |
 | [Networking runtime performance](network-runtime-performance.md) | Socket allocation, writes and operation lifetimes |

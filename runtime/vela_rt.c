@@ -107,6 +107,34 @@ typedef struct vela_visit {
     void *p;
     vela_visit_fn f;
 } vela_visit;
+// The IoKind of the last failure a built-in reported (M34), in IoKind's
+// order: the back ends read it with the message, for the IoError they build.
+enum { KIND_NOT_FOUND, KIND_PERMISSION_DENIED, KIND_ALREADY_EXISTS, KIND_TIMEOUT, KIND_CLOSED, KIND_INVALID, KIND_OTHER };
+static _Thread_local int64_t vela_error_kind = KIND_OTHER;
+static void set_kind(int64_t kind) { vela_error_kind = kind; }
+static void set_errno_kind(int code) {
+    switch (code) {
+        case ENOENT: set_kind(KIND_NOT_FOUND); break;
+        case EACCES: case EPERM: case EROFS: set_kind(KIND_PERMISSION_DENIED); break;
+        case EEXIST: set_kind(KIND_ALREADY_EXISTS); break;
+#ifdef ETIMEDOUT
+        case ETIMEDOUT: set_kind(KIND_TIMEOUT); break;
+#endif
+        case EPIPE: case EBADF:
+#ifdef ECONNRESET
+        case ECONNRESET:
+#endif
+            set_kind(KIND_CLOSED); break;
+        case EINVAL: case ENOTDIR: case EISDIR: case ENAMETOOLONG: set_kind(KIND_INVALID); break;
+        default: set_kind(KIND_OTHER); break;
+    }
+}
+int64_t vela_take_error_kind(void) {
+    int64_t kind = vela_error_kind;
+    vela_error_kind = KIND_OTHER;
+    return kind;
+}
+
 static _Thread_local vela_visit *visits;
 static _Thread_local int64_t visit_cap;
 
@@ -1419,6 +1447,7 @@ bool vela_files_read(vela_str path, vela_str *out) {
         }
         unlock_fakes();
         if (!found) {
+            set_errno_kind(ENOENT);
             *out = file_error("cannot read", path, strerror(ENOENT));
             return false;
         }
@@ -1427,12 +1456,14 @@ bool vela_files_read(vela_str path, vela_str *out) {
     if (!vela_cap_check("fs", path, out)) return false;
     char *p = c_path(path);
     if (!p) {
+        set_kind(KIND_INVALID);
         *out = file_error("cannot read", path, "the path contains a zero byte");
         return false;
     }
     FILE *f = fopen(p, "rb");
     free(p);
     if (!f) {
+        set_errno_kind(errno);
         *out = file_error("cannot read", path, strerror(errno));
         return false;
     }
@@ -1454,6 +1485,7 @@ bool vela_files_read(vela_str path, vela_str *out) {
     fclose(f);
     if (failed) {
         free(obj);
+        set_errno_kind(failed);
         *out = file_error("cannot read", path, strerror(failed));
         return false;
     }
@@ -1479,12 +1511,14 @@ bool vela_files_write(vela_str path, vela_str data, vela_str *err) {
     if (!vela_cap_check("fs", path, err)) return false;
     char *p = c_path(path);
     if (!p) {
+        set_kind(KIND_INVALID);
         *err = file_error("cannot write", path, "the path contains a zero byte");
         return false;
     }
     FILE *f = fopen(p, "wb");
     free(p);
     if (!f) {
+        set_errno_kind(errno);
         *err = file_error("cannot write", path, strerror(errno));
         return false;
     }
@@ -1493,6 +1527,7 @@ bool vela_files_write(vela_str path, vela_str data, vela_str *err) {
     // fclose writes what is still buffered, so it can fail too (a full disk).
     if (fclose(f) != 0 && !failed) failed = errno;
     if (failed) {
+        set_errno_kind(failed);
         *err = file_error("cannot write", path, strerror(failed));
         return false;
     }
@@ -1544,18 +1579,21 @@ bool vela_files_remove(vela_str path, vela_str *err) {
         unlock_fakes();
         vela_str_release(dir);
         if (removed) return true;
+        set_errno_kind(ENOENT);
         *err = file_error("cannot remove", path, strerror(ENOENT));
         return false;
     }
     if (!vela_cap_check("fs", path, err)) return false;
     char *p = c_path(path);
     if (!p) {
+        set_kind(KIND_INVALID);
         *err = file_error("cannot remove", path, "the path contains a zero byte");
         return false;
     }
     int failed = remove(p) != 0 ? errno : 0;
     free(p);
     if (failed) {
+        set_errno_kind(failed);
         *err = file_error("cannot remove", path, strerror(failed));
         return false;
     }
@@ -1600,6 +1638,7 @@ bool vela_files_temp_dir(vela_str *out) {
     if (!mkdtemp(dir)) {
         int e = errno;
         snprintf(dir, n, "%s", base);
+        set_errno_kind(e);
         *out = file_error("cannot make a directory in", (vela_str){NULL, (const uint8_t *)dir, (int64_t)strlen(dir)},
                           strerror(e));
         free(dir);

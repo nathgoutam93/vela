@@ -1,31 +1,86 @@
-// Value-state interfaces: each operation returns the reader/writer's next state.
+// Readers and writers (M34): methods change the reader or writer they are
+// called on, and code generic over them uses only what each implementation
+// uses (`uses R`): copying between memory buffers uses nothing.
 import net
 import strings
-pub type Read[T] = struct { data: Str, next: T }
-pub type Reader = interface { fn read(value: Self, max: Int) -> Result[Read[Self], Str] uses fs, os, net }
-pub type Writer = interface { fn write(value: Self, data: Str) -> Result[Self, Str] uses fs, os, net }
+pub type Reader = interface { fn read(r: mut Self, max: Int) -> Result[Str, IoError] }
+pub type Writer = interface { fn write(w: mut Self, data: Str) -> Result[Unit, IoError] }
 pub type MemoryReader = struct { data: Str, position: Int }
 pub type MemoryWriter = struct { data: strings.Builder }
 pub type Socket = struct { connection: net.Tcp }
-pub type Copied[R, W] = struct { reader: R, writer: W, size: Int }
+
+fn bad(message: Str) -> IoError { return IoError { kind: IoKind.Invalid, message: message } }
+
 pub fn reader(data: Str) -> MemoryReader { return MemoryReader { data: data, position: 0 } }
 pub fn writer() -> MemoryWriter { return MemoryWriter { data: strings.builder() } }
-pub fn MemoryReader.read(value: MemoryReader, max: Int) -> Result[Read[MemoryReader], Str] {
-    if max <= 0 { return Err("read size must be positive") }
-    if value.position < 0 || value.position > len(value.data) { return Err("invalid reader position") }
-    let mut n = len(value.data) - value.position; if n > max { n = max }
-    return Ok(Read { data: value.data[value.position..value.position + n], next: MemoryReader { data: value.data, position: value.position + n } })
+pub fn socket(connection: net.Tcp) -> Socket { return Socket { connection: connection } }
+
+// Up to `max` bytes, or "" at the end.
+pub fn MemoryReader.read(r: mut MemoryReader, max: Int) -> Result[Str, IoError] {
+    if max <= 0 { return Err(bad("read size must be positive")) }
+    if r.position < 0 || r.position > len(r.data) { return Err(bad("invalid reader position")) }
+    let mut n = len(r.data) - r.position
+    if n > max { n = max }
+    let part = r.data[r.position..r.position + n]
+    r.position += n
+    return Ok(part)
 }
-pub fn MemoryWriter.write(value: MemoryWriter, data: Str) -> Result[MemoryWriter, Str] { let mut b = value.data; strings.add(mut b, data); return Ok(MemoryWriter { data: b }) }
-pub fn MemoryWriter.text(value: MemoryWriter) -> Str { return strings.build(value.data) }
-pub fn Socket.read(value: Socket, max: Int) -> Result[Read[Socket], Str] uses net { return Ok(Read { data: value.connection.read(max)?, next: value }) }
-pub fn Socket.write(value: Socket, data: Str) -> Result[Socket, Str] uses net { value.connection.write(data)?; return Ok(value) }
-// A finite total limit bounds copy even for an untrusted or infinite source.
-pub fn copy[R: Reader, W: Writer](reader: R, writer: W, limit: Int) -> Result[Copied[R, W], Str] uses fs, os, net {
-    if limit < 0 { return Err("negative copy limit") }; let mut r = reader; let mut w = writer; let mut size = 0
-    for { let mut ask = 8192; if limit - size < 8192 { ask = limit - size + 1 }; let step = r.read(ask)?; r = step.next
-        if len(step.data) == 0 { return Ok(Copied { reader: r, writer: w, size: size }) }
-        if len(step.data) > ask || len(step.data) > limit - size { return Err("copy limit exceeded") }
-        w = w.write(step.data)?; size = size + len(step.data)
+
+pub fn MemoryWriter.write(w: mut MemoryWriter, data: Str) -> Result[Unit, IoError] {
+    strings.add(mut w.data, data)
+    return Ok(())
+}
+
+pub fn MemoryWriter.text(w: MemoryWriter) -> Str { return strings.build(w.data) }
+
+pub fn Socket.read(s: mut Socket, max: Int) -> Result[Str, IoError] uses net { return s.connection.read(max) }
+
+pub fn Socket.write(s: mut Socket, data: Str) -> Result[Unit, IoError] uses net {
+    let _ = s.connection.write(data)?
+    return Ok(())
+}
+
+// Everything `reader` gives, into `writer`, at most `limit` bytes: a finite
+// limit bounds copy even for an untrusted or infinite source. The size copied.
+pub fn copy[R: Reader, W: Writer](reader: mut R, writer: mut W, limit: Int) -> Result[Int, IoError] uses R, W {
+    if limit < 0 { return Err(bad("negative copy limit")) }
+    let mut size = 0
+    for {
+        let mut ask = 8192
+        if limit - size < 8192 { ask = limit - size + 1 }
+        let data = reader.read(ask)?
+        if len(data) == 0 { return Ok(size) }
+        if len(data) > ask || len(data) > limit - size { return Err(bad("copy limit exceeded")) }
+        writer.write(data)?
+        size += len(data)
+    }
+    return Ok(size)
+}
+
+test "copy between memory buffers uses nothing" {
+    let mut r = reader("hello, world")
+    let mut w = writer()
+    assert(copy(mut r, mut w, 100) == Ok(12))
+    assert(w.text() == "hello, world")
+    assert(r.read(4) == Ok(""))
+}
+
+test "copy stops at its limit" {
+    let mut r = reader("0123456789")
+    let mut w = writer()
+    match copy(mut r, mut w, 4) {
+        Err(e) => assert(e.kind == IoKind.Invalid)
+        Ok(_) => assert(false)
+    }
+}
+
+test "a memory reader reads in parts" {
+    let mut r = reader("abcdef")
+    assert(r.read(4) == Ok("abcd"))
+    assert(r.read(4) == Ok("ef"))
+    assert(r.read(4) == Ok(""))
+    match r.read(0) {
+        Err(e) => assert(e.message == "read size must be positive")
+        Ok(_) => assert(false)
     }
 }

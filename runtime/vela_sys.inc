@@ -21,12 +21,35 @@ extern char **environ;
 typedef int sys_fd;
 #define sys_close close
 #endif
+// The IoKind of the runtime's own failures (M34), by their message.
+static int64_t sys_kind(const char *s) {
+    static const char *const timeouts[] = {"I/O timeout", "process timeout"};
+    static const char *const closed[] = {"socket is closed", "closed descriptor"};
+    static const char *const invalid[] = {"invalid path", "invalid port", "empty host", "host contains a zero byte",
+        "argument contains a zero byte", "invalid UDP host", "not a directory", "parent is not a directory", "negative sleep",
+        "timeout must be between 0 and 86400000 milliseconds", "size must be between 1 and 67108864 bytes",
+        "UDP payload exceeds 65507 bytes", "datagram exceeds receive limit", "process needs a program", "wrong socket kind"};
+    for (size_t i = 0; i < sizeof timeouts / sizeof *timeouts; i++) if (!strcmp(s, timeouts[i])) return KIND_TIMEOUT;
+    for (size_t i = 0; i < sizeof closed / sizeof *closed; i++) if (!strcmp(s, closed[i])) return KIND_CLOSED;
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; i++) if (!strcmp(s, invalid[i])) return KIND_INVALID;
+    if (!strcmp(s, "path exists")) return KIND_ALREADY_EXISTS;
+    return KIND_OTHER;
+}
+// The IoKind a fake failure row names, as one digit (M34); Other otherwise.
+static int64_t sys_failure_kind(vela_str w) {
+    if (w.len == 1 && w.data[0] >= '0' && w.data[0] <= '6') return w.data[0] - '0';
+    return KIND_OTHER;
+}
 static bool sys_error(vela_str *e, const char *s) {
     *e = str_from(s, strlen(s));
+    set_kind(sys_kind(s));
     return false;
 }
 static bool sys_errno(vela_str *e) {
-    return sys_error(e, strerror(errno));
+    int code = errno;
+    sys_error(e, strerror(code));
+    set_errno_kind(code);
+    return false;
 }
 #if !defined(__wasi__)
 static int64_t sys_now(void) {
@@ -374,8 +397,10 @@ static bool sys_open(vela_str host,int64_t port,int64_t timeout,int kind,vela_io
         if (kind==1) {
             row=sys_claim(sys_net,"error",host,port);
             if (row>=0) {
-                *e=sys_word(sys_row(sys_net,row),3);
+                vela_array *fail=sys_row(sys_net,row);
+                *e=sys_word(fail,3);
                 vela_str_retain(*e);
+                set_kind(fail->len>4?sys_failure_kind(sys_word(fail,4)):KIND_OTHER);
                 unlock_fakes();
                 return false;
             }
@@ -853,6 +878,7 @@ static bool sys_process_fake(vela_array *args,vela_str input,int64_t limit,vela_
         if (sys_is(sys_word(r,0),"error")) {
             *e=sys_word(r,3);
             vela_str_retain(*e);
+            set_kind(sys_failure_kind(sys_word(r,2)));
             unlock_fakes();
             return false;
         }

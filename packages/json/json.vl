@@ -326,6 +326,7 @@ type Reader = struct {
     text: Str
     pos: Int
     error: Str  // the first error, "line L, col C: ...", or ""
+    error_at: Int  // its byte offset (M34: ParseError.offset)
 }
 
 // Arrays and objects nested deeper than this are an error rather than a
@@ -336,8 +337,8 @@ fn max_depth() -> Int {
 
 // The one JSON value in `text`, which may have spaces around it but
 // nothing else.
-pub fn parse(text: Str) -> Result[Json, Str] {
-    let mut r = Reader { text: text, pos: 0, error: "" }
+pub fn parse(text: Str) -> Result[Json, ParseError] {
+    let mut r = Reader { text: text, pos: 0, error: "", error_at: 0 }
     skip_space(mut r)
     let v = value(mut r, 0)
     if r.error == "" {
@@ -347,7 +348,7 @@ pub fn parse(text: Str) -> Result[Json, Str] {
         }
     }
     if r.error != "" {
-        return Err(r.error)
+        return Err(ParseError { message: r.error, offset: r.error_at })
     }
     return Ok(v)
 }
@@ -357,6 +358,7 @@ fn fail(r: mut Reader, message: Str) {
     if r.error != "" {
         return
     }
+    r.error_at = r.pos
     let mut line = 1
     let mut col = 1
     for i in 0..r.pos {
@@ -686,7 +688,7 @@ fn parsed(text: Str) -> Json {
 fn error_of(text: Str) -> Str {
     match parse(text) {
         Ok(_) => return "no error"
-        Err(e) => return e
+        Err(e) => return e.message
     }
 }
 

@@ -135,7 +135,7 @@ fn expr(g: mut Graph, e: ast.Expr) {
         ast.ExprKind.Unary(_, e) => expr(mut g, e), ast.ExprKind.Binary(_, a, b) => { expr(mut g, a); expr(mut g, b) },
         ast.ExprKind.Call(f, args) => { expr(mut g, f); for a in args { expr(mut g, a) } }, ast.ExprKind.Field(e, _) => expr(mut g, e),
         ast.ExprKind.Index(a, b) => { expr(mut g, a); expr(mut g, b) }, ast.ExprKind.Slice(a, b, c) => { expr(mut g, a); expr(mut g, b); expr(mut g, c) },
-        ast.ExprKind.Try(e) => expr(mut g, e), ast.ExprKind.MutArg(e) => expr(mut g, e), ast.ExprKind.ArrayLit(es) => { for e in es { expr(mut g, e) } },
+        ast.ExprKind.Try(x) => expr(mut g, checker.try_source(g.k, e, x)), ast.ExprKind.MutArg(e) => expr(mut g, e), ast.ExprKind.ArrayLit(es) => { for e in es { expr(mut g, e) } },
         ast.ExprKind.Interpolate(parts) => {
             for hole in ast.interpolation_holes(parts) { expr(mut g, hole) }
         }
