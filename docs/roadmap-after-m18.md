@@ -403,7 +403,7 @@ where it cannot escape; value-copy behavior is unchanged in the corpus.
 
 ## M34: Typed errors
 
-**Status:** planned.
+**Status:** implemented; see [the walkthrough](history/m34-typed-errors.md). `?` converts by wrapping into a variant or showing into a Str, system errors are the prelude's `IoError { kind, message }`, and parsers return `ParseError` (decided 2026-11-08).
 
 **Needs:** M32 (Show for errors) and M33 (`mut Self` for readers and writers).
 

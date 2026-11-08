@@ -151,7 +151,7 @@ pub fn command(args: [Str], std_dir: Str) uses fs, os {
                     json.member("file", json.string(path)), json.member("symbols", symbols_json(program)),
                 ])))
             }
-            Err(e) => fail(e)
+            Err(e) => fail(f"{e}")
         }
         return
     }
@@ -208,7 +208,7 @@ pub fn fail(message: Str) uses os {
 pub fn load(path: Str, std_dir: Str) -> Analysis uses fs, os {
     match files.read(path) {
         Ok(_) => {}
-        Err(e) => fail(e)
+        Err(e) => fail(f"{e}")
     }
     return program_of(path, std_dir, [:])
 }

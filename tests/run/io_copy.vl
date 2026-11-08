@@ -1,0 +1,35 @@
+// Readers and writers (M34): interface methods take `mut Self`, and a
+// function written `uses R` uses what R's implementations use, so these
+// generic copies use nothing.
+// out: abc
+// out: 210
+// out: 0
+import io
+
+// A Reader of its own: implementations take `mut Self`, as io.Reader does.
+type Countdown = struct { left: Int }
+
+fn Countdown.read(c: mut Countdown, max: Int) -> Result[Str, IoError] {
+    if c.left == 0 { return Ok("") }
+    c.left -= 1
+    return Ok(f"{c.left}")
+}
+
+fn copy_all[R: io.Reader](r: mut R) -> Str uses R {
+    let mut w = io.writer()
+    let _ = io.copy(mut r, mut w, 100)
+    return w.text()
+}
+
+// No effects: copying between memory readers and writers uses nothing.
+fn pure_copy(text: Str) -> Str {
+    let mut r = io.reader(text)
+    return copy_all(mut r)
+}
+
+fn main() {
+    print(pure_copy("abc"))
+    let mut c = Countdown { left: 3 }
+    print(copy_all(mut c))
+    print(c.left)
+}

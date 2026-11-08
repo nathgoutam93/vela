@@ -4,7 +4,7 @@ import files
 import tasks
 import views
 
-fn get[T](result: Result[T, Str]) -> T {
+fn get[T, E](result: Result[T, E]) -> T {
     match result { Ok(value) => return value, Err(_) => { assert(false); for {} } }
 }
 fn apply[T](f: fn() -> T) -> T uses f { return f() }

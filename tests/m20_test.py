@@ -108,7 +108,7 @@ def rejected(c, work, env):
         ('type X = struct { n: Int }\nfn Wrong.f(x: X) {}', 'E3196'),
         ('type X = struct { n: Int }\nfn X.f() {}', 'E3196'),
         ('type I = interface { fn f(x: Int) -> Int }', 'E3191'),
-        ('type I = interface { fn f(x: mut Self) -> Int }', 'E3191'),
+        ('type I = interface { fn f(x: Self, y: mut Int) -> Int }', 'E3191'),
         ('type I = interface { fn f[T](x: Self) -> Int }', 'E3191'),
         ('type I = interface { fn f(x: Self) -> Int }\ntype X = struct { n: Int }\nfn X.f(x: X) -> Int uses fs { return 1 }\nfn use[T: I](x: T) {}\nfn main() { use(X { n: 1 }) }', 'E3031'),
         ('type X = struct { f: fn() -> Int }\nfn X.hash(x: X) -> u64 { return 0u64 }\nfn main() { let m: Map[X, Int] = [:] }', 'E3026'),

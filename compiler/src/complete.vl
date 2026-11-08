@@ -542,7 +542,7 @@ pub fn command(at: Str, std_dir: Str) uses fs, os {
     let mut text = ""
     match files.read(path) {
         Ok(t) => text = t
-        Err(e) => query.fail(e)
+        Err(e) => query.fail(f"{e}")
     }
     let c = complete(path, text, line, col, std_dir, [:], [])
     let mut out: [json.Json] = []

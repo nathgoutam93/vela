@@ -1,0 +1,33 @@
+// Every IoKind is reachable through an effect fake (M34): files, net and
+// process fakes, the latter two given an IoError to fail with.
+// command: test
+// out: PASS  error_kinds.vl: test "every IoKind through an effect fake"
+// out: 1 test: 1 passed, 0 failed
+import files
+import net
+import paths
+import processes
+
+fn main() {}
+
+fn kind_of[T](r: Result[T, IoError]) -> IoKind {
+    return match r { Ok(_) => IoKind.Other, Err(e) => e.kind }
+}
+
+test "every IoKind through an effect fake" {
+    with files = ["a.txt": "x"] {
+        assert(kind_of(files.read("missing.txt")) == IoKind.NotFound)
+    }
+    with net = [net.failure("h", 1, IoError { kind: IoKind.PermissionDenied, message: "denied" }),
+        net.failure("h", 2, IoError { kind: IoKind.Timeout, message: "slow" }),
+        net.failure("h", 3, IoError { kind: IoKind.Closed, message: "reset" })] {
+        assert(kind_of(net.connect("h", 1)) == IoKind.PermissionDenied)
+        assert(kind_of(net.connect("h", 2)) == IoKind.Timeout)
+        assert(kind_of(net.connect("h", 3)) == IoKind.Closed)
+        assert(kind_of(net.connect("h", 4)) == IoKind.Other)
+        assert(kind_of(net.connect("", 5)) == IoKind.Invalid)
+    }
+    with processes = [processes.failure(["tool"], "", IoError { kind: IoKind.AlreadyExists, message: "exists" })] {
+        assert(kind_of(processes.run(["tool"], "")) == IoKind.AlreadyExists)
+    }
+}

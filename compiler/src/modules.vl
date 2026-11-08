@@ -360,7 +360,7 @@ fn moved_to_package(name: Str) -> Str {
 fn read(ld: Loader, path: Str) -> Result[Str, Str] uses fs {
     match maps.get(ld.open, normpath(path)) {
         Some(text) => return Ok(text)
-        None => return files.read(path)
+        None => return Ok(files.read(path)?)
     }
 }
 

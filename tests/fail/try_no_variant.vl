@@ -1,0 +1,10 @@
+// err: try_no_variant.vl:7:22: error: '?' would return this Result[Str, IoError]'s error, which is IoError, but 'load' returns Result[Str, AppError]; add a variant holding it, as in `AppError = enum { ..., Wrapped(IoError) }`, or convert it with map_err [E3112]
+type AppError = enum { Bad(Str) }
+
+fn read(p: Str) -> Result[Str, IoError] { return Err(IoError { kind: IoKind.NotFound, message: p }) }
+
+fn load(p: Str) -> Result[Str, AppError] {
+    return Ok(read(p)?)
+}
+
+fn main() {}

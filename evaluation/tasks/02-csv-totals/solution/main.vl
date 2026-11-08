@@ -18,7 +18,7 @@ fn main() {
     let mut content = ""
     match files.read(args[1]) {
         Ok(t) => content = t
-        Err(e) => fail("cannot read " + args[1] + ": " + e)
+        Err(e) => fail(f"cannot read {args[1]}: {e}")
     }
     let lines = text.lines(content)
     let mut totals: Map[Str, Int] = [:]

@@ -4464,6 +4464,28 @@ No additional CI workflow run was requested or launched for reconciliation.
   changed `i`) agree on both back ends with optimization on and off. When
   adding another way to change a local, add it to `mutations`.
 
+### TL-136: Changing a std API the compiler imports needs two seed updates
+
+- **Status:** open; documented workaround.
+- **Discovery:** M34, typing `std/processes.vl`, `std/time.vl` and the json
+  package's errors (2026-11-08, branch `m34-errors`).
+- **Evidence (observed):** the bootstrap's generation 1 is the previous seed,
+  which compiles `compiler/src/` together with every std module and package
+  it imports. Writing `Result[Output, IoError]` in `std/processes.vl` failed
+  generation 1 with E3027 (unknown type IoError), so the change had to wait
+  until the seed knew IoError. M33 had the same need for `std/lists.vl`'s
+  `scoped` parameters.
+- **Impact:** a milestone that changes such an API needs two bootstrap
+  updates, and the compiler's own uses must compile against both versions
+  in between (here, interpolating errors instead of using them as Str).
+- **Workaround:** make the compiler's uses version-agnostic, regenerate the
+  seed, then change the std API and regenerate again; record both runs.
+- **Proposed improvement:** keep the compiler off std modules whose APIs are
+  still moving before 1.0 (or vendor them under `compiler/src/`), or let the
+  bootstrap use the previous std tree for generation 1.
+- **Verify:** a std API change the compiler uses goes through one
+  `bootstrap.sh --update`.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;

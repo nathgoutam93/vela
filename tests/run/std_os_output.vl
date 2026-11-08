@@ -8,10 +8,10 @@
 import os
 import strings
 
-fn show(r: Result[Str, Str]) -> Str {
+fn show(r: Result[Str, IoError]) -> Str {
     match r {
         Ok(text) => return text
-        Err(e) => return e
+        Err(e) => return e.message
     }
 }
 

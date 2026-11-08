@@ -16,8 +16,8 @@ import threading
 import time
 ROOT=Path(__file__).resolve().parent.parent
 HELPER='''
-fn get[T](r:Result[T,Str])->T{match r{Ok(v)=>return v,Err(e)=>{print(e);assert(false);for{}}}}
-fn bad[T](r:Result[T,Str]){match r{Ok(_)=>assert(false),Err(_)=>{}}}
+fn get[T,E:Show](r:Result[T,E])->T{match r{Ok(v)=>return v,Err(e)=>{print(e);assert(false);for{}}}}
+fn bad[T,E](r:Result[T,E]){match r{Ok(_)=>assert(false),Err(_)=>{}}}
 '''
 def quote(s):
     return json.dumps(s,ensure_ascii=False).replace('\\u0000','\\0')
@@ -69,7 +69,7 @@ test "clock nesting and effects"{
 }
 test "socket ownership, snapshots, task and fake lifetimes"{
     let mut escaped:Option[net.Tcp]=None
-    with net=[net.reply("host",80,"abcd","response"),net.failure("bad",80,"refused")]{
+    with net=[net.reply("host",80,"abcd","response"),net.failure("bad",80,IoError{kind:IoKind.Other,message:"refused"})]{
         let s=get(net.connect("host",80));let mut copies=[s];let saved=copies;copies[0]=s
         assert(get(s.write("ab"))==2);assert(get(s.write("cd"))==2)
         let chunks=tasks.map([1,2],fn(n)=>get(s.read(4)));assert(len(chunks[0])==4 && len(chunks[1])==4)
@@ -90,7 +90,7 @@ test "UDP datagrams"{
     }
 }
 test "process pipes and legacy APIs share a fake"{
-    with processes=[processes.reply(["cmd","a b"],"in",3,"out","err"),processes.reply(["ok"],"",0,"yes",""),processes.reply(["status"],"",7,"",""),processes.failure(["missing"],"","missing")]{
+    with processes=[processes.reply(["cmd","a b"],"in",3,"out","err"),processes.reply(["ok"],"",0,"yes",""),processes.reply(["status"],"",7,"",""),processes.failure(["missing"],"",IoError{kind:IoKind.NotFound,message:"missing"})]{
         let p=get(processes.run(["cmd","a b"],"in"));assert(p.status==3 && p.stdout=="out" && p.stderr=="err")
         assert(get(os.output(["ok"]))=="yes");assert(get(os.run(["status"]))==7);bad(processes.run(["missing"],""));bad(processes.run(["cmd","a","b"],"in"))
     }
@@ -110,8 +110,8 @@ test "files fake covers directories and pure IO snapshots"{
         bad(paths.mkdir("missing/child"));bad(paths.list("dir/a"));bad(paths.walk("missing"));bad(paths.kind("x\\0bad"))
     }
     with files=["/dir/a":"a"] {let mut b=strings.builder();strings.add(mut b,"/");let root=strings.build(b);assert(get(paths.list(root))[0]=="dir");assert(get(paths.list(root))[0]=="dir" && root=="/")}
-    let reader=io.reader("abc");let writer=io.writer();let copied=get(io.copy(reader,writer,3));assert(copied.writer.text()=="abc" && writer.text()=="" && reader.position==0 && copied.size==3)
-    bad(io.copy(reader,writer,2));bad(reader.read(0));assert(get(io.copy(io.reader(""),writer,0)).size==0)
+    let mut reader=io.reader("abc");let mut writer=io.writer();let original=reader;assert(get(io.copy(mut reader,mut writer,3))==3);assert(writer.text()=="abc" && reader.position==3 && original.position==0)
+    let mut again=io.reader("abc");let mut other=io.writer();bad(io.copy(mut again,mut other,2));bad(again.read(0));let mut empty=io.reader("");assert(get(io.copy(mut empty,mut other,0))==0)
 }
 '''
     test(c,w,env,source)
@@ -127,7 +127,7 @@ import os
 fn main(){let args=os.args();if len(args)>1{
 let s=get(net.connect("127.0.0.1",1));let copy=tasks_copy(s);get(s.write("x"));get(copy.close());bad(s.read(1))
 print(get(processes.run(["true"],"")).status);print(get(time.wall_ns()));print(len(get(paths.list("."))))
-let copied=get(io.copy(io.reader("abc"),io.writer(),3));print(copied.writer.text())
+let mut r=io.reader("abc");let mut w=io.writer();let _=get(io.copy(mut r,mut w,3));print(w.text())
 }}
 fn tasks_copy(s:net.Tcp)->net.Tcp{return s}
 ''');cross(c,w,env,p)
@@ -426,7 +426,7 @@ def cache(c,w,env):
     changed=run();assert len(changed)==2 and set(first)<set(changed);assert run()==changed
 
 def tooling(c,w,env):
-    p=w/'tools.vl';p.write_text('import net\nimport clock\nimport sysio\nfn close(h:sysio.Handle) uses net{sysio.net_close(h)}\nfn now()->Result[Int,Str] uses clock{return clock.wall_ns()}\nfn main(){}\n')
+    p=w/'tools.vl';p.write_text('import net\nimport clock\nimport sysio\nfn close(h:sysio.Handle) uses net{sysio.net_close(h)}\nfn now()->Result[Int,IoError] uses clock{return clock.wall_ns()}\nfn main(){}\n')
     command(c,env,'check',p)
     def loc(needle,offset=0):
         at=p.read_text().index(needle)+offset;before=p.read_text()[:at];return f'{p}:{before.count(chr(10))+1}:{len(before.rsplit(chr(10),1)[-1])+1}'
@@ -434,7 +434,7 @@ def tooling(c,w,env):
     items=json.loads(command(c,env,'query','complete',loc('sysio.Handle',6)).stdout)['items'];assert {'Handle','tcp_connect','net_read','process'}<={i['name'] for i in items},items
     info=json.loads(command(c,env,'query','type',loc('clock.wall_ns',6)).stdout);assert 'uses clock' in str(info),info
     items=json.loads(command(c,env,'query','complete',loc('clock.wall_ns',6)).stdout)['items'];assert {'wall_ns','monotonic_ns','sleep_ns'}<={i['name'] for i in items},items
-    p.write_text('import clock\nfn now()->Result[Int,Str]{return clock.wall_ns()}\nfn main(){}')
+    p.write_text('import clock\nfn now()->Result[Int,IoError]{return clock.wall_ns()}\nfn main(){}')
     command(c,env,'fix',p);assert 'uses clock' in p.read_text();command(c,env,'check',p)
     guide=command(c,env,'guide').stdout;assert len(guide.encode())<=32000,len(guide.encode())
     # Module signatures are in `vela guide --all` (M31).

@@ -1,0 +1,13 @@
+// err: interface_mut_self.vl:12:16: error: 'io.copy' needs R: io.Reader, but here R is Fixed; io.Reader.read: expected fn(Fixed, Int) -> Result[Str, IoError]; found fn(Fixed, Int) -> Result[Str, IoError]; the interface takes `mut Self`, so the method must take a mut receiver [E3031]
+import io
+
+type Fixed = struct { text: Str }
+
+// io.Reader's read takes `mut Self`, so an immutable receiver does not implement it.
+fn Fixed.read(f: Fixed, max: Int) -> Result[Str, IoError] { return Ok(f.text) }
+
+fn main() {
+    let mut r = Fixed { text: "x" }
+    let mut w = io.writer()
+    let _ = io.copy(mut r, mut w, 10)
+}

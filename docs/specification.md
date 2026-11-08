@@ -336,8 +336,11 @@ bodies must type-check against their declared bounds, not incidental facts
 about one call site. Implementations use static specialization; there is no
 runtime generic reflection or dynamic interface dispatch.
 
-An interface declares methods whose first argument is Self. Interface methods
-have no bodies, mutable parameters, method type parameters or contracts.
+An interface declares methods whose first argument is Self, which may be
+`mut Self`. Interface methods have no bodies, other mutable parameters,
+method type parameters or contracts. An implementation of a `mut Self`
+method takes a mut receiver, and one of an immutable receiver does not;
+`r.read(n)` on a `T: Reader` then checks `r` as a mutable place.
 Parents are listed with `interface: Parent + Other`; all parent obligations
 must hold. Interfaces are bounds, not runtime value types. An implementation
 must have the required parameter/result types and no additional effects;
@@ -481,15 +484,41 @@ value. `let mut` with a pattern is rejected (E2032).
 
 `Option[T]` has Some(T)/None; `Result[T, E]` has Ok(T)/Err(E). Postfix `?`
 extracts a Some/Ok payload, or immediately returns None/Err from the enclosing
-function. The enclosing result family/error type must be compatible. There
-are no implicit error conversions or exceptions. Match explicitly, or use
-`map_err`, to convert errors; compare Results with `==` when their payloads
-implement Eq. Panic is separate from Result.
+function. The enclosing result family must match. On a Result whose error
+type E1 differs from the function's E2, `?` converts the error: into the one
+variant of enum E2 whose only payload is E1, as `AppError.Io(e)`, or, when E2
+is Str and E1 implements Show, into `e.show()`; otherwise it is E3112 (also
+when E2 has several variants holding E1). There are no other implicit error
+conversions or exceptions. Match explicitly, or use `map_err`, to convert
+errors; compare Results with `==` when their payloads implement Eq. Panic is
+separate from Result.
+
+The prelude's error types, used by every fallible standard API:
+
+```text
+pub type IoKind = enum { NotFound, PermissionDenied, AlreadyExists, Timeout, Closed, Invalid, Other }
+pub type IoError = struct { kind: IoKind, message: Str }
+pub type ParseError = struct { message: Str, offset: Int }
+```
+
+files, os, paths, processes, net, http and time fail with IoError; parsers
+(unicode, and the json, toml and regex packages) with ParseError, whose
+`offset` is the byte where parsing failed. Each type's `show` is its
+message. The kind comes from the failed operation (ENOENT is NotFound,
+EACCES or a denied capability PermissionDenied, EEXIST AlreadyExists, a
+deadline Timeout, a reset or closed socket Closed, an argument the call
+rejects Invalid), and is Other when nothing more is known. A module's own
+type of one of these names hides the prelude's there.
 
 ## Effects, contracts and tests
 
-Effects are `fs`, `os`, `net`, `clock`, `unsafe`, or a named function parameter
-in a `uses f` declaration. Effects propagate through direct/indirect calls,
+Effects are `fs`, `os`, `net`, `clock`, `unsafe`, a named function parameter
+in a `uses f` declaration, or a type parameter in `uses R`: then the function
+uses, at each call, whatever the type given for R uses in its
+implementations of R's interface methods, so
+`fn copy[R: io.Reader, W: io.Writer](r: mut R, w: mut W, limit: Int) uses R, W`
+uses nothing for memory readers and writers and net for sockets. For such a
+parameter, an implementation's effects need not fit the interface's. Effects propagate through direct/indirect calls,
 methods and contracts. A caller must permit the callee's effects. Main/tests
 permit ordinary environmental effects; unsafe requires an explicit declaration
 or block. Printing and os.write are intentionally effect-free. An empty uses

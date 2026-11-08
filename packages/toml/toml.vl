@@ -224,6 +224,7 @@ type Reader = struct {
     text: Str
     pos: Int
     error: Str
+    error_at: Int  // its byte offset (M34: ParseError.offset)
     nodes: [Node]
     values: [Value]  // scalars, apart from the nodes, which are many and small
     children: Map[Str, Int]  // "table:key": the node of the key's value, for tables of many keys
@@ -233,8 +234,8 @@ type Reader = struct {
 
 // The document's root table, or the first error, as "line 3, column 5:
 // ...".
-pub fn parse(text: Str) -> Result[Value, Str] {
-    let mut r = Reader { text: text, pos: 0, error: "", nodes: [], values: [], children: [:], no_keys: [], no_items: [] }
+pub fn parse(text: Str) -> Result[Value, ParseError] {
+    let mut r = Reader { text: text, pos: 0, error: "", error_at: 0, nodes: [], values: [], children: [:], no_keys: [], no_items: [] }
     check_utf8(mut r)
     let root = node(mut r, TABLE())
     r.nodes[root].explicit = true
@@ -255,7 +256,7 @@ pub fn parse(text: Str) -> Result[Value, Str] {
         }
     }
     if r.error != "" {
-        return Err(r.error)
+        return Err(ParseError { message: r.error, offset: r.error_at })
     }
     return Ok(build(r, root))
 }
@@ -265,6 +266,7 @@ fn fail(r: mut Reader, message: Str) {
     if r.error != "" {
         return
     }
+    r.error_at = r.pos
     let mut line = 1
     let mut col = 1
     let end = min(r.pos, len(r.text))
@@ -1527,7 +1529,7 @@ fn parsed(text: Str) -> Value {
     match parse(text) {
         Ok(v) => return v
         Err(e) => {
-            assert(e == "")
+            assert(e.message == "")
             return Value.Table([])
         }
     }
@@ -1536,7 +1538,7 @@ fn parsed(text: Str) -> Value {
 fn error_of(text: Str) -> Str {
     match parse(text) {
         Ok(_) => return ""
-        Err(e) => return e
+        Err(e) => return e.message
     }
 }
 

@@ -42,7 +42,7 @@ fn main() {
             }
             match files.remove(p) {
                 Ok(_) => print("removed again?")
-                Err(e) => print(e[0..13])
+                Err(e) => print(e.message[0..13])
             }
             match files.remove(d) {
                 Ok(_) => print("removed dir")

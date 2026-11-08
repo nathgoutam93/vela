@@ -119,14 +119,14 @@ pub fn command(path: Str, root: Str, dry: Bool) uses fs, os {
                     }
                 }
                 Err(e) => {
-                    os.eprint("vela: error: " + e + " [E6001]")
+                    os.eprint("vela: error: " + f"{e}" + " [E6001]")
                     os.exit(1)
                 }
             }
             match files.write(file, apply(m.source, edits)) {
                 Ok(_) => {}
                 Err(e) => {
-                    os.eprint("vela: error: " + e + " [E6001]")
+                    os.eprint("vela: error: " + f"{e}" + " [E6001]")
                     os.exit(1)
                 }
             }

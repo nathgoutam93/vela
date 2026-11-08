@@ -898,7 +898,7 @@ fn show_enum(table: Table, ti: TypeInfo, viewpoint: Str) -> Str {
 }
 
 fn qualified(module: Str, name: Str, viewpoint: Str) -> Str {
-    if module != "" && module != viewpoint {
+    if module != "" && module != viewpoint && module != "<prelude>" {  // prelude types are named without a module (M34)
         return module + "." + name
     }
     return name

@@ -158,7 +158,8 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int,
     }
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
-        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && !k.fns[id].skipped && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) {
+        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && !k.fns[id].skipped && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) &&
+            checker.writes_fn(k, id) {
             push(mut roots, id)
         }
     }
@@ -190,7 +191,7 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int,
     }
     let mut user_types: [Int] = []
     for t in k.decls {
-        if !types.is_generic(k.table, t) && !types.is_interface(k.table, t) {
+        if !types.is_generic(k.table, t) && !types.is_interface(k.table, t) && checker.laid_out(k, t) {
             push(mut user_types, t)
         }
     }
@@ -2605,7 +2606,8 @@ fn indirect_call(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
 // `x?`: if x is an Err (or None), return it from the function now,
 // releasing everything that is live, exactly as `return` does. Otherwise
 // the value inside the Ok (or Some), borrowed from x.
-fn try_value(g: mut Gen, e: ast.Expr, inner: ast.Expr) -> Value {
+fn try_value(g: mut Gen, e: ast.Expr, written: ast.Expr) -> Value {
+    let inner = checker.try_source(g.k, e, written)  // through hid_convert when the error converts (M34)
     let v = expr(mut g, inner)
     let t = ty(g, inner)
     let result = result_type(g)
@@ -3036,6 +3038,12 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
         return integer_builtin(mut g, e, name, args)
     }
+    if name == "0into" {
+        // `?`'s conversion (M34): into a Str by show, or into the variant holding it.
+        let part = ty(g, args[0])
+        if t == types.STR() { return method_value(mut g, e, args, part, "show") }
+        return enum_value(mut g, t, checker.wrapping_index(g.k, part, t), [consume(mut g, expr(mut g, args[0]))])
+    }
     if checker.is_hidden_builtin(name) {
         let part = ty(g, args[0])
         if name == "0show" && part == types.STR() {
@@ -3259,7 +3267,7 @@ fn file_call(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     }
     let rt = c_type(g, r)
     let ok_value = "(" + rt + "){ .tag = " + layout.tag(g.l, r, "Ok") + ", .as.m_Ok = { ._0 = " + success + " } }"
-    let err_value = "(" + rt + "){ .tag = " + layout.tag(g.l, r, "Err") + ", .as.m_Err = { ._0 = " + text + " } }"
+    let err_value = "(" + rt + "){ .tag = " + layout.tag(g.l, r, "Err") + ", .as.m_Err = { ._0 = " + io_error(mut g, r, text) + " } }"
     return store(mut g, r, ok + " ? " + ok_value + " : " + err_value)
 }
 
@@ -3565,6 +3573,15 @@ fn system_builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value
     emit(mut g, "vela_str " + error + " = VELA_STR(\"\", 0);")
     emit(mut g, "bool " + ok + " = " + call + "&" + output + ", &" + error + ");")
     let yes = "(" + rt + "){.tag = " + layout.tag(g.l, r, "Ok") + ", .as.m_Ok = {._0 = " + output + "}}"
-    let no = "(" + rt + "){.tag = " + layout.tag(g.l, r, "Err") + ", .as.m_Err = {._0 = " + error + "}}"
+    let no = "(" + rt + "){.tag = " + layout.tag(g.l, r, "Err") + ", .as.m_Err = {._0 = " + io_error(mut g, r, error) + "}}"
     return store(mut g, r, ok + " ? " + yes + " : " + no)
+}
+
+// The IoError of a failed built-in (M34) whose Result type is `r`: the
+// runtime's message `text`, and the kind it recorded with it.
+fn io_error(g: mut Gen, r: Int, text: Str) -> Str {
+    let t = types.get(g.k.table, r).args[1]
+    let kind_t = types.get(g.k.table, t).fields[0].ty
+    let kind = scalar(mut g, types.INT(), "vela_take_error_kind()")
+    return "(" + c_type(g, t) + "){ .m_kind = (" + c_type(g, kind_t) + "){ .tag = (int)" + kind + " }, .m_message = " + text + " }"
 }

@@ -136,6 +136,7 @@ bool vela_cap_check(const char *effect,vela_str path,vela_str *error) {
     }
     if (allowed)return true;
     *error=message("capability denied: ",VELA_STR(effect,(int64_t)strlen(effect))," [E6010]");
+    set_kind(KIND_PERMISSION_DENIED);
     return false;
 }
 void vela_cap_require(const char *effect) {

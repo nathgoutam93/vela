@@ -1,0 +1,11 @@
+// err: uses_type_param.vl:8:15: error: 'send' uses net, through 'io.copy', through io.Socket.write, but does not say so; add `uses net` after its signature [E3036]
+import io
+import net
+
+fn send(c: net.Tcp, text: Str) -> Result[Int, IoError] {
+    let mut r = io.reader(text)
+    let mut s = io.socket(c)
+    return io.copy(mut r, mut s, 1000)
+}
+
+fn main() {}

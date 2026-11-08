@@ -302,7 +302,7 @@ pub fn command(at: Str, new_name: Str, std_dir: Str, write: Bool) uses fs, os {
                 for f in maps.keys(r.texts) {
                     match files.write(f, r.texts[f]) {
                         Ok(_) => {}
-                        Err(e) => query.fail(e)
+                        Err(e) => query.fail(f"{e}")
                     }
                 }
             }

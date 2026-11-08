@@ -78,6 +78,6 @@ fn run(c: json.Json) -> json.Json {
             }
             return json.object([json.member("matches", json.array(matches))])
         }
-        Err(e) => return json.object([json.member("error", json.string(e))])
+        Err(e) => return json.object([json.member("error", json.string(e.message))])
     }
 }

@@ -6,7 +6,7 @@ import processes
 import strings
 import time
 
-fn get[T](value: Result[T, Str]) -> T {
+fn get[T, E](value: Result[T, E]) -> T {
     match value { Ok(v) => return v, Err(_) => { assert(false); for {} } }
 }
 fn main() { print("fakes ok") }

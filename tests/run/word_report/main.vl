@@ -33,15 +33,15 @@ fn main() {
     }
     match run(args[1], args[2]) {
         Ok(n) => print("wrote " + args[2] + ", " + strings.from_int(n) + " bytes")
-        Err(e) => fail(e)
+        Err(e) => fail(e.message)
     }
     match files.read(args[2]) {
         Ok(text) => print(text)
-        Err(e) => fail(e)
+        Err(e) => fail(e.message)
     }
 }
 
-fn run(input: Str, output: Str) -> Result[Int, Str] uses fs {
+fn run(input: Str, output: Str) -> Result[Int, IoError] uses fs {
     let text = files.read(input)?
     let all = words.split(text)
     return files.write(output, report.render(len(all), words.count(all), 10))

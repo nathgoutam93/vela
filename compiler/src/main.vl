@@ -236,7 +236,7 @@ fn internal_error(message: Str) uses os {
 fn read(path: Str) -> Str uses fs, os {
     match files.read(path) {
         Ok(text) => return text
-        Err(e) => driver_error(e)
+        Err(e) => driver_error(f"{e}")
     }
     return ""  // not reached
 }
@@ -342,7 +342,7 @@ fn get_command(args: [Str]) uses fs, os {
         }
         match files.write("vela.mod", packages.with_use(text, rest[0], line)) {
             Ok(_) => {}
-            Err(e) => driver_error(e)
+            Err(e) => driver_error(f"{e}")
         }
     }
     let mut old: Map[Str, packages.Locked] = [:]
@@ -361,7 +361,7 @@ fn get_command(args: [Str]) uses fs, os {
         Ok(locked) => {
             match files.write("vela.lock", packages.lock_text(locked)) {
                 Ok(_) => {}
-                Err(e) => driver_error(e)
+                Err(e) => driver_error(f"{e}")
             }
             for l in locked {
                 print(l.name + " " + l.ref + " " + l.commit[0..12] + " " + l.source)
@@ -395,7 +395,7 @@ fn new_command(args: [Str]) uses fs, os {
                 driver_error(name + " exists already")
             }
         }
-        Err(e) => driver_error(e)
+        Err(e) => driver_error(f"{e}")
     }
     match os.run(["mkdir", name]) {
         Ok(code) => {
@@ -403,13 +403,13 @@ fn new_command(args: [Str]) uses fs, os {
                 driver_error("cannot make the directory " + name)
             }
         }
-        Err(e) => driver_error(e)
+        Err(e) => driver_error(f"{e}")
     }
     let made = packages.new_files(name, package)
     for f in made {
         match files.write(f[0], f[1]) {
             Ok(_) => {}
-            Err(e) => driver_error(e)
+            Err(e) => driver_error(f"{e}")
         }
         print("made " + f[0])
     }
@@ -567,7 +567,7 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
-        Err(e) => driver_error(e)
+        Err(e) => driver_error(f"{e}")
     }
     let compiler = targets.compiler(target)
     let cache = incremental.begin(cache_dir(), mode, "native", targets.selected(target), compiler)
@@ -582,7 +582,7 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
     let source = modules.join(tmp, stem + ".s")
     match files.write(source, asm) {
         Ok(_) => {}
-        Err(e) => driver_error(e)
+        Err(e) => driver_error(f"{e}")
     }
     let program_o = modules.join(tmp, "program.o")
     let mut runtime_o = modules.join(tmp, "runtime.o")
@@ -653,7 +653,7 @@ fn assemble_mode(asm: Str, stem: Str, exe: Str, root: Str, opt: Str, libraries: 
                     linking_failed = true
                 }
             }
-            Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + e + ")")
+            Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + f"{e}" + ")")
         }
     }
     if len(failed) == 0 { retain_debug(exe, target, mode) }
@@ -695,7 +695,7 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
-        Err(e) => driver_error(e)
+        Err(e) => driver_error(f"{e}")
     }
     let compiler = targets.compiler(target)
     let cache = incremental.begin(cache_dir(), mode, "c", targets.selected(target), compiler)
@@ -736,7 +736,7 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
             source = modules.join(tmp, stem + "_" + strings.from_int(i) + ".c")
             match files.write(source, units[i]) {
                 Ok(_) => push(mut written, source)
-                Err(e) => driver_error(e)
+                Err(e) => driver_error(f"{e}")
             }
         }
         let object = modules.join(tmp, "part" + strings.from_int(i) + ".o")
@@ -781,7 +781,7 @@ fn compile_mode(c_source: Str, stem: Str, exe: Str, root: Str, opt: Str, librari
     if len(failed) == 0 {
         match os.run(link) {
             Ok(c) => code = c
-            Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + e + "); install gcc or clang, or set VELA_CC")
+            Err(e) => driver_error("C compiler '" + cc + "' could not be run (" + f"{e}" + "); install gcc or clang, or set VELA_CC")
         }
         if code != 0 {
             failed = link
@@ -975,7 +975,7 @@ fn run(path: Str, args: [Str], root: Str, options: capabilities.Options) uses fs
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
-        Err(e) => driver_error(e)
+        Err(e) => driver_error(f"{e}")
     }
     let exe = temporary_executable(tmp, "program")
     let mut mode = 0; if options.debug { mode = 1 }
@@ -989,7 +989,7 @@ fn run(path: Str, args: [Str], root: Str, options: capabilities.Options) uses fs
     cleanup(tmp)
     match result {
         Ok(code) => os.exit(code)
-        Err(e) => capabilities.fail(e)
+        Err(e) => capabilities.fail(f"{e}")
     }
 }
 
@@ -1024,7 +1024,7 @@ fn fmt(args: [Str]) uses fs, os {
                     if out != source {
                         match files.write(path, out) {
                             Ok(_) => {}
-                            Err(e) => driver_error(e)
+                            Err(e) => driver_error(f"{e}")
                         }
                     }
                 } else if mode == "-l" {
@@ -1056,7 +1056,7 @@ fn check_json(path: Str, root: Str) uses fs, os {
     let mut failed = false
     match files.read(path) {
         Err(e) => {
-            push(mut errs, errors.CompileError { code: "E7002", fix: [], path: path, line: 0, col: 0, message: e, warning: false })
+            push(mut errs, errors.CompileError { code: "E7002", fix: [], path: path, line: 0, col: 0, message: f"{e}", warning: false })
             failed = true
         }
         Ok(source) => {
@@ -1176,14 +1176,14 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
         }
     }
     if len(chosen) == 0 {
-        if options.coverage != "" { match agent_queries.report(k, []) { Ok(data) => { match files.write(options.coverage, json.pretty(data)) { Ok(_) => {}, Err(e) => driver_error(e) } }, Err(e) => driver_error(e) } }
+        if options.coverage != "" { match agent_queries.report(k, []) { Ok(data) => { match files.write(options.coverage, json.pretty(data)) { Ok(_) => {}, Err(e) => driver_error(f"{e}") } }, Err(e) => driver_error(e) } }
         print("no tests to run")
         return
     }
     let mut tmp = ""
     match files.temp_dir() {
         Ok(dir) => tmp = dir
-        Err(e) => driver_error(e)
+        Err(e) => driver_error(f"{e}")
     }
     let exe = temporary_executable(tmp, "tests")
     // Tests are built often and run briefly, so the C compiler does not
@@ -1206,7 +1206,7 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
         let events = modules.join(tmp, "hits")
         let mut command = [exe, strings.from_int(i)]
         let mut allows = options.allow
-        if options.coverage != "" { match files.write(events, "") { Ok(_) => {}, Err(e) => driver_error(e) }; push(mut command, events); push(mut allows, "coverage:" + events) }
+        if options.coverage != "" { match files.write(events, "") { Ok(_) => {}, Err(e) => driver_error(f"{e}") }; push(mut command, events); push(mut allows, "coverage:" + events) }
         match sysio.sandbox_run(command, allows, options.deny) {
             Ok(code) => {
                 if options.coverage != "" { let mut hits = ""; match files.read(events) { Ok(s) => hits = s, Err(_) => {} }; push(mut results, agent_queries.hit_record(k, ids[i], code, hits)) }
@@ -1220,11 +1220,11 @@ fn test_command(path: Str, words: [Str], root: Str, options: capabilities.Option
                     failed = failed + 1
                 }
             }
-            Err(e) => { cleanup(events); remove_executable(exe, options.debug); cleanup(tmp); capabilities.fail(e) }
+            Err(e) => { cleanup(events); remove_executable(exe, options.debug); cleanup(tmp); capabilities.fail(f"{e}") }
         }
     }
     cleanup(modules.join(tmp, "hits"))
-    if options.coverage != "" { match agent_queries.report(k, results) { Ok(data) => { match files.write(options.coverage, json.pretty(data)) { Ok(_) => {}, Err(e) => driver_error(e) } }, Err(e) => driver_error(e) } }
+    if options.coverage != "" { match agent_queries.report(k, results) { Ok(data) => { match files.write(options.coverage, json.pretty(data)) { Ok(_) => {}, Err(e) => driver_error(f"{e}") } }, Err(e) => driver_error(e) } }
     remove_executable(exe, options.debug)
     cleanup(tmp)
     let n = len(chosen)
@@ -1314,10 +1314,10 @@ fn profile_command(words: [Str], root: Str) uses fs, os {
     for denied in options.deny { if denied == "clock" { capabilities.fail("profiling requires clock access") } }
     let path = options.rest[0]; let k = checked(path, root); let libraries = link_flags(path)
     capabilities.admit(k, options, libraries, false)
-    let mut tmp = ""; match files.temp_dir() { Ok(d) => tmp = d, Err(e) => driver_error(e) }
+    let mut tmp = ""; match files.temp_dir() { Ok(d) => tmp = d, Err(e) => driver_error(f"{e}") }
     let persistent = report != ""; if !persistent { report = modules.join(tmp, "profile.json") }
     // Create/truncate before launch; a stale report cannot pass as this run.
-    match files.write(report, "") { Ok(_) => {}, Err(e) => driver_error(e) }
+    match files.write(report, "") { Ok(_) => {}, Err(e) => driver_error(f"{e}") }
     let exe = temporary_executable(tmp, "profile")
     build_observed(path, exe, root, true, k, libraries, "", 2, report)
     let mut command = [exe]; for arg in options.rest[1..len(options.rest)] { push(mut command, arg) }
@@ -1326,7 +1326,7 @@ fn profile_command(words: [Str], root: Str) uses fs, os {
     let mut valid = false
     match files.read(report) { Ok(data) => { valid = profile_report.show(data); }, Err(_) => {} }
     remove_executable(exe, true); if !persistent { cleanup(report) }; cleanup(tmp)
-    match result { Ok(code) => { if code != 0 { os.exit(code) }; if !valid { driver_error("program exited without a valid profile report") } }, Err(e) => capabilities.fail(e) }
+    match result { Ok(code) => { if code != 0 { os.exit(code) }; if !valid { driver_error("program exited without a valid profile report") } }, Err(e) => capabilities.fail(f"{e}") }
 }
 
 // Verification is opt-in, with hard solver/process/output budgets. Reused
@@ -1347,7 +1347,7 @@ fn verify_command(words: [Str], root: Str) uses fs, os, clock {
     if path == "" { verification_error("missing source file") }
     let k = checked_target(path, root, output == "", target)
     if reuse != "" {
-        let old = json.parse(read(reuse)); let mut prior = json.null(); match old { Ok(v) => prior = v, Err(e) => verification_error(e) }
+        let old = json.parse(read(reuse)); let mut prior = json.null(); match old { Ok(v) => prior = v, Err(e) => verification_error(f"{e}") }
         if json.str_or(json.get(prior, "format"), "") != "vela.verify" || json.int_or(json.get(prior, "version"), 0) != 1 { verification_error("unsupported proof report") }
         let mut now = json.null(); match evidence.context(k) { Ok(v) => now = v, Err(e) => verification_error(e) }
         match evidence.fresh(json.get(prior, "context"), now) { Ok(_) => {}, Err(e) => verification_error(e) }
@@ -1355,7 +1355,7 @@ fn verify_command(words: [Str], root: Str) uses fs, os, clock {
     let mut proof = verification.Outcome { checked: k, report: json.null() }
     match verification.run(k, solver, timeout, budget) { Ok(v) => proof = v, Err(e) => verification_error(e) }
     let data = json.pretty(proof.report)
-    if report != "" { match files.write(report, data) { Ok(_) => {}, Err(e) => verification_error(e) } }
+    if report != "" { match files.write(report, data) { Ok(_) => {}, Err(e) => verification_error(f"{e}") } }
     let mut refuted = false
     for row in json.items(json.get(proof.report, "results")) {
         let state = json.str_or(json.get(row, "status"), "unknown"); if state == "refuted" { refuted = true }
@@ -1371,10 +1371,10 @@ fn verification_error(message: Str) uses os { os.eprint("vela: " + message + " [
 fn property_child(args: [Str]) uses os {
     if len(args) != 7 { verification_error("invalid property launch") }
     let mut allow: [Str] = []; let mut deny: [Str] = []
-    for side in 0..2 { let mut doc = json.null(); match json.parse(args[side + 2]) { Ok(v) => doc = v, Err(e) => verification_error(e) }
+    for side in 0..2 { let mut doc = json.null(); match json.parse(args[side + 2]) { Ok(v) => doc = v, Err(e) => verification_error(f"{e}") }
         match doc { json.Json.Array(values) => { for value in values { match value { json.Json.Str(word) => { if side == 0 { push(mut allow, word) } else { push(mut deny, word) } }, _ => verification_error("invalid property policy") } } }, _ => verification_error("invalid property policy") }
     }
-    match sysio.sandbox_run(args[4..7], allow, deny) { Ok(code) => os.exit(code), Err(e) => capabilities.fail(e) }
+    match sysio.sandbox_run(args[4..7], allow, deny) { Ok(code) => os.exit(code), Err(e) => capabilities.fail(f"{e}") }
 }
 fn property_command(path: Str, words: [Str], root: Str, options: capabilities.Options) uses fs, os, clock {
     let loaded = load(path, read(path), root)
@@ -1387,14 +1387,14 @@ fn property_command(path: Str, words: [Str], root: Str, options: capabilities.Op
     let plan = properties.prepare(loaded, original, options.cases, options.seed, options.size, options.shrinks, words)
     let mut k = original
     if len(plan.specs) > 0 { k = checker.check_target(plan.loaded, true, "", targets.host()); if len(k.errors) > 0 { fail(path, k.errors) }; k = properties.mark(k, plan.specs) }
-    let mut tmp = ""; match files.temp_dir() { Ok(dir) => tmp = dir, Err(e) => driver_error(e) }; let exe = temporary_executable(tmp, "properties")
+    let mut tmp = ""; match files.temp_dir() { Ok(dir) => tmp = dir, Err(e) => driver_error(f"{e}") }; let exe = temporary_executable(tmp, "properties")
     if len(plan.specs) > 0 {
         if native(true) { assemble_mode(targets.program(lowered(path, lower.lower_observed(k, true, false, 3, "")), ""), modules.stem(path) + "_properties", exe, root, "-O0", libraries, "", 3) } else { compile_mode(c_code(path, codegen.generate_observed(k, true, false, 3, "")), modules.stem(path) + "_properties", exe, root, "-O0", libraries, "", 3) }
     }
     let report = properties.run_cases(original, k, plan, exe, options, context)
     remove_executable(exe, true); cleanup(tmp)
     let data = json.pretty(report)
-    if options.report != "" { match files.write(options.report, data) { Ok(_) => {}, Err(e) => driver_error(e) } }
+    if options.report != "" { match files.write(options.report, data) { Ok(_) => {}, Err(e) => driver_error(f"{e}") } }
     if options.as_json { print(data) } else {
         for result in json.items(json.get(report, "results")) { let f = json.get(result, "function"); print(json.str_or(json.get(result, "status"), "unknown") + "  " + json.str_or(json.get(f, "file"), "") + ":" + strings.from_int(json.int_or(json.get(f, "line"), 0)) + " " + json.str_or(json.get(f, "name"), "") + " — " + json.str_or(json.get(result, "reason"), "")) }
         print("properties: " + json.str_or(json.get(report, "status"), "unknown") + "; passing samples are not proof")
