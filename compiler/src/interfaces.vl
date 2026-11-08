@@ -16,10 +16,10 @@ pub fn methods() -> Str {
     return "pub fn Option.is_some[T](value: Option[T]) -> Bool { return match value { Some(_) => true, None => false } }\n" +
         "pub fn Option.is_none[T](value: Option[T]) -> Bool { return match value { Some(_) => false, None => true } }\n" +
         "pub fn Option.unwrap_or[T](value: Option[T], default: T) -> T { return match value { Some(x) => x, None => default } }\n" +
-        "pub fn Option.map[T, U](value: Option[T], f: fn(T) -> U) -> Option[U] uses f {\n" +
+        "pub fn Option.map[T, U](value: Option[T], f: scoped fn(T) -> U) -> Option[U] uses f {\n" +
         "    return match value { Some(x) => Some(f(x)), None => None }\n" +
         "}\n" +
-        "pub fn Option.and_then[T, U](value: Option[T], f: fn(T) -> Option[U]) -> Option[U] uses f {\n" +
+        "pub fn Option.and_then[T, U](value: Option[T], f: scoped fn(T) -> Option[U]) -> Option[U] uses f {\n" +
         "    return match value { Some(x) => f(x), None => None }\n" +
         "}\n" +
         "pub fn Option.ok_or[T, E](value: Option[T], error: E) -> Result[T, E] { return match value { Some(x) => Ok(x), None => Err(error) } }\n" +
@@ -48,13 +48,13 @@ pub fn methods() -> Str {
         "pub fn Result.is_ok[T, E](value: Result[T, E]) -> Bool { return match value { Ok(_) => true, Err(_) => false } }\n" +
         "pub fn Result.is_err[T, E](value: Result[T, E]) -> Bool { return match value { Ok(_) => false, Err(_) => true } }\n" +
         "pub fn Result.unwrap_or[T, E](value: Result[T, E], default: T) -> T { return match value { Ok(x) => x, Err(_) => default } }\n" +
-        "pub fn Result.map[T, E, U](value: Result[T, E], f: fn(T) -> U) -> Result[U, E] uses f {\n" +
+        "pub fn Result.map[T, E, U](value: Result[T, E], f: scoped fn(T) -> U) -> Result[U, E] uses f {\n" +
         "    return match value { Ok(x) => Ok(f(x)), Err(e) => Err(e) }\n" +
         "}\n" +
-        "pub fn Result.map_err[T, E, F](value: Result[T, E], f: fn(E) -> F) -> Result[T, F] uses f {\n" +
+        "pub fn Result.map_err[T, E, F](value: Result[T, E], f: scoped fn(E) -> F) -> Result[T, F] uses f {\n" +
         "    return match value { Ok(x) => Ok(x), Err(e) => Err(f(e)) }\n" +
         "}\n" +
-        "pub fn Result.and_then[T, E, U](value: Result[T, E], f: fn(T) -> Result[U, E]) -> Result[U, E] uses f {\n" +
+        "pub fn Result.and_then[T, E, U](value: Result[T, E], f: scoped fn(T) -> Result[U, E]) -> Result[U, E] uses f {\n" +
         "    return match value { Ok(x) => f(x), Err(e) => Err(e) }\n" +
         "}\n" +
         "pub fn Result.eq[T: Eq, E: Eq](a: Result[T, E], b: Result[T, E]) -> Bool {\n" +

@@ -1,0 +1,7 @@
+// err: closure_change_overlap.vl:6:11: error: 'total' is changed by a function argument of this call, so no other argument may change or capture it [E3144]
+fn apply(n: mut Int, f: scoped fn()) { f() }
+
+fn main() {
+    let mut total = 0
+    apply(mut total, fn() { total += 1 })
+}

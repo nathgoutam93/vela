@@ -1,0 +1,6 @@
+// err: scoped_returned.vl:3:12: error: 'f' is a scoped parameter: call it, or pass it as the argument for another scoped parameter [E3246]
+fn keep(f: scoped fn(Int)) -> fn(Int) {
+    return f
+}
+
+fn main() {}

@@ -58,7 +58,8 @@ fn uses_expr(u: mut Uses, e: ast.Expr, in_closure: Bool) {
             uses_expr(mut u, l, in_closure)
             uses_expr(mut u, r, in_closure)
         }
-        ast.ExprKind.Call(f, args) => {
+        ast.ExprKind.Call(f, written) => {
+            let args = checker.call_arguments(u.k, e, written)
             let mut name = ""
             match u.k.refs[e.id] {
                 checker.Ref.Builtin(n) => name = n
@@ -123,7 +124,10 @@ fn uses_expr(u: mut Uses, e: ast.Expr, in_closure: Bool) {
             uses_expr(mut u, x, in_closure)
             uses_arms(mut u, arms, in_closure)
         }
-        ast.ExprKind.Closure(_, _, body, _) => uses_block(mut u, body, true)
+        ast.ExprKind.Closure(_, _, body, _) => {
+            for l in u.k.closures[e.id].writes { push(mut u.writes, l) }  // changed during the call (M33)
+            uses_block(mut u, body, true)
+        }
         _ => {}
     }
 }

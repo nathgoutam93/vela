@@ -42,6 +42,7 @@ pub type FnInfo = struct {
     is_test: Bool  // a `test` block, checked as a function named `test "..."`
     result_local: Int  // `result` in its ensures clauses, or -1
     generated: Bool  // a derived method (M32), written by derive() for its type, not by a programmer
+    scoped: [Bool]  // by parameter: `f: scoped fn(...)`, which the function only calls (M33)
     skipped: Bool  // a derived method nothing uses: its body is empty, it is never checked or written
 }
 
@@ -73,6 +74,7 @@ pub type ClosureInfo = struct {
     params: [Int]  // locals
     captures: [Int]  // locals of the enclosing code it copies, in order of first use
     result: Int  // NOTHING() when it returns nothing
+    writes: [Int]  // captures it changes, which it holds by address, not copies (M33: a scoped argument)
 }
 
 // While a closure's body is checked.
@@ -83,6 +85,8 @@ type ClosureCtx = struct {
     result: Int  // -3 until a return says, when it was not written
     // What its body uses (M15), which its type says: whoever calls it uses it.
     effects: [Str]
+    scoped: Bool  // written as an argument for a scoped parameter, so it may change captures (M33)
+    writes: [Int]
 }
 
 pub type Checked = struct {
@@ -102,6 +106,7 @@ pub type Checked = struct {
     closures: Map[Int, ClosureInfo]  // by node id
     shows: Map[Int, Int]  // by node id: an interpolated or printed value written by its type's `show` (M32)
     methods: Map[Str, [Int]]  // functions with parameters, by method_key(), for method lookup
+    mutations: Map[Int, Int]  // by node (M33): a method call changing its receiver, with its `mut obj` node; a closure changing captures, with -1
     completion: Completion
     escaped: Map[Int, Bool]
     stack: Int  // bytes for main's thread (vela.mod `stack`), or 0 for the system's
@@ -174,6 +179,9 @@ type Checker = struct {
     shows: Map[Int, Int]
     methods: Map[Str, [Int]]
     wanted: Map[Int, Bool]  // derived methods some check found a use for
+    mutations: Map[Int, Int]
+    scoped_args: Map[Int, Bool]  // argument nodes passed for a scoped parameter
+    scoped_locals: Map[Int, Bool]  // the scoped parameters of the functions checked
     derivables: [Derivable]  // the types with derived methods
     derived_of: Map[Int, [Int]]  // by derived method: its type in derivables, and its derived_bounds() index
     used: Map[Str, Bool]  // the (type, method) pairs use_method has seen
@@ -216,7 +224,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
         undefined: [], targs: targs, literal: literal, chained: breaks, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
         in_closures: [], pending: [], defining: -1, expected: -2,
         completion: Completion { name: name, module: -1, visible: [], type_params: [], object: [] },
-        next_node: loaded.node_count, generated: [], shows: [:], methods: [:], wanted: [:], used: [:], derivables: [], derived_of: [:],
+        next_node: loaded.node_count, generated: [], shows: [:], methods: [:], wanted: [:], used: [:], mutations: [:], scoped_args: [:], scoped_locals: [:], derivables: [], derived_of: [:],
     }
     // A file with main is a program even when only checking or running tests.
     for f in loaded.modules[loaded.order[len(loaded.order) - 1]].program.fns {
@@ -245,7 +253,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
         proved_contracts: [:],
         target: target,
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
-        locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures, shows: c.shows, methods: c.methods,
+        locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures, shows: c.shows, methods: c.methods, mutations: c.mutations,
         completion: c.completion, escaped: c.escaped, stack: loaded.stack,
     }
 }
@@ -781,7 +789,7 @@ fn signatures(c: mut Checker) {
         }
         push(mut c.fns, FnInfo {
             decl: f, module: m, params: [], mutable: [], result: types.NOTHING(), param_locals: [], type_params: [],
-            is_test: true, result_local: -1, generated: false, skipped: false,
+            is_test: true, result_local: -1, generated: false, skipped: false, scoped: [],
         })
     }
 }
@@ -793,9 +801,11 @@ fn declare_fn(c: mut Checker, m: Int, f: ast.FnDecl) {
     c.type_scope = scope_of(c, type_params)
     let mut params: [Int] = []
     let mut mutable: [Bool] = []
+    let mut scoped: [Bool] = []
     for p in f.params {
         push(mut params, resolve_type(mut c, p.ty))
         push(mut mutable, p.mutable)
+        push(mut scoped, p.scoped)
     }
     let mut result = types.NOTHING()
     match f.result {
@@ -836,7 +846,7 @@ fn declare_fn(c: mut Checker, m: Int, f: ast.FnDecl) {
     }
     push(mut c.fns, FnInfo {
         decl: f, module: m, params: params, mutable: mutable, result: result, param_locals: [],
-        type_params: type_params, is_test: false, result_local: -1, generated: false, skipped: false,
+        type_params: type_params, is_test: false, result_local: -1, generated: false, skipped: false, scoped: scoped,
     })
     if len(params) > 0 {
         let key = method_key(c.modules[m].name, f.name)
@@ -1209,6 +1219,7 @@ fn function(c: mut Checker, id: Int) {
             kind = "mut parameter"
         }
         let local = new_local(mut c, p.name, c.fns[id].params[i], kind, p.line, p.col)
+        if i < len(c.fns[id].scoped) && c.fns[id].scoped[i] { c.scoped_locals[local] = true }
         scope[p.name] = local
         push(mut locals, local)
     }
@@ -1863,11 +1874,13 @@ fn place(c: mut Checker, target: ast.Expr, verb: Str) -> Int {
         Ref.Constant(id) => report_at(mut c, root, "E3232", "cannot " + verb + " constant '" + c.fns[id].decl.name + "'; copy it into a 'let mut' first")
         Ref.Local(id) => {
             let l = c.locals[id]
-            if captured(c, id) {
+            if captured(c, id) && !may_change_capture(c, id) {
                 report_at(mut c, root, "E3060", "cannot " + verb + " '" + l.name + "' inside a function value: it has its own copy " +
-                    "of '" + l.name + "', made when it was created, and changes to the copy would be lost")
+                    "of '" + l.name + "', made when it was created, and changes to the copy would be lost. Only a function written " +
+                        "as the argument for a `scoped` parameter can change it")
                 return ty
             }
+            if captured(c, id) { note_capture_change(mut c, id) }
             let mut part = ""
             if is_field(target) {
                 part = "a field of "
@@ -2922,6 +2935,7 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
             match resolve(mut c, e, name) {
                 Ref.Local(id) => {
                     c.refs[e.id] = Ref.Local(id)
+                    if maps.has(c.scoped_locals, id) && (!maps.has(c.scoped_args, e.id) || captured(c, id)) { scoped_use(mut c, e, id) }
                     capture(mut c, id)
                     return c.locals[id].ty
                 }
@@ -4273,6 +4287,7 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
             let local = lookup_local(c, name)
             if local >= 0 {
                 if types.is_func(c.table, c.locals[local].ty) {
+                    if maps.has(c.scoped_locals, local) && captured(c, local) { scoped_use(mut c, callee, local) }
                     capture(mut c, local)
                     return Ref.Local(local)  // a call through a function value
                 }
@@ -4324,6 +4339,48 @@ fn callee_value(c: mut Checker, callee: ast.Expr) -> Ref {
 
 // Whether local `id` belongs to code outside the innermost closure being
 // checked: a capture.
+// A scoped parameter used other than by calling it or passing it on as a
+// scoped argument (E3246): it could outlive the call that gave it.
+fn scoped_use(c: mut Checker, e: ast.Expr, id: Int) {
+    let name = c.locals[id].name
+    if captured(c, id) {
+        report_at(mut c, e, "E3246", "'" + name + "' is a scoped parameter, so a function value cannot use it; call it here instead")
+    } else {
+        report_at(mut c, e, "E3246", "'" + name + "' is a scoped parameter: call it, or pass it as the argument for another scoped parameter")
+    }
+}
+
+// Whether the closures being checked may change captured local `id` (M33):
+// each one that captures it was written as a scoped argument.
+fn may_change_capture(c: Checker, id: Int) -> Bool {
+    for k in 0..len(c.in_closures) {
+        if !closure_holds(c, k, id) && !c.in_closures[k].scoped { return false }
+    }
+    return true
+}
+
+// Whether closure `k` being checked declares local `id` itself.
+fn closure_holds(c: Checker, k: Int, id: Int) -> Bool {
+    for i in c.in_closures[k].boundary..len(c.scopes) {
+        for name in maps.keys(c.scopes[i]) {
+            if c.scopes[i][name] == id { return true }
+        }
+    }
+    return false
+}
+
+fn note_capture_change(c: mut Checker, id: Int) {
+    for k in 0..len(c.in_closures) {
+        if closure_holds(c, k, id) || listed_id(c.in_closures[k].writes, id) { continue }
+        push(mut c.in_closures[k].writes, id)
+    }
+}
+
+fn listed_id(ids: [Int], id: Int) -> Bool {
+    for x in ids { if x == id { return true } }
+    return false
+}
+
 fn captured(c: Checker, id: Int) -> Bool {
     let n = len(c.in_closures)
     if n == 0 {
@@ -4418,7 +4475,9 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
     }
     let saved_unsafe = c.unsafe_depth
     c.unsafe_depth = 0
-    push(mut c.in_closures, ClosureCtx { id: e.id, boundary: len(c.scopes), captures: [], result: res, effects: [] })
+    push(mut c.in_closures, ClosureCtx {
+        id: e.id, boundary: len(c.scopes), captures: [], result: res, effects: [], scoped: maps.has(c.scoped_args, e.id), writes: [],
+    })
     push_scope(mut c, scope)
     let saved_loops = c.loops
     c.loops = []  // break and continue cannot leave a function value
@@ -4438,7 +4497,8 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
         report(mut c, body.end_line, body.end_col, "E3159", "missing return: this function value returns " + show(c, final) +
             ", but the end of its body can be reached")
     }
-    c.closures[e.id] = ClosureInfo { params: locals, captures: ctx.captures, result: final }
+    c.closures[e.id] = ClosureInfo { params: locals, captures: ctx.captures, result: final, writes: ctx.writes }
+    if len(ctx.writes) > 0 { c.mutations[e.id] = -1 }
     return types.func_with(mut c.table, param_types, final, ctx.effects)
 }
 
@@ -5243,6 +5303,9 @@ fn lookup_in(table: types.Table, fns: [FnInfo], mods: [modules.Module], index: M
         }
         for id in ids {
             let f = fns[id]
+            // Only a qualified method may change its receiver (M33): `x.f()` changes x
+            // only where its type's module says so with `fn Type.f(x: mut Type)`.
+            if pass == 1 && f.mutable[0] { continue }
             let receiver = types.get(table, f.params[0])
             if module != "<prelude>" && receiver.module != module { continue }
             let mut args = unknown(len(f.type_params))
@@ -5865,8 +5928,8 @@ fn validate_interfaces(c: mut Checker) {
                 continue
             }
             let ti = types.get(c.table, f.params[0])
-            if ti.name != owner || ti.module != c.modules[f.module].name || (!types.is_struct(c.table, f.params[0]) && !types.is_enum(c.table, f.params[0])) || f.mutable[0] {
-                report(mut c, f.decl.line, f.decl.col, "E3196", "a qualified method must take its local receiver type as an immutable first parameter")
+            if ti.name != owner || ti.module != c.modules[f.module].name || (!types.is_struct(c.table, f.params[0]) && !types.is_enum(c.table, f.params[0])) {
+                report(mut c, f.decl.line, f.decl.col, "E3196", "a qualified method must take its local receiver type as its first parameter")
             }
             if types.is_enum(c.table, f.params[0]) && types.variant_index(c.table, f.params[0], name[i + 1..len(name)]) >= 0 {
                 report(mut c, f.decl.line, f.decl.col, "E3196", "a method cannot have the name of an enum variant")
@@ -5902,8 +5965,12 @@ fn validate_interfaces(c: mut Checker) {
 fn known_call(c: mut Checker, e: ast.Expr, id: Int, name: Str, args: [ast.Expr], expected: Int) -> Int {
     let f = c.fns[id]
     c.refs[e.id] = Ref.Function(id)
+    for i in 0..len(args) {
+        if i < len(f.scoped) && f.scoped[i] { c.scoped_args[args[i].id] = true }
+    }
     if len(f.type_params) > 0 {
         let t = generic_call(mut c, e, id, name, args, expected)
+        changed_captures(mut c, args)
         use_call_effects(mut c, e, f, args, name)
         return t
     }
@@ -5934,9 +6001,46 @@ fn known_call(c: mut Checker, e: ast.Expr, id: Int, name: Str, args: [ast.Expr],
         }
     }
     exclusive(mut c, args)
+    changed_captures(mut c, args)
     use_call_effects(mut c, e, f, args, name)
     // Even after an argument error, the call has the declared result type.
     return f.result
+}
+
+// A function argument that changes a captured local (M33) holds it while the
+// call runs: no other argument of the call may change it or capture it.
+fn changed_captures(c: mut Checker, args: [ast.Expr]) {
+    for i in 0..len(args) {
+        let mut writes: [Int] = []
+        match maps.get(c.closures, args[i].id) {
+            Some(info) => writes = info.writes
+            None => {}
+        }
+        for w in writes {
+            for j in 0..len(args) {
+                if j == i { continue }
+                let other = args[j]
+                let mut clash = false
+                match other.kind {
+                    ast.ExprKind.MutArg(p) => {
+                        match c.refs[root_of(p).id] {
+                            Ref.Local(l) => clash = l == w
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+                match maps.get(c.closures, other.id) {
+                    Some(info) => { for x in info.captures { if x == w { clash = true } } }
+                    None => {}
+                }
+                if clash {
+                    report_at(mut c, other, "E3144", "'" + c.locals[w].name + "' is changed by a function argument of this call, so no other argument may " +
+                        "change or capture it")
+                }
+            }
+        }
+    }
 }
 
 fn method_call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], t: Int, name: Str, expected: Int) -> Int {
@@ -5950,6 +6054,15 @@ fn method_call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], 
         result = indirect_call(mut c, e, signature, all, "method '" + name + "'")
     } else {
         let dispatch = lookup_method(c.table, c.fns, c.modules, c.methods, t, name)
+        if dispatch.fn_id >= 0 && c.fns[dispatch.fn_id].mutable[0] && len(all) > 0 {
+            // A mutable receiver (M33): checked as the argument `mut obj`, with the
+            // place, overlap and stale-copy rules of any mut argument.
+            let obj = all[0]
+            c.chained[obj.id] = true
+            let spare = spare_node(mut c)
+            all[0] = ast.Expr { kind: ast.ExprKind.MutArg(obj), line: obj.line, col: obj.col, id: spare }
+            c.mutations[e.id] = spare
+        }
         if dispatch.fn_id >= 0 {
             let f = c.fns[dispatch.fn_id]
             if f.module != c.current && !f.decl.public {
@@ -5959,7 +6072,19 @@ fn method_call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], 
         } else {
             let bound = intrinsic_bound(name)
             if bound == "" || !intrinsic(c.table, t, bound) {
-                report_at(mut c, e, "E3194", "no method '" + name + "' on " + show(c, t))
+                let mut hint = ""
+                match maps.get(c.methods, method_key(types.get(c.table, t).module, name)) {
+                    Some(ids) => {
+                        for fid in ids {
+                            if c.fns[fid].mutable[0] && types.plain(c.table, c.fns[fid].params[0]) == types.plain(c.table, t) {
+                                hint = "; '" + name + "' changes its first argument, so call it as " + name + "(mut ...), or declare it " +
+                                    "`fn " + types.get(c.table, t).name + "." + name + "` to call it as a method"
+                            }
+                        }
+                    }
+                    None => {}
+                }
+                report_at(mut c, e, "E3194", "no method '" + name + "' on " + show(c, t) + hint)
                 for arg in args { infer(mut c, arg) }
                 return result
             }
@@ -5994,11 +6119,26 @@ fn named_receiver(c: mut Checker, e: ast.Expr) -> Int {
     return -1
 }
 
-pub fn method_args(e: ast.Expr, args: [ast.Expr]) -> [ast.Expr] {
+// A call's arguments as the analyses see them: with a method call that
+// changes its receiver (M33), the receiver first, as the argument `mut obj`.
+pub fn call_arguments(k: Checked, e: ast.Expr, args: [ast.Expr]) -> [ast.Expr] {
+    if !maps.has(k.mutations, e.id) { return args }
+    return method_args(k, e, args)
+}
+
+pub fn method_args(k: Checked, e: ast.Expr, args: [ast.Expr]) -> [ast.Expr] {
     let mut out: [ast.Expr] = []
     match e.kind {
         ast.ExprKind.Call(callee, _) => {
-            match callee.kind { ast.ExprKind.Field(obj, _) => push(mut out, obj), _ => {} }
+            match callee.kind {
+                ast.ExprKind.Field(obj, _) => {
+                    match maps.get(k.mutations, e.id) {
+                        Some(spare) => push(mut out, ast.Expr { kind: ast.ExprKind.MutArg(obj), line: obj.line, col: obj.col, id: spare })
+                        None => push(mut out, obj)
+                    }
+                }
+                _ => {}
+            }
         }
         _ => {}
     }

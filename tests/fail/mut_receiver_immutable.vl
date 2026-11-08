@@ -1,0 +1,8 @@
+// err: mut_receiver_immutable.vl:7:5: error: cannot change 's', which was declared with 'let'; use 'let mut' to allow changes [E3061]
+type Stack = struct { items: [Int] }
+fn Stack.push(s: mut Stack, x: Int) { push(mut s.items, x) }
+
+fn main() {
+    let s = Stack { items: [] }
+    s.push(1)
+}

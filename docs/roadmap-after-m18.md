@@ -386,7 +386,7 @@ corpus change is recorded as the decision requires.
 
 ## M33: Mutable receivers
 
-**Status:** planned.
+**Status:** implemented; see [the walkthrough](history/m33-mutable-receivers.md). A mutating method is called `s.push(x)`, non-escaping function parameters are written `f: scoped fn(T)`, and arrays and maps keep their free functions (decided 2026-11-08).
 
 **Needs:** M30.
 
