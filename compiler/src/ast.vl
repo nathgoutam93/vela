@@ -241,6 +241,7 @@ pub type TypeDecl = struct {
     line: Int
     col: Int
     public: Bool
+    without: [Str]  // interfaces it does not derive (M32): "Eq", "Ord", "Key", "Show"
 }
 
 pub type Import = struct {
@@ -502,6 +503,11 @@ fn sx_type_decl(d: TypeDecl) -> Sx {
             }
             push(mut items, list(parts))
         }
+    }
+    if len(d.without) > 0 {
+        let mut left_out = [atom("without")]
+        for name in d.without { push(mut left_out, atom(name)) }
+        push(mut items, list(left_out))
     }
     return list(items)
 }

@@ -367,7 +367,7 @@ in the audit are accepted.
 
 ## M32: Derived conformances
 
-**Status:** planned.
+**Status:** implemented; see [the walkthrough](history/m32-derived-conformances.md). The opt-out is a `without` clause, arrays derive all four interfaces and maps Eq and Show, and there is no panicking extractor (decided 2026-11-07); fixed arrays derive nothing.
 
 **Needs:** M30.
 

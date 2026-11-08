@@ -1,0 +1,52 @@
+// Option and Result methods (M32): is_some/is_none, is_ok/is_err,
+// unwrap_or, map, and_then, ok_or and map_err.
+// out: true
+// out: true
+// out: 8
+// out: 0
+// out: Some(16)
+// out: None
+// out: Err("empty")
+// out: Ok(12)
+// out: Err("not a number: x")
+// out: Err("negative")
+// out: 10
+// out: Err(15)
+// out: true
+// out: true
+import text
+
+fn double(x: Int) -> Int { return x * 2 }
+
+fn half(x: Int) -> Option[Int] {
+    if x % 2 != 0 { return None }
+    return Some(x / 2)
+}
+
+fn parse(s: Str) -> Result[Int, Str] { return text.parse_int(s).ok_or("not a number: " + s) }
+
+fn checked(s: Str) -> Result[Int, Str] {
+    return parse(s).and_then(fn(n: Int) -> Result[Int, Str] {
+        if n < 0 { return Err("negative") }
+        return Ok(n)
+    })
+}
+
+fn main() {
+    let some: Option[Int] = Some(8)
+    let none: Option[Int] = None
+    print(some.is_some())
+    print(none.is_none())
+    print(some.unwrap_or(0))
+    print(none.unwrap_or(0))
+    print(some.map(double))
+    print(some.and_then(half).and_then(half).and_then(half).and_then(half))
+    print(none.ok_or("empty"))
+    print(parse("12"))
+    print(parse("x"))
+    print(checked("-3"))
+    print(checked("5").map(double).unwrap_or(0))
+    print(parse("x").map_err(fn(e: Str) => len(e)))
+    print(parse("x").is_err())
+    print(parse("1").is_ok())
+}

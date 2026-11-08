@@ -68,7 +68,8 @@ integer literal; the positive magnitude need not fit the signed type first.
 An interpolated string begins with `f"`, such as `f"user {name}"`. Each
 brace-delimited hole is an ordinary expression and evaluates left to right.
 Str, Bool, Float, and every integer type convert to text (a Byte, being
-`u8`, as its number: `f"{'a'}"` is `"97"`); other types are rejected. Write
+`u8`, as its number: `f"{'a'}"` is `"97"`); a value of any other type that
+implements Show is written by its `show` (E3234 otherwise). Write
 `{{` or `}}` for a literal brace; a single `}` outside a hole is an error.
 Interpolated strings use the same escapes as ordinary strings.
 
@@ -84,8 +85,8 @@ import NAME
 [pub] fn NAME[TYPE_PARAMETERS](PARAMETERS) [-> TYPE] [uses EFFECTS]
     [requires BOOL_EXPRESSION] [ensures BOOL_EXPRESSION] { STATEMENTS }
 [pub] const NAME [: TYPE] = INITIALIZER
-[pub] type NAME[TYPE_PARAMETERS] = struct { FIELDS }
-[pub] type NAME[TYPE_PARAMETERS] = enum { VARIANTS }
+[pub] type NAME[TYPE_PARAMETERS] = struct { FIELDS } [without INTERFACES]
+[pub] type NAME[TYPE_PARAMETERS] = enum { VARIANTS } [without INTERFACES]
 [pub] type NAME = interface [: PARENTS] { METHOD_SIGNATURES }
 test "description" { STATEMENTS }
 [pub] extern fn NAME(PARAMETERS [, ...]) [-> SCALAR] uses unsafe [= "C_symbol"]
@@ -242,11 +243,15 @@ Use parentheses to make grouping explicit. Bool conditions have no implicit
 truthiness. `&&` evaluates its right operand only if the left is true; `||`
 only if the left is false. `!` negates Bool. `+` also concatenates two Strs.
 Str comparisons use byte content/order. Equality requires Eq; ordering
-requires the appropriate intrinsic operation or Ord. Structs and payload
-enums, including Result, do not gain derived structural equality. Primitive
-values and enums without payloads have intrinsic equality; Float equality
-has IEEE behavior (NaN is unequal to itself). Function values are not
-equality-comparable. Pointer equality observes the pointer value only.
+requires the appropriate intrinsic operation or Ord. Structs, enums,
+Option, Result, arrays and maps derive them from their parts as described
+under [derived conformances](#derived-conformances). Primitive values and
+enums without payloads have intrinsic equality; Float equality has IEEE
+behavior (NaN is unequal to itself). Function values are not
+equality-comparable. Pointer equality observes the pointer value only. When
+one operand of a comparison needs a type from its context (`None`,
+`Ok(...)`, `Err(...)`, `[]`, `[:]`), it takes the other operand's:
+`r == Ok(1)` checks `Ok(1)` as `r`'s type.
 
 ### Integer arithmetic
 
@@ -337,13 +342,70 @@ The ordinary prelude interfaces are:
 pub type Eq = interface { fn eq(a: Self, b: Self) -> Bool }
 pub type Ord = interface: Eq { fn compare(a: Self, b: Self) -> Int }
 pub type Key = interface: Eq { fn hash(value: Self) -> u64 }
+pub type Show = interface { fn show(value: Self) -> Str }
 ```
 
-Integers, Bool and Str have intrinsic Key; integers, Float and Str have
-intrinsic ordering. Other types may implement the interfaces structurally.
-Implementations must obey equality, ordering and hashing laws; equal map
-keys must hash equally. The compiler checks signatures/effects, not those
-mathematical laws. Invalid laws cannot support reliable map/sort results.
+Integers, Bool and Str have intrinsic Key; integers, Float, Str and Bool
+(`false < true`) have intrinsic ordering; integers, Float, Bool and Str have
+intrinsic Show, writing what interpolation writes. Other types may implement
+the interfaces structurally, or derive them. Implementations must obey
+equality, ordering and hashing laws; equal map keys must hash equally. The
+compiler checks signatures/effects, not those mathematical laws; derived
+implementations obey them except through Float's NaN. Invalid laws cannot
+support reliable map/sort results. `compare` returns a negative number, zero
+or a positive number; derived and intrinsic ones return -1, 0 or 1. A
+module's own type named Show hides the prelude's in that module; `print`
+and interpolation still use the prelude's.
+
+### Derived conformances
+
+A struct or enum meets Eq, Ord, Key and Show without writing a method when:
+
+- its module does not define that method (`eq`, `compare`, `hash`, `show`)
+  for it: a defined method takes the derived one's place, for that interface
+  only;
+- its declaration does not list the interface after `without`, which follows
+  the closing brace on the same line. `without Eq`
+  also leaves out Ord and Key, which extend Eq; listing an interface whose
+  method the module defines is E3244, and a malformed list is E2033;
+- for Ord and Key, Eq is derived too: a type that defines its own `eq` must
+  define `compare` and `hash` itself;
+- every field and variant payload meets the interface. A type reached again
+  through its own parts is assumed to meet it, so recursive types derive.
+
+A generic declaration derives for the instances whose type arguments meet
+the interface, counting only the parameters some field or payload mentions:
+`Pair[Int, Str]` is Key and `Pair[Float, Int]` is not. Enums without
+payloads keep their intrinsic Eq, unless `without Eq` removes it.
+
+Option and Result derive the same way from their payloads, and their
+methods are in the prelude. `[T]` meets Eq, Ord, Key and Show when T does;
+`Map[K, V]` meets Eq (the same keys with equal values, in any order) when V
+does, and Show when K and V do. Fixed arrays, function values and pointers
+derive nothing; raw pointers keep their intrinsic Eq.
+
+Derived `eq` compares every part. Derived `compare` orders fields in
+declaration order, the first difference deciding; variants by declaration
+order, then payloads left to right; arrays element by element, a proper
+prefix first. Option orders `None` before `Some` and Result `Ok` before
+`Err`. Derived `hash` combines the parts' hashes; hash values are not
+specified and may change between releases.
+
+Derived `show` writes a value as source writes it: `Point { x: 1, y: 2 }`,
+`Shape.Circle(1.5)`, `Color.Red`, `Some(3)`, `None`, `Ok("a")`,
+`[1, 2]`, and maps in insertion order as `["a": 1]`, or `[:]` when empty.
+Type names are unqualified and type arguments are left out. A Str inside a
+value is quoted with the string-literal escapes, other control bytes and
+DEL as `\u{HEX}`, and each byte that is not UTF-8 as `\xHH`; a Str on its
+own is written as its bytes. A part whose type defines `show` is written by
+that method, unquoted. `print` and `os.eprint` take a value of any type that
+implements Show and write its text and a newline (E3170 otherwise).
+
+The prelude's methods on Option and Result are `is_some`, `is_none`,
+`is_ok`, `is_err`, `unwrap_or(default)`, `map(f)`, `and_then(f)`,
+`ok_or(error)` (Option) and `map_err(f)` (Result); `map`, `and_then` and
+`map_err` use what `f` uses. Functions of the main module whose receiver is
+an Option or Result are found first, as before.
 
 ## Statements and matching
 
@@ -401,8 +463,9 @@ value. `let mut` with a pattern is rejected (E2032).
 `Option[T]` has Some(T)/None; `Result[T, E]` has Ok(T)/Err(E). Postfix `?`
 extracts a Some/Ok payload, or immediately returns None/Err from the enclosing
 function. The enclosing result family/error type must be compatible. There
-are no implicit error conversions or exceptions. Match explicitly to convert
-errors or assert Result payloads. Panic is separate from Result.
+are no implicit error conversions or exceptions. Match explicitly, or use
+`map_err`, to convert errors; compare Results with `==` when their payloads
+implement Eq. Panic is separate from Result.
 
 ## Effects, contracts and tests
 

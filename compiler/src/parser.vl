@@ -431,7 +431,7 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
     let kind = peek(p, 0)
     let mut decl = ast.TypeDecl {
         name: name.text, params: params, is_struct: true, is_interface: false, parents: [], methods: [], fields: [], variants: [], line: name.line, col: name.col,
-        public: false,
+        public: false, without: [],
     }
     if kind.kind == lexer.Kind.Ident && kind.text == "interface" {
         advance(mut p)
@@ -468,6 +468,7 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
             list_separator(mut p, "struct")?
         }
         advance(mut p)
+        decl.without = without(mut p)?
         return Ok(decl)
     }
     if kind.kind == lexer.Kind.Ident && kind.text == "enum" {
@@ -480,9 +481,33 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
             list_separator(mut p, "enum")?
         }
         advance(mut p)
+        decl.without = without(mut p)?
         return Ok(decl)
     }
     return Err(error(kind, "E2011", "expected 'struct', 'enum' or 'interface' after 'type " + name.text + " ='" + found(kind)))
+}
+
+// `without Eq, Show` after a struct or enum body (M32): the interfaces it
+// does not derive. `without Eq` also leaves out Ord and Key, which extend Eq.
+fn without(p: mut Parser) -> Result[[Str], errors.CompileError] {
+    let mut out: [Str] = []
+    let t = peek(p, 0)
+    if t.kind != lexer.Kind.Ident || t.text != "without" { return Ok(out) }
+    advance(mut p)
+    for {
+        let name = peek(p, 0)
+        if name.kind != lexer.Kind.Ident || name.text != "Eq" && name.text != "Ord" && name.text != "Key" && name.text != "Show" {
+            return Err(error(name, "E2033", "expected Eq, Ord, Key or Show after 'without'" + found(name)))
+        }
+        for done in out {
+            if done == name.text { return Err(error(name, "E2033", "'" + name.text + "' is listed twice after 'without'")) }
+        }
+        advance(mut p)
+        push(mut out, name.text)
+        if peek(p, 0).kind != lexer.Kind.Comma { break }
+        advance(mut p)
+    }
+    return Ok(out)
 }
 
 // Skip the line end before `uses`, `requires` or `ensures` on a line of its

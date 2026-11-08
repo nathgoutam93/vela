@@ -505,6 +505,10 @@ fn type_detail_limit(t: ast.TypeDecl, limit: Int) -> Str {
         strings.add(mut s, "\n    " + lines[i])
     }
     strings.add(mut s, "\n}")
+    for i in 0..len(t.without) {
+        if i == 0 { strings.add(mut s, " without ") } else { strings.add(mut s, ", ") }
+        strings.add(mut s, t.without[i])
+    }
     return strings.build(s)
 }
 
@@ -707,7 +711,8 @@ fn walk_module(b: mut Builder, mi: Int) {
         }
     }
     for id in 0..len(b.k.fns) {
-        if b.k.fns[id].module == mi {
+        // Derived methods and the prelude's have no source of their own to index (M32).
+        if b.k.fns[id].module == mi && !b.k.fns[id].generated && m.name != "<prelude>" {
             function(mut b, id)
         }
     }

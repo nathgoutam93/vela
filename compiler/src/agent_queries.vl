@@ -37,7 +37,7 @@ pub fn function_json(k: checker.Checked, id: Int) -> json.Json {
 pub fn summary(k: checker.Checked, path: Str) -> Result[json.Json, Str] uses fs {
     let paths = names(k); let target = wanted(k, path, paths); if target < 0 { return Err("module is not in this program") }
     let g = call_graph.build(k); let mut functions: [json.Json] = []; let mut constants: [json.Json] = []; let mut types: [json.Json] = []; let mut imports: [json.Json] = []
-    for i in 0..len(k.fns) { let f = k.fns[i]; if f.module != target || f.is_test || (!f.decl.public && f.decl.name != "main") { continue }
+    for i in 0..len(k.fns) { let f = k.fns[i]; if f.module != target || f.is_test || f.generated || (!f.decl.public && f.decl.name != "main") { continue }
         if f.decl.constant {
             push(mut constants, json.object([json.member("name", json.string(f.decl.name)), json.member("signature", json.string(index.constant_signature(k, i))), json.member("line", json.integer(f.decl.line)), json.member("col", json.integer(f.decl.col))]))
             continue

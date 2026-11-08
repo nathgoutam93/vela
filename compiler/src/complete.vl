@@ -202,7 +202,7 @@ fn items(k: checker.Checked, path: Str, member: Bool, chain: [Str]) -> [Item] {
     let lines = index.source_lines(m.source)
     for name in maps.keys(m.fns) {
         let f = k.fns[m.fns[name]]
-        if !f.is_test {
+        if !f.is_test && !f.generated {
             let mut kind = "function"; let mut detail = index.signature(f.decl)
             if f.decl.constant { kind = "constant"; detail = index.constant_signature(k, m.fns[name]) }
             push(mut out, Item {
@@ -288,7 +288,7 @@ fn module_items(k: checker.Checked, target: Int) -> [Item] {
     let lines = index.source_lines(m.source)
     for name in maps.keys(m.fns) {
         let f = k.fns[m.fns[name]]
-        if f.decl.public && !f.is_test {
+        if f.decl.public && !f.is_test && !f.generated {
             let mut kind = "function"; let mut detail = index.signature(f.decl)
             if f.decl.constant { kind = "constant"; detail = index.constant_signature(k, m.fns[name]) }
             push(mut out, Item {
@@ -580,7 +580,7 @@ fn type_members(k: checker.Checked, t: Int, mi: Int) -> [Item] {
     let prefix = ti.name + "."
     for f in k.fns {
         let name = f.decl.name
-        if k.modules[f.module].name != ti.module || (f.module != mi && !f.decl.public) { continue }
+        if k.modules[f.module].name != ti.module || (f.module != mi && !f.decl.public) || f.generated { continue }
         if len(name) > len(prefix) && name[0..len(prefix)] == prefix {
             push(mut out, Item { name: name[len(prefix)..len(name)], kind: "function", detail: index.signature(f.decl), doc: "A function on this type." })
         }

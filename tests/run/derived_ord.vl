@@ -1,0 +1,43 @@
+// Derived Ord (M32): fields compare in declaration order, variants in
+// declaration order and then by payload; arrays compare element by element,
+// a prefix first; None < Some and Ok < Err; false < true.
+// out: [Version { major: 0, minor: 9 }, Version { major: 1, minor: 0 }, Version { major: 1, minor: 2 }]
+// out: true
+// out: true
+// out: true
+// out: [Size.Small, Size.Medium, Size.Large]
+// out: [Token.Number(1), Token.Number(2), Token.Word("a"), Token.Word("b"), Token.End]
+// out: true
+// out: true
+// out: true
+// out: true
+// out: true
+// out: true
+// out: 0
+// out: 1
+import lists
+
+type Version = struct { major: Int, minor: Int }
+type Size = enum { Small, Medium, Large }
+type Token = enum { Number(Int), Word(Str), End }
+type Ranked[T] = struct { rank: Int, item: T }
+
+fn main() {
+    let vs = [Version { major: 1, minor: 2 }, Version { major: 0, minor: 9 }, Version { major: 1, minor: 0 }]
+    print(lists.sort_by(vs, fn(v: Version) => v))
+    print(Version { major: 1, minor: 2 } < Version { major: 1, minor: 3 })
+    print(Version { major: 2, minor: 0 } >= Version { major: 1, minor: 9 })
+    print(Size.Small < Size.Large)
+    print(lists.sort_by([Size.Large, Size.Small, Size.Medium], fn(s: Size) => s))
+    print(lists.sort_by([Token.End, Token.Word("b"), Token.Number(2), Token.Word("a"), Token.Number(1)], fn(t: Token) => t))
+    print(Ranked { rank: 1, item: "b" } < Ranked { rank: 1, item: "c" })
+    print([1, 2] < [1, 2, 0])
+    print([2] > [1, 9, 9])
+    let none: Option[Int] = None
+    print(none < Some(0))
+    let ok: Result[Int, Int] = Ok(9)
+    print(ok < Err(0))
+    print(false < true)
+    print(Version { major: 1, minor: 2 }.compare(Version { major: 1, minor: 2 }))
+    print(Size.Large.compare(Size.Small))
+}

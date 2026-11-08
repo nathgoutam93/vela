@@ -1,0 +1,7 @@
+// err: show_function_field.vl:6:21: error: an interpolated value must implement Show, and Button does not; field 'on_click' is fn() -> Int, which does not implement Show [E3234]
+type Button = struct { label: Str, on_click: fn() -> Int }
+
+fn main() {
+    let b = Button { label: "ok", on_click: fn() => 1 }
+    print(f"button {b}")
+}

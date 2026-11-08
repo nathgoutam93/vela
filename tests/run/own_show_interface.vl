@@ -1,0 +1,16 @@
+// A main module's own type named Show keeps its meaning there (M32): the
+// bound `T: Show` is the module's interface, while print and interpolation
+// use the prelude's Show.
+// out: P
+// out: Point { x: 2 }
+type Show = interface { fn render(value: Self) -> Str }
+type Point = struct { x: Int }
+
+fn Point.render(p: Point) -> Str { return "P" }
+
+fn draw[T: Show](v: T) -> Str { return v.render() }
+
+fn main() {
+    print(draw(Point { x: 1 }))
+    print(Point { x: 2 })
+}

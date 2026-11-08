@@ -1,0 +1,81 @@
+// The laws on derived implementations (M32), checked over every triple of
+// values decoded from property samples: eq is reflexive, symmetric and
+// transitive; compare is antisymmetric, transitive and 0 exactly when eq
+// holds; equal values hash equally; show tells unequal values apart.
+// out: Token: 0 violations in 13824 triples
+// out: Option[[Token]]: 0 violations in 13824 triples
+// out: Result[Point, Str]: 0 violations in 13824 triples
+import property
+
+type Point = struct { x: Int, y: Int }
+type Token = enum { Number(Int), Word(Str), Pair(Point, Bool), End }
+
+fn small(bits: u64, shift: u64) -> Int { return int((bits >> shift) & 3u64) }
+
+fn point(bits: u64) -> Point { return Point { x: small(bits, 4u64), y: small(bits, 6u64) } }
+
+fn token(bits: u64) -> Token {
+    return match small(bits, 0u64) {
+        0 => Token.Number(small(bits, 2u64)),
+        1 => Token.Word(["a", "b", "ab", ""][small(bits, 2u64)]),
+        2 => Token.Pair(point(bits), small(bits, 8u64) > 1),
+        _ => Token.End,
+    }
+}
+
+fn tokens(bits: u64) -> Option[[Token]] {
+    if small(bits, 10u64) == 0 { return None }
+    let mut out: [Token] = []
+    for i in 0..small(bits, 12u64) { push(mut out, token(bits >> u64(14 + 10 * i))) }
+    return Some(out)
+}
+
+fn outcome(bits: u64) -> Result[Point, Str] {
+    if small(bits, 0u64) == 0 { return Err(["x", "y", "", "x"][small(bits, 2u64)]) }
+    return Ok(point(bits))
+}
+
+fn sign(n: Int) -> Int {
+    if n < 0 { return -1 }
+    if n > 0 { return 1 }
+    return 0
+}
+
+fn violations[T: Key + Ord + Show](values: [T]) -> Int {
+    let mut bad = 0
+    for a in values {
+        if a != a { bad = bad + 1 }
+        for b in values {
+            if (a == b) != (b == a) { bad = bad + 1 }
+            if sign(a.compare(b)) != -sign(b.compare(a)) { bad = bad + 1 }
+            if (a.compare(b) == 0) != (a == b) { bad = bad + 1 }
+            if a == b && a.hash() != b.hash() { bad = bad + 1 }
+            if (a.show() == b.show()) != (a == b) { bad = bad + 1 }
+            for c in values {
+                if a == b && b == c && a != c { bad = bad + 1 }
+                if a <= b && b <= c && !(a <= c) { bad = bad + 1 }
+            }
+        }
+    }
+    return bad
+}
+
+fn report[T: Key + Ord + Show](name: Str, values: [T]) {
+    let n = len(values)
+    print(f"{name}: {violations(values)} violations in {n * n * n} triples")
+}
+
+fn main() {
+    let bits = property.samples(property.generator(), 32u64, 24)
+    let mut a: [Token] = []
+    let mut b: [Option[[Token]]] = []
+    let mut c: [Result[Point, Str]] = []
+    for x in bits {
+        push(mut a, token(x))
+        push(mut b, tokens(x))
+        push(mut c, outcome(x))
+    }
+    report("Token", a)
+    report("Option[[Token]]", b)
+    report("Result[Point, Str]", c)
+}
