@@ -4355,6 +4355,87 @@ No additional CI workflow run was requested or launched for reconciliation.
 - **Verify:** on a host with nvim, `python3 run_tests.py nvim_test` passes, and
   the full suite reports 390 tests rather than 389.
 
+### TL-131: Analyses that read match arms assumed every arm unconditional
+
+- **Status:** resolved during M31.
+- **Discovery:** M31, while adding match guards (2026-11-07, branch
+  `m31-expressions`). Found by reading the code for every use of `Arm`, not by
+  a failing program: before M31 no arm could be conditional.
+- **Evidence (observed in source):** `contract_checks.returned_bound` takes the
+  bound of a `match` from its literal arms; `verification.expression` builds a
+  solver term choosing arms by pattern; `lower.counting` (TL-128) reuses a map
+  slot when every arm writes the looked-up key; `codegen.switch_texts` and
+  `switch_spans` (TL-107) choose an arm by literal before testing it. Each
+  reads only `arm.pattern` and `arm.body`.
+- **Impact (suspected, had it shipped):** with a guard, `0 if c => 1` would be
+  treated as always taken: a wrong bound or solver term, an unsound contract
+  check removal, or a switch jumping into an arm whose guard is false.
+- **Resolution:** each declines a match with a guard (`codegen.has_guard`, or
+  `absent()`/`unknown()`), keeping its conservative result. Guarded matches use
+  ordinary tests in both back ends.
+- **Verify:** `tests/run/match_guards.vl` passes on both back ends, including
+  `word` and `digit`: matches of nine Str and Int literal arms, enough for the
+  TL-107 switches, where a false guard on `"2"`/`2` falls to the fallback.
+  When adding another pattern or arm feature, check these five sites.
+
+### TL-132: Method lookup scanned every function for each call
+
+- **Status:** resolved during M32.
+- **Discovery:** M32, profiling `build/vela-dev check compiler/src/main.vl`
+  after adding derived conformances (2026-11-07, branch `m32-derives`).
+- **Evidence (observed):** `checker.lookup_method` looped over every
+  function in the program for each method call, interface check and map-key
+  check. With 556 derived method signatures added, checking the compiler's
+  source went from 0.22 s to 0.30 s on macOS ARM64. Sampling showed the
+  time in the derivation check and in body checking. Suspected cause: the
+  scan, which was linear in the number of functions.
+- **Impact:** every interface conformance and method call paid for the
+  program's size; derivation multiplied the calls.
+- **Resolution:** `Checker.methods` (and `Checked.methods`) index functions
+  with parameters by module and name, filled as each is declared;
+  `lookup_in` tries only those, in declaration order, so the first match is
+  the one the scan found. Derived bodies are also parsed and checked only
+  when used (`check_derived`).
+- **Verify:** `build/vela-dev check compiler/src/main.vl` takes the same
+  time as the M31 compiler (0.23 s against 0.22 s on the discovery host);
+  both suites pass.
+
+### TL-133: A generic method calling itself left its type arguments unbound
+
+- **Status:** resolved during M32.
+- **Discovery:** M32, `tests/run/generics.vl` failed with E3031 "method type
+  arguments cannot be inferred" at `type Tree[T]`, once Tree derived Eq.
+- **Evidence (observed):** `checker.method_unify` returned true at once when
+  the receiver pattern was the very type being matched. Inside
+  `fn Tree.eq[T: Eq](a: Tree[T], b: Tree[T])`, comparing two `Tree[T]`
+  payloads unifies `Tree[T]` with itself, so `T` stayed unbound.
+- **Impact:** a hand-written recursive generic method used through an
+  interface had the same failure before M32; derived methods on recursive
+  generic types made it common.
+- **Resolution:** the shortcut applies only to closed types; open ones
+  recurse into their arguments and bind the parameters.
+- **Verify:** `tests/run/generics.vl` and `tests/run/derived_eq.vl` (a
+  recursive `Tree`) pass on both back ends.
+
+### TL-134: A closure's constructor result cannot take its type from a generic method's parameter
+
+- **Status:** open; deferred (inference beyond M32's scope).
+- **Discovery:** M32, writing `tests/run/option_methods.vl`.
+- **Evidence (observed):**
+  `parse(s).and_then(fn(n: Int) => if n >= 0 { Ok(n) } else { Err("negative") })`
+  reports E3140 "cannot tell which Result this Ok(...) is", although
+  `and_then` wants `fn(T) -> Result[U, E]` and E is known from the receiver.
+  Suspected cause: the closure is checked before U is known, and the
+  expected function type's result is not passed into the closure body.
+- **Impact:** short closures passed to `map`, `and_then` and `map_err` need
+  an explicit result type when they build an Option or Result.
+- **Workaround:** write the closure with its result type,
+  `fn(n: Int) -> Result[Int, Str] { ... }`.
+- **Proposed improvement:** check a closure argument against the expected
+  function type with the unknown parameters left open, so its result
+  constructors take E from the receiver and fix U.
+- **Verify:** the expression above checks and runs on both back ends.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;

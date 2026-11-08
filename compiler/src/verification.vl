@@ -93,7 +93,7 @@ fn expression(k: checker.Checked, values: Map[Int, Term], e: ast.Expr, fuel: Int
         ast.ExprKind.Match(subject, arms) => {
             let value = expression(k, values, subject, fuel / 2); if !value.ok { return unknown() }; let mut out = unknown(); let mut i = len(arms) - 1
             for i >= 0 {
-                let arm = arms[i]; let mut v = unknown(); match arm.body { ast.ArmBody.Value(x) => v = expression(k, values, x, fuel / 2), _ => {} }
+                let arm = arms[i]; match arm.guard { Some(_) => return unknown(), None => {} }; let mut v = unknown(); match arm.body { ast.ArmBody.Value(x) => v = expression(k, values, x, fuel / 2), _ => {} }
                 if !v.ok { return unknown() }
                 match arm.pattern.kind {
                     ast.PatternKind.Wild => out = v

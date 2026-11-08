@@ -1,0 +1,11 @@
+// err: guard_not_exhaustive.vl:3:12: error: match is not exhaustive: add a '_' arm for the Int values not listed; guarded arms do not count, since their conditions may be false [E3067]
+fn sign(n: Int) -> Int {
+    return match n {
+        x if x > 0 => 1,
+        x if x <= 0 => -1,
+    }
+}
+
+fn main() {
+    print(sign(1))
+}

@@ -111,7 +111,7 @@ def rejected(c, work, env):
         ('type I = interface { fn f(x: mut Self) -> Int }', 'E3191'),
         ('type I = interface { fn f[T](x: Self) -> Int }', 'E3191'),
         ('type I = interface { fn f(x: Self) -> Int }\ntype X = struct { n: Int }\nfn X.f(x: X) -> Int uses fs { return 1 }\nfn use[T: I](x: T) {}\nfn main() { use(X { n: 1 }) }', 'E3031'),
-        ('type X = struct { n: Int }\nfn X.hash(x: X) -> u64 { return 0u64 }\nfn main() { let m: Map[X, Int] = [:] }', 'E3026'),
+        ('type X = struct { f: fn() -> Int }\nfn X.hash(x: X) -> u64 { return 0u64 }\nfn main() { let m: Map[X, Int] = [:] }', 'E3026'),
     ]
     for source, code in cases:
         p = work/'bad.vl'
@@ -167,11 +167,13 @@ fn main() { let x = Item { n: 1 }; print(x.bump()); print(Item.show(x)); print(r
 def obligations(c, work, env):
     p = work/'obligation.vl'
     item = 'type Item = struct { n: Int }\n'
+    # Since M32 a plain Item derives Eq and Key; `without Eq` keeps it without.
+    bare = 'type Item = struct { n: Int } without Eq\n'
     eq = 'fn Item.eq(a: Item, b: Item) -> Bool { return a.n == b.n }\n'
     key = 'fn main() { let m: Map[Item, Int] = [:] }\n'
     cases = [
-        (item+key, 'E3026', ('Key requires Eq', 'Eq.eq', 'expected fn(Item, Item) -> Bool', 'missing')),
-        (item+eq+key, 'E3026', ('Key.hash', 'expected fn(Item) -> u64', 'missing')),
+        (bare+key, 'E3026', ('leaves out Eq with `without`', 'Key extends Eq')),
+        (item+eq+key, 'E3026', ('defines its own eq', 'must define hash')),
         (item+eq+'fn Item.hash(x: Item) -> Int { return x.n }\n'+key,
          'E3026', ('expected fn(Item) -> u64', 'found fn(Item) -> Int')),
         (item+'fn Item.eq(a: Item, b: Int) -> Bool { return true }\n'+key,
@@ -179,10 +181,10 @@ def obligations(c, work, env):
         (item+eq+'fn Item.hash(x: Item) -> u64 uses fs { return 0u64 }\n'+key,
          'E3026', ('expected fn(Item) -> u64', 'found fn(Item) -> u64 uses fs')),
         # Deferred declarations and inferred map literals use the same explanation.
-        (item+'type Index = struct { m: Map[Item, Int] }\n',
-         'E3026', ('Key requires Eq', 'Eq.eq', 'missing')),
-        (item+'fn main() { let m = [Item { n: 1 }: 2] }\n',
-         'E3116', ('Key requires Eq', 'Eq.eq', 'missing')),
+        (bare+'type Index = struct { m: Map[Item, Int] }\n',
+         'E3026', ('leaves out Eq with `without`', 'Key extends Eq')),
+        (bare+'fn main() { let m = [Item { n: 1 }: 2] }\n',
+         'E3116', ('leaves out Eq with `without`', 'Key extends Eq')),
         (item+'type Parent = interface { fn read(x: Self) -> Int }\n'
          'type Child = interface: Parent {}\n'
          'fn Item.read(x: Item) -> Str { return "wrong" }\n'

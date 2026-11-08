@@ -1127,9 +1127,20 @@ fn changed_stmt(k: checker.Checked, st: ast.Stmt, out: mut Map[Int, Bool]) {
 
 fn changed_arms(k: checker.Checked, arms: [ast.Arm], out: mut Map[Int, Bool]) {
     for a in arms {
+        match a.guard {
+            Some(g) => changed_expr(k, g, mut out)
+            None => {}
+        }
         match a.body {
             ast.ArmBody.Value(v) => changed_expr(k, v, mut out)
             ast.ArmBody.Do(st) => changed_stmt(k, st, mut out)
+            ast.ArmBody.Valued(b, value) => {
+                changed_block(k, b, mut out)
+                match value {
+                    Some(v) => changed_expr(k, v, mut out)
+                    None => {}
+                }
+            }
         }
     }
 }
@@ -1289,9 +1300,20 @@ fn walk_arms(w: mut Walk, arms: [ast.Arm]) {
     for a in arms {
         w.env = before
         w.dead = false
+        match a.guard {
+            Some(g) => walk_expr(mut w, g)
+            None => {}
+        }
         match a.body {
             ast.ArmBody.Value(v) => walk_expr(mut w, v)
             ast.ArmBody.Do(st) => walk_stmt(mut w, st)
+            ast.ArmBody.Valued(b, value) => {
+                walk_block(mut w, b)
+                match value {
+                    Some(v) => walk_expr(mut w, v)
+                    None => {}
+                }
+            }
         }
         if !w.dead {
             if first {

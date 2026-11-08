@@ -198,8 +198,8 @@ fn continues(p: Piece) -> Bool {
     if is_binary(p.kind) && !p.unary {
         return true
     }
-    return p.kind == lexer.Kind.Eq || p.kind == lexer.Kind.FatArrow || p.kind == lexer.Kind.Arrow ||
-        p.kind == lexer.Kind.Dot
+    return p.kind == lexer.Kind.Eq || p.kind == lexer.Kind.AssignOp || p.kind == lexer.Kind.FatArrow ||
+        p.kind == lexer.Kind.Arrow || p.kind == lexer.Kind.Dot
 }
 
 // The start of a line that continues a function's signature.
@@ -219,6 +219,11 @@ fn space(a: Piece, b: Piece) -> Bool {
     let bk = b.kind
     if ak == lexer.Kind.LParen || ak == lexer.Kind.LBracket || ak == lexer.Kind.Dot || a.unary {
         return false
+    }
+    // `Point { x, .. }` (M31): the rest of a struct pattern is spaced as a field.
+    if ak == lexer.Kind.Comma && bk == lexer.Kind.DotDot || ak == lexer.Kind.LBrace && bk == lexer.Kind.DotDot ||
+        ak == lexer.Kind.DotDot && bk == lexer.Kind.RBrace {
+        return true
     }
     if ak == lexer.Kind.DotDot || ak == lexer.Kind.DotDotEq || bk == lexer.Kind.DotDot || bk == lexer.Kind.DotDotEq {
         return false

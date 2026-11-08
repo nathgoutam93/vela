@@ -11,7 +11,7 @@
 //     vela check --json FILE      the same, as one JSON document on stdout
 //     vela explain CODE           explain a stable diagnostic code
 //     vela fix [--dry-run] FILE    apply diagnostic edits to local sources
-//     vela guide                  generate a compact language reference
+//     vela guide [--all]          generate a compact language reference; --all adds module signatures
 //     vela tokens FILE            print the token stream
 //     vela ast FILE               print the syntax tree
 //     vela fmt [-w | -l] FILE...  print the files formatted; -w rewrites them,
@@ -85,6 +85,10 @@ fn main() {
     }
     if len(args) == 2 && args[1] == "guide" {
         print(guide.reference(root_dir()))
+        return
+    }
+    if len(args) == 3 && args[1] == "guide" && args[2] == "--all" {
+        print(guide.reference_all(root_dir()))
         return
     }
     if len(args) < 2 || len(args) < 3 && args[1] != "get" {

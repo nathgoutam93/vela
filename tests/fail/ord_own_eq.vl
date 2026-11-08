@@ -1,0 +1,10 @@
+// err: ord_own_eq.vl:9:30: error: Name values cannot be ordered with '<': Name defines its own eq, so it must define compare too: a derived one could disagree with it [E3106]
+type Name = struct { text: Str }
+
+// Names are equal ignoring case of the first byte, so a derived compare
+// would disagree: Name must define compare itself to be ordered.
+fn Name.eq(a: Name, b: Name) -> Bool { return len(a.text) == len(b.text) }
+
+fn main() {
+    print(Name { text: "a" } < Name { text: "b" })
+}

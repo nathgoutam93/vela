@@ -1,0 +1,42 @@
+// Derived Key (M32): structs and enums whose parts are keys are map keys;
+// equal values hash equally.
+// out: 2
+// out: Cell.Item("key")
+// out: false
+// out: [Cell.Wall: 2, Cell.Item("a"): 2, Cell.Item("b"): 1]
+// out: true
+// out: false
+// out: true
+// out: one
+import maps
+
+type Point = struct { x: Int, y: Int }
+type Cell = enum { Empty, Wall, Item(Str) }
+type Pair[A, B] = struct { a: A, b: B }
+
+fn main() {
+    let mut grid: Map[Point, Cell] = [:]
+    grid[Point { x: 0, y: 0 }] = Cell.Wall
+    grid[Point { x: 1, y: 0 }] = Cell.Item("key")
+    grid[Point { x: 0, y: 0 }] = Cell.Empty
+    print(len(grid))
+    print(grid[Point { x: 1, y: 0 }])
+    print(maps.has(grid, Point { x: 2, y: 2 }))
+    let mut seen: Map[Cell, Int] = [:]
+    for c in [Cell.Wall, Cell.Item("a"), Cell.Wall, Cell.Item("a"), Cell.Item("b")] {
+        match maps.get(seen, c) {
+            Some(n) => seen[c] = n + 1
+            None => seen[c] = 1
+        }
+    }
+    print(seen)
+    let mut pairs: Map[Pair[Str, [Int]], Bool] = [:]
+    pairs[Pair { a: "x", b: [1, 2] }] = true
+    print(maps.has(pairs, Pair { a: "x", b: [1, 2] }))
+    print(maps.has(pairs, Pair { a: "x", b: [2, 1] }))
+    print(Point { x: 3, y: 4 }.hash() == Point { x: 3, y: 4 }.hash())
+    let mut opts: Map[Option[Int], Str] = [:]
+    opts[None] = "none"
+    opts[Some(1)] = "one"
+    print(opts[Some(1)])
+}

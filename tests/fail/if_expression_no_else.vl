@@ -1,0 +1,5 @@
+// err: if_expression_no_else.vl:3:26: error: an 'if' that gives a value needs an 'else' for when its condition is false, found newline [E2030]
+fn main() {
+    let x = if true { 1 }
+    print(x)
+}

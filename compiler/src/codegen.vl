@@ -158,7 +158,7 @@ fn program(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: Int,
     }
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
-        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) {
+        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && !k.fns[id].skipped && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) {
             push(mut roots, id)
         }
     }
@@ -1520,10 +1520,148 @@ fn unchanging(g: Gen, e: ast.Expr) -> Bool {
 
 // An if / else-if chain, one test per arm, in order; the last arm is a
 // plain `else`, since the checker proved the arms exhaustive.
+pub fn has_guard(arms: [ast.Arm]) -> Bool {
+    for a in arms {
+        match a.guard {
+            Some(_) => return true
+            None => {}
+        }
+    }
+    return false
+}
+
+// The C condition that holds when the value at `path` matches `p`.
+fn condition(g: mut Gen, p: ast.Pattern, path: Str, t: Int) -> Str {
+    let tests = tests(mut g, p, path, t)
+    let mut cond = strings.builder()
+    for j in 0..len(tests) {
+        if j > 0 {
+            strings.add(mut cond, " && ")
+        }
+        strings.add(mut cond, tests[j])
+    }
+    let c = strings.build(cond)
+    if c == "" {
+        return "true"
+    }
+    return c
+}
+
+// Declare an arm's bindings in the current frame.
+fn bind_arm(g: mut Gen, a: ast.Arm, v: Str, t: Int, borrowed: Bool) {
+    for bound in bindings(g, a.pattern, v, t) {
+        if borrowed {
+            // Borrowed from a variable nothing can change (M16b), as a
+            // parameter is: whatever keeps it retains it then.
+            let name = local(mut g, bound.local)
+            emit(mut g, c_type(g, local_ty(g, bound.local)) + " " + name + " = " + bound.path + ";")
+        } else {
+            // A binding is a copy of part of the value: it gets a reference of its own.
+            let name = declare(mut g, bound.local, bound.path)
+            emit(mut g, retain(mut g, local_ty(g, bound.local), name))
+        }
+    }
+}
+
+// An arm's body: its statements, or its value stored in the result.
+fn arm_body(g: mut Gen, a: ast.Arm, code: ArmCode) {
+    match code {
+        ArmCode.Statements => {
+            match a.body {
+                ast.ArmBody.Do(s) => {
+                    match s.kind {
+                        ast.StmtKind.Block(b) => {
+                            for inner in b.stmts {
+                                stmt(mut g, inner)
+                            }
+                        }
+                        _ => stmt(mut g, s)
+                    }
+                }
+                _ => {}
+            }
+        }
+        ArmCode.StoreIn(result) => {
+            match a.body {
+                ast.ArmBody.Value(e) => {
+                    let c = consume(mut g, expr(mut g, e))
+                    emit(mut g, result + " = " + c + ";")
+                }
+                ast.ArmBody.Valued(b, value) => {
+                    // A block arm (M31): its statements, then its value.
+                    for inner in b.stmts {
+                        stmt(mut g, inner)
+                    }
+                    match value {
+                        Some(e) => {
+                            if !g.dead {
+                                let c = consume(mut g, expr(mut g, e))
+                                emit(mut g, result + " = " + c + ";")
+                            }
+                        }
+                        None => {}
+                    }
+                }
+                ast.ArmBody.Do(_) => {}
+            }
+        }
+    }
+}
+
+// A match with a guard (M31). A failed guard goes on to the next arm, so the
+// arms are separate tests of a flag rather than an else-if chain:
+//     if (!done && TESTS) { BINDINGS; if (GUARD) { done = true; BODY } }
+// The last arm has no guard and no tests: the arms cover every value.
+fn guarded_match_code(g: mut Gen, v: Str, t: Int, borrowed: Bool, arms: [ast.Arm], code: ArmCode) {
+    let done = new_temp(mut g)
+    emit(mut g, "bool " + done + " = false;")
+    let mut all_end = true
+    let before = g.found
+    for i in 0..len(arms) {
+        let a = arms[i]
+        g.dead = false
+        g.found = before
+        if i == len(arms) - 1 {
+            open(mut g, "if (!" + done + ") {")
+        } else {
+            open(mut g, "if (!" + done + " && (" + condition(mut g, a.pattern, v, t) + ")) {")
+        }
+        push_frame(mut g, "arm")
+        bind_arm(mut g, a, v, t, borrowed)
+        let mut guarded = false
+        match a.guard {
+            Some(cond) => {
+                guarded = true
+                let c = expr(mut g, cond).c
+                open(mut g, "if (" + c + ") {")
+            }
+            None => {}
+        }
+        emit(mut g, done + " = true;")
+        push_frame(mut g, "block")
+        arm_body(mut g, a, code)
+        if !g.dead {
+            all_end = false
+        }
+        pop_frame(mut g)
+        if guarded {
+            close(mut g, "}")
+        }
+        pop_frame(mut g)
+        close(mut g, "}")
+    }
+    g.found = before
+    g.dead = all_end
+}
+
 fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
     let v = expr(mut g, scrutinee).c
     let t = ty(g, scrutinee)
     let borrowed = unchanging(g, scrutinee)
+    if has_guard(arms) {
+        guarded_match_code(mut g, v, t, borrowed, arms, code)
+        return
+    }
     // Many Str literals: the arm is chosen first, then tested by number.
     let texts = switch_texts(arms)
     let mut spans: [Span] = []
@@ -1551,18 +1689,11 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
                 open(mut g, "{")
             }
         } else {
-            let mut tests = tests(mut g, a.pattern, v, t)
-            if chosen != "" { tests = [chosen + " == " + strings.from_int(i)] }
-            let mut cond = strings.builder()
-            for j in 0..len(tests) {
-                if j > 0 {
-                    strings.add(mut cond, " && ")
-                }
-                strings.add(mut cond, tests[j])
-            }
-            let mut c = strings.build(cond)
-            if c == "" {
-                c = "true"
+            let mut c = ""
+            if chosen != "" {
+                c = chosen + " == " + strings.from_int(i)
+            } else {
+                c = condition(mut g, a.pattern, v, t)
             }
             if i > 0 {
                 open(mut g, "} else if (" + c + ") {")
@@ -1571,44 +1702,8 @@ fn match_code(g: mut Gen, scrutinee: ast.Expr, arms: [ast.Arm], code: ArmCode) {
             }
         }
         push_frame(mut g, "arm")
-        for bound in bindings(g, a.pattern, v, t) {
-            if borrowed {
-                // Borrowed from a variable nothing can change (M16b), as a
-                // parameter is: whatever keeps it retains it then.
-                let name = local(mut g, bound.local)
-                emit(mut g, c_type(g, local_ty(g, bound.local)) + " " + name + " = " + bound.path + ";")
-            } else {
-                // A binding is a copy of part of the value: it gets a reference of its own.
-                let name = declare(mut g, bound.local, bound.path)
-                emit(mut g, retain(mut g, local_ty(g, bound.local), name))
-            }
-        }
-        match code {
-            ArmCode.Statements => {
-                match a.body {
-                    ast.ArmBody.Do(s) => {
-                        match s.kind {
-                            ast.StmtKind.Block(b) => {
-                                for inner in b.stmts {
-                                    stmt(mut g, inner)
-                                }
-                            }
-                            _ => stmt(mut g, s)
-                        }
-                    }
-                    ast.ArmBody.Value(_) => {}
-                }
-            }
-            ArmCode.StoreIn(result) => {
-                match a.body {
-                    ast.ArmBody.Value(e) => {
-                        let c = consume(mut g, expr(mut g, e))
-                        emit(mut g, result + " = " + c + ";")
-                    }
-                    ast.ArmBody.Do(_) => {}
-                }
-            }
-        }
+        bind_arm(mut g, a, v, t, borrowed)
+        arm_body(mut g, a, code)
         if !g.dead {
             all_end = false
         }
@@ -1647,6 +1742,9 @@ fn many_texts() -> Int {
 pub fn switch_texts(arms: [ast.Arm]) -> [Str] {
     let none: [Str] = []
     if len(arms) - 1 < many_texts() {
+        return none
+    }
+    if has_guard(arms) {
         return none
     }
     let mut out: [Str] = []
@@ -1757,6 +1855,9 @@ pub fn switch_spans(arms: [ast.Arm], t: Int) -> [Span] {
     // so that Int order is unsigned order.
     let mut flip = 0
     if t == 13 { flip = integers.min(types.INT()) }
+    if has_guard(arms) {
+        return none
+    }
     let mut taken: [Span] = []  // keys, ascending
     for i in 0..len(arms) - 1 {
         let mut lo = 0
@@ -1970,7 +2071,39 @@ fn tests(g: mut Gen, p: ast.Pattern, path: Str, t: Int) -> [Str] {
             }
             return out
         }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            // `Point { x: 0, .. }` (M31): the named fields' tests.
+            let mut out: [Str] = []
+            for f in fields {
+                let fi = types.field_index(g.k.table, t, f.name)
+                let ft = types.get(g.k.table, t).fields[fi].ty
+                for t2 in tests(mut g, f.pattern, struct_field(g, path, t, f.name, ft), ft) {
+                    push(mut out, t2)
+                }
+            }
+            return out
+        }
+        ast.PatternKind.Or(alternatives) => {
+            // `A | B` (M31): any alternative's tests, each kept whole.
+            let mut b = strings.builder()
+            for i in 0..len(alternatives) {
+                if i > 0 {
+                    strings.add(mut b, " || ")
+                }
+                strings.add(mut b, "(" + condition(mut g, alternatives[i], path, t) + ")")
+            }
+            return [strings.build(b)]
+        }
     }
+}
+
+// The C path to field `name`, of type `ft`, of the struct of type `t` at `path`.
+fn struct_field(g: Gen, path: Str, t: Int, name: Str, ft: Int) -> Str {
+    let member = path + ".m_" + name
+    if layout.is_boxed(g.l, t, name, 0) {
+        return layout.box_value(g.l, ft, member)
+    }
+    return member
 }
 
 fn literal(e: ast.Expr) -> Int {
@@ -1996,6 +2129,14 @@ fn bindings(g: Gen, p: ast.Pattern, path: Str, t: Int) -> [Binding] {
             let v = types.get(g.k.table, r[0]).variants[r[1]]
             for i in 0..len(args) {
                 for b in bindings(g, args[i], payload(g, path, r[0], r[1], i), v.payload[i]) {
+                    push(mut out, b)
+                }
+            }
+        }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            for f in fields {
+                let ft = types.get(g.k.table, t).fields[types.field_index(g.k.table, t, f.name)].ty
+                for b in bindings(g, f.pattern, struct_field(g, path, t, f.name, ft), ft) {
                     push(mut out, b)
                 }
             }
@@ -2176,7 +2317,11 @@ fn interpolate(g: mut Gen, parts: [ast.InterpolationPart]) -> Value {
         match parts[i] {
             ast.InterpolationPart.Text(s) => emit(mut g, slot + " = " + string_literal(mut g, s) + ";")
             ast.InterpolationPart.Hole(hole) => {
-                let mut v = expr(mut g, hole)
+                let mut v = no_value()
+                match maps.get(g.k.shows, hole.id) {
+                    Some(spare) => v = show_call(mut g, hole, spare)
+                    None => v = expr(mut g, hole)
+                }
                 if v.ty == types.STR() {
                     if snapshot[hole_index] && !v.owned && !v.is_static {
                         v = store(mut g, types.STR(), consume(mut g, v))
@@ -2872,6 +3017,14 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
         return integer_builtin(mut g, e, name, args)
     }
+    if checker.is_hidden_builtin(name) {
+        let part = ty(g, args[0])
+        if name == "0show" && part == types.STR() {
+            let v = expr(mut g, args[0])
+            return store(mut g, types.STR(), "vela_str_quote(" + v.c + ")")
+        }
+        return method_value(mut g, e, args, part, checker.hidden_method(name))
+    }
     if name == "tasks.map" || name == "tasks.each" {
         return tasks_call(mut g, name, args, t)
     }
@@ -2887,7 +3040,11 @@ fn builtin(g: mut Gen, e: ast.Expr, name: Str, args: [ast.Expr]) -> Value {
         return no_value()
     }
     if name == "print" || name == "os.eprint" {
-        let arg = expr(mut g, args[0])
+        let mut arg = no_value()
+        match maps.get(g.k.shows, args[0].id) {
+            Some(spare) => arg = show_call(mut g, args[0], spare)
+            None => arg = expr(mut g, args[0])
+        }
         let mut func = print_function(arg.ty)
         if name == "os.eprint" {
             func = "vela_eprint" + func[10..len(func)]
@@ -3172,6 +3329,10 @@ fn method_value(g: mut Gen, e: ast.Expr, args: [ast.Expr], t: Int, name: Str) ->
         return out
     }
     let first = expr(mut g, args[0])
+    if name == "show" {
+        if t == types.STR() { return first }
+        return store(mut g, types.STR(), shown(t, first.c))
+    }
     let left = scalar(mut g, t, first.c)
     if name == "hash" {
         return value(scalar(mut g, 13, "vela_hash_value(" + layout.descriptor(g.l, t) + ", &" + left + ")"), 13)
@@ -3181,6 +3342,12 @@ fn method_value(g: mut Gen, e: ast.Expr, args: [ast.Expr], t: Int, name: Str) ->
     if name == "eq" { return equal }
     let less = operation(mut g, e, "<", left, right, t)
     return value(scalar(mut g, types.INT(), "(" + equal.c + " ? 0 : (" + less.c + " ? -1 : 1))"), types.INT())
+}
+
+// `hole.show()`, for a value the checker writes by its type's show (M32).
+fn show_call(g: mut Gen, hole: ast.Expr, spare: Int) -> Value {
+    let call = ast.Expr { kind: ast.ExprKind.UnitLit, line: hole.line, col: hole.col, id: spare }
+    return method_value(mut g, call, [hole], ty(g, hole), "show")
 }
 
 fn dispatch_name(k: checker.Checked, names: Map[Str, Str], dispatch: checker.Dispatch) -> Str {

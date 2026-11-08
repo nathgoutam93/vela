@@ -88,6 +88,7 @@ fn starts_expression(k: lexer.Kind) -> Bool {
         lexer.Kind.Tilde => true
         lexer.Kind.LParen => true
         lexer.Kind.Match => true
+        lexer.Kind.If => true
         lexer.Kind.Fn => true
         _ => false
     }
@@ -430,7 +431,7 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
     let kind = peek(p, 0)
     let mut decl = ast.TypeDecl {
         name: name.text, params: params, is_struct: true, is_interface: false, parents: [], methods: [], fields: [], variants: [], line: name.line, col: name.col,
-        public: false,
+        public: false, without: [],
     }
     if kind.kind == lexer.Kind.Ident && kind.text == "interface" {
         advance(mut p)
@@ -467,6 +468,7 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
             list_separator(mut p, "struct")?
         }
         advance(mut p)
+        decl.without = without(mut p)?
         return Ok(decl)
     }
     if kind.kind == lexer.Kind.Ident && kind.text == "enum" {
@@ -479,9 +481,33 @@ fn type_decl(p: mut Parser) -> Result[ast.TypeDecl, errors.CompileError] {
             list_separator(mut p, "enum")?
         }
         advance(mut p)
+        decl.without = without(mut p)?
         return Ok(decl)
     }
     return Err(error(kind, "E2011", "expected 'struct', 'enum' or 'interface' after 'type " + name.text + " ='" + found(kind)))
+}
+
+// `without Eq, Show` after a struct or enum body (M32): the interfaces it
+// does not derive. `without Eq` also leaves out Ord and Key, which extend Eq.
+fn without(p: mut Parser) -> Result[[Str], errors.CompileError] {
+    let mut out: [Str] = []
+    let t = peek(p, 0)
+    if t.kind != lexer.Kind.Ident || t.text != "without" { return Ok(out) }
+    advance(mut p)
+    for {
+        let name = peek(p, 0)
+        if name.kind != lexer.Kind.Ident || name.text != "Eq" && name.text != "Ord" && name.text != "Key" && name.text != "Show" {
+            return Err(error(name, "E2033", "expected Eq, Ord, Key or Show after 'without'" + found(name)))
+        }
+        for done in out {
+            if done == name.text { return Err(error(name, "E2033", "'" + name.text + "' is listed twice after 'without'")) }
+        }
+        advance(mut p)
+        push(mut out, name.text)
+        if peek(p, 0).kind != lexer.Kind.Comma { break }
+        advance(mut p)
+    }
+    return Ok(out)
 }
 
 // Skip the line end before `uses`, `requires` or `ensures` on a line of its
@@ -703,9 +729,156 @@ fn block(p: mut Parser, context: Str) -> Result[ast.Block, errors.CompileError] 
 
 // A statement and what ends it; the statement is kept even when its end is wrong.
 fn statement_item(p: mut Parser, stmts: mut [ast.Stmt]) -> Result[Unit, errors.CompileError] {
-    push(mut stmts, statement(mut p)?)
+    if peek(p, 0).kind == lexer.Kind.Let && is_pattern_let(p) {
+        for s in let_pattern(mut p)? {
+            push(mut stmts, s)
+        }
+    } else {
+        push(mut stmts, statement(mut p)?)
+    }
     end_of_item(mut p, "statement")?
     return Ok(())
+}
+
+// ---- `let PATTERN = value else { ... }` (M31) ----
+
+// Whether the `let` here names a pattern, not one variable.
+fn is_pattern_let(p: Parser) -> Bool {
+    let mut i = 1
+    if peek(p, 1).kind == lexer.Kind.Mut {
+        i = 2
+    }
+    if peek(p, i).kind != lexer.Kind.Ident {
+        return false
+    }
+    let next = peek(p, i + 1).kind
+    return next == lexer.Kind.LParen || next == lexer.Kind.Dot || next == lexer.Kind.LBrace
+}
+
+// The statements a pattern `let` stands for. The value goes into a hidden
+// local; a match of it runs the `else` block (which must leave) when the
+// pattern does not match; then each name the pattern binds is a `let` of a
+// one-arm match that takes that part out:
+//     let 0sN = value
+//     match 0sN { PATTERN => {}, _ => ELSE }
+//     let x = match 0sN { PATTERN => x }
+// Without `else`, the pattern must match every value.
+fn let_pattern(p: mut Parser) -> Result[[ast.Stmt], errors.CompileError] {
+    let tok = advance(mut p)  // "let"
+    if peek(p, 0).kind == lexer.Kind.Mut {
+        return Err(error(peek(p, 0), "E2032", "a `let` with a pattern binds read-only names; copy one into a `let mut` after it"))
+    }
+    let pat = pattern(mut p)?
+    let mut annotation: Option[ast.TypeName] = None
+    if peek(p, 0).kind == lexer.Kind.Colon {
+        advance(mut p)
+        annotation = Some(type_name(mut p)?)
+    }
+    expect(mut p, lexer.Kind.Eq, "after the pattern")?
+    let value = expression(mut p, 0)?
+    let hidden = "0s" + strings.from_int(p.next_id)
+    let mut out = [stmt(mut p, ast.StmtKind.Let(hidden, false, annotation, value), tok.line, tok.col)]
+    let mut arms = [ast.Arm {
+        pattern: copy_pattern(mut p, pat, ""), guard: None, sugar: "let",
+        body: ast.ArmBody.Do(stmt(mut p, ast.StmtKind.Block(ast.Block { stmts: [], end_line: tok.line, end_col: tok.col }), tok.line, tok.col)),
+        line: tok.line, col: tok.col,
+    }]
+    if peek(p, 0).kind == lexer.Kind.Else {
+        let else_tok = advance(mut p)
+        let b = block(mut p, "after 'else'")?
+        push(mut arms, ast.Arm {
+            pattern: pattern_node(mut p, ast.PatternKind.Wild, else_tok.line, else_tok.col), guard: None, sugar: "let",
+            body: ast.ArmBody.Do(stmt(mut p, ast.StmtKind.Block(b), else_tok.line, else_tok.col)),
+            line: else_tok.line, col: else_tok.col,
+        })
+    }
+    let scrutinee = expr(mut p, ast.ExprKind.Name(hidden), pat.line, pat.col)
+    push(mut out, stmt(mut p, ast.StmtKind.MatchStmt(scrutinee, arms), pat.line, pat.col))
+    for bound in bound_names(pat) {
+        let mut name = ""
+        match bound.kind {
+            ast.PatternKind.Bind(n) => name = n
+            _ => {}
+        }
+        let one = copy_pattern(mut p, pat, name)
+        let named = expr(mut p, ast.ExprKind.Name(name), bound.line, bound.col)
+        let arm = ast.Arm { pattern: one, guard: None, sugar: "let-bind", body: ast.ArmBody.Value(named), line: bound.line, col: bound.col }
+        let from = expr(mut p, ast.ExprKind.Name(hidden), bound.line, bound.col)
+        let taken = expr(mut p, ast.ExprKind.Match(from, [arm]), bound.line, bound.col)
+        push(mut out, stmt(mut p, ast.StmtKind.Let(name, false, None, taken), bound.line, bound.col))
+    }
+    return Ok(out)
+}
+
+// The names a pattern binds, in source order, where each is bound.
+fn bound_names(pat: ast.Pattern) -> [ast.Pattern] {
+    let mut out: [ast.Pattern] = []
+    match pat.kind {
+        ast.PatternKind.Bind(_) => push(mut out, pat)
+        ast.PatternKind.Variant(_, _, _, _, args) => {
+            for a in args {
+                for b in bound_names(a) {
+                    push(mut out, b)
+                }
+            }
+        }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            for f in fields {
+                for b in bound_names(f.pattern) {
+                    push(mut out, b)
+                }
+            }
+        }
+        ast.PatternKind.Or(alternatives) => {
+            for a in alternatives {
+                for b in bound_names(a) {
+                    push(mut out, b)
+                }
+            }
+        }
+        _ => {}
+    }
+    return out
+}
+
+// A copy of a pattern with new ids, binding only `keep` ("" for none):
+// other names become `_`.
+fn copy_pattern(p: mut Parser, pat: ast.Pattern, keep: Str) -> ast.Pattern {
+    let mut kind = pat.kind
+    match pat.kind {
+        ast.PatternKind.Bind(name) => {
+            if name != keep {
+                kind = ast.PatternKind.Wild
+            }
+        }
+        ast.PatternKind.Lit(e) => kind = ast.PatternKind.Lit(expr(mut p, e.kind, e.line, e.col))
+        ast.PatternKind.Range(lo, hi) => {
+            kind = ast.PatternKind.Range(expr(mut p, lo.kind, lo.line, lo.col), expr(mut p, hi.kind, hi.line, hi.col))
+        }
+        ast.PatternKind.Variant(module, enum, variant, parens, args) => {
+            let mut copies: [ast.Pattern] = []
+            for a in args {
+                push(mut copies, copy_pattern(mut p, a, keep))
+            }
+            kind = ast.PatternKind.Variant(module, enum, variant, parens, copies)
+        }
+        ast.PatternKind.Struct(module, name, fields, rest) => {
+            let mut copies: [ast.FieldPattern] = []
+            for f in fields {
+                push(mut copies, ast.FieldPattern { name: f.name, pattern: copy_pattern(mut p, f.pattern, keep), line: f.line, col: f.col })
+            }
+            kind = ast.PatternKind.Struct(module, name, copies, rest)
+        }
+        ast.PatternKind.Or(alternatives) => {
+            let mut copies: [ast.Pattern] = []
+            for a in alternatives {
+                push(mut copies, copy_pattern(mut p, a, keep))
+            }
+            kind = ast.PatternKind.Or(copies)
+        }
+        ast.PatternKind.Wild => {}
+    }
+    return pattern_node(mut p, kind, pat.line, pat.col)
 }
 
 // After an error in a statement, skip to just after the next `;` outside
@@ -800,7 +973,94 @@ fn simple_statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
         let value = expression(mut p, 0)?
         return Ok(stmt(mut p, ast.StmtKind.Assign(e, value), eq.line, eq.col))
     }
+    if peek(p, 0).kind == lexer.Kind.AssignOp {
+        let op = advance(mut p)
+        if !is_place(e) {
+            return Err(error(op, "E2029", "'" + op.text + "' changes a place: a variable, a field or an index, such as `total " + op.text + " x`"))
+        }
+        let value = expression(mut p, 0)?
+        return Ok(compound(mut p, e, op, value))
+    }
     return Ok(stmt(mut p, ast.StmtKind.ExprStmt(e), e.line, e.col))
+}
+
+// ---- Compound assignment (M31) ----
+
+// `place op= value` is `place = place op value`, except that each index in
+// the place is evaluated once, before the value: into a hidden local, whose
+// name starts with a digit so no source name can refer to it.
+fn compound(p: mut Parser, place: ast.Expr, op: lexer.Token, value: ast.Expr) -> ast.Stmt {
+    let mut lets: [ast.Stmt] = []
+    let target = hoist_indexes(mut p, place, mut lets)
+    let read = copy_place(mut p, target)
+    let operator = op.text[0..len(op.text) - 1]
+    let combined = expr(mut p, ast.ExprKind.Binary(operator, read, value), op.line, op.col)
+    let assign = stmt(mut p, ast.StmtKind.Assign(target, combined), op.line, op.col)
+    if len(lets) == 0 {
+        return assign
+    }
+    push(mut lets, assign)
+    let b = ast.Block { stmts: lets, end_line: op.line, end_col: op.col }
+    return stmt(mut p, ast.StmtKind.Block(b), place.line, place.col)
+}
+
+// A name, or fields and indexes of one: what `op=` can change.
+fn is_place(e: ast.Expr) -> Bool {
+    return match e.kind {
+        ast.ExprKind.Name(_) => true
+        ast.ExprKind.Field(obj, _) => is_place(obj)
+        ast.ExprKind.Index(obj, _) => is_place(obj)
+        _ => false
+    }
+}
+
+fn is_literal(e: ast.Expr) -> Bool {
+    return match e.kind {
+        ast.ExprKind.IntLit(_) => true
+        ast.ExprKind.FixedIntLit(_, _, _) => true
+        ast.ExprKind.ByteLit(_) => true
+        ast.ExprKind.BoolLit(_) => true
+        ast.ExprKind.StrLit(_) => true
+        _ => false
+    }
+}
+
+// The place with each index that is not a literal replaced by a hidden
+// local, in source order; their `let`s are added to `lets`.
+fn hoist_indexes(p: mut Parser, e: ast.Expr, lets: mut [ast.Stmt]) -> ast.Expr {
+    match e.kind {
+        ast.ExprKind.Field(obj, name) => {
+            let inner = hoist_indexes(mut p, obj, mut lets)
+            return expr(mut p, ast.ExprKind.Field(inner, name), e.line, e.col)
+        }
+        ast.ExprKind.Index(obj, i) => {
+            let inner = hoist_indexes(mut p, obj, mut lets)
+            let mut index = i
+            if !is_literal(i) {
+                let name = hidden_name(p)
+                push(mut lets, stmt(mut p, ast.StmtKind.Let(name, false, None, i), i.line, i.col))
+                index = expr(mut p, ast.ExprKind.Name(name), i.line, i.col)
+            }
+            return expr(mut p, ast.ExprKind.Index(inner, index), e.line, e.col)
+        }
+        _ => return e
+    }
+}
+
+// A copy, with new ids, of a place hoist_indexes made: names, fields, and
+// indexes that are names or literals.
+fn copy_place(p: mut Parser, e: ast.Expr) -> ast.Expr {
+    let kind = match e.kind {
+        ast.ExprKind.Field(obj, name) => ast.ExprKind.Field(copy_place(mut p, obj), name)
+        ast.ExprKind.Index(obj, i) => ast.ExprKind.Index(copy_place(mut p, obj), copy_place(mut p, i))
+        _ => e.kind
+    }
+    return expr(mut p, kind, e.line, e.col)
+}
+
+// A local name no source can write: names start with a letter or `_`.
+fn hidden_name(p: Parser) -> Str {
+    return "0t" + strings.from_int(p.next_id)
 }
 
 // `with files = m, stdout = mut out { ... }`
@@ -909,13 +1169,29 @@ fn arms(p: mut Parser, is_stmt: Bool) -> Result[[ast.Arm], errors.CompileError] 
 
 fn arm(p: mut Parser, is_stmt: Bool) -> Result[ast.Arm, errors.CompileError] {
     let pat = pattern(mut p)?
+    let mut guard: Option[ast.Expr] = None
+    if peek(p, 0).kind == lexer.Kind.If {
+        advance(mut p)
+        guard = Some(nested_expression(mut p)?)
+    }
     let arrow = expect(mut p, lexer.Kind.FatArrow, "after the pattern")?
     if !is_stmt {
+        if peek(p, 0).kind == lexer.Kind.LBrace {
+            let body = value_block(mut p)?
+            return Ok(ast.Arm { pattern: pat, guard: guard, sugar: "", body: body, line: arrow.line, col: arrow.col })
+        }
         let value = nested_expression(mut p)?
-        return Ok(ast.Arm { pattern: pat, body: ast.ArmBody.Value(value), line: arrow.line, col: arrow.col })
+        return Ok(ast.Arm { pattern: pat, guard: guard, sugar: "", body: ast.ArmBody.Value(value), line: arrow.line, col: arrow.col })
     }
     let body = arm_statement(mut p)?
-    return Ok(ast.Arm { pattern: pat, body: ast.ArmBody.Do(body), line: arrow.line, col: arrow.col })
+    return Ok(ast.Arm { pattern: pat, guard: guard, sugar: "", body: ast.ArmBody.Do(body), line: arrow.line, col: arrow.col })
+}
+
+// `{ statements; value }` in a match expression's arm (M31): the value is
+// the last statement, when it is an expression.
+fn value_block(p: mut Parser) -> Result[ast.ArmBody, errors.CompileError] {
+    let b = block(mut p, "")?
+    return Ok(block_body(mut p, b))
 }
 
 // A match statement's arm: a block, a nested match statement, or a simple statement.
@@ -935,7 +1211,57 @@ fn is_builtin_variant(name: Str) -> Bool {
     return name == "None" || name == "Some" || name == "Ok" || name == "Err"
 }
 
+// `Name { x, y: pattern, .. }` (M31), at its `{`.
+fn struct_pattern(p: mut Parser, start: lexer.Token, module: Str, name: lexer.Token) -> Result[ast.Pattern, errors.CompileError] {
+    advance(mut p)  // "{"
+    let mut written = name.text
+    if module != "" {
+        written = module + "." + name.text
+    }
+    let what = "'" + written + "' pattern"
+    let mut fields: [ast.FieldPattern] = []
+    let mut rest = false
+    for peek(p, 0).kind != lexer.Kind.RBrace {
+        list_not_ended(p, what)?
+        if peek(p, 0).kind == lexer.Kind.DotDot {
+            advance(mut p)
+            rest = true
+            if peek(p, 0).kind == lexer.Kind.Comma || peek(p, 0).kind == lexer.Kind.Semi {
+                advance(mut p)
+            }
+            if peek(p, 0).kind != lexer.Kind.RBrace {
+                return Err(error(peek(p, 0), "E2031", "'..' ends a struct pattern, after the fields it names" + found(peek(p, 0))))
+            }
+            break
+        }
+        let fname = expect_name(mut p, "for a field")?
+        let mut sub = pattern_node(mut p, ast.PatternKind.Bind(fname.text), fname.line, fname.col)
+        if peek(p, 0).kind == lexer.Kind.Colon {
+            advance(mut p)
+            sub = pattern(mut p)?
+        }
+        push(mut fields, ast.FieldPattern { name: fname.text, pattern: sub, line: fname.line, col: fname.col })
+        list_separator(mut p, what)?
+    }
+    advance(mut p)  // "}"
+    return Ok(pattern_node(mut p, ast.PatternKind.Struct(module, name.text, fields, rest), start.line, start.col))
+}
+
+// A pattern, or alternatives `A | B` (M31).
 fn pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
+    let first = single_pattern(mut p)?
+    if peek(p, 0).kind != lexer.Kind.Pipe {
+        return Ok(first)
+    }
+    let mut alternatives = [first]
+    for peek(p, 0).kind == lexer.Kind.Pipe {
+        advance(mut p)
+        push(mut alternatives, single_pattern(mut p)?)
+    }
+    return Ok(pattern_node(mut p, ast.PatternKind.Or(alternatives), first.line, first.col))
+}
+
+fn single_pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
     let tok = peek(p, 0)
     let k = tok.kind
     if k == lexer.Kind.Int || k == lexer.Kind.Byte || k == lexer.Kind.Minus && peek(p, 1).kind == lexer.Kind.Int {
@@ -978,6 +1304,9 @@ fn pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
         advance(mut p)
         enum = tok.text
         variant = expect_name(mut p, "for a variant after '.'")?
+        if peek(p, 0).kind == lexer.Kind.LBrace {  // module.Struct { ... }
+            return struct_pattern(mut p, tok, enum, variant)
+        }
         if peek(p, 0).kind == lexer.Kind.Dot {  // module.Enum.Variant
             advance(mut p)
             module = enum
@@ -985,6 +1314,9 @@ fn pattern(p: mut Parser) -> Result[ast.Pattern, errors.CompileError] {
             variant = expect_name(mut p, "for a variant after '.'")?
         }
     } else if !is_builtin_variant(tok.text) {
+        if peek(p, 0).kind == lexer.Kind.LBrace {  // Struct { ... }
+            return struct_pattern(mut p, tok, "", tok)
+        }
         return Ok(pattern_node(mut p, ast.PatternKind.Bind(tok.text), tok.line, tok.col))
     }
     let mut parens = false
@@ -1159,11 +1491,134 @@ fn prefix(p: mut Parser) -> Result[ast.Expr, errors.CompileError] {
         advance(mut p)
         return Ok(inner)  // parentheses only group; they leave no node behind
     }
+    if k == lexer.Kind.If {
+        return if_expression(mut p, tok)
+    }
     // `match`
     let scrutinee = head_expression(mut p)?
     expect(mut p, lexer.Kind.LBrace, "after the value being matched")?
     let arms = arms(mut p, false)?
     return Ok(expr(mut p, ast.ExprKind.Match(scrutinee, arms), tok.line, tok.col))
+}
+
+// ---- Values from control flow (M31) ----
+
+// `if c { ... } else { ... }` as a value, after its `if`: a match of the
+// condition, `true => then, false => else`, whose arms are the blocks'
+// values. An `if` with a value needs an `else`.
+fn if_expression(p: mut Parser, tok: lexer.Token) -> Result[ast.Expr, errors.CompileError] {
+    let cond = head_expression(mut p)?
+    let then = block(mut p, "after the 'if' condition")?
+    if peek(p, 0).kind != lexer.Kind.Else {
+        return Err(error(peek(p, 0), "E2030", "an 'if' that gives a value needs an 'else' for when its condition is false" +
+            found(peek(p, 0))))
+    }
+    let else_tok = advance(mut p)
+    let mut otherwise = ast.ArmBody.Value(cond)  // replaced below
+    if peek(p, 0).kind == lexer.Kind.If {
+        let inner = advance(mut p)
+        otherwise = ast.ArmBody.Value(if_expression(mut p, inner)?)
+    } else {
+        otherwise = block_body(mut p, block(mut p, "or 'if' after 'else'")?)
+    }
+    return Ok(if_match(mut p, cond, block_body(mut p, then), otherwise, tok, else_tok))
+}
+
+fn if_match(p: mut Parser, cond: ast.Expr, then: ast.ArmBody, otherwise: ast.ArmBody, tok: lexer.Token, else_tok: lexer.Token) -> ast.Expr {
+    let yes_lit = expr(mut p, ast.ExprKind.BoolLit(true), cond.line, cond.col)
+    let yes = pattern_node(mut p, ast.PatternKind.Lit(yes_lit), cond.line, cond.col)
+    let no_lit = expr(mut p, ast.ExprKind.BoolLit(false), else_tok.line, else_tok.col)
+    let no = pattern_node(mut p, ast.PatternKind.Lit(no_lit), else_tok.line, else_tok.col)
+    let arms = [
+        ast.Arm { pattern: yes, guard: None, sugar: "if", body: then, line: tok.line, col: tok.col },
+        ast.Arm { pattern: no, guard: None, sugar: "if", body: otherwise, line: else_tok.line, col: else_tok.col },
+    ]
+    return expr(mut p, ast.ExprKind.Match(cond, arms), tok.line, tok.col)
+}
+
+// A block as an arm's value: its last statement, when that is an
+// expression, or an `if` or `match` statement with values in its branches.
+fn block_body(p: mut Parser, b: ast.Block) -> ast.ArmBody {
+    let n = len(b.stmts)
+    if n > 0 {
+        match trailing_value(mut p, b.stmts[n - 1]) {
+            Some(e) => {
+                let rest = ast.Block { stmts: b.stmts[0..n - 1], end_line: b.end_line, end_col: b.end_col }
+                return ast.ArmBody.Valued(rest, Some(e))
+            }
+            None => {}
+        }
+    }
+    return ast.ArmBody.Valued(b, None)
+}
+
+fn has_value(body: ast.ArmBody) -> Bool {
+    match body {
+        ast.ArmBody.Valued(_, value) => {
+            match value {
+                Some(_) => return true
+                None => return false
+            }
+        }
+        _ => return true
+    }
+}
+
+// The value of a block's last statement, if it has one. An `if` with an
+// `else` or a match statement becomes the value form of itself, unless no
+// branch has a value: then the block leaves in every branch.
+fn trailing_value(p: mut Parser, s: ast.Stmt) -> Option[ast.Expr] {
+    match s.kind {
+        ast.StmtKind.ExprStmt(e) => return Some(e)
+        ast.StmtKind.If(cond, then, otherwise) => {
+            let yes = block_body(mut p, then)
+            let mut no = yes
+            match otherwise {
+                ast.Else.NoElse => return None
+                ast.Else.ElseBlock(b) => no = block_body(mut p, b)
+                ast.Else.ElseIf(inner) => {
+                    match trailing_value(mut p, inner) {
+                        Some(e) => no = ast.ArmBody.Value(e)
+                        None => no = ast.ArmBody.Valued(ast.Block { stmts: [inner], end_line: inner.line, end_col: inner.col }, None)
+                    }
+                }
+            }
+            if !has_value(yes) && !has_value(no) {
+                return None
+            }
+            let tok = lexer.Token { kind: lexer.Kind.If, text: "if", line: s.line, col: s.col, value: "" }
+            let else_tok = lexer.Token { kind: lexer.Kind.Else, text: "else", line: then.end_line, col: then.end_col, value: "" }
+            return Some(if_match(mut p, cond, yes, no, tok, else_tok))
+        }
+        ast.StmtKind.MatchStmt(scrutinee, arms) => {
+            let mut out: [ast.Arm] = []
+            let mut any = false
+            for a in arms {
+                let mut body = a.body
+                match a.body {
+                    ast.ArmBody.Do(st) => {
+                        match st.kind {
+                            ast.StmtKind.Block(b) => body = block_body(mut p, b)
+                            _ => {
+                                match trailing_value(mut p, st) {
+                                    Some(e) => body = ast.ArmBody.Value(e)
+                                    None => body = ast.ArmBody.Valued(ast.Block { stmts: [st], end_line: st.line, end_col: st.col }, None)
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                any = any || has_value(body)
+                push(mut out, ast.Arm { pattern: a.pattern, guard: a.guard, sugar: a.sugar, body: body, line: a.line, col: a.col })
+            }
+            if !any {
+                return None
+            }
+            return Some(expr(mut p, ast.ExprKind.Match(scrutinee, out), s.line, s.col))
+        }
+        _ => return None
+    }
 }
 
 // Parse the source retained by the lexer for `f"..."`. Each hole is parsed

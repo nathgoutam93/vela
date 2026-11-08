@@ -1,0 +1,7 @@
+// err: without_show.vl:6:23: error: an interpolated value must implement Show, and Password does not; Password leaves out Show with `without` [E3234]
+type Password = struct { text: Str } without Show
+
+fn main() {
+    let p = Password { text: "hunter2" }
+    print(f"password {p}")
+}

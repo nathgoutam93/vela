@@ -1,0 +1,8 @@
+// err: struct_pattern_enum.vl:6:9: error: 'E' is not a struct; match an enum by its variants, as in E.Variant [E3239]
+type E = enum { A, B }
+
+fn main() {
+    match E.A {
+        E { .. } => print("e"),
+    }
+}

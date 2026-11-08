@@ -1,0 +1,4 @@
+// err: without_unknown.vl:2:46: error: expected Eq, Ord, Key or Show after 'without', found identifier 'Hash' [E2033]
+type Handle = struct { fd: Int } without Eq, Hash
+
+fn main() {}

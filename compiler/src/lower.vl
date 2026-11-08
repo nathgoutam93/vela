@@ -164,7 +164,7 @@ fn lower_mode(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: I
     }
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
-        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) {
+        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && !k.fns[id].skipped && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) {
             push(mut roots, id)
         }
     }
@@ -1432,9 +1432,20 @@ fn taken_in_stmt(g: Low, s: ast.Stmt, out: mut Map[Int, Bool]) {
 
 fn taken_in_arms(g: Low, arms: [ast.Arm], out: mut Map[Int, Bool]) {
     for a in arms {
+        match a.guard {
+            Some(e) => taken_in_expr(g, e, mut out)
+            None => {}
+        }
         match a.body {
             ast.ArmBody.Value(e) => taken_in_expr(g, e, mut out)
             ast.ArmBody.Do(s) => taken_in_stmt(g, s, mut out)
+            ast.ArmBody.Valued(b, value) => {
+                taken_in_block(g, b, mut out)
+                match value {
+                    Some(e) => taken_in_expr(g, e, mut out)
+                    None => {}
+                }
+            }
         }
     }
 }
@@ -2212,6 +2223,10 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
             tests(mut g, a.pattern, v, t, next)
         }
         push_frame(mut g, "arm")
+        let mut guard: Option[ast.Expr] = None
+        if next >= 0 {
+            guard = a.guard  // the checker makes the last arm unguarded
+        }
         for bound in bindings(mut g, a.pattern, v, t) {
             if borrowed && !maps.has(g.fs.taken, bound.local) {
                 // Immutable scrutinees stay alive throughout the arm. A
@@ -2222,6 +2237,19 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
                 let p = declare(mut g, bound.local, bound.path)
                 retain(mut g, local_ty(g, bound.local), p)
             }
+        }
+        match guard {
+            Some(cond) => {
+                // A false guard (M31) releases the bindings and tries the next arm.
+                let pass = label(mut g)
+                let reject = label(mut g)
+                branch_on(mut g, cond, pass, reject)
+                place_label(mut g, reject)
+                release_frame(mut g, g.fs.frames[len(g.fs.frames) - 1])
+                jump(mut g, next)
+                place_label(mut g, pass)
+            }
+            None => {}
         }
         if result.reg < 0 {
             match a.body {
@@ -2235,13 +2263,28 @@ fn match_code(g: mut Low, scrutinee: ast.Expr, arms: [ast.Arm], result: Val) {
                         _ => stmt(mut g, s)
                     }
                 }
-                ast.ArmBody.Value(_) => {}
+                _ => {}
             }
         } else {
             match a.body {
                 ast.ArmBody.Value(e) => {
                     let c = consume(mut g, expr(mut g, e))
                     put_place(mut g, result, c)
+                }
+                ast.ArmBody.Valued(b, value) => {
+                    // A block arm (M31): its statements, then its value.
+                    for inner in b.stmts {
+                        stmt(mut g, inner)
+                    }
+                    match value {
+                        Some(e) => {
+                            if !g.fs.dead {
+                                let c = consume(mut g, expr(mut g, e))
+                                put_place(mut g, result, c)
+                            }
+                        }
+                        None => {}
+                    }
                 }
                 ast.ArmBody.Do(_) => {}
             }
@@ -2290,7 +2333,7 @@ fn counting(g: Low, scrutinee: ast.Expr, arms: [ast.Arm]) -> [Int] {
         }
         _ => return []
     }
-    if map < 0 || key < 0 || maps.has(g.k.escaped, map) {
+    if map < 0 || key < 0 || maps.has(g.k.escaped, map) || codegen.has_guard(arms) {
         return []
     }
     for a in arms {
@@ -2440,6 +2483,27 @@ fn tests(g: mut Low, p: ast.Pattern, path: Val, t: Int, fail: Int) {
                 tests(mut g, args[i], payload(mut g, path, enum, vi, i), v.payload[i], fail)
             }
         }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            // `Point { x: 0, .. }` (M31): the named fields' tests.
+            for f in fields {
+                let ft = types.get(g.k.table, t).fields[types.field_index(g.k.table, t, f.name)].ty
+                tests(mut g, f.pattern, field_value(mut g, path, t, f.name), ft, fail)
+            }
+        }
+        ast.PatternKind.Or(alternatives) => {
+            // `A | B` (M31): each alternative but the last goes to the next on
+            // failure; one that matches skips the rest.
+            let matched = label(mut g)
+            let n = len(alternatives)
+            for i in 0..n - 1 {
+                let next = label(mut g)
+                tests(mut g, alternatives[i], path, t, next)
+                jump(mut g, matched)
+                place_label(mut g, next)
+            }
+            tests(mut g, alternatives[n - 1], path, t, fail)
+            place_label(mut g, matched)
+        }
     }
 }
 
@@ -2569,6 +2633,14 @@ fn bindings(g: mut Low, p: ast.Pattern, path: Val, t: Int) -> [Binding] {
             for i in 0..len(args) {
                 let inner = payload(mut g, path, r[0], r[1], i)
                 for b in bindings(mut g, args[i], inner, v.payload[i]) {
+                    push(mut out, b)
+                }
+            }
+        }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            for f in fields {
+                let ft = types.get(g.k.table, t).fields[types.field_index(g.k.table, t, f.name)].ty
+                for b in bindings(mut g, f.pattern, field_value(mut g, path, t, f.name), ft) {
                     push(mut out, b)
                 }
             }
@@ -2792,7 +2864,11 @@ fn interpolate(g: mut Low, parts: [ast.InterpolationPart]) -> Val {
                 push(mut vals, v)
             }
             ast.InterpolationPart.Hole(hole) => {
-                let value = expr(mut g, hole)
+                let mut value = no_value()
+                match maps.get(g.k.shows, hole.id) {
+                    Some(spare) => value = show_call(mut g, hole, spare)
+                    None => value = expr(mut g, hole)
+                }
                 let mut shown_value = value
                 if value.ty != types.STR() {
                     shown_value = shown(mut g, value.ty, value)
@@ -2813,6 +2889,12 @@ fn interpolate(g: mut Low, parts: [ast.InterpolationPart]) -> Val {
     ccall(mut g, "vela_str_join", [array, konst(mut g, len(vals))], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_STR(), out.reg)
     for value in vals { release_now(mut g, value) }
     return own(mut g, out)
+}
+
+// `hole.show()`, for a value the checker writes by its type's show (M32).
+fn show_call(g: mut Low, hole: ast.Expr, spare: Int) -> Val {
+    let call = ast.Expr { kind: ast.ExprKind.UnitLit, line: hole.line, col: hole.col, id: spare }
+    return method_value(mut g, call, [hole], ty(g, hole), "show")
 }
 
 fn float_const(g: mut Low, text: Str) -> Val {
@@ -3688,6 +3770,17 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
         return integer_builtin(mut g, e, name, args)
     }
+    if checker.is_hidden_builtin(name) {
+        let part = ty(g, args[0])
+        if name == "0show" && part == types.STR() {
+            let v = expr(mut g, args[0])
+            let out = slot_val(mut g, types.STR())
+            ccall(mut g, "vela_str_quote", [address(mut g, v)], [ir.KIND_STR()], ir.RET_STR(), out.reg)
+            release_now(mut g, v)
+            return own(mut g, out)
+        }
+        return method_value(mut g, e, args, part, checker.hidden_method(name))
+    }
     if name == "tasks.map" || name == "tasks.each" {
         return tasks_call(mut g, name, args, t)
     }
@@ -3703,7 +3796,11 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
         return no_value()
     }
     if name == "print" || name == "os.eprint" {
-        let arg = expr(mut g, args[0])
+        let mut arg = no_value()
+        match maps.get(g.k.shows, args[0].id) {
+            Some(spare) => arg = show_call(mut g, args[0], spare)
+            None => arg = expr(mut g, args[0])
+        }
         let mut func = print_function(arg.ty)
         if name == "os.eprint" {
             func = "vela_eprint" + func[10..len(func)]
@@ -4080,6 +4177,7 @@ fn method_value(g: mut Low, e: ast.Expr, args: [ast.Expr], t: Int, name: Str) ->
         g.k.ty[e.id] = saved_type
         return out
     }
+    if name == "show" { return shown(mut g, t, expr(mut g, args[0])) }
     let left = fresh(mut g, expr(mut g, args[0]))
     if name == "hash" {
         let slot = slot_val(mut g, t)

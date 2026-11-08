@@ -51,7 +51,8 @@ python3 run_tests.py --backend c --jobs 4
 
 `build` defaults to C; `run` and `test` use the native backend on Linux
 x86-64 and macOS ARM64. Use `VELA_BACKEND=c` to select C explicitly.
-`build/vela guide` provides the compact language and command reference;
+`build/vela guide` provides the compact language and command reference, and
+`build/vela guide --all` adds every module's signatures;
 [editor setup](editors/README.md) covers Neovim and VS Code.
 
 ## Find your way

@@ -130,9 +130,20 @@ fn uses_expr(u: mut Uses, e: ast.Expr, in_closure: Bool) {
 
 fn uses_arms(u: mut Uses, arms: [ast.Arm], in_closure: Bool) {
     for a in arms {
+        match a.guard {
+            Some(g) => uses_expr(mut u, g, in_closure)
+            None => {}
+        }
         match a.body {
             ast.ArmBody.Value(v) => uses_expr(mut u, v, in_closure)
             ast.ArmBody.Do(st) => uses_stmt(mut u, st, in_closure)
+            ast.ArmBody.Valued(b, value) => {
+                uses_block(mut u, b, in_closure)
+                match value {
+                    Some(v) => uses_expr(mut u, v, in_closure)
+                    None => {}
+                }
+            }
         }
     }
 }

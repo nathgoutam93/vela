@@ -18,6 +18,30 @@
       "kind": "field",
       "detail": "Point.label: Str",
       "doc": null
+    },
+    {
+      "name": "eq",
+      "kind": "function",
+      "detail": "fn Point.eq(a: Point, b: Point) -> Bool",
+      "doc": "A statically resolved method on this receiver."
+    },
+    {
+      "name": "compare",
+      "kind": "function",
+      "detail": "fn Point.compare(a: Point, b: Point) -> Int",
+      "doc": "A statically resolved method on this receiver."
+    },
+    {
+      "name": "hash",
+      "kind": "function",
+      "detail": "fn Point.hash(a: Point) -> u64",
+      "doc": "A statically resolved method on this receiver."
+    },
+    {
+      "name": "show",
+      "kind": "function",
+      "detail": "fn Point.show(a: Point) -> Str",
+      "doc": "A statically resolved method on this receiver."
     }
   ]
 }

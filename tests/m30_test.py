@@ -158,7 +158,7 @@ def documents(c, manifest):
                             ('Key', 'fn hash(value: Self) -> u64')]:
         assert signature in guide and signature in interface_source
         assert signature in (ROOT/manifest['specification']).read_text(encoding='utf-8')
-    assert 'Result has no ==' in guide
+    assert 'Assert Results with `assert(r == Ok(2))`' in guide  # M32: Result derives Eq
     assert 'let mut out = strings.builder()' in guide
     assert 'unknown checks stay' in guide and 'not proofs or ordinary test blocks' in guide
     for label, text in [('guide', guide), ('spec', (ROOT/manifest['specification']).read_text(encoding='utf-8'))]:
@@ -277,7 +277,13 @@ def queries(c):
         assert s['hash'].isdigit()
         if s['file'] == '<prelude>':
             spec = (ROOT/'docs/specification.md').read_text(encoding='utf-8')
-            data = re.search(r'```text\n(pub type Eq.*?\n)```', spec, re.S).group(1).encode()
+            data = re.search(r'```text\n(pub type Eq.*?\n)```', spec, re.S).group(1)
+            # Since M32 the prelude also holds its methods, written in interfaces.vl.
+            source = (ROOT/'compiler/src/interfaces.vl').read_text(encoding='utf-8')
+            body = source.split('pub fn methods() -> Str {', 1)[1].split('\n}\n', 1)[0]
+            for literal in re.findall(r'"((?:[^"\\]|\\.)*)"', body):
+                data += re.sub(r'\\(.)', lambda m: {'n': '\n', '"': '"', '\\': '\\'}[m.group(1)], literal)
+            data = data.encode()
         else:
             data = Path(s['file']).read_bytes()
         h = 14695981039346656037

@@ -1,0 +1,7 @@
+// err: without_eq.vl:6:13: error: Handle values cannot be compared with '==': Handle leaves out Eq with `without` [E3099]
+type Handle = struct { fd: Int } without Eq
+
+fn main() {
+    let a = Handle { fd: 3 }
+    print(a == Handle { fd: 3 })
+}

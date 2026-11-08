@@ -1,0 +1,7 @@
+// err: key_float_field.vl:5:23: error: Map key Reading does not implement Key; field 'celsius' is Float, which does not implement Key [E3026]
+type Reading = struct { sensor: Str, celsius: Float }
+
+fn main() {
+    let mut seen: Map[Reading, Int] = [:]
+    seen[Reading { sensor: "a", celsius: 1.5 }] = 1
+}
