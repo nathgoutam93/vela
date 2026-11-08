@@ -61,7 +61,8 @@ pub fn report(k: checker.Checked) -> json.Json {
     }
     let mut functions: [json.Json] = []
     for i in 0..len(k.fns) {
-        if !reaches[i] { continue }
+        // The prelude's methods and derived ones run only code their callers give them (M32).
+        if !reaches[i] || k.fns[i].generated || k.modules[k.fns[i].module].name == "<prelude>" { continue }
         let f = k.fns[i]
         let mut declared = false
         for effect in f.decl.effects { if effect == "unsafe" { declared = true } }

@@ -1,0 +1,6 @@
+// err: result_payload_no_eq.vl:5:14: error: Result[fn() -> Int, Str] values cannot be compared with '==': fn() -> Int does not implement Eq [E3099]
+fn main() {
+    let a: Result[fn() -> Int, Str] = Err("x")
+    let b: Result[fn() -> Int, Str] = Err("x")
+    assert(a == b)
+}

@@ -35,9 +35,34 @@
     "let_else": {
       "section": "statements-and-matching",
       "program": "tests/run/let_else.vl"
+    },
+    "derived_eq": {
+      "section": "derived-conformances",
+      "program": "tests/run/derived_eq.vl"
+    },
+    "derived_ord": {
+      "section": "derived-conformances",
+      "program": "tests/run/derived_ord.vl"
+    },
+    "derived_key": {
+      "section": "derived-conformances",
+      "program": "tests/run/derived_key.vl"
+    },
+    "derived_show": {
+      "section": "derived-conformances",
+      "program": "tests/run/derived_show.vl"
+    },
+    "option_result_methods": {
+      "section": "derived-conformances",
+      "program": "tests/run/option_methods.vl"
+    },
+    "comparison_operand_inference": {
+      "section": "expressions-and-operators",
+      "program": "tests/run/derived_eq.vl"
     }
   },
   "contextual_words": [
-    "const"
+    "const",
+    "without"
   ]
 }

@@ -1,10 +1,11 @@
-// Ordering works on two Ints, two Bytes or two Strs (Strs since M8), and
-// nothing else.
-// err: str_ordering.vl:7:15: error: operator '<' needs matching integers, Floats or Strs, found Str and Int [E3106]
-// err: str_ordering.vl:8:16: error: operator '<' needs matching integers, Floats or Strs, found Bool and Bool [E3106]
-// err: str_ordering.vl:9:15: error: operator '>=' needs matching integers, Floats or Strs, found Str and Byte [E3106]
+// Ordering needs two values of one type that implements Ord: integers,
+// Floats, Strs (since M8), and since M32 Bools and derived types, but not
+// function values.
+// err: str_ordering.vl:8:15: error: operator '<' needs two values of one type that implements Ord, found Str and Int [E3106]
+// err: str_ordering.vl:9:16: error: fn() values cannot be ordered with '<': function values do not implement Ord [E3106]
+// err: str_ordering.vl:10:15: error: operator '>=' needs two values of one type that implements Ord, found Str and Byte [E3106]
 fn main() {
     print("a" < 1)
-    print(true < false)
+    print(main < main)
     print("a" >= 'a')
 }

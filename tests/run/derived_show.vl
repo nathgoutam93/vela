@@ -1,0 +1,67 @@
+// Show (M32): print and interpolation write any value whose type implements
+// Show. Derived Show writes values as source does; a Str inside a value is
+// quoted and escaped, and a type's own show is used wherever it appears.
+// out: Point { x: 3, y: -4 }
+// out: at Point { x: 3, y: -4 }
+// out: Shape.Circle(Point { x: 3, y: -4 }, 1.5)
+// out: Shape.Dot
+// out: Person { name: "Ann \"A\"\t\\", tags: ["a, b", "c\n"], age: 30 }
+// out: Pair { a: true, b: 2.5 }
+// out: Some("x")
+// out: None
+// out: Err("bad")
+// out: [1, 2, 3]
+// out: []
+// out: ["b": [2], "a": [1, 1]]
+// out: [:]
+// out: $12.34
+// out: Wallet { owner: "Bo", cash: $0.5 }
+// out: ["\u{1}", "\u{7f}", "é"]
+// out: p=Point { x: 3, y: -4 }
+// out: s=raw
+// out: Point { x: 3, y: -4 }
+// out: 42
+// out: text
+type Point = struct { x: Int, y: Int }
+type Shape = enum { Circle(Point, Float), Dot }
+type Person = struct { name: Str, tags: [Str], age: Byte }
+type Pair[A, B] = struct { a: A, b: B }
+type Money = struct { cents: Int }
+type Wallet = struct { owner: Str, cash: Money }
+
+fn Money.show(m: Money) -> Str { return f"${m.cents / 100}.{m.cents % 100}" }
+
+fn describe[T: Show](label: Str, value: T) -> Str { return f"{label}={value}" }
+
+fn main() {
+    let p = Point { x: 3, y: -4 }
+    print(p)
+    print(f"at {p}")
+    print(Shape.Circle(p, 1.5))
+    print(Shape.Dot)
+    print(Person { name: "Ann \"A\"\t\\", tags: ["a, b", "c\n"], age: byte(30) })
+    print(Pair { a: true, b: 2.5 })
+    let some: Option[Str] = Some("x")
+    print(some)
+    let none: Option[Int] = None
+    print(none)
+    let r: Result[Int, Str] = Err("bad")
+    print(r)
+    print([1, 2, 3])
+    let nothing: [Int] = []
+    print(nothing)
+    let mut m: Map[Str, [Int]] = [:]
+    m["b"] = [2]
+    m["a"] = [1, 1]
+    print(m)
+    let empty: Map[Int, Int] = [:]
+    print(empty)
+    print(Money { cents: 1234 })
+    print(Wallet { owner: "Bo", cash: Money { cents: 5 } })
+    print(["\u{1}", "\u{7f}", "\u{e9}"])
+    print(describe("p", p))
+    print(describe("s", "raw"))
+    print(p.show())
+    print(42.show())
+    print("text".show())
+}

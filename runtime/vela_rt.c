@@ -2151,6 +2151,48 @@ int64_t vela_fixed_compare(uint64_t a, uint64_t b, int64_t condition) {
     }
 }
 double vela_uint_to_float(uint64_t n) { return (double)n; }
+// A Str written as a Vela string literal, for Show inside a value (M32):
+// quoted, with \n \t \r \0 \\ \" escapes, \u{HEX} for other control bytes
+// and DEL, valid UTF-8 as it is, and \xHH for each byte that is not UTF-8.
+static int utf8_length(const uint8_t *p, int64_t n) {
+    uint8_t b = p[0];
+    int len = b >= 0xf0 && b <= 0xf4 ? 4 : b >= 0xe0 ? 3 : b >= 0xc2 && b < 0xe0 ? 2 : 0;
+    if (b >= 0xf5 || len == 0 || len > n) return 0;
+    for (int i = 1; i < len; i++) if ((p[i] & 0xc0) != 0x80) return 0;
+    if (len == 3 && b == 0xe0 && p[1] < 0xa0) return 0;  // overlong
+    if (len == 3 && b == 0xed && p[1] >= 0xa0) return 0;  // surrogate
+    if (len == 4 && b == 0xf0 && p[1] < 0x90) return 0;  // overlong
+    if (len == 4 && b == 0xf4 && p[1] >= 0x90) return 0;  // above U+10FFFF
+    return len;
+}
+
+vela_str vela_str_quote(vela_str s) {
+    VELA_PROFILE_SCOPE("strings");
+    // \u{1f} and \xHH are the longest forms of one byte: six bytes, plus room for snprintf's NUL.
+    char *buf = vela_alloc(checked_bytes((uint64_t)s.len, 6, 8));
+    size_t out = 0;
+    buf[out++] = '"';
+    for (int64_t i = 0; i < s.len;) {
+        uint8_t c = s.data[i];
+        if (c == '"' || c == '\\') { buf[out++] = '\\'; buf[out++] = (char)c; i++; continue; }
+        if (c == '\n') { buf[out++] = '\\'; buf[out++] = 'n'; i++; continue; }
+        if (c == '\t') { buf[out++] = '\\'; buf[out++] = 't'; i++; continue; }
+        if (c == '\r') { buf[out++] = '\\'; buf[out++] = 'r'; i++; continue; }
+        if (c == 0) { buf[out++] = '\\'; buf[out++] = '0'; i++; continue; }
+        if (c < 0x20 || c == 0x7f) { out += (size_t)snprintf(buf + out, 8, "\\u{%x}", c); i++; continue; }
+        if (c < 0x80) { buf[out++] = (char)c; i++; continue; }
+        int len = utf8_length(s.data + i, s.len - i);
+        if (len == 0) { out += (size_t)snprintf(buf + out, 8, "\\x%02x", c); i++; continue; }
+        memcpy(buf + out, s.data + i, (size_t)len);
+        out += (size_t)len;
+        i += len;
+    }
+    buf[out++] = '"';
+    vela_str r = str_from(buf, out);
+    free(buf);
+    return r;
+}
+
 vela_str vela_from_uint(uint64_t n) {
     char buf[32];
     int len = format_digits(buf, n, false);

@@ -57,6 +57,7 @@ pub type TypeInfo = struct {
     params: [Int]  // a generic declaration's type parameters
     bounds: [Str]  // a type parameter's bounds: "Eq", "Ord", "Key"
     origin: Int  // an instance's generic declaration; -1 for anything else
+    without: [Str]  // a declaration's `without` interfaces (M32)
     open: Bool  // mentions a type parameter
     filled: Bool  // a generic declaration: its fields or variants are known; an instance: they are put in
     result: Int  // a function type's result type; NOTHING() when it returns nothing
@@ -114,7 +115,7 @@ pub fn NOTHING() -> Int {
 fn info(tag: Tag, name: Str) -> TypeInfo {
     return TypeInfo {
         tag: tag, length: -1, name: name, module: "", public: true, line: 0, col: 0, args: [], fields: [], variants: [],
-        params: [], bounds: [], origin: -1, open: false, filled: false, result: -1, effects: [], plain: -1,
+        params: [], bounds: [], origin: -1, without: [], open: false, filled: false, result: -1, effects: [], plain: -1,
     }
 }
 

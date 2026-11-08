@@ -196,7 +196,7 @@ def guide_and_install(c: Checks):
     guide = c.run('guide').stdout
     # Same bytes/4 budget as M16's baseline; fail when the reference grows.
     assert len(guide.encode()) <= 8000 * 4, len(guide.encode())
-    assert 'Assert Result by matching Ok/Err' in guide and 'Err(e) => assert(len(e) > 0)' in guide
+    assert 'Assert Results with `assert(r == Ok(2))`' in guide and 'Err(e) => assert(len(e) > 0)' in guide
     # Module signatures are in `vela guide --all` (M31).
     full = c.run('guide', '--all').stdout
     assert full.startswith(guide.rsplit('\nModule signatures:', 1)[0])

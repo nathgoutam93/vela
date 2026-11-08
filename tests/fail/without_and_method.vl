@@ -1,0 +1,6 @@
+// err: without_and_method.vl:2:6: error: 'Token' defines show and also lists Show after 'without' [E3244]
+type Token = struct { secret: Str } without Show
+
+fn Token.show(t: Token) -> Str { return "Token(...)" }
+
+fn main() {}

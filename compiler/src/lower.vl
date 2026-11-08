@@ -164,7 +164,7 @@ fn lower_mode(checked: checker.Checked, for_tests: Bool, coverage: Bool, mode: I
     }
     let mut roots: [Int] = []
     for id in 0..len(k.fns) {
-        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) {
+        if len(k.fns[id].type_params) == 0 && !k.fns[id].is_test && !k.fns[id].skipped && k.fns[id].decl.foreign == "" && (!pruned || alive[id]) {
             push(mut roots, id)
         }
     }
@@ -2864,7 +2864,11 @@ fn interpolate(g: mut Low, parts: [ast.InterpolationPart]) -> Val {
                 push(mut vals, v)
             }
             ast.InterpolationPart.Hole(hole) => {
-                let value = expr(mut g, hole)
+                let mut value = no_value()
+                match maps.get(g.k.shows, hole.id) {
+                    Some(spare) => value = show_call(mut g, hole, spare)
+                    None => value = expr(mut g, hole)
+                }
                 let mut shown_value = value
                 if value.ty != types.STR() {
                     shown_value = shown(mut g, value.ty, value)
@@ -2885,6 +2889,12 @@ fn interpolate(g: mut Low, parts: [ast.InterpolationPart]) -> Val {
     ccall(mut g, "vela_str_join", [array, konst(mut g, len(vals))], [ir.KIND_INT(), ir.KIND_INT()], ir.RET_STR(), out.reg)
     for value in vals { release_now(mut g, value) }
     return own(mut g, out)
+}
+
+// `hole.show()`, for a value the checker writes by its type's show (M32).
+fn show_call(g: mut Low, hole: ast.Expr, spare: Int) -> Val {
+    let call = ast.Expr { kind: ast.ExprKind.UnitLit, line: hole.line, col: hole.col, id: spare }
+    return method_value(mut g, call, [hole], ty(g, hole), "show")
 }
 
 fn float_const(g: mut Low, text: Str) -> Val {
@@ -3760,6 +3770,17 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
     if integers.type_id(name) >= 0 || len(name) > 5 && name[0..5] == "ints." {
         return integer_builtin(mut g, e, name, args)
     }
+    if checker.is_hidden_builtin(name) {
+        let part = ty(g, args[0])
+        if name == "0show" && part == types.STR() {
+            let v = expr(mut g, args[0])
+            let out = slot_val(mut g, types.STR())
+            ccall(mut g, "vela_str_quote", [address(mut g, v)], [ir.KIND_STR()], ir.RET_STR(), out.reg)
+            release_now(mut g, v)
+            return own(mut g, out)
+        }
+        return method_value(mut g, e, args, part, checker.hidden_method(name))
+    }
     if name == "tasks.map" || name == "tasks.each" {
         return tasks_call(mut g, name, args, t)
     }
@@ -3775,7 +3796,11 @@ fn builtin(g: mut Low, e: ast.Expr, name: Str, args: [ast.Expr]) -> Val {
         return no_value()
     }
     if name == "print" || name == "os.eprint" {
-        let arg = expr(mut g, args[0])
+        let mut arg = no_value()
+        match maps.get(g.k.shows, args[0].id) {
+            Some(spare) => arg = show_call(mut g, args[0], spare)
+            None => arg = expr(mut g, args[0])
+        }
         let mut func = print_function(arg.ty)
         if name == "os.eprint" {
             func = "vela_eprint" + func[10..len(func)]
@@ -4152,6 +4177,7 @@ fn method_value(g: mut Low, e: ast.Expr, args: [ast.Expr], t: Int, name: Str) ->
         g.k.ty[e.id] = saved_type
         return out
     }
+    if name == "show" { return shown(mut g, t, expr(mut g, args[0])) }
     let left = fresh(mut g, expr(mut g, args[0]))
     if name == "hash" {
         let slot = slot_val(mut g, t)

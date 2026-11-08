@@ -254,39 +254,62 @@ fn expr(w: mut Walk, e: ast.Expr) {
         _ => {}
     }
     match target {
+        checker.Ref.Builtin(name) => {
+            if checker.is_hidden_builtin(name) {
+                match e.kind { ast.ExprKind.Call(_, args) => method_use(mut w, e, w.k.ty[args[0].id], checker.hidden_method(name)), _ => {} }
+            }
+        }
+        _ => {}
+    }
+    if maps.has(w.k.shows, e.id) { method_use(mut w, e, w.k.ty[e.id], "show") }
+    match target {
         checker.Ref.Function(id) => {
             if len(w.k.fns[id].type_params) > 0 {
                 let mut args: [Int] = []
                 for t in call_args {
                     push(mut args, sub(mut w, t))
                 }
-                let mut deepest = 0
-                for a in args {
-                    let d = types.depth(w.k.table, a)
-                    if d > deepest {
-                        deepest = d
-                    }
-                }
-                let k = key(id, args)
-                if deepest > max_depth() {
-                    if len(w.out.errors) == 0 {
-                        let name = w.k.fns[id].decl.name
-                        push(mut w.out.errors, errors.CompileError { code: "E7006", fix: [],
-                            path: w.path, line: e.line, col: e.col, warning: false,
-                            message: "'" + name + "' is called here with types that grow without end, as generic " +
-                                "functions that call each other with bigger types do (f[T] calling g[[T]])",
-                        })
-                    }
-                } else if !maps.has(w.out.index, k) {
-                    w.out.index[k] = len(w.out.instances)
-                    let inst = Instance { fn_id: id, args: args }
-                    push(mut w.out.instances, inst)
-                    push(mut w.queue, inst)
-                }
+                use_instance(mut w, e, id, args)
             }
         }
         _ => {}
     }
+    walk_parts(mut w, e)
+}
+
+// The copy of a generic method that writing, hashing or comparing a `t` calls (M32).
+fn method_use(w: mut Walk, e: ast.Expr, t: Int, name: Str) {
+    let dispatch = checker.method(w.k, sub(mut w, t), name)
+    if dispatch.fn_id >= 0 && len(w.k.fns[dispatch.fn_id].type_params) > 0 { use_instance(mut w, e, dispatch.fn_id, dispatch.args) }
+}
+
+fn use_instance(w: mut Walk, e: ast.Expr, id: Int, args: [Int]) {
+    let mut deepest = 0
+    for a in args {
+        let d = types.depth(w.k.table, a)
+        if d > deepest {
+            deepest = d
+        }
+    }
+    let k = key(id, args)
+    if deepest > max_depth() {
+        if len(w.out.errors) == 0 {
+            let name = w.k.fns[id].decl.name
+            push(mut w.out.errors, errors.CompileError { code: "E7006", fix: [],
+                path: w.path, line: e.line, col: e.col, warning: false,
+                message: "'" + name + "' is called here with types that grow without end, as generic " +
+                    "functions that call each other with bigger types do (f[T] calling g[[T]])",
+            })
+        }
+    } else if !maps.has(w.out.index, k) {
+        w.out.index[k] = len(w.out.instances)
+        let inst = Instance { fn_id: id, args: args }
+        push(mut w.out.instances, inst)
+        push(mut w.queue, inst)
+    }
+}
+
+fn walk_parts(w: mut Walk, e: ast.Expr) {
     match e.kind {
         ast.ExprKind.Unary(_, x) => expr(mut w, x)
         ast.ExprKind.Binary(_, l, r) => {

@@ -41,6 +41,8 @@ pub type FnInfo = struct {
     type_params: [Int]  // a generic function's, as Param types
     is_test: Bool  // a `test` block, checked as a function named `test "..."`
     result_local: Int  // `result` in its ensures clauses, or -1
+    generated: Bool  // a derived method (M32), written by derive() for its type, not by a programmer
+    skipped: Bool  // a derived method nothing uses: its body is empty, it is never checked or written
 }
 
 // What a name, call, field, pattern or declaration refers to.
@@ -98,6 +100,8 @@ pub type Checked = struct {
     breaks: [Bool]  // by node id: whether a `for` loop has a break
     targs: [[Int]]  // by node id: the type arguments of a call to a generic function
     closures: Map[Int, ClosureInfo]  // by node id
+    shows: Map[Int, Int]  // by node id: an interpolated or printed value written by its type's `show` (M32)
+    methods: Map[Str, [Int]]  // functions with parameters, by method_key(), for method lookup
     completion: Completion
     escaped: Map[Int, Bool]
     stack: Int  // bytes for main's thread (vela.mod `stack`), or 0 for the system's
@@ -165,6 +169,14 @@ type Checker = struct {
     in_closures: [ClosureCtx]  // the closures being checked, innermost last
     pending: [Int]  // type parameters of a generic call whose arguments are being checked, still unknown
     completion: Completion
+    next_node: Int  // the first node id no syntax tree uses yet, for the prelude and derived methods
+    generated: [Int]  // the derived methods, checked after the program's functions
+    shows: Map[Int, Int]
+    methods: Map[Str, [Int]]
+    wanted: Map[Int, Bool]  // derived methods some check found a use for
+    derivables: [Derivable]  // the types with derived methods
+    derived_of: Map[Int, [Int]]  // by derived method: its type in derivables, and its derived_bounds() index
+    used: Map[Str, Bool]  // the (type, method) pairs use_method has seen
 }
 
 pub fn check(loaded: modules.Loaded) -> Checked {
@@ -204,6 +216,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
         undefined: [], targs: targs, literal: literal, chained: breaks, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
         in_closures: [], pending: [], defining: -1, expected: -2,
         completion: Completion { name: name, module: -1, visible: [], type_params: [], object: [] },
+        next_node: loaded.node_count, generated: [], shows: [:], methods: [:], wanted: [:], used: [:], derivables: [], derived_of: [:],
     }
     // A file with main is a program even when only checking or running tests.
     for f in loaded.modules[loaded.order[len(loaded.order) - 1]].program.fns {
@@ -212,10 +225,15 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
         }
     }
     c.warnings = loaded.warnings
-    let source = interfaces.source()
-    let parsed = parser.parse(lexer.tokenize(source).tokens, loaded.node_count)
+    let source = interfaces.source() + interfaces.methods()
+    let mut prelude_program = parsed_hidden(mut c, source, 0, 0)
+    for i in 0..len(prelude_program.types) {
+        if prelude_program.types[i].name == "Show" { prelude_program.types[i].name = SHOW() }
+    }
+    let mut imports: Map[Str, Int] = [:]
+    for name in ["strings", "maps"] { imports[name] = modules.builtin_in(mut c.modules, name) }
     let prelude = modules.Module { name: "<prelude>", package: "std", path: "<prelude>", file: "<prelude>", source: source,
-        program: parsed.program, has_program: true, imports: [:], std: [], is_std: true, types: [:], fns: [:] }
+        program: prelude_program, has_program: true, imports: imports, std: [], is_std: true, types: [:], fns: [:] }
     let mut order = [len(c.modules)]
     for m in c.order { push(mut order, m) }
     c.order = order
@@ -227,9 +245,62 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
         proved_contracts: [:],
         target: target,
         errors: errors.sorted(c.errors), warnings: errors.sorted(c.warnings), table: c.table, modules: c.modules, fns: c.fns, decls: c.decls,
-        locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures,
+        locals: c.locals, ty: c.ty, refs: c.refs, breaks: c.breaks, targs: c.targs, closures: c.closures, shows: c.shows, methods: c.methods,
         completion: c.completion, escaped: c.escaped, stack: loaded.stack,
     }
+}
+
+// A node id no syntax tree has, for a back end to call a method through (M32).
+fn spare_node(c: mut Checker) -> Int {
+    push(mut c.ty, -2)
+    push(mut c.refs, Ref.NoRef)
+    push(mut c.breaks, false)
+    push(mut c.targs, [])
+    push(mut c.literal, 0)
+    push(mut c.chained, false)
+    c.next_node = c.next_node + 1
+    return c.next_node - 1
+}
+
+// The names compiler-written source uses for what no program can name.
+fn is_hidden_word(w: Str) -> Bool {
+    if len(w) < 5 || w[0..4] != "hid_" { return false }
+    let rest = w[4..len(w)]
+    if rest == "h" || rest == "i" || rest == "j" || rest == "show" || rest == "hash" || rest == "compare" || rest == "Show" ||
+        rest == "Array" || rest == "Map" {
+        return true
+    }
+    if len(rest) < 2 || rest[0] != 'x' && rest[0] != 'y' && rest[0] != 'c' { return false }
+    for i in 1..len(rest) { if rest[i] < '0' || rest[i] > '9' { return false } }
+    return true
+}
+
+// Source the compiler writes (the prelude's methods, derived methods),
+// parsed with node ids after every file's. Identifiers starting `hid_` become
+// hidden names starting with a digit (is_hidden_word), which no program can
+// write or capture.
+// A nonzero `line` places every token at the declaration it was written for.
+fn parsed_hidden(c: mut Checker, source: Str, line: Int, col: Int) -> ast.Program {
+    let mut tokens = lexer.tokenize(source).tokens
+    for i in 0..len(tokens) {
+        let t = tokens[i]
+        if t.kind == lexer.Kind.Ident && is_hidden_word(t.text) && (i == 0 || tokens[i - 1].kind != lexer.Kind.Dot) { tokens[i].text = "0" + t.text[4..len(t.text)] }
+        if line > 0 {
+            tokens[i].line = line
+            tokens[i].col = col
+        }
+    }
+    let parsed = parser.parse(tokens, c.next_node)
+    for _ in c.next_node..parsed.next_id {
+        push(mut c.ty, -2)
+        push(mut c.refs, Ref.NoRef)
+        push(mut c.breaks, false)
+        push(mut c.targs, [])
+        push(mut c.literal, 0)
+        push(mut c.chained, false)
+    }
+    c.next_node = parsed.next_id
+    return parsed.program
 }
 
 // ---- Generic instantiation cycles ----
@@ -492,6 +563,7 @@ fn program(c: mut Checker, for_tests: Bool) {
         push(mut fn_start, len(c.fns))
         signatures(mut c)
     }
+    derive(mut c)
     c.signatures_done = true
     validate_interfaces(mut c)
     for use in c.bound_uses {
@@ -514,6 +586,7 @@ fn program(c: mut Checker, for_tests: Bool) {
             function(mut c, fn_start[k] + i)
         }
     }
+    check_derived(mut c)
     c.current = c.order[len(c.order) - 1]  // the main module
     match maps.get(module_fns(c), "main") {
         None => {
@@ -687,79 +760,7 @@ fn exposes(c: mut Checker, t: ast.TypeName, what: Str) {
 fn signatures(c: mut Checker) {
     let m = c.current
     for f in c.modules[m].program.fns {
-        let type_params = make_type_params(mut c, f.type_params)
-        if f.public { public_bounds(mut c, type_params, f.line, f.col) }
-        c.type_scope = scope_of(c, type_params)
-        let mut params: [Int] = []
-        let mut mutable: [Bool] = []
-        for p in f.params {
-            push(mut params, resolve_type(mut c, p.ty))
-            push(mut mutable, p.mutable)
-        }
-        let mut result = types.NOTHING()
-        match f.result {
-            Some(t) => result = resolve_type(mut c, t)
-            None => {}
-        }
-        c.type_scope = [:]
-        for i in 0..len(f.effects) {
-            let u = f.effects[i]
-            let pi = param_named(f, u)
-            if types.concrete_effect(u) {
-            } else if pi < 0 {
-                report(mut c, f.effects_line, f.effects_col, "E3015", "unknown effect '" + u + "'; the effects are fs (the files module), " +
-                    "os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), net (networking), clock (time), or the name of a " +
-                        "parameter that is a function, for whatever that function uses")
-            } else if !types.is_func(c.table, params[pi]) {
-                if params[pi] != types.ERROR() {
-                    report(mut c, f.effects_line, f.effects_col, "E3016", "`uses " + u + "` names parameter '" + u + "', which is " +
-                        show(c, params[pi]) + ", not a function")
-                }
-            } else if f.params[pi].mutable {
-                report(mut c, f.effects_line, f.effects_col, "E3017", "`uses " + u + "` names a mut parameter; the function could " +
-                    "put a function that uses anything in it")
-            } else if len(types.effects_of(c.table, params[pi])) > 0 {
-                report(mut c, f.effects_line, f.effects_col, "E3018", "`uses " + u + "` lets '" + u + "' use anything, but its " +
-                    "type says what it uses; write one or the other")
-            } else {
-                // Polymorphic in what f uses: `@f` stands for the effects of
-                // the function each call passes, which the caller uses.
-                let ft = types.get(c.table, params[pi])
-                params[pi] = types.func_with(mut c.table, ft.args, ft.result, [types.effect_var(u)])
-            }
-            for j in 0..i {
-                if f.effects[j] == u {
-                    report(mut c, f.effects_line, f.effects_col, "E3019", "effect '" + u + "' is listed twice")
-                }
-            }
-        }
-        push(mut c.fns, FnInfo {
-            decl: f, module: m, params: params, mutable: mutable, result: result, param_locals: [],
-            type_params: type_params, is_test: false, result_local: -1,
-        })
-        let id = len(c.fns) - 1
-        validate_foreign(mut c, id)
-        if f.public && !f.constant {
-            for p in f.params {
-                exposes(mut c, p.ty, "function '" + f.name + "'")
-            }
-            match f.result {
-                Some(t) => exposes(mut c, t, "function '" + f.name + "'")
-                None => {}
-            }
-        }
-        if is_prelude(f.name) && c.modules[m].name == "" && !c.library {
-            report(mut c, f.line, f.col, "E3020", "'" + f.name + "' is a built-in function and cannot be redefined")
-        } else if maps.has(module_fns(c), f.name) {
-            let first = c.fns[module_fns(c)[f.name]].decl
-            report(mut c, f.line, f.col, "E3021", "function '" + f.name + "' is already defined at " +
-                strings.from_int(first.line) + ":" + strings.from_int(first.col))
-        } else if f.constant && maps.has(module_types(c), f.name) {
-            report(mut c, f.line, f.col, "E3233", "constant '" + f.name + "' has the same name as a type")
-        } else if !taken(mut c, f.name, f.line, f.col, "function") {
-            c.modules[m].fns[f.name] = id
-        }
-        // The body is checked even when the name is rejected.
+        declare_fn(mut c, m, f)
     }
     // A test is a function with no parameters and no result, which nothing
     // can call: its name is a string.
@@ -780,9 +781,97 @@ fn signatures(c: mut Checker) {
         }
         push(mut c.fns, FnInfo {
             decl: f, module: m, params: [], mutable: [], result: types.NOTHING(), param_locals: [], type_params: [],
-            is_test: true, result_local: -1,
+            is_test: true, result_local: -1, generated: false, skipped: false,
         })
     }
+}
+
+// Declare function `f` of module `m`: its FnInfo, and its name in the module.
+fn declare_fn(c: mut Checker, m: Int, f: ast.FnDecl) {
+    let type_params = make_type_params(mut c, f.type_params)
+    if f.public { public_bounds(mut c, type_params, f.line, f.col) }
+    c.type_scope = scope_of(c, type_params)
+    let mut params: [Int] = []
+    let mut mutable: [Bool] = []
+    for p in f.params {
+        push(mut params, resolve_type(mut c, p.ty))
+        push(mut mutable, p.mutable)
+    }
+    let mut result = types.NOTHING()
+    match f.result {
+        Some(t) => result = resolve_type(mut c, t)
+        None => {}
+    }
+    c.type_scope = [:]
+    for i in 0..len(f.effects) {
+        let u = f.effects[i]
+        let pi = param_named(f, u)
+        if types.concrete_effect(u) {
+        } else if pi < 0 {
+            report(mut c, f.effects_line, f.effects_col, "E3015", "unknown effect '" + u + "'; the effects are fs (the files module), " +
+                "os (os.args, os.exit, os.env, os.run, os.output, os.read_line and os.read), unsafe (C and raw memory), net (networking), clock (time), or the name of a " +
+                    "parameter that is a function, for whatever that function uses")
+        } else if !types.is_func(c.table, params[pi]) {
+            if params[pi] != types.ERROR() {
+                report(mut c, f.effects_line, f.effects_col, "E3016", "`uses " + u + "` names parameter '" + u + "', which is " +
+                    show(c, params[pi]) + ", not a function")
+            }
+        } else if f.params[pi].mutable {
+            report(mut c, f.effects_line, f.effects_col, "E3017", "`uses " + u + "` names a mut parameter; the function could " +
+                "put a function that uses anything in it")
+        } else if len(types.effects_of(c.table, params[pi])) > 0 {
+            report(mut c, f.effects_line, f.effects_col, "E3018", "`uses " + u + "` lets '" + u + "' use anything, but its " +
+                "type says what it uses; write one or the other")
+        } else {
+            // Polymorphic in what f uses: `@f` stands for the effects of
+            // the function each call passes, which the caller uses.
+            let ft = types.get(c.table, params[pi])
+            params[pi] = types.func_with(mut c.table, ft.args, ft.result, [types.effect_var(u)])
+        }
+        for j in 0..i {
+            if f.effects[j] == u {
+                report(mut c, f.effects_line, f.effects_col, "E3019", "effect '" + u + "' is listed twice")
+            }
+        }
+    }
+    push(mut c.fns, FnInfo {
+        decl: f, module: m, params: params, mutable: mutable, result: result, param_locals: [],
+        type_params: type_params, is_test: false, result_local: -1, generated: false, skipped: false,
+    })
+    if len(params) > 0 {
+        let key = method_key(c.modules[m].name, f.name)
+        match maps.get(c.methods, key) {
+            Some(ids) => {
+                let mut more = ids
+                push(mut more, len(c.fns) - 1)
+                c.methods[key] = more
+            }
+            None => c.methods[key] = [len(c.fns) - 1]
+        }
+    }
+    let id = len(c.fns) - 1
+    validate_foreign(mut c, id)
+    if f.public && !f.constant {
+        for p in f.params {
+            exposes(mut c, p.ty, "function '" + f.name + "'")
+        }
+        match f.result {
+            Some(t) => exposes(mut c, t, "function '" + f.name + "'")
+            None => {}
+        }
+    }
+    if is_prelude(f.name) && c.modules[m].name == "" && !c.library {
+        report(mut c, f.line, f.col, "E3020", "'" + f.name + "' is a built-in function and cannot be redefined")
+    } else if maps.has(module_fns(c), f.name) {
+        let first = c.fns[module_fns(c)[f.name]].decl
+        report(mut c, f.line, f.col, "E3021", "function '" + f.name + "' is already defined at " +
+            strings.from_int(first.line) + ":" + strings.from_int(first.col))
+    } else if f.constant && maps.has(module_types(c), f.name) {
+        report(mut c, f.line, f.col, "E3233", "constant '" + f.name + "' has the same name as a type")
+    } else if !taken(mut c, f.name, f.line, f.col, "function") {
+        c.modules[m].fns[f.name] = id
+    }
+    // The body is checked even when the name is rejected.
 }
 
 // The index of the parameter called `name`, or -1.
@@ -986,9 +1075,11 @@ fn check_bounds(c: mut Checker, line: Int, col: Int, owner: Str, p: Int, t: Int)
     let pname = types.get(c.table, p).name
     for b in types.get(c.table, p).bounds {
         if satisfies(c, t, b) {
+            use_derived(mut c, t, b)
             continue
         }
-        report(mut c, line, col, "E3031", owner + " needs " + pname + ": " + b + ", but here " + pname + " is " + show(c, t) + "; " + failed_obligation(c, t, b, 0))
+        report(mut c, line, col, "E3031", owner + " needs " + pname + ": " + bound_text(b) + ", but here " + pname + " is " + show(c, t) + "; " +
+            failed_obligation(c, t, b, 0))
     }
 }
 
@@ -2810,8 +2901,14 @@ fn infer_type(c: mut Checker, e: ast.Expr, expected: Int) -> Int {
                     ast.InterpolationPart.Hole(hole) => {
                         let t = value(mut c, hole)
                         // An error type was reported where it arose.
-                        if t != types.ERROR() && t != types.STR() && t != types.BOOL() && t != types.FLOAT() && !types.is_integer(t) {
-                            report_at(mut c, hole, "E3234", "interpolated expressions must have type Str, Bool, Float, or an integer type, found " + show(c, t))
+                        if t != types.ERROR() && !is_printable(t) {
+                            if satisfies(c, t, SHOW()) {
+                                c.shows[hole.id] = spare_node(mut c)
+                                use_derived(mut c, t, SHOW())
+                            } else {
+                                report_at(mut c, hole, "E3234", "an interpolated value must implement Show, and " + show(c, t) + " does not" +
+                                    why_not(c, t, SHOW()))
+                            }
                         }
                     }
                     _ => {}
@@ -2943,9 +3040,20 @@ fn operands(c: mut Checker, l: ast.Expr, r: ast.Expr, expected: Int) -> [Int] {
         let right = value(mut c, r)
         return [literal_like(mut c, l, right), right]
     }
+    // `r == Ok(1)`: an operand that needs a type from its context takes the other's (M32).
+    if needs_context(c, l) && !needs_context(c, r) {
+        let right = value(mut c, r)
+        if right == types.ERROR() { infer(mut c, l); return [right, right] }
+        check_expr(mut c, l, right, msg("cannot compare " + show(c, right) + " with ", ""))
+        return [right, right]
+    }
     let left = value(mut c, l)
     if is_int_lit(mut c, r) {
         return [left, literal_like(mut c, r, left)]
+    }
+    if needs_context(c, r) && left != types.ERROR() {
+        check_expr(mut c, r, left, msg("cannot compare " + show(c, left) + " with ", ""))
+        return [left, left]
     }
     return [left, value(mut c, r)]
 }
@@ -3016,8 +3124,8 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr, expect
             report_at(mut c, e, "E3098", show(c, left) + " values cannot be compared with '" + op + "'; declare the type parameter as `" +
                 show(c, left) + ": Eq`")
         } else if !comparable(c, left) {
-            report_at(mut c, e, "E3099", show(c, left) + " values cannot be compared with '" + op +
-                "'; use match, or compare their fields")
+            report_at(mut c, e, "E3099", show(c, left) + " values cannot be compared with '" + op + "': " +
+                failed_obligation(c, left, "Eq", 0))
         }
     } else if op == "&&" || op == "||" {
         if left != types.BOOL() || right != types.BOOL() {
@@ -3052,8 +3160,10 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr, expect
         } else if is_ordering(op) && left == right && types.is_param(c.table, left) {
             report_at(mut c, e, "E3105", "operator '" + op + "' needs values that can be ordered; declare the type parameter as `" +
                 show(c, left) + ": Ord`")
+        } else if is_ordering(op) && left == right && left != types.UNIT() {
+            report_at(mut c, e, "E3106", show(c, left) + " values cannot be ordered with '" + op + "': " + failed_obligation(c, left, "Ord", 0))
         } else if is_ordering(op) {
-            report_at(mut c, e, "E3106", "operator '" + op + "' needs matching integers, Floats or Strs, found " + show(c, left) +
+            report_at(mut c, e, "E3106", "operator '" + op + "' needs two values of one type that implements Ord, found " + show(c, left) +
                 " and " + show(c, right))
         } else {
             report_at(mut c, e, "E3107", "operator '" + op + "' needs Int operands, found " + show(c, left) + " and " + show(c, right))
@@ -3065,6 +3175,7 @@ fn binary(c: mut Checker, e: ast.Expr, op: Str, l: ast.Expr, r: ast.Expr, expect
         if is_ordering(op) { bound = "Ord"; method_name = "compare" }
         if !intrinsic(c.table, left, bound) && satisfies(c, left, bound) {
             c.refs[e.id] = Ref.Method(left, method_name)
+            use_derived(mut c, left, bound)
         }
     }
     // The result type is known even when the operands were wrong.
@@ -4151,7 +4262,7 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
                 let field = types.field_index(c.table, receiver, name)
                 if field >= 0 {
                     let ft = types.get(c.table, receiver).fields[field].ty
-                    let method = lookup_method(c.table, c.fns, c.modules, receiver, name)
+                    let method = lookup_method(c.table, c.fns, c.modules, c.methods, receiver, name)
                     if types.is_func(c.table, ft) || method.fn_id < 0 { return callee_value(mut c, callee) }
                 }
             }
@@ -4175,7 +4286,7 @@ fn call_target(c: mut Checker, callee: ast.Expr) -> Ref {
                 Some(f) => { if c.fns[f].decl.constant { return Ref.Constant(f) }; return Ref.Function(f) }
                 None => {}
             }
-            if is_prelude(name) || is_builtin_variant(name) {
+            if is_prelude(name) || is_builtin_variant(name) || is_hidden_builtin(name) {
                 return Ref.Builtin(name)
             }
             if maps.has(c.modules[c.current].imports, name) {
@@ -4506,6 +4617,33 @@ fn arity(c: mut Checker, e: ast.Expr, name: Str, expected: Int, got: Int) -> Boo
     return true
 }
 
+// The built-ins only compiler-written code can name (M32): write a part of a
+// value as Show does inside a value, hash it, compare two. A back end calls
+// the type's show, hash or compare, except that 0show quotes a Str.
+pub fn is_hidden_builtin(name: Str) -> Bool { return name == "0show" || name == "0hash" || name == "0compare" }
+
+// The method a hidden built-in calls: "show", "hash" or "compare".
+pub fn hidden_method(name: Str) -> Str { return name[1..len(name)] }
+
+fn hidden_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr]) -> Int {
+    let mut want = 1
+    let mut bound = SHOW()
+    let mut result = types.STR()
+    if name == "0hash" { bound = "Key"; result = integers.type_id("u64") }
+    if name == "0compare" { want = 2; bound = "Ord"; result = types.INT() }
+    if !arity(mut c, e, name, want, len(args)) {
+        for a in args { infer(mut c, a) }
+        return result
+    }
+    let t = value(mut c, args[0])
+    if want == 2 { check_expr(mut c, args[1], t, msg("expected " + show(c, t) + ", found ", "")) }
+    use_derived(mut c, t, bound)
+    if t != types.ERROR() && !satisfies(c, t, bound) {
+        report_at(mut c, args[0], "E3031", show(c, t) + " does not implement " + bound_text(bound) + "; " + failed_obligation(c, t, bound, 0))
+    }
+    return result
+}
+
 fn is_printable(t: Int) -> Bool {
     return types.is_integer(t) || t == types.BOOL() || t == types.STR() || t == types.FLOAT()
 }
@@ -4650,6 +4788,7 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
     if has_signature(name) {
         return fixed_builtin(mut c, e, name, args, written)
     }
+    if is_hidden_builtin(name) { return hidden_builtin(mut c, e, name, args) }
     let mut want = 2
     if name == "print" || name == "os.eprint" || name == "len" || name == "int" || name == "byte" || name == "maps.keys" ||
         name == "assert" || name == "float" {
@@ -4676,7 +4815,13 @@ fn builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr], written: St
     if name == "print" || name == "os.eprint" {
         let t = value(mut c, args[0])
         if !is_printable(t) && t != types.ERROR() {
-            report_at(mut c, args[0], "E3170", written + " takes an integer, Float, Bool or Str, not " + show(c, t))
+            if satisfies(c, t, SHOW()) {
+                c.shows[args[0].id] = spare_node(mut c)
+                use_derived(mut c, t, SHOW())
+            } else {
+                report_at(mut c, args[0], "E3170", written + " takes a value that implements Show, and " + show(c, t) + " does not" +
+                    why_not(c, t, SHOW()))
+            }
         }
         return types.NOTHING()
     }
@@ -4949,9 +5094,11 @@ fn resolve_bound(c: mut Checker, name: Str, line: Int, col: Int) -> Str {
     } else {
         match maps.get(module_types(c), name) { Some(t) => id = t, None => {} }
         if !types.is_interface(c.table, id) {
+            let mut prelude_name = name
+            if name == "Show" { prelude_name = SHOW() }
             for t in c.decls {
                 let ti = types.get(c.table, t)
-                if ti.module == "<prelude>" && ti.name == name { id = t }
+                if ti.module == "<prelude>" && ti.name == prelude_name { id = t }
             }
         }
     }
@@ -5044,7 +5191,9 @@ fn method_unify(table: types.Table, pattern: Int, actual: Int, params: [Int], bo
             return bound[i] == actual
         }
     }
-    if pattern == actual { return true }
+    // An open pattern equal to the receiver, as when a generic method calls
+    // itself, still binds the parameters it mentions.
+    if pattern == actual && !types.is_open(table, pattern) { return true }
     if pattern < 0 || actual < 0 { return false }
     let p = types.get(table, pattern)
     let a = types.get(table, actual)
@@ -5054,35 +5203,494 @@ fn method_unify(table: types.Table, pattern: Int, actual: Int, params: [Int], bo
     return p.result == a.result || method_unify(table, p.result, a.result, params, mut bound)
 }
 
-fn lookup_method(table: types.Table, fns: [FnInfo], mods: [modules.Module], t: Int, name: Str) -> Dispatch {
+// How Checker.methods files a function: its module's name and its own.
+fn method_key(module: Str, name: Str) -> Str { return module + " " + name }
+
+fn lookup_method(table: types.Table, fns: [FnInfo], mods: [modules.Module], index: Map[Str, [Int]], t: Int, name: Str) -> Dispatch {
     let empty = Dispatch { fn_id: -1, args: [] }
     if t < 0 { return empty }
     let ti = types.get(table, t)
+    if ti.tag == types.Tag.Array && !types.is_fixed(table, t) || ti.tag == types.Tag.Map {
+        return lookup_in(table, fns, mods, index, t, method_owner(table, t) + "." + name, "", "<prelude>")
+    }
     if ti.tag != types.Tag.Struct && ti.tag != types.Tag.Enum { return empty }
-    let qualified = ti.name + "." + name
+    let found = lookup_in(table, fns, mods, index, t, ti.name + "." + name, name, ti.module)
+    if found.fn_id >= 0 || ti.module != "" || ti.name != "Option" && ti.name != "Result" { return found }
+    // Option and Result: the main module's own functions first, as before M32, then the prelude's.
+    return lookup_in(table, fns, mods, index, t, ti.name + "." + name, "", "<prelude>")
+}
+
+// Who owns the methods of `t`'s type: its name, or the prelude's hidden name
+// for arrays and maps.
+fn method_owner(table: types.Table, t: Int) -> Str {
+    let ti = types.get(table, t)
+    if ti.tag == types.Tag.Array { return "0Array" }
+    if ti.tag == types.Tag.Map { return "0Map" }
+    return ti.name
+}
+
+// A function of module `module` whose receiver is `t`, named `qualified`, or
+// else `plain` (an ordinary function with the receiver first; "" for none).
+fn lookup_in(table: types.Table, fns: [FnInfo], mods: [modules.Module], index: Map[Str, [Int]], t: Int, qualified: Str, plain: Str, module: Str) -> Dispatch {
     for pass in 0..2 {
-        for id in 0..len(fns) {
+        if pass == 1 && plain == "" { break }
+        let mut name = qualified
+        if pass == 1 { name = plain }
+        let mut ids: [Int] = []
+        match maps.get(index, method_key(module, name)) {
+            Some(found) => ids = found
+            None => {}
+        }
+        for id in ids {
             let f = fns[id]
-            if len(f.params) == 0 { continue }
-            let owner = types.get(table, f.params[0]).module
-            if owner != ti.module || mods[f.module].name != ti.module { continue }
-            if pass == 0 && f.decl.name != qualified || pass == 1 && f.decl.name != name { continue }
+            let receiver = types.get(table, f.params[0])
+            if module != "<prelude>" && receiver.module != module { continue }
             let mut args = unknown(len(f.type_params))
             if !method_unify(table, f.params[0], t, f.type_params, mut args) { continue }
             return Dispatch { fn_id: id, args: args }
         }
     }
-    return empty
+    return Dispatch { fn_id: -1, args: [] }
 }
 
-pub fn method(k: Checked, t: Int, name: Str) -> Dispatch { return lookup_method(k.table, k.fns, k.modules, t, name) }
+pub fn method(k: Checked, t: Int, name: Str) -> Dispatch { return lookup_method(k.table, k.fns, k.modules, k.methods, t, name) }
+
+// ---- Derived conformances (M32) ----
+
+// Check the derived methods the program uses, and those they use in turn.
+// The rest keep an empty body and are marked skipped: no back end writes
+// them, which keeps a program's unused conformances free.
+fn check_derived(c: mut Checker) {
+    for j in 0..len(c.table.maps) {
+        if j % 2 == 0 { use_derived(mut c, c.table.maps[j], "Key") }  // maps holds key and value types in turn
+    }
+    let mut done: Map[Int, Bool] = [:]
+    let mut more = true
+    for more {
+        more = false
+        for r in c.refs {
+            match r {
+                Ref.Function(id) => { if c.fns[id].generated { c.wanted[id] = true } }
+                _ => {}
+            }
+        }
+        for id in c.generated {
+            if maps.has(done, id) || !maps.has(c.wanted, id) { continue }
+            done[id] = true
+            more = true
+            c.current = c.fns[id].module
+            let which = c.derived_of[id]
+            let x = c.derivables[which[0]]
+            let program = parsed_hidden(mut c, derived_source(c, x, derived_bounds()[which[1]], true), x.decl.line, x.decl.col)
+            c.fns[id].decl.body = program.fns[0].body
+            function(mut c, id)
+        }
+    }
+    for id in c.generated {
+        if maps.has(done, id) { continue }
+        let body = c.fns[id].decl.body
+        c.fns[id].decl.body = ast.Block { stmts: [], end_line: body.end_line, end_col: body.end_col }
+        c.fns[id].skipped = true
+    }
+}
+
+// Note that a check found `t` meeting `bound`, so its derived methods for
+// it, and its parents', will be written.
+fn use_derived(c: mut Checker, t: Int, bound: Str) {
+    if !listed(derived_bounds(), bound) { return }
+    use_method(mut c, t, bound_method(bound))
+    if bound == "Ord" || bound == "Key" { use_method(mut c, t, "eq") }
+}
+
+// The method `name` of `t` is called: want it if it is derived, and the same
+// method of every type `t` is built from, which a derived or generic one calls.
+fn use_method(c: mut Checker, t: Int, name: Str) {
+    if t < 0 || t == types.ERROR() { return }
+    let key = strings.from_int(t) + " " + name
+    if maps.has(c.used, key) { return }
+    c.used[key] = true
+    let ti = types.get(c.table, t)
+    if ti.tag == types.Tag.Param || ti.tag == types.Tag.Prim { return }
+    let dispatch = lookup_method(c.table, c.fns, c.modules, c.methods, t, name)
+    if dispatch.fn_id >= 0 && c.fns[dispatch.fn_id].generated { c.wanted[dispatch.fn_id] = true }
+    for a in ti.args { use_method(mut c, a, name) }
+    for f in ti.fields { use_method(mut c, f.ty, name) }
+    for v in ti.variants { for x in v.payload { use_method(mut c, x, name) } }
+}
+
+fn derived_bounds() -> [Str] { return ["Eq", "Ord", "Key", SHOW()] }
+
+// The prelude's Show, by a name no module's own interface can have: a main
+// module may declare an interface called Show, which keeps its meaning there
+// (M32). Programs write `Show`; resolve_bound finds this one when the module
+// has no Show of its own, and bound_text shows it as Show.
+pub fn SHOW() -> Str { return "0Show" }
+
+fn bound_text(bound: Str) -> Str {
+    if bound == SHOW() { return "Show" }
+    return bound
+}
+
+fn bound_method(bound: Str) -> Str {
+    return match bound { "Eq" => "eq", "Ord" => "compare", "Key" => "hash", _ => "show" }
+}
+
+// Whether `d` declares a field or variant name twice.
+fn repeats_names(d: ast.TypeDecl) -> Bool {
+    let mut seen: Map[Str, Bool] = [:]
+    for f in d.fields {
+        if maps.has(seen, f.name) { return true }
+        seen[f.name] = true
+    }
+    for v in d.variants {
+        if maps.has(seen, v.name) { return true }
+        seen[v.name] = true
+    }
+    return false
+}
+
+// "; why", explaining why `t` does not implement `bound`, or "" when the
+// type's name already says it (a primitive or function type).
+fn why_not(c: Checker, t: Int, bound: Str) -> Str {
+    let tag = types.get(c.table, t).tag
+    if tag == types.Tag.Prim || tag == types.Tag.Std || types.is_func(c.table, t) { return "" }
+    return "; " + failed_obligation(c, t, bound, 0)
+}
+
+fn listed(words: [Str], w: Str) -> Bool {
+    for x in words { if x == w { return true } }
+    return false
+}
+
+// A struct or enum declaration that may derive Eq, Ord, Key or Show.
+type Derivable = struct {
+    module: Int
+    decl: ast.TypeDecl
+    t: Int  // the declaration's type
+    own: [Bool]  // by derived_bounds(): the module defines the method itself
+    ok: [Bool]  // by derived_bounds(): derived, as far as known
+    occurs: [Bool]  // by type parameter: some field or payload mentions it
+    parts: [[Int]]  // by derived_bounds(): field and payload types, each parameter replaced by one with that bound
+}
+
+// Give each struct and enum the conformances its parts allow, as generated
+// methods (spec "Derived conformances"). A type defining a method keeps it;
+// `without` leaves one out; Ord and Key need a derived (or intrinsic) Eq.
+// Types that mention themselves are assumed to derive while their parts are
+// checked, so the result is the largest consistent set.
+fn derive(c: mut Checker) {
+    let names = derived_bounds()
+    let mut all: [Derivable] = []
+    let mut index: Map[Int, Int] = [:]
+    let mut k = 0
+    for m in c.order {
+        for d in c.modules[m].program.types {
+            let t = c.decls[k]
+            k = k + 1
+            c.table.types[t].without = d.without
+            if d.is_interface || c.modules[m].name == "<prelude>" { continue }
+            match maps.get(c.modules[m].types, d.name) {
+                Some(registered) => { if registered != t { continue } }  // a rejected second declaration
+                None => continue
+            }
+            if repeats_names(d) { continue }  // already rejected: E3011, E3013
+            let ti = types.get(c.table, t)
+            if ti.tag != types.Tag.Struct && ti.tag != types.Tag.Enum || !d.is_struct && len(d.variants) == 0 { continue }
+            let mut self_type = t
+            if len(ti.params) > 0 { self_type = types.instantiate(mut c.table, t, ti.params) }
+            let mut own: [Bool] = []
+            let mut ok: [Bool] = []
+            let mut parts: [[Int]] = []
+            for b in names {
+                let method = bound_method(b)
+                let defined = lookup_method(c.table, c.fns, c.modules, c.methods, self_type, method).fn_id >= 0
+                if defined && listed(d.without, bound_text(b)) {
+                    c.current = m
+                    report(mut c, d.line, d.col, "E3244", "'" + d.name + "' defines " + method + " and also lists " + bound_text(b) + " after 'without'")
+                }
+                let left_out = listed(d.without, bound_text(b)) || (b == "Ord" || b == "Key") && listed(d.without, "Eq")
+                let clash = types.is_enum(c.table, t) && types.variant_index(c.table, t, method) >= 0
+                push(mut own, defined)
+                push(mut ok, !defined && !left_out && !clash)
+                let mut fresh: [Int] = []
+                for p in ti.params {
+                    let mut bounds = [b]
+                    for x in types.get(c.table, p).bounds { push(mut bounds, x) }
+                    push(mut fresh, types.param(mut c.table, types.get(c.table, p).name, bounds, d.line, d.col))
+                }
+                let mut ps: [Int] = []
+                for f in types.get(c.table, t).fields { push(mut ps, types.subst(mut c.table, f.ty, ti.params, fresh)) }
+                for v in types.get(c.table, t).variants {
+                    for x in v.payload { push(mut ps, types.subst(mut c.table, x, ti.params, fresh)) }
+                }
+                push(mut parts, ps)
+            }
+            let mut occurs: [Bool] = []
+            for p in ti.params {
+                let mut found = false
+                for f in ti.fields { if types.mentions(c.table, f.ty, p) { found = true } }
+                for v in ti.variants { for x in v.payload { if types.mentions(c.table, x, p) { found = true } } }
+                push(mut occurs, found)
+            }
+            index[t] = len(all)
+            push(mut all, Derivable { module: m, decl: d, t: t, own: own, ok: ok, occurs: occurs, parts: parts })
+        }
+    }
+    let mut changed = true
+    for changed {
+        changed = false
+        for i in 0..len(all) {
+            for b in 0..len(names) {
+                if !all[i].ok[b] { continue }
+                let mut meets_all = true
+                for part in all[i].parts[b] {
+                    if !meets(c, all, index, part, b) { meets_all = false; break }
+                }
+                if b > 0 && b < 3 && !all[i].ok[0] { meets_all = false }
+                if !meets_all {
+                    all[i].ok[b] = false
+                    changed = true
+                }
+            }
+        }
+    }
+    for x in all {
+        for b in 0..len(names) {
+            if !x.ok[b] || b == 0 && types.c_like(c.table, x.t) && types.is_enum(c.table, x.t) { continue }
+            if b == 0 || len(c.derivables) == 0 || c.derivables[len(c.derivables) - 1].t != x.t { push(mut c.derivables, x) }
+            c.current = x.module
+            let program = parsed_hidden(mut c, derived_source(c, x, names[b], false), x.decl.line, x.decl.col)
+            for f in program.fns {
+                declare_fn(mut c, x.module, f)
+                c.fns[len(c.fns) - 1].generated = true
+                push(mut c.generated, len(c.fns) - 1)
+                c.derived_of[len(c.fns) - 1] = [len(c.derivables) - 1, b]
+            }
+        }
+    }
+}
+
+// Whether `t`, a part of a derivable type, meets derived_bounds()[b], with
+// the derivations in `all` taken as they stand.
+fn meets(c: Checker, all: [Derivable], index: Map[Int, Int], t: Int, b: Int) -> Bool {
+    let bound = derived_bounds()[b]
+    if t == types.ERROR() { return false }
+    let ti = types.get(c.table, t)
+    if ti.tag == types.Tag.Param || intrinsic(c.table, t, bound) { return true }
+    let mut decl = t
+    if ti.origin >= 0 { decl = ti.origin }
+    match maps.get(index, decl) {
+        Some(j) => {
+            if !all[j].own[b] {
+                if !all[j].ok[b] { return false }
+                for a in 0..len(ti.args) {
+                    if all[j].occurs[a] && !meets(c, all, index, ti.args[a], b) { return false }
+                }
+                return true
+            }
+        }
+        None => {}
+    }
+    if ti.tag == types.Tag.Array && !types.is_fixed(c.table, t) { return meets(c, all, index, ti.args[0], b) }
+    if ti.tag == types.Tag.Map {
+        if bound == "Eq" { return meets(c, all, index, ti.args[1], b) }
+        if bound == SHOW() { return meets(c, all, index, ti.args[0], b) && meets(c, all, index, ti.args[1], b) }
+        return false
+    }
+    if ti.tag == types.Tag.Enum && ti.module == "" && ti.origin < 0 && (ti.name == "Option" || ti.name == "Result") {
+        let dispatch = lookup_method(c.table, c.fns, c.modules, c.methods, t, bound_method(bound))
+        if dispatch.fn_id >= 0 && c.modules[c.fns[dispatch.fn_id].module].name == "<prelude>" {
+            for a in ti.args { if !meets(c, all, index, a, b) { return false } }
+            return true
+        }
+    }
+    return satisfies_depth(c, t, bound, 0)
+}
+
+// The source of `x`'s derived method for `bound`, in hidden names (parsed_hidden).
+fn derived_source(c: Checker, x: Derivable, bound: Str, with_body: Bool) -> Str {
+    let d = x.decl
+    let method = bound_method(bound)
+    let mut b = strings.builder()
+    if d.public { strings.add(mut b, "pub ") }
+    strings.add(mut b, "fn " + d.name + "." + method)
+    let mut receiver = d.name
+    if len(d.params) > 0 {
+        strings.add(mut b, "[")
+        receiver = receiver + "["
+        for i in 0..len(d.params) {
+            if i > 0 {
+                strings.add(mut b, ", ")
+                receiver = receiver + ", "
+            }
+            let p = d.params[i]
+            receiver = receiver + p.name
+            strings.add(mut b, p.name)
+            let mut bounds = p.bounds
+            let mut written = bound
+            if bound == SHOW() { written = "hid_Show" }
+            if x.occurs[i] && !listed(bounds, bound) { push(mut bounds, written) }
+            for j in 0..len(bounds) {
+                if j == 0 { strings.add(mut b, ": ") } else { strings.add(mut b, " + ") }
+                strings.add(mut b, bounds[j])
+            }
+        }
+        strings.add(mut b, "]")
+        receiver = receiver + "]"
+    }
+    let result = match bound { "Eq" => "Bool", "Ord" => "Int", "Key" => "u64", _ => "Str" }
+    if bound == "Eq" || bound == "Ord" {
+        strings.add(mut b, "(a: " + receiver + ", b: " + receiver + ") -> " + result + " {\n")
+    } else {
+        strings.add(mut b, "(a: " + receiver + ") -> " + result + " {\n")
+    }
+    if !with_body {
+        strings.add(mut b, "}\n")  // a signature, until something wants the body (check_derived)
+    } else if d.is_struct {
+        strings.add(mut b, struct_body(d, bound))
+    } else {
+        strings.add(mut b, enum_body(c, x, bound))
+    }
+    if with_body { strings.add(mut b, "}\n") }
+    return strings.build(b)
+}
+
+fn struct_body(d: ast.TypeDecl, bound: Str) -> Str {
+    let mut b = strings.builder()
+    if bound == "Eq" {
+        let mut terms: [Str] = []
+        for f in d.fields { push(mut terms, "a." + f.name + " == b." + f.name) }
+        strings.add(mut b, "return " + joined(terms, " && ", "true") + "\n")
+    } else if bound == "Ord" {
+        for i in 0..len(d.fields) {
+            let f = d.fields[i].name
+            let v = "hid_c" + strings.from_int(i)
+            strings.add(mut b, "let " + v + " = hid_compare(a." + f + ", b." + f + ")\n")
+            strings.add(mut b, "if " + v + " != 0 { return " + v + " }\n")
+        }
+        strings.add(mut b, "return 0\n")
+    } else if bound == "Key" {
+        if len(d.fields) == 0 {
+            strings.add(mut b, "return 0u64\n")
+        } else {
+            strings.add(mut b, "let mut hid_h = 0u64\n")
+            for f in d.fields { strings.add(mut b, mix("a." + f.name)) }
+            strings.add(mut b, "return hid_h\n")
+        }
+    } else {
+        let mut terms: [Str] = []
+        for f in d.fields { push(mut terms, "\"" + f.name + ": \" + hid_show(a." + f.name + ")") }
+        if len(terms) == 0 {
+            strings.add(mut b, "return \"" + d.name + " {}\"\n")
+        } else {
+            strings.add(mut b, "return \"" + d.name + " { \" + " + joined(terms, " + \", \" + ", "") + " + \" }\"\n")
+        }
+    }
+    return strings.build(b)
+}
+
+fn mix(value: Str) -> Str { return "hid_h = ((hid_h << 5) | (hid_h >> 59)) ^ hid_hash(" + value + ")\n" }
+
+fn joined(terms: [Str], between: Str, none: Str) -> Str {
+    if len(terms) == 0 { return none }
+    let mut out = terms[0]
+    for i in 1..len(terms) { out = out + between + terms[i] }
+    return out
+}
+
+// `D.V(hid_x0, hid_x1)` for variant `v` of `d`, its names starting `prefix`,
+// or `_` for each when prefix is "".
+fn variant_text(d: ast.TypeDecl, v: ast.VariantDecl, prefix: Str) -> Str {
+    let mut text = d.name + "." + v.name
+    if len(v.payload) == 0 { return text }
+    let mut names: [Str] = []
+    for i in 0..len(v.payload) {
+        if prefix == "" { push(mut names, "_") } else { push(mut names, prefix + strings.from_int(i)) }
+    }
+    return text + "(" + joined(names, ", ", "") + ")"
+}
+
+fn enum_body(c: Checker, x: Derivable, bound: Str) -> Str {
+    let d = x.decl
+    let mut b = strings.builder()
+    let single = len(d.variants) == 1
+    if bound == "Eq" {
+        strings.add(mut b, "return match a {\n")
+        for v in d.variants {
+            let mut terms: [Str] = []
+            for i in 0..len(v.payload) {
+                let n = strings.from_int(i)
+                push(mut terms, "hid_x" + n + " == hid_y" + n)
+            }
+            strings.add(mut b, variant_text(d, v, "hid_x") + " => match b { " + variant_text(d, v, "hid_y") + " => " +
+                joined(terms, " && ", "true"))
+            if !single { strings.add(mut b, ", _ => false") }
+            strings.add(mut b, " },\n")
+        }
+        strings.add(mut b, "}\n")
+    } else if bound == "Ord" {
+        for side in ["i", "j"] {
+            let mut operand = "a"
+            if side == "j" { operand = "b" }
+            strings.add(mut b, "let hid_" + side + " = match " + operand + " {\n")
+            for i in 0..len(d.variants) {
+                strings.add(mut b, variant_text(d, d.variants[i], "") + " => " + strings.from_int(i) + ",\n")
+            }
+            strings.add(mut b, "}\n")
+        }
+        strings.add(mut b, "if hid_i != hid_j {\nif hid_i < hid_j { return -1 }\nreturn 1\n}\n")
+        if !types.c_like(c.table, x.t) {
+            strings.add(mut b, "match a {\n")
+            for v in d.variants {
+                strings.add(mut b, variant_text(d, v, "hid_x") + " => {\n")
+                if len(v.payload) > 0 {
+                    strings.add(mut b, "match b {\n" + variant_text(d, v, "hid_y") + " => {\n")
+                    for i in 0..len(v.payload) {
+                        let n = strings.from_int(i)
+                        strings.add(mut b, "let hid_c" + n + " = hid_compare(hid_x" + n + ", hid_y" + n + ")\n")
+                        strings.add(mut b, "if hid_c" + n + " != 0 { return hid_c" + n + " }\n")
+                    }
+                    strings.add(mut b, "}\n")
+                    if !single { strings.add(mut b, "_ => {}\n") }
+                    strings.add(mut b, "}\n")
+                }
+                strings.add(mut b, "}\n")
+            }
+            strings.add(mut b, "}\n")
+        }
+        strings.add(mut b, "return 0\n")
+    } else if bound == "Key" {
+        strings.add(mut b, "let mut hid_h = 0u64\nmatch a {\n")
+        for i in 0..len(d.variants) {
+            let v = d.variants[i]
+            strings.add(mut b, variant_text(d, v, "hid_x") + " => {\nhid_h = " + strings.from_int(i) + "u64\n")
+            for j in 0..len(v.payload) { strings.add(mut b, mix("hid_x" + strings.from_int(j))) }
+            strings.add(mut b, "}\n")
+        }
+        strings.add(mut b, "}\nreturn hid_h\n")
+    } else {
+        strings.add(mut b, "return match a {\n")
+        for v in d.variants {
+            let mut text = "\"" + d.name + "." + v.name + "\""
+            if len(v.payload) > 0 {
+                let mut shown: [Str] = []
+                for i in 0..len(v.payload) { push(mut shown, "hid_show(hid_x" + strings.from_int(i) + ")") }
+                text = "\"" + d.name + "." + v.name + "(\" + " + joined(shown, " + \", \" + ", "") + " + \")\""
+            }
+            strings.add(mut b, variant_text(d, v, "hid_x") + " => " + text + ",\n")
+        }
+        strings.add(mut b, "}\n")
+    }
+    return strings.build(b)
+}
 
 fn intrinsic(table: types.Table, t: Int, bound: Str) -> Bool {
     if bound == "Eq" {
         let ti = types.get(table, t)
-        return ti.tag == types.Tag.Prim || ti.tag == types.Tag.Enum && len(ti.args) == 0 && types.c_like(table, t)
+        return ti.tag == types.Tag.Prim || ti.tag == types.Tag.Enum && len(ti.args) == 0 && types.c_like(table, t) && !listed(ti.without, "Eq")
     }
-    if bound == "Ord" { return types.is_integer(t) || t == types.FLOAT() || t == types.STR() }
+    if bound == "Ord" { return types.is_integer(t) || t == types.FLOAT() || t == types.STR() || t == types.BOOL() }
+    if bound == SHOW() { return is_printable(t) }
     return bound == "Key" && types.is_map_key(t)
 }
 
@@ -5095,7 +5703,7 @@ fn satisfies_depth(c: Checker, t: Int, bound: Str, depth: Int) -> Bool {
     let mut table = c.table
     for parent in ti.bounds { if !satisfies_depth(c, t, parent, depth + 1) { return false } }
     for field in ti.fields {
-        let dispatch = lookup_method(table, c.fns, c.modules, t, field.name)
+        let dispatch = lookup_method(table, c.fns, c.modules, c.methods, t, field.name)
         if dispatch.fn_id < 0 {
             let primitive_bound = intrinsic_bound(field.name)
             if primitive_bound == "" || !intrinsic(table, t, primitive_bound) { return false }
@@ -5126,28 +5734,93 @@ fn satisfies_depth(c: Checker, t: Int, bound: Str, depth: Int) -> Bool {
 }
 
 fn key_failure(c: Checker, t: Int) -> Str {
-    return "Map key " + show(c, t) + " does not implement Key; " + failed_obligation(c, t, "Key", 0)
+    return "Map key " + show(c, t) + " does not implement Key" + why_not(c, t, "Key")
 }
 
 // Explain only a rejected bound. Keep successful conformance checks allocation
 // free of diagnostic text, and use the same lookup/substitution/effect rules.
+// Why struct or enum `t` does not derive `bound` (M32), or "" for a type
+// that cannot derive.
+fn not_derived(c: Checker, t: Int, bound: Str, depth: Int) -> Str {
+    if !listed(derived_bounds(), bound) || depth > 32 { return "" }
+    let ti = types.get(c.table, t)
+    let own = lookup_method(c.table, c.fns, c.modules, c.methods, t, bound_method(bound)).fn_id
+    let mut parts: [Int] = []
+    if ti.tag == types.Tag.Array && !types.is_fixed(c.table, t) {
+        parts = ti.args
+    } else if ti.tag == types.Tag.Map {
+        if bound == "Ord" || bound == "Key" { return "maps do not implement " + bound_text(bound) }
+        parts = [ti.args[1]]
+        if bound == SHOW() { parts = ti.args }
+    } else if ti.module == "" && ti.origin < 0 && (ti.name == "Option" || ti.name == "Result") {
+        if own >= 0 && c.modules[c.fns[own].module].name != "<prelude>" { return "" }
+        parts = ti.args
+    }
+    if ti.tag == types.Tag.Array && types.is_fixed(c.table, t) { return "fixed arrays do not implement " + bound_text(bound) }
+    if len(parts) > 0 {
+        for a in parts {
+            if !satisfies_depth(c, a, bound, depth + 1) { return show(c, a) + " does not implement " + bound_text(bound) + part_detail(c, a, bound, depth) }
+        }
+        return ""
+    }
+    if !types.is_struct(c.table, t) && !types.is_enum(c.table, t) || own >= 0 && !c.fns[own].generated { return "" }
+    let mut decl = ti
+    if ti.origin >= 0 { decl = types.get(c.table, ti.origin) }
+    let name = show(c, t)
+    if listed(decl.without, bound_text(bound)) { return name + " leaves out " + bound_text(bound) + " with `without`" }
+    if (bound == "Ord" || bound == "Key") && listed(decl.without, "Eq") { return name + " leaves out Eq with `without`, and " + bound_text(bound) + " extends Eq" }
+    if bound == "Ord" || bound == "Key" {
+        if !satisfies_depth(c, t, "Eq", depth + 1) { return bound_text(bound) + " extends Eq: " + failed_obligation(c, t, "Eq", depth + 1) }
+        let eq = lookup_method(c.table, c.fns, c.modules, c.methods, t, "eq").fn_id
+        if eq >= 0 && !c.fns[eq].generated {
+            return name + " defines its own eq, so it must define " + bound_method(bound) + " too: a derived one could disagree with it"
+        }
+    }
+    for f in ti.fields {
+        if !satisfies_depth(c, f.ty, bound, depth + 1) {
+            return "field '" + f.name + "' is " + show(c, f.ty) + ", which does not implement " + bound_text(bound) + part_detail(c, f.ty, bound, depth)
+        }
+    }
+    for v in ti.variants {
+        for x in v.payload {
+            if !satisfies_depth(c, x, bound, depth + 1) {
+                return "variant '" + v.name + "' holds " + show(c, x) + ", which does not implement " + bound_text(bound) + part_detail(c, x, bound, depth)
+            }
+        }
+    }
+    return ""
+}
+
+// Why a part does not implement `bound`, unless it is a primitive or function type, which just does not.
+fn part_detail(c: Checker, t: Int, bound: Str, depth: Int) -> Str {
+    if types.get(c.table, t).tag == types.Tag.Prim || types.is_func(c.table, t) { return "" }
+    return ": " + failed_obligation(c, t, bound, depth + 1)
+}
+
 fn failed_obligation(c: Checker, t: Int, bound: Str, depth: Int) -> Str {
-    if types.is_param(c.table, t) { return "type parameter " + show(c, t) + " lacks bound " + bound }
-    if depth > 32 { return "interface obligation depth exceeded for " + bound }
+    if types.is_param(c.table, t) { return "type parameter " + show(c, t) + " lacks bound " + bound_text(bound) }
+    if types.is_func(c.table, t) && listed(derived_bounds(), bound) { return "function values do not implement " + bound_text(bound) }
+    let tag = types.get(c.table, t).tag
+    if (tag == types.Tag.Prim || tag == types.Tag.Std) && listed(derived_bounds(), bound) && !intrinsic(c.table, t, bound) {
+        return show(c, t) + " does not implement " + bound_text(bound)
+    }
+    let why = not_derived(c, t, bound, depth)
+    if why != "" { return why }
+    if depth > 32 { return "interface obligation depth exceeded for " + bound_text(bound) }
     let id = types.interface_id(c.table, bound)
-    if id < 0 { return "unknown interface " + bound }
+    if id < 0 { return "unknown interface " + bound_text(bound) }
     let ti = types.get(c.table, id)
     for parent in ti.bounds {
         if !satisfies_depth(c, t, parent, depth + 1) {
-            return bound + " requires " + parent + ": " + failed_obligation(c, t, parent, depth + 1)
+            return bound_text(bound) + " requires " + parent + ": " + failed_obligation(c, t, parent, depth + 1)
         }
     }
     let mut table = c.table
     let viewpoint = c.modules[c.current].name
     for field in ti.fields {
         let want = replace_self(mut table, field.ty, t)
-        let expected = bound + "." + field.name + ": expected " + types.show(table, want, viewpoint)
-        let dispatch = lookup_method(table, c.fns, c.modules, t, field.name)
+        let expected = bound_text(bound) + "." + field.name + ": expected " + types.show(table, want, viewpoint)
+        let dispatch = lookup_method(table, c.fns, c.modules, c.methods, t, field.name)
         if dispatch.fn_id < 0 {
             let primitive_bound = intrinsic_bound(field.name)
             if primitive_bound == "" || !intrinsic(table, t, primitive_bound) { return expected + "; method is missing" }
@@ -5181,7 +5854,7 @@ fn failed_obligation(c: Checker, t: Int, bound: Str, depth: Int) -> Str {
 
 fn validate_interfaces(c: mut Checker) {
     for f in c.fns {
-        if f.is_test { continue }
+        if f.is_test || c.modules[f.module].name == "<prelude>" { continue }
         c.current = f.module
         let name = f.decl.name
         for i in 0..len(name) {
@@ -5276,7 +5949,7 @@ fn method_call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], 
         if signature < 0 { report_at(mut c, e, "E3194", "missing or ambiguous interface method '" + name + "'"); return result }
         result = indirect_call(mut c, e, signature, all, "method '" + name + "'")
     } else {
-        let dispatch = lookup_method(c.table, c.fns, c.modules, t, name)
+        let dispatch = lookup_method(c.table, c.fns, c.modules, c.methods, t, name)
         if dispatch.fn_id >= 0 {
             let f = c.fns[dispatch.fn_id]
             if f.module != c.current && !f.decl.public {
@@ -5296,11 +5969,13 @@ fn method_call(c: mut Checker, e: ast.Expr, callee: ast.Expr, args: [ast.Expr], 
         }
     }
     c.refs[e.id] = Ref.Method(t, name)
+    let bound = intrinsic_bound(name)
+    if bound != "" { use_derived(mut c, t, bound) } else { use_method(mut c, t, name) }
     return result
 }
 
 fn intrinsic_bound(name: Str) -> Str {
-    return match name { "eq" => "Eq", "compare" => "Ord", "hash" => "Key", _ => "" }
+    return match name { "eq" => "Eq", "compare" => "Ord", "hash" => "Key", "show" => SHOW(), _ => "" }
 }
 
 fn named_receiver(c: mut Checker, e: ast.Expr) -> Int {
@@ -5348,9 +6023,12 @@ pub fn method_names(k: Checked, t: Int, module: Int) -> [Str] {
             let mut name = f.decl.name
             for i in 0..len(name) { if name[i] == '.' { name = name[i + 1..len(name)]; break } }
             if maps.has(seen, name) { continue }
+            // The prelude's eq, compare, hash and show need bounds on the parts that
+            // completion does not check; operators and print are the usual way to them.
+            if k.modules[f.module].name == "<prelude>" && intrinsic_bound(name) != "" { continue }
             if method(k, t, name).fn_id == id { seen[name] = true; push(mut out, name) }
         }
-        for name in ["eq", "compare", "hash"] {
+        for name in ["eq", "compare", "hash", "show"] {
             if intrinsic(k.table, t, intrinsic_bound(name)) && !maps.has(seen, name) { push(mut out, name) }
         }
     }

@@ -39,6 +39,9 @@ pub fn mangle(module: Str, name: Str) -> Str {
     if module == "" {
         return name
     }
+    // The prelude's functions (M32). Every other mangled name with a leading
+    // 0 has a digit next, so this cannot meet one.
+    if module == "<prelude>" { return "0P_" + name }
     let mut dot = -1
     for i in 0..len(module) {
         if module[i] == '.' {

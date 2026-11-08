@@ -3,5 +3,141 @@
 pub fn source() -> Str {
     return "pub type Eq = interface { fn eq(a: Self, b: Self) -> Bool }\n" +
         "pub type Ord = interface: Eq { fn compare(a: Self, b: Self) -> Int }\n" +
-        "pub type Key = interface: Eq { fn hash(value: Self) -> u64 }\n"
+        "pub type Key = interface: Eq { fn hash(value: Self) -> u64 }\n" +
+        "pub type Show = interface { fn show(value: Self) -> Str }\n"
+}
+
+// The prelude's methods (M32): Option and Result, and the conformances of
+// arrays and maps. Names starting `hid_` become hidden names starting with a
+// digit (checker.hidden_tokens), which no program can write: `hid_Array` and
+// `hid_Map` own the array and map methods, and `hid_show`/`hid_hash` are the
+// built-ins derived code uses to write, hash and compare a part of a value.
+pub fn methods() -> Str {
+    return "pub fn Option.is_some[T](value: Option[T]) -> Bool { return match value { Some(_) => true, None => false } }\n" +
+        "pub fn Option.is_none[T](value: Option[T]) -> Bool { return match value { Some(_) => false, None => true } }\n" +
+        "pub fn Option.unwrap_or[T](value: Option[T], default: T) -> T { return match value { Some(x) => x, None => default } }\n" +
+        "pub fn Option.map[T, U](value: Option[T], f: fn(T) -> U) -> Option[U] uses f {\n" +
+        "    return match value { Some(x) => Some(f(x)), None => None }\n" +
+        "}\n" +
+        "pub fn Option.and_then[T, U](value: Option[T], f: fn(T) -> Option[U]) -> Option[U] uses f {\n" +
+        "    return match value { Some(x) => f(x), None => None }\n" +
+        "}\n" +
+        "pub fn Option.ok_or[T, E](value: Option[T], error: E) -> Result[T, E] { return match value { Some(x) => Ok(x), None => Err(error) } }\n" +
+        "pub fn Option.eq[T: Eq](a: Option[T], b: Option[T]) -> Bool {\n" +
+        "    return match a {\n" +
+        "        Some(x) => match b { Some(y) => x == y, None => false },\n" +
+        "        None => match b { Some(_) => false, None => true },\n" +
+        "    }\n" +
+        "}\n" +
+        "pub fn Option.compare[T: Ord](a: Option[T], b: Option[T]) -> Int {\n" +
+        "    return match a {\n" +
+        "        Some(x) => match b {\n" +
+        "            Some(y) => hid_compare(x, y),\n" +
+        "            None => 1,\n" +
+        "        },\n" +
+        "        None => match b { Some(_) => -1, None => 0 },\n" +
+        "    }\n" +
+        "}\n" +
+        "pub fn Option.hash[T: Key](value: Option[T]) -> u64 {\n" +
+        "    return match value { Some(x) => ((1u64 << 5) | (1u64 >> 59)) ^ hid_hash(x), None => 0u64 }\n" +
+        "}\n" +
+        "pub fn Option.show[T: Show](value: Option[T]) -> Str {\n" +
+        "    return match value { Some(x) => \"Some(\" + hid_show(x) + \")\", None => \"None\" }\n" +
+        "}\n" +
+        "\n" +
+        "pub fn Result.is_ok[T, E](value: Result[T, E]) -> Bool { return match value { Ok(_) => true, Err(_) => false } }\n" +
+        "pub fn Result.is_err[T, E](value: Result[T, E]) -> Bool { return match value { Ok(_) => false, Err(_) => true } }\n" +
+        "pub fn Result.unwrap_or[T, E](value: Result[T, E], default: T) -> T { return match value { Ok(x) => x, Err(_) => default } }\n" +
+        "pub fn Result.map[T, E, U](value: Result[T, E], f: fn(T) -> U) -> Result[U, E] uses f {\n" +
+        "    return match value { Ok(x) => Ok(f(x)), Err(e) => Err(e) }\n" +
+        "}\n" +
+        "pub fn Result.map_err[T, E, F](value: Result[T, E], f: fn(E) -> F) -> Result[T, F] uses f {\n" +
+        "    return match value { Ok(x) => Ok(x), Err(e) => Err(f(e)) }\n" +
+        "}\n" +
+        "pub fn Result.and_then[T, E, U](value: Result[T, E], f: fn(T) -> Result[U, E]) -> Result[U, E] uses f {\n" +
+        "    return match value { Ok(x) => f(x), Err(e) => Err(e) }\n" +
+        "}\n" +
+        "pub fn Result.eq[T: Eq, E: Eq](a: Result[T, E], b: Result[T, E]) -> Bool {\n" +
+        "    return match a {\n" +
+        "        Ok(x) => match b { Ok(y) => x == y, Err(_) => false },\n" +
+        "        Err(x) => match b { Ok(_) => false, Err(y) => x == y },\n" +
+        "    }\n" +
+        "}\n" +
+        "pub fn Result.compare[T: Ord, E: Ord](a: Result[T, E], b: Result[T, E]) -> Int {\n" +
+        "    return match a {\n" +
+        "        Ok(x) => match b { Ok(y) => hid_compare(x, y), Err(_) => -1 },\n" +
+        "        Err(x) => match b { Ok(_) => 1, Err(y) => hid_compare(x, y) },\n" +
+        "    }\n" +
+        "}\n" +
+        "pub fn Result.hash[T: Key, E: Key](value: Result[T, E]) -> u64 {\n" +
+        "    return match value {\n" +
+        "        Ok(x) => hid_hash(x),\n" +
+        "        Err(x) => ((1u64 << 5) | (1u64 >> 59)) ^ hid_hash(x),\n" +
+        "    }\n" +
+        "}\n" +
+        "pub fn Result.show[T: Show, E: Show](value: Result[T, E]) -> Str {\n" +
+        "    return match value { Ok(x) => \"Ok(\" + hid_show(x) + \")\", Err(x) => \"Err(\" + hid_show(x) + \")\" }\n" +
+        "}\n" +
+        "\n" +
+        "pub fn hid_Array.eq[T: Eq](a: [T], b: [T]) -> Bool {\n" +
+        "    if len(a) != len(b) { return false }\n" +
+        "    for i in 0..len(a) {\n" +
+        "        if a[i] != b[i] { return false }\n" +
+        "    }\n" +
+        "    return true\n" +
+        "}\n" +
+        "pub fn hid_Array.compare[T: Ord](a: [T], b: [T]) -> Int {\n" +
+        "    let mut n = len(a)\n" +
+        "    if len(b) < n { n = len(b) }\n" +
+        "    for i in 0..n {\n" +
+        "        let c = hid_compare(a[i], b[i])\n" +
+        "        if c != 0 { return c }\n" +
+        "    }\n" +
+        "    if len(a) < len(b) { return -1 }\n" +
+        "    if len(a) > len(b) { return 1 }\n" +
+        "    return 0\n" +
+        "}\n" +
+        "pub fn hid_Array.hash[T: Key](value: [T]) -> u64 {\n" +
+        "    let mut h = u64(len(value))\n" +
+        "    for x in value { h = ((h << 5) | (h >> 59)) ^ hid_hash(x) }\n" +
+        "    return h\n" +
+        "}\n" +
+        "pub fn hid_Array.show[T: Show](value: [T]) -> Str {\n" +
+        "    let mut b = strings.builder()\n" +
+        "    strings.add(mut b, \"[\")\n" +
+        "    for i in 0..len(value) {\n" +
+        "        if i > 0 { strings.add(mut b, \", \") }\n" +
+        "        strings.add(mut b, hid_show(value[i]))\n" +
+        "    }\n" +
+        "    strings.add(mut b, \"]\")\n" +
+        "    return strings.build(b)\n" +
+        "}\n" +
+        "\n" +
+        "pub fn hid_Map.eq[K: Key, V: Eq](a: Map[K, V], b: Map[K, V]) -> Bool {\n" +
+        "    if len(a) != len(b) { return false }\n" +
+        "    for k in maps.keys(a) {\n" +
+        "        match maps.get(b, k) {\n" +
+        "            Some(v) => {\n" +
+        "                if v != a[k] { return false }\n" +
+        "            }\n" +
+        "            None => return false\n" +
+        "        }\n" +
+        "    }\n" +
+        "    return true\n" +
+        "}\n" +
+        "pub fn hid_Map.show[K: Key + Show, V: Show](value: Map[K, V]) -> Str {\n" +
+        "    if len(value) == 0 { return \"[:]\" }\n" +
+        "    let mut b = strings.builder()\n" +
+        "    strings.add(mut b, \"[\")\n" +
+        "    let mut first = true\n" +
+        "    for k in maps.keys(value) {\n" +
+        "        if !first { strings.add(mut b, \", \") }\n" +
+        "        first = false\n" +
+        "        strings.add(mut b, hid_show(k))\n" +
+        "        strings.add(mut b, \": \")\n" +
+        "        strings.add(mut b, hid_show(value[k]))\n" +
+        "    }\n" +
+        "    strings.add(mut b, \"]\")\n" +
+        "    return strings.build(b)\n" +
+        "}\n"
 }

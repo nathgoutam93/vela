@@ -1,0 +1,17 @@
+// err: option_map_effect.vl:12:17: error: 'greeting' uses os, through the function passed to 'map', but does not say so; add `uses os` after its signature [E3036]
+import os
+
+fn home(user: Str) -> Str uses os {
+    match os.env("HOME") {
+        Some(h) => return h
+        None => return user
+    }
+}
+
+fn greeting(user: Option[Str]) -> Option[Str] {
+    return user.map(home)
+}
+
+fn main() {
+    print(greeting(Some("ann")))
+}

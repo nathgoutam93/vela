@@ -1,0 +1,70 @@
+// Derived Eq (M32): structs, enums, generic and recursive types, Option,
+// Result, arrays and maps compare by their parts; a method of the type's own
+// replaces the derived one.
+// out: true
+// out: true
+// out: true
+// out: false
+// out: false
+// out: true
+// out: true
+// out: false
+// out: true
+// out: true
+// out: true
+// out: true
+// out: false
+// out: true
+// out: true
+// out: true
+// out: false
+// out: true
+// out: true
+// out: false
+import maps
+
+type Point = struct { x: Int, y: Int }
+type Shape = enum { Circle(Point, Float), Poly([Point]), Empty }
+type Pair[A, B] = struct { a: A, b: B }
+type Tree = enum { Leaf(Int), Node([Tree]) }
+type Phantom[T] = struct { n: Int }
+type Loose = struct { label: Str, weight: Int }
+
+// Two Looses are equal when their labels are: the type's own eq wins.
+fn Loose.eq(a: Loose, b: Loose) -> Bool { return a.label == b.label }
+
+fn main() {
+    let p = Point { x: 1, y: 2 }
+    print(p == Point { x: 1, y: 2 })
+    print(p != Point { x: 2, y: 1 })
+    print(Shape.Circle(p, 1.5) == Shape.Circle(p, 1.5))
+    print(Shape.Circle(p, 1.5) == Shape.Empty)
+    print(Shape.Poly([p, p]) == Shape.Poly([p]))
+    print(Pair { a: 1, b: "x" } == Pair { a: 1, b: "x" })
+    let t = Tree.Node([Tree.Leaf(1), Tree.Node([])])
+    print(t == Tree.Node([Tree.Leaf(1), Tree.Node([])]))
+    print(t == Tree.Leaf(1))
+    let ph: Phantom[fn() -> Int] = Phantom { n: 3 }
+    print(ph == ph)
+    let r: Result[Int, Str] = Ok(1)
+    print(r == Ok(1))
+    print(r != Err("bad"))
+    print(Ok(1) == r)
+    let o: Option[Point] = Some(p)
+    print(o == None)
+    print([1, 2, 3] == [1, 2, 3])
+    print([[1], [2]] != [[1], [3]])
+    let mut a: Map[Str, Int] = [:]
+    a["one"] = 1
+    a["two"] = 2
+    let mut b: Map[Str, Int] = [:]
+    b["two"] = 2
+    b["one"] = 1
+    print(a == b)
+    b["two"] = 3
+    print(a == b)
+    print(Loose { label: "k", weight: 1 } == Loose { label: "k", weight: 2 })
+    print(p.eq(Point { x: 1, y: 2 }))
+    let nan = 0.0 / 0.0
+    print(Pair { a: nan, b: 1 } == Pair { a: nan, b: 1 })
+}

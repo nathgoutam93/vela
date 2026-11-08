@@ -199,8 +199,13 @@ fn report(ld: mut Loader, importer: Int, imp: ast.Import, code: Str, message: St
 }
 
 fn builtin_module(ld: mut Loader, name: Str) -> Int {
-    for i in 0..len(ld.modules) {
-        if ld.modules[i].is_std && ld.modules[i].name == name {
+    return builtin_in(mut ld.modules, name)
+}
+
+// The index of built-in module `name` in `mods`, added if it is not there.
+pub fn builtin_in(mods: mut [Module], name: Str) -> Int {
+    for i in 0..len(mods) {
+        if mods[i].is_std && mods[i].name == name {
             return i
         }
     }
@@ -211,8 +216,8 @@ fn builtin_module(ld: mut Loader, name: Str) -> Int {
     if name == "strings" {
         m.types["Builder"] = types.BUILDER()
     }
-    push(mut ld.modules, m)
-    return len(ld.modules) - 1
+    push(mut mods, m)
+    return len(mods) - 1
 }
 
 fn follow(ld: mut Loader, importer: Int, imp: ast.Import) uses fs {

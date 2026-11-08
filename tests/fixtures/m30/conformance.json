@@ -71,10 +71,9 @@
     },
     {
       "file": "reject_result_equality.vl",
-      "kind": "rejected",
-      "exit": 1,
-      "stdout": "",
-      "code": "E3099"
+      "kind": "program",
+      "exit": 0,
+      "stdout": ""
     },
     {
       "file": "systems.vl",
