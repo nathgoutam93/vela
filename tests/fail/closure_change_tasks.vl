@@ -1,0 +1,10 @@
+// err: closure_change_tasks.vl:7:9: error: cannot assign to 'n' inside a function value: it has its own copy of 'n', made when it was created, and changes to the copy would be lost. Only a function written as the argument for a `scoped` parameter can change it [E3060]
+import tasks
+
+fn main() {
+    let mut n = 0
+    let r = tasks.map([1, 2], fn(x: Int) -> Int {
+        n += x
+        return x
+    })
+}

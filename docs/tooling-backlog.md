@@ -4436,6 +4436,34 @@ No additional CI workflow run was requested or launched for reconciliation.
   constructors take E from the receiver and fix U.
 - **Verify:** the expression above checks and runs on both back ends.
 
+### TL-135: Analyses found mutation only through written `mut` arguments
+
+- **Status:** resolved during M33.
+- **Discovery:** M33, while adding mutable receivers and changing closures
+  (2026-11-08, branch `m33-receivers`). Found by reading every use of
+  `ast.ExprKind.MutArg` and `ast.has_mut`, not by a failing program: before
+  M33 a local could change only through an assignment or a written
+  `mut place`.
+- **Evidence (observed in source):** `ast.has_mut` decides evaluation-order
+  snapshots in both back ends (`codegen.join_snapshots`, argument copies)
+  and "stable" expressions in `ranges.vl`; `ranges.changed_expr` and
+  `walk_call`, `loops.uses_expr` and `lower.taken_in_expr` find changed or
+  address-taken locals by matching `MutArg` in call arguments. `s.push(x)`
+  and `fn(x: Int) { total += x }` change locals with no `MutArg` written.
+- **Impact (suspected, had it shipped):** a value read before `s.pop()` in
+  the same expression could be read after the change; a range fact about
+  `total` could survive a call that changed it; a changed local could stay
+  in a register the callee writes past.
+- **Resolution:** `Checked.mutations` marks method calls that change their
+  receiver and closures that change captures. `ast.has_mut` takes it;
+  `checker.call_arguments` gives the analyses a mutating receiver as
+  `mut obj`; closures' `writes` invalidate range facts, count as loop
+  writes and make the locals address-taken.
+- **Verify:** `tests/run/mut_receivers.vl` (`f"{c.n} {c.bump()} {c.n}"` is
+  `0 1 1`) and `tests/run/scoped_closures.vl` (`xs[i]` after a closure
+  changed `i`) agree on both back ends with optimization on and off. When
+  adding another way to change a local, add it to `mutations`.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;

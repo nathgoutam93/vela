@@ -1,0 +1,8 @@
+// err: mut_receiver_overlap.vl:7:12: error: 's' is passed as mut twice in this call [E3144]
+type Stack = struct { items: [Int] }
+fn Stack.take(s: mut Stack, into: mut [Int]) { push(mut into, len(s.items)) }
+
+fn main() {
+    let mut s = Stack { items: [] }
+    s.take(mut s.items)
+}

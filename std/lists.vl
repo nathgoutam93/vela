@@ -183,7 +183,7 @@ pub fn sort[T: Ord](xs: [T]) -> [T] {
 }
 
 // `xs` sorted by what `key` gives for each.
-pub fn sort_by[T, K: Ord](xs: [T], key: fn(T) -> K) -> [T] uses key {
+pub fn sort_by[T, K: Ord](xs: [T], key: scoped fn(T) -> K) -> [T] uses key {
     return in_order(xs, map(xs, key))
 }
 
@@ -198,7 +198,7 @@ pub fn in_order[T, K: Ord](xs: [T], keys: [K]) -> [T] {
 }
 
 // What `f` gives for each element.
-pub fn map[T, U](xs: [T], f: fn(T) -> U) -> [U] uses f {
+pub fn map[T, U](xs: [T], f: scoped fn(T) -> U) -> [U] uses f {
     let mut out: [U] = []
     for x in xs {
         push(mut out, f(x))
@@ -207,7 +207,7 @@ pub fn map[T, U](xs: [T], f: fn(T) -> U) -> [U] uses f {
 }
 
 // The elements `keep` says yes to, in order.
-pub fn filter[T](xs: [T], keep: fn(T) -> Bool) -> [T] uses keep {
+pub fn filter[T](xs: [T], keep: scoped fn(T) -> Bool) -> [T] uses keep {
     let mut out: [T] = []
     for x in xs {
         if keep(x) {
@@ -217,7 +217,7 @@ pub fn filter[T](xs: [T], keep: fn(T) -> Bool) -> [T] uses keep {
     return out
 }
 
-pub fn any[T](xs: [T], holds: fn(T) -> Bool) -> Bool uses holds {
+pub fn any[T](xs: [T], holds: scoped fn(T) -> Bool) -> Bool uses holds {
     for x in xs {
         if holds(x) {
             return true
@@ -226,7 +226,7 @@ pub fn any[T](xs: [T], holds: fn(T) -> Bool) -> Bool uses holds {
     return false
 }
 
-pub fn all[T](xs: [T], holds: fn(T) -> Bool) -> Bool uses holds {
+pub fn all[T](xs: [T], holds: scoped fn(T) -> Bool) -> Bool uses holds {
     for x in xs {
         if !holds(x) {
             return false
@@ -235,8 +235,16 @@ pub fn all[T](xs: [T], holds: fn(T) -> Bool) -> Bool uses holds {
     return true
 }
 
+// `f` called on each element, in order (M33). `f` may change the caller's
+// `let mut` locals: `lists.each(xs, fn(x: Int) { total += x })`.
+pub fn each[T](xs: [T], f: scoped fn(T)) uses f {
+    for x in xs {
+        f(x)
+    }
+}
+
 // `f(... f(f(start, xs[0]), xs[1]) ..., xs[n - 1])`.
-pub fn fold[T, A](xs: [T], start: A, f: fn(A, T) -> A) -> A uses f {
+pub fn fold[T, A](xs: [T], start: A, f: scoped fn(A, T) -> A) -> A uses f {
     let mut acc = start
     for x in xs {
         acc = f(acc, x)

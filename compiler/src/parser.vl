@@ -361,8 +361,18 @@ fn fn_decl_in(p: mut Parser, with_body: Bool) -> Result[ast.FnDecl, errors.Compi
         if mutable {
             advance(mut p)
         }
+        // `f: scoped fn(T)` (M33): the function may call f but not keep it.
+        let mut scoped = false
+        let word = peek(p, 0)
+        if word.kind == lexer.Kind.Ident && word.text == "scoped" && peek(p, 1).kind == lexer.Kind.Fn {
+            if mutable {
+                push(mut p.errors, error(word, "E2034", "a parameter cannot be both `mut` and `scoped`; a scoped function is only called"))
+            }
+            advance(mut p)
+            scoped = !mutable
+        }
         let t = type_name(mut p)?
-        push(mut params, ast.Param { name: pname.text, ty: t, line: pname.line, col: pname.col, mutable: mutable })
+        push(mut params, ast.Param { name: pname.text, ty: t, line: pname.line, col: pname.col, mutable: mutable, scoped: scoped })
         if peek(p, 0).kind != lexer.Kind.Comma {
             break
         }

@@ -94,8 +94,9 @@ test "description" { STATEMENTS }
 
 These are syntax forms, not a grammar that overrides the token/newline rules.
 List elements use commas or the declaration-specific newline separators;
-calls require commas between arguments. Function parameters have `name: T`
-or `name: mut T`; struct fields have `name: T`. An executable has exactly one
+calls require commas between arguments. Function parameters have `name: T`,
+`name: mut T` or, for a function type, `name: scoped fn(...)`; struct fields
+have `name: T`. An executable has exactly one
 entry `fn main()` without parameters or result. A library can be checked and
 tested without main. A function omitting `->` returns nothing, which is
 distinct from returning the explicit value `()` of type Unit.
@@ -206,7 +207,9 @@ An argument that is a copy of a place the call changes through a `mut`
 argument, or that a later argument's nested call changes, keeps the value
 from before the change; this is valid but warns (E3138, E3139). Separate
 the operations with a temporary or a preceding statement. Loop
-variables, match bindings and captured values are read-only. A binding is
+variables, match bindings and captured values are read-only, except that a
+closure written as a scoped argument may change captured locals (see
+[functions](#functions-generics-and-interfaces)). A binding is
 visible in its lexical scope; inner scopes may shadow outer names. Repeated
 immutable `let _ = call()` acknowledges intentional discard without creating
 a useful local name. A discarded Result-returning call otherwise warns with
@@ -313,6 +316,18 @@ or `fn(x) => x + 1`, with inference from context. Captures are immutable value
 snapshots and can outlive the function creating them. Function values do not
 accept mutable parameters. Built-ins used as callbacks require a wrapper.
 
+A parameter `f: scoped fn(...)` promises that the function does not keep f:
+it may call f, or pass it as the argument for another scoped parameter, and
+nothing else (E3246). A scoped parameter accepts any function value of its
+type. A closure written directly as the argument for a scoped parameter may
+change captured locals that are mutable where they are declared: assign
+them, pass them as `mut`, or call methods that change them. It changes the
+locals themselves, not copies, while the call it was passed to runs;
+closures nested in such a closure may do the same when they are scoped
+arguments too. Any other closure that changes a capture is E3060. In the
+call, no other argument may change or capture a local such a closure
+changes (E3144). `tasks.map` and `tasks.each` take ordinary parameters.
+
 Generic declarations use `[T, U]` or bounds `[T: Eq + Key]`. Calls infer type
 arguments from arguments and the expected result; explicit type arguments
 are written in type instances, not at function call sites. Generic recursion
@@ -332,7 +347,11 @@ must be public under the accessibility rules.
 Methods belong to the receiver type's defining module. A qualified
 `fn Item.name(value: Item) -> Str` or eligible ordinary module function with
 the receiver first supplies `value.name()`. `Item.name(value)` uses the same
-qualified function. Function-valued fields take precedence. Importing another
+qualified function. A qualified method may take its receiver as `mut`:
+`fn Stack.push(s: mut Stack, x: Int)` is called `s.push(x)`, which checks
+`s` as the argument `mut s` (a mutable place, E3144 overlap, E3138 copies),
+and is the same call as `Stack.push(mut s, x)`. An ordinary function with a
+mut first parameter does not supply a method. Function-valued fields take precedence. Importing another
 module must not add or override the receiver's methods. Generic method
 implementations must meet their own bounds and inferred arguments too.
 

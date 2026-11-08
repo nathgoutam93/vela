@@ -1118,7 +1118,7 @@ fn for_each(g: mut Gen, s: ast.Stmt, iterable: ast.Expr, body: ast.Block) {
 fn call_value(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
     let t = ty(g, e)
     match g.k.refs[e.id] {
-        checker.Ref.Method(t, name) => return method_value(mut g, e, checker.method_args(e, args), sub(g, t), name)
+        checker.Ref.Method(t, name) => return method_value(mut g, e, checker.method_args(g.k, e, args), sub(g, t), name)
         checker.Ref.Variant(enum, vi) => {
             let mut consumed: [Str] = []
             for a in args {
@@ -1140,7 +1140,7 @@ fn call_value(g: mut Gen, e: ast.Expr, args: [ast.Expr]) -> Value {
             // needs no copy: nothing here can change it.
             let mut protect = false
             for a in args {
-                if ast.has_mut(a) {
+                if ast.has_mut(a, g.k.mutations) {
                     protect = true
                 }
             }
@@ -2407,7 +2407,11 @@ fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
     inner.mode = g.mode
     observe_scope(mut inner, display_name(g.k, g.current_fn) + "::<closure@" + strings.from_int(e.line) + ":" + strings.from_int(e.col) + ">", e.line, e.col)
     for i in 0..len(info.captures) {
-        inner.captures[info.captures[i]] = "(env->c" + strings.from_int(i) + ")"
+        if by_address(info, info.captures[i]) {
+            inner.captures[info.captures[i]] = "(*env->c" + strings.from_int(i) + ")"  // the caller's local itself (M33)
+        } else {
+            inner.captures[info.captures[i]] = "(env->c" + strings.from_int(i) + ")"
+        }
     }
     push_frame(mut inner, "function")
     let mut params = strings.builder()
@@ -2438,12 +2442,15 @@ fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
         push(mut g.extra, "typedef struct " + env + " {")
         push(mut g.extra, "    vela_env head;")
         for i in 0..n {
-            push(mut g.extra, "    " + c_type(g, local_ty(g, info.captures[i])) + " c" + strings.from_int(i) + ";")
+            let mut star = ""
+            if by_address(info, info.captures[i]) { star = "*" }
+            push(mut g.extra, "    " + c_type(g, local_ty(g, info.captures[i])) + " " + star + "c" + strings.from_int(i) + ";")
         }
         push(mut g.extra, "} " + env + ";")
         push(mut g.extra, "static void " + env + "_drop(vela_env *e_) {")
         push(mut g.extra, "    " + env + " *e = (" + env + " *)e_;")
         for i in 0..n {
+            if by_address(info, info.captures[i]) { continue }
             let r = release(mut g, local_ty(g, info.captures[i]), "e->c" + strings.from_int(i))
             if r != "" {
                 push(mut g.extra, "    " + r)
@@ -2455,6 +2462,7 @@ fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
         push(mut g.extra, "    " + env + " *e = (" + env + " *)e_;")
         push(mut g.extra, "    (void)e;")
         for i in 0..n {
+            if by_address(info, info.captures[i]) { continue }
             let m = share(mut g, local_ty(g, info.captures[i]), "e->c" + strings.from_int(i))
             if m != "" {
                 push(mut g.extra, "    " + m)
@@ -2486,10 +2494,21 @@ fn closure_value(g: mut Gen, e: ast.Expr, body: ast.Block) -> Value {
     for i in 0..n {
         let cid = info.captures[i]
         let member = block + "->c" + strings.from_int(i)
+        if by_address(info, cid) {
+            emit(mut g, member + " = &" + local(mut g, cid) + ";")
+            continue
+        }
         emit(mut g, member + " = " + local(mut g, cid) + ";")
         emit(mut g, retain(mut g, local_ty(g, cid), member))
     }
     return store(mut g, t, "(" + c_type(g, t) + "){ .fn = " + fname + ", .env = &" + block + "->head }")
+}
+
+// Whether a closure holds captured local `id` by its address: it changes it,
+// which it may as a scoped argument (M33).
+pub fn by_address(info: checker.ClosureInfo, id: Int) -> Bool {
+    for w in info.writes { if w == id { return true } }
+    return false
 }
 
 // The C function called, or named as a value, at node `e`: for a generic
@@ -2780,7 +2799,7 @@ pub fn join_snapshots(k: checker.Checked, parts: [ast.Expr]) -> [Bool] {
     for n in 0..len(parts) {
         let i = len(parts) - 1 - n
         out[i] = i < len(parts) - 1 && (later || loops.escaped(k, parts[i]))
-        later = later || ast.has_mut(parts[i])
+        later = later || ast.has_mut(parts[i], k.mutations)
     }
     return out
 }
@@ -2883,7 +2902,7 @@ fn binary_left(g: mut Gen, l: ast.Expr, r: ast.Expr) -> Value {
     let mut left = first.c
     if cffi.pointer(first.ty) || types.is_integer(first.ty) || first.ty == types.FLOAT() || first.ty == types.BOOL() || first.ty == types.UNIT() {
         left = scalar(mut g, first.ty, left)  // snapshot before the right side can mutate a local
-    } else if (ast.has_mut(r) || loops.escaped(g.k, l)) && !first.owned && !first.is_static {
+    } else if (ast.has_mut(r, g.k.mutations) || loops.escaped(g.k, l)) && !first.owned && !first.is_static {
         left = store(mut g, first.ty, consume(mut g, first)).c
     }
     return value(left, first.ty)

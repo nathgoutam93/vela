@@ -1,0 +1,4 @@
+// err: scoped_mut.vl:2:27: error: a parameter cannot be both `mut` and `scoped`; a scoped function is only called [E2034]
+fn each(xs: [Int], f: mut scoped fn(Int)) {}
+
+fn main() {}

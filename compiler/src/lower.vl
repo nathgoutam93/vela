@@ -1475,13 +1475,15 @@ fn taken_in_expr(g: Low, e: ast.Expr, out: mut Map[Int, Bool]) {
             taken_in_expr(g, a, mut out)
             taken_in_expr(g, b, mut out)
         }
-        ast.ExprKind.Call(callee, args) => {
+        ast.ExprKind.Call(callee, written) => {
             let address_args = match g.k.refs[e.id] {
                 checker.Ref.Function(_) => true
+                checker.Ref.Method(_, _) => true
                 checker.Ref.Builtin(name) => name == "c.addr"
                 _ => false
             }
             taken_in_expr(g, callee, mut out)
+            let args = checker.call_arguments(g.k, e, written)
             for a in args {
                 match a.kind {
                     ast.ExprKind.MutArg(p) => {
@@ -1530,7 +1532,11 @@ fn taken_in_expr(g: Low, e: ast.Expr, out: mut Map[Int, Bool]) {
             taken_in_expr(g, x, mut out)
             taken_in_arms(g, arms, mut out)
         }
-        ast.ExprKind.Closure(_, _, body, _) => taken_in_block(g, body, mut out)
+        ast.ExprKind.Closure(_, _, body, _) => {
+            // A capture the closure changes is held by its address (M33).
+            for w in g.k.closures[e.id].writes { out[w] = true }
+            taken_in_block(g, body, mut out)
+        }
         _ => {}
     }
 }
@@ -2722,7 +2728,7 @@ fn expr(g: mut Low, e: ast.Expr) -> Val {
                     return enum_value(mut g, sub(g, enum), vi, consumed)
                 }
                 checker.Ref.Builtin(name) => return builtin(mut g, e, name, args)
-                checker.Ref.Method(t, name) => return method_value(mut g, e, checker.method_args(e, args), sub(g, t), name)
+                checker.Ref.Method(t, name) => return method_value(mut g, e, checker.method_args(g.k, e, args), sub(g, t), name)
                 checker.Ref.Function(id) => return direct_call(mut g, e, id, args)
                 checker.Ref.Indirect => return indirect_call(mut g, e, args)
                 _ => return no_value()
@@ -2969,7 +2975,7 @@ fn direct_call(g: mut Low, e: ast.Expr, id: Int, args: [ast.Expr]) -> Val {
     if g.k.fns[id].decl.foreign != "" { return foreign_call(mut g, e, id, args) }
     let mut protect = false
     for a in args {
-        if ast.has_mut(a) {
+        if ast.has_mut(a, g.k.mutations) {
             protect = true
         }
     }
@@ -3133,6 +3139,12 @@ fn closure_value(g: mut Low, e: ast.Expr, body: ast.Block) -> Val {
     let mut at = 24
     for cid in info.captures {
         let s = shape(mut g, local_ty(g, cid))
+        if codegen.by_address(info, cid) {
+            at = align_up(at, 8)
+            push(mut offs, at)
+            at = at + 8  // the address of the caller's local (M33)
+            continue
+        }
         at = align_up(at, s.align)
         push(mut offs, at)
         at = at + s.size
@@ -3161,7 +3173,11 @@ fn closure_value(g: mut Low, e: ast.Expr, body: ast.Block) -> Val {
     let env = ir.param(mut g.fs.f, ir.INT())
     for i in 0..len(info.captures) {
         let cid = info.captures[i]
-        g.fs.captures[cid] = mem_val(env, offs[i], local_ty(g, cid))
+        if codegen.by_address(info, cid) {
+            g.fs.captures[cid] = mem_val(load(mut g, env, offs[i], 8), 0, local_ty(g, cid))
+        } else {
+            g.fs.captures[cid] = mem_val(env, offs[i], local_ty(g, cid))
+        }
     }
     push_frame(mut g, "function")
     for lid in info.params {
@@ -3191,6 +3207,7 @@ fn closure_value(g: mut Low, e: ast.Expr, body: ast.Block) -> Val {
     g.fs = new_fn(env_name + "_drop", -1)
     let d = ir.param(mut g.fs.f, ir.INT())
     for i in 0..n {
+        if codegen.by_address(info, info.captures[i]) { continue }
         release(mut g, local_ty(g, info.captures[i]), mem_val(d, offs[i], local_ty(g, info.captures[i])))
     }
     ccall(mut g, "free", [d], [ir.KIND_INT()], ir.RET_NONE(), -1)
@@ -3199,6 +3216,7 @@ fn closure_value(g: mut Low, e: ast.Expr, body: ast.Block) -> Val {
     g.fs = new_fn(env_name + "_share", -1)
     let sh = ir.param(mut g.fs.f, ir.INT())
     for i in 0..n {
+        if codegen.by_address(info, info.captures[i]) { continue }
         share(mut g, local_ty(g, info.captures[i]), mem_val(sh, offs[i], local_ty(g, info.captures[i])))
     }
     ret(mut g, -1)
@@ -3210,6 +3228,10 @@ fn closure_value(g: mut Low, e: ast.Expr, body: ast.Block) -> Val {
     store(mut g, block, 16, 8, sym_addr(mut g, env_name + "_share"))
     for i in 0..n {
         let cid = info.captures[i]
+        if codegen.by_address(info, cid) {
+            store(mut g, block, offs[i], 8, address(mut g, local(mut g, cid)))
+            continue
+        }
         let member = mem_val(block, offs[i], local_ty(g, cid))
         put(mut g, block, offs[i], member.ty, local(mut g, cid))
         retain(mut g, member.ty, member)
@@ -3508,7 +3530,7 @@ fn binary_left(g: mut Low, l: ast.Expr, r: ast.Expr) -> Val {
     let mut left = expr(mut g, l)
     if cffi.pointer(left.ty) || types.is_integer(left.ty) || left.ty == types.FLOAT() || left.ty == types.BOOL() || left.ty == types.UNIT() {
         left = fresh(mut g, left)  // load before the right side can mutate its source
-    } else if (ast.has_mut(r) || loops.escaped(g.k, l)) && !left.owned && !left.is_static {
+    } else if (ast.has_mut(r, g.k.mutations) || loops.escaped(g.k, l)) && !left.owned && !left.is_static {
         if managed(mut g, left.ty) { left = own(mut g, consume(mut g, left)) } else { left = fresh(mut g, left) }
     }
     return left

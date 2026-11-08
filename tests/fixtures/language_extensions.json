@@ -59,10 +59,19 @@
     "comparison_operand_inference": {
       "section": "expressions-and-operators",
       "program": "tests/run/derived_eq.vl"
+    },
+    "mutable_receivers": {
+      "section": "functions-generics-and-interfaces",
+      "program": "tests/run/mut_receivers.vl"
+    },
+    "scoped_parameters": {
+      "section": "functions-generics-and-interfaces",
+      "program": "tests/run/scoped_closures.vl"
     }
   },
   "contextual_words": [
     "const",
-    "without"
+    "without",
+    "scoped"
   ]
 }

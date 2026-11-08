@@ -1,0 +1,62 @@
+// Methods that change their receiver (M33): `fn Stack.push(s: mut Stack, x: Int)`
+// is called `s.push(x)` on a mutable place, the same call as
+// `Stack.push(mut s, x)`. Copies keep their values, and arguments are
+// evaluated left to right around the change.
+// out: 2
+// out: Some(2)
+// out: Stack { items: [1, 7] }
+// out: 3
+// out: Pair { left: Stack { items: [1] }, right: Stack { items: [9] } }
+// out: [Stack { items: [5] }]
+// out: 3
+// out: 4
+// out: 0 1 1
+// out: [1, 2, 2]
+// out: [1, 2]
+type Stack = struct { items: [Int] }
+type Pair = struct { left: Stack, right: Stack }
+type Counter = struct { n: Int, log: [Int] }
+
+fn Stack.push(s: mut Stack, x: Int) { push(mut s.items, x) }
+fn Stack.pop(s: mut Stack) -> Option[Int] {
+    let n = len(s.items)
+    if n == 0 { return None }
+    let top = s.items[n - 1]
+    s.items = s.items[0..n - 1]
+    return Some(top)
+}
+fn Stack.size(s: Stack) -> Int { return len(s.items) }
+
+fn Counter.bump(c: mut Counter) -> Int {
+    c.n += 1
+    push(mut c.log, c.n)
+    return c.n
+}
+
+fn fill(s: mut Stack) { s.push(7) }
+
+fn main() {
+    let mut s = Stack { items: [] }
+    s.push(1)
+    s.push(2)
+    print(s.size())
+    print(s.pop())
+    fill(mut s)
+    print(s)
+    Stack.push(mut s, 8)
+    print(s.size())
+    let mut p = Pair { left: Stack { items: [] }, right: Stack { items: [9] } }
+    p.left.push(p.right.size())
+    let mut many = [Stack { items: [] }]
+    many[0].push(5)
+    print(p)
+    print(many)
+    let copy = s
+    s.push(3)
+    print(copy.size())
+    print(s.size())
+    let mut c = Counter { n: 0, log: [] }
+    print(f"{c.n} {c.bump()} {c.n}")
+    print([c.n, c.bump(), c.n])
+    print(c.log)
+}

@@ -529,7 +529,7 @@ pub type Limit = struct {
 fn limit(k: checker.Checked, env: Env, e: ast.Expr) -> Option[Limit] {
     // Reconstructing a bound from syntax is valid only when evaluation
     // cannot change the lengths or locals read earlier in the expression.
-    if !stable(e) {
+    if !stable(k, e) {
         return None
     }
     return stable_limit(k, env, e)
@@ -674,7 +674,7 @@ fn set_local(w: mut Walk, l: Int, e: ast.Expr) {
     if !w.detailed {
         // Parameter inference works out ranges only where they are used.
         r = full()
-        if is_int(w.k, e) && stable(e) {
+        if is_int(w.k, e) && stable(w.k, e) {
             r = of(w.k, w.env, e)
         }
     }
@@ -815,8 +815,8 @@ fn comparison(w: mut Walk, op: Str, x: ast.Expr, y: ast.Expr) {
 // Refinement uses source expressions after their evaluation. A mutable
 // argument could have changed a tested value, so such conditions give no
 // additional facts (including their enclosing short-circuit expression).
-fn stable(e: ast.Expr) -> Bool {
-    return !ast.has_mut(e)
+fn stable(k: checker.Checked, e: ast.Expr) -> Bool {
+    return !ast.has_mut(e, k.mutations)
 }
 
 // stable(e), remembered by node: walk_expr asks it of every operator of a
@@ -830,15 +830,15 @@ fn stable_at(w: mut Walk, e: ast.Expr) -> Bool {
     let s = match e.kind {
         ast.ExprKind.Binary(_, l, r) => stable_at(mut w, l) && stable_at(mut w, r)
         ast.ExprKind.Unary(_, x) => stable_at(mut w, x)
-        _ => stable(e)
+        _ => stable(w.k, e)
     }
     w.stable[e.id] = s
     return s
 }
 
-fn stable_args(args: [ast.Expr]) -> Bool {
+fn stable_args(k: checker.Checked, args: [ast.Expr]) -> Bool {
     for a in args {
-        if !stable(a) {
+        if !stable(k, a) {
             return false
         }
     }
@@ -1148,7 +1148,7 @@ fn changed_arms(k: checker.Checked, arms: [ast.Arm], out: mut Map[Int, Bool]) {
 // The variables passed as `mut` in `e`. A closure's body runs elsewhere
 // and cannot change the variables it captured.
 fn changed_expr(k: checker.Checked, e: ast.Expr, out: mut Map[Int, Bool]) {
-    if !ast.has_mut(e) {
+    if !ast.has_mut(e, k.mutations) {
         match e.kind {
             ast.ExprKind.Match(_, _) => {}  // an arm may be a statement
             _ => return
@@ -1162,14 +1162,17 @@ fn changed_expr(k: checker.Checked, e: ast.Expr, out: mut Map[Int, Bool]) {
             }
             changed_expr(k, x, mut out)
         }
+        ast.ExprKind.Closure(_, _, _, _) => {
+            for l in k.closures[e.id].writes { out[l] = true }
+        }
         ast.ExprKind.Unary(_, x) => changed_expr(k, x, mut out)
         ast.ExprKind.Binary(_, a, b) => {
             changed_expr(k, a, mut out)
             changed_expr(k, b, mut out)
         }
-        ast.ExprKind.Call(f, args) => {
+        ast.ExprKind.Call(f, written) => {
             changed_expr(k, f, mut out)
-            for a in args {
+            for a in checker.call_arguments(k, e, written) {
                 changed_expr(k, a, mut out)
             }
         }
@@ -1349,7 +1352,8 @@ fn note_value(w: mut Walk, e: ast.Expr) {
     }
 }
 
-fn walk_call(w: mut Walk, e: ast.Expr, callee: ast.Expr, args: [ast.Expr]) {
+fn walk_call(w: mut Walk, e: ast.Expr, callee: ast.Expr, written: [ast.Expr]) {
+    let args = checker.call_arguments(w.k, e, written)
     match w.k.refs[e.id] {
         checker.Ref.Function(_) => {}
         _ => walk_expr(mut w, callee)
@@ -1369,7 +1373,7 @@ fn walk_call(w: mut Walk, e: ast.Expr, callee: ast.Expr, args: [ast.Expr]) {
         }
         _ => {}
     }
-    let steady = stable_args(args) && stable(callee)
+    let steady = stable_args(w.k, args) && stable(w.k, callee)
     for i in 0..len(args) {
         walk_expr(mut w, args[i])
         if callee_id >= 0 && i < len(params) && ranged_type(params[i]) && !mutable[i] {
@@ -1470,6 +1474,8 @@ fn parameter_expr(w: mut Walk, e: ast.Expr) {
             walk_block(mut w, body)
             w.env = before
             w.dead = false
+            // A scoped argument changes these during the call it is passed to (M33).
+            for l in w.k.closures[e.id].writes { invalidate(mut w.env, l) }
         }
         _ => {}
     }
@@ -1548,7 +1554,7 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
             if w.record && !types.is_map(w.k.table, w.k.ty[obj.id]) {
                 let mut safe = false
                 match limit(w.k, w.env, i) {
-                    Some(bound) => safe = bound.container == local_of(w.k, obj.id) && bound.offset < 0 && of(w.k, w.env, i).lo >= 0 && stable(i) && stable(obj)
+                    Some(bound) => safe = bound.container == local_of(w.k, obj.id) && bound.offset < 0 && of(w.k, w.env, i).lo >= 0 && stable(w.k, i) && stable(w.k, obj)
                     None => {}
                 }
                 if maps.has(w.safe, e.id) {
@@ -1560,7 +1566,7 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
             walk_expr(mut w, i)
             // A successful checked access is itself a guard. Subsequent
             // accesses and arithmetic may use its facts until invalidated.
-            if !types.is_map(w.k.table, w.k.ty[obj.id]) && stable(obj) && stable(i) {
+            if !types.is_map(w.k.table, w.k.ty[obj.id]) && stable(w.k, obj) && stable(w.k, i) {
                 let l = local_of(w.k, i.id)
                 let container = local_of(w.k, obj.id)
                 if l >= 0 && is_int(w.k, i) {
@@ -1610,6 +1616,8 @@ fn walk_expr(w: mut Walk, e: ast.Expr) {
             walk_block(mut w, body)
             w.env = before
             w.dead = false
+            // A scoped argument changes these during the call it is passed to (M33).
+            for l in w.k.closures[e.id].writes { invalidate(mut w.env, l) }
         }
         _ => {}
     }

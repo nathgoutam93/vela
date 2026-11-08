@@ -1,0 +1,7 @@
+// err: scoped_captured.vl:4:19: error: 'f' is a scoped parameter, so a function value cannot use it; call it here instead [E3246]
+fn each(xs: [Int], f: scoped fn(Int)) { for x in xs { f(x) } }
+fn later(f: scoped fn(Int)) -> fn() {
+    return fn() { f(1) }
+}
+
+fn main() {}

@@ -9,6 +9,7 @@
 // missing name (a module, an enum) and Option for a missing node.
 import strings
 import integers
+import maps
 
 pub type TypeName = struct {
     // "[]" for an array type [T], with T as its one argument; "fn" for a
@@ -185,6 +186,7 @@ pub type Param = struct {
     line: Int
     col: Int
     mutable: Bool
+    scoped: Bool  // `f: scoped fn(T)`: callable here, never kept (M33)
 }
 
 // `T` or `T: Ord + Key` in `fn f[T](...)` or `type Box[T] = ...`.
@@ -286,22 +288,25 @@ pub fn literal_table(values: [Expr]) -> Bool {
     return len(values) > 0
 }
 
-// Whether `e` has a `mut` argument in it, which may change variables.
-pub fn has_mut(e: Expr) -> Bool {
+// Whether `e` has a `mut` argument in it, which may change variables, or a
+// node in `marked` (Checked.mutations: a method call changing its receiver,
+// a closure changing captured locals; M33).
+pub fn has_mut(e: Expr, marked: Map[Int, Int]) -> Bool {
+    if maps.has(marked, e.id) { return true }
     return match e.kind {
         ExprKind.MutArg(_) => true
-        ExprKind.Unary(_, x) => has_mut(x)
-        ExprKind.Binary(_, a, b) => has_mut(a) || has_mut(b)
-        ExprKind.Call(f, args) => has_mut(f) || any_mut(args)
-        ExprKind.Field(x, _) => has_mut(x)
-        ExprKind.Index(a, b) => has_mut(a) || has_mut(b)
-        ExprKind.Try(x) => has_mut(x)
-        ExprKind.Slice(a, b, c) => has_mut(a) || has_mut(b) || has_mut(c)
-        ExprKind.Interpolate(parts) => any_mut(interpolation_holes(parts))
-        ExprKind.ArrayLit(xs) => any_mut(xs)
-        ExprKind.MapLit(entries) => entries_mut(entries)
-        ExprKind.StructLit(_, _, fields) => fields_mut(fields)
-        ExprKind.Match(x, arms) => has_mut(x) || arms_mut(arms)
+        ExprKind.Unary(_, x) => has_mut(x, marked)
+        ExprKind.Binary(_, a, b) => has_mut(a, marked) || has_mut(b, marked)
+        ExprKind.Call(f, args) => has_mut(f, marked) || any_mut(args, marked)
+        ExprKind.Field(x, _) => has_mut(x, marked)
+        ExprKind.Index(a, b) => has_mut(a, marked) || has_mut(b, marked)
+        ExprKind.Try(x) => has_mut(x, marked)
+        ExprKind.Slice(a, b, c) => has_mut(a, marked) || has_mut(b, marked) || has_mut(c, marked)
+        ExprKind.Interpolate(parts) => any_mut(interpolation_holes(parts), marked)
+        ExprKind.ArrayLit(xs) => any_mut(xs, marked)
+        ExprKind.MapLit(entries) => entries_mut(entries, marked)
+        ExprKind.StructLit(_, _, fields) => fields_mut(fields, marked)
+        ExprKind.Match(x, arms) => has_mut(x, marked) || arms_mut(arms, marked)
         _ => false  // a closure's body does not run here
     }
 }
@@ -318,38 +323,38 @@ pub fn interpolation_holes(parts: [InterpolationPart]) -> [Expr] {
     return holes
 }
 
-fn any_mut(es: [Expr]) -> Bool {
+fn any_mut(es: [Expr], marked: Map[Int, Int]) -> Bool {
     for e in es {
-        if has_mut(e) {
+        if has_mut(e, marked) {
             return true
         }
     }
     return false
 }
 
-fn entries_mut(entries: [MapEntry]) -> Bool {
+fn entries_mut(entries: [MapEntry], marked: Map[Int, Int]) -> Bool {
     for en in entries {
-        if has_mut(en.key) || has_mut(en.value) {
+        if has_mut(en.key, marked) || has_mut(en.value, marked) {
             return true
         }
     }
     return false
 }
 
-fn fields_mut(fields: [FieldInit]) -> Bool {
+fn fields_mut(fields: [FieldInit], marked: Map[Int, Int]) -> Bool {
     for f in fields {
-        if has_mut(f.value) {
+        if has_mut(f.value, marked) {
             return true
         }
     }
     return false
 }
 
-fn arms_mut(arms: [Arm]) -> Bool {
+fn arms_mut(arms: [Arm], marked: Map[Int, Int]) -> Bool {
     for a in arms {
         match a.guard {
             Some(g) => {
-                if has_mut(g) {
+                if has_mut(g, marked) {
                     return true
                 }
             }
@@ -357,7 +362,7 @@ fn arms_mut(arms: [Arm]) -> Bool {
         }
         match a.body {
             ArmBody.Value(e) => {
-                if has_mut(e) {
+                if has_mut(e, marked) {
                     return true
                 }
             }
@@ -547,6 +552,9 @@ fn sx_fn(f: FnDecl) -> Sx {
         let mut parts = [atom(p.name)]
         if p.mutable {
             push(mut parts, atom("mut"))
+        }
+        if p.scoped {
+            push(mut parts, atom("scoped"))
         }
         push(mut parts, atom(type_text(p.ty)))
         push(mut params, list(parts))

@@ -1,0 +1,8 @@
+// err: mut_receiver_plain_fn.vl:7:7: error: no method 'grow' on Stack; 'grow' changes its first argument, so call it as grow(mut ...), or declare it `fn Stack.grow` to call it as a method [E3194]
+type Stack = struct { items: [Int] }
+fn grow(s: mut Stack) { push(mut s.items, 0) }
+
+fn main() {
+    let mut s = Stack { items: [] }
+    s.grow()
+}

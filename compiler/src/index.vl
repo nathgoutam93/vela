@@ -422,6 +422,9 @@ pub fn signature(f: ast.FnDecl) -> Str {
         if p.mutable {
             strings.add(mut s, "mut ")
         }
+        if p.scoped {
+            strings.add(mut s, "scoped ")
+        }
         strings.add(mut s, ast.type_text(p.ty))
     }
     if f.variadic { if len(f.params) > 0 { strings.add(mut s, ", ") }; strings.add(mut s, "...") }

@@ -1,0 +1,6 @@
+// err: closure_change_escapes.vl:4:28: error: cannot assign to 'total' inside a function value: it has its own copy of 'total', made when it was created, and changes to the copy would be lost. Only a function written as the argument for a `scoped` parameter can change it [E3060]
+fn main() {
+    let mut total = 0
+    let add = fn(x: Int) { total += x }
+    add(1)
+}

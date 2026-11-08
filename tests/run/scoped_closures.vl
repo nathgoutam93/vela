@@ -1,0 +1,61 @@
+// Scoped parameters (M33): `f: scoped fn(Int)` is only called, so a closure
+// written as its argument may change captured locals, through nested
+// scoped closures too; lists.each and the Option and Result methods take
+// such closures.
+// out: 6
+// out: ["n4", "n5"]
+// out: Stack { items: [10, 20] }
+// out: 6
+// out: 6
+// out: 12
+// out: 30
+// out: Some(6)
+// out: 1
+// out: 10
+// out: [1, 3, 2] 3
+import lists
+
+type Stack = struct { items: [Int] }
+fn Stack.push(s: mut Stack, x: Int) { push(mut s.items, x) }
+
+fn each(xs: [Int], f: scoped fn(Int)) { for x in xs { f(x) } }
+fn twice(f: scoped fn(Int)) { each([1, 2], f) }
+
+fn main() {
+    let mut total = 0
+    each([1, 2, 3], fn(x: Int) { total += x })
+    print(total)
+    let mut names: [Str] = []
+    each([4, 5], fn(x: Int) { push(mut names, f"n{x}") })
+    print(names)
+    let mut s = Stack { items: [] }
+    twice(fn(x: Int) { s.push(x * 10) })
+    print(s)
+    let mut rows = 0
+    each([1, 2], fn(r: Int) { each([r, r], fn(x: Int) { rows += x }) })
+    print(rows)
+    let before = total
+    each([total], fn(x: Int) { total = total + x })
+    print(before)
+    print(total)
+    let xs = [10, 20, 30]
+    let mut i = 0
+    each([1, 1], fn(x: Int) { i += x })
+    print(xs[i])
+    let mut seen = 0
+    let o: Option[Int] = Some(3)
+    print(o.map(fn(x: Int) -> Int {
+        seen += 1
+        return x * 2
+    }))
+    print(seen)
+    let mut sum = 0
+    lists.each([1, 2, 3, 4], fn(x: Int) { sum += x })
+    print(sum)
+    let mut longest = 0
+    let words = lists.map(["a", "bbb", "cc"], fn(w: Str) -> Int {
+        if len(w) > longest { longest = len(w) }
+        return len(w)
+    })
+    print(f"{words} {longest}")
+}
