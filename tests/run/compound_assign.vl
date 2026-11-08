@@ -1,0 +1,49 @@
+// Compound assignment (M31): `place op= value` is `place = place op value`
+// with the same checked arithmetic, and each index in the place is
+// evaluated once, before the value.
+// out: 2
+// out: 20
+// out: abc
+// out: 42
+// out: 70 2
+// out: 2
+// err: compound_assign.vl:48:9: panic: integer overflow
+// exit: 101
+type Counter = struct { n: Int, xs: [Int] }
+
+fn next(i: mut Int) -> Int {
+    i = i + 1
+    return i - 1
+}
+
+fn main() {
+    let mut x = 5
+    x += 3
+    x -= 1
+    x *= 2
+    x /= 7
+    x %= 3
+    print(x)
+    let mut b = 0b1100u8
+    b &= 0b1010u8
+    b |= 1u8
+    b ^= 0b11u8
+    b <<= 2
+    b >>= 1
+    print(b)
+    let mut s = "a"
+    s += "bc"
+    print(s)
+    let mut c = Counter { n: 1, xs: [10, 20, 30] }
+    c.n += 41
+    let mut i = 0
+    c.xs[next(mut i)] += 5
+    c.xs[next(mut i)] += 5
+    print(c.n)
+    print(f"{c.xs[0] + c.xs[1] + c.xs[2]} {i}")
+    let mut m: Map[Str, Int] = ["k": 1]
+    m["k"] += 1
+    print(m["k"])
+    let mut big = 9223372036854775807
+    big += 1
+}

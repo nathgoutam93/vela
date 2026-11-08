@@ -1,0 +1,6 @@
+// err: let_pattern_mut.vl:4:9: error: a `let` with a pattern binds read-only names; copy one into a `let mut` after it [E2032]
+fn main() {
+    let o: Option[Int] = Some(1)
+    let mut Some(x) = o else { return }
+    print(x)
+}

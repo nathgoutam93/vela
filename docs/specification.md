@@ -12,7 +12,8 @@ Examples in `tests/fixtures/m30/v1/` are the retained compatibility corpus.
 The [conformance manifest](../tests/fixtures/m30/conformance.json) connects
 each syntax-tree construct, keyword, operator and additional language feature
 to a section here and executable checks. The generated `vela guide` is the
-compact reference and standard-library signature inventory. The
+compact reference; `vela guide --all` adds the standard-library signature
+inventory. The
 [compatibility policy](compatibility.md) and [agent JSON contracts](agent-json.md)
 are companion specifications. Milestone walkthroughs explain implementation
 history; they do not override this specification.
@@ -193,8 +194,12 @@ its call site must supply `mut place`. Mutable locals alone do not make a
 parameter mutable. A place is an assignable local or field/index projection
 rooted in an allowed mutable binding. Str indexes are never writable.
 
-`place = expression` assigns; there are no increment/decrement or compound
-assignment operators. Mutation uses checked indexes. A call passing `mut`
+`place = expression` assigns. `place op= expression`, for `op` one of
+`+ - * / % & | ^ << >>`, is `place = place op expression` with the same
+checks, except that each index expression in the place is evaluated once,
+before the expression; the place must be a name or a field/index projection
+of one (E2029). There are no increment/decrement operators. Mutation uses
+checked indexes. A call passing `mut`
 places rooted in the same binding, even disjoint fields, is rejected (E3144).
 An argument that is a copy of a place the call changes through a `mut`
 argument, or that a later argument's nested call changes, keeps the value
@@ -345,7 +350,17 @@ mathematical laws. Invalid laws cannot support reliable map/sort results.
 A block `{ statements }` has lexical scope. Statements include bindings,
 assignments, calls, blocks, if/else, loops, break/continue, return, statement
 match, unsafe and test fakes. `if Bool { ... } else if Bool { ... } else { ... }`
-is a statement, not a conditional value expression. Use a match for a value.
+is a statement. In an expression position, `if c { ... } else { ... }` has a
+value and requires `else` (E2030); it is a match of the condition with
+`true` and `false` arms, so each branch is a value block as below and
+branches must agree in type.
+
+A value block, an `if` branch or a `=> { statements }` arm of a match
+expression, runs its statements in order and has the value of its last
+statement, which must be an expression, or an `if` with `else` or a match
+statement whose branches end in values. A value block whose last statement
+is not such a value must leave by return, break or continue (E3235); a match
+or `if` none of whose branches has a value is rejected (E3236).
 
 `for { ... }` repeats indefinitely; `for Bool { ... }` tests before each
 iteration. `for i in a..b { ... }` evaluates bounds and iterates with b
@@ -358,10 +373,30 @@ exception catch, labeled break or async/await syntax.
 `match expression { PATTERN => VALUE, ... }` produces a value when all arms
 agree in type; statement matches may use a block or simple statement per arm.
 Arms are tried in order and must cover all cases. Patterns are `_`, read-only
-name bindings, scalar literals, inclusive integer ranges `a..=b`, and enum
-variants with nested positional patterns. There is no pattern guard syntax.
-Put the fallback last; unreachable arms are diagnosed. Parenthesize a struct
-literal in an if/for/match head where `{` would otherwise begin the body.
+name bindings, scalar literals, inclusive integer ranges `a..=b`, enum
+variants with nested positional patterns, struct patterns and alternatives.
+Put the fallback last; unreachable arms and alternatives are diagnosed.
+Parenthesize a struct literal in an if/for/match head where `{` would
+otherwise begin the body.
+
+A struct pattern `Name { field: PATTERN, name, .. }` (or `module.Name { ... }`)
+matches a value of that struct, or an instance of that generic struct, when
+each named field matches; `name` alone is `name: name`. It names every field
+once unless it ends with `..` (E3240). `A | B` matches when any alternative
+does, tried left to right; alternatives may appear inside other patterns
+and must not bind names (E3238).
+
+`PATTERN if Bool =>` adds a guard. After the pattern matches, its bindings
+are in scope for the guard, which is evaluated with ordinary effects; when it
+is false the next arm is tried. A guarded arm does not count toward covering
+the matched type, so the last arm cannot usefully be guarded.
+
+`let PATTERN = value else { ... }` evaluates the value once and binds the
+pattern's names, read-only, in the rest of the block. When the pattern does
+not match, the else block runs; it must leave by return, break or continue
+(E3243). Without `else` the pattern must match every value (E3241); with
+`else` it must not (E3242). An annotation `let PATTERN: T = value` types the
+value. `let mut` with a pattern is rejected (E2032).
 
 `Option[T]` has Some(T)/None; `Result[T, E]` has Ok(T)/Err(E). Postfix `?`
 extracts a Some/Ok payload, or immediately returns None/Err from the enclosing
@@ -503,8 +538,9 @@ library behavior are not converted implicitly into Result or proof.
 
 ## Standard library and conformance
 
-The generated guide inventories prelude and built-in functions plus public
-std functions, effects and contracts. Standard modules include bytes, lists,
+The generated guide lists prelude functions; `vela guide --all` also
+inventories built-in module functions plus public std functions, effects and
+contracts. Standard modules include bytes, lists,
 text, views, buffers, arenas, time, unicode, net, http, processes, paths, io
 and property; maps/files/os/strings/tasks/math/c and low-level built-ins use
 compiler metadata. Public APIs follow the compatibility policy. Networking

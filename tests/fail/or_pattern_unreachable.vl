@@ -1,0 +1,7 @@
+// err: or_pattern_unreachable.vl:4:17: error: this alternative can never match: the arms and alternatives before it cover every value it would [E3237]
+fn main() {
+    match 3 {
+        1 | 2 | 1 => print("small"),
+        _ => print("other"),
+    }
+}

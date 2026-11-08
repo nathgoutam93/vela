@@ -4355,6 +4355,29 @@ No additional CI workflow run was requested or launched for reconciliation.
 - **Verify:** on a host with nvim, `python3 run_tests.py nvim_test` passes, and
   the full suite reports 390 tests rather than 389.
 
+### TL-131: Analyses that read match arms assumed every arm unconditional
+
+- **Status:** resolved during M31.
+- **Discovery:** M31, while adding match guards (2026-11-07, branch
+  `m31-expressions`). Found by reading the code for every use of `Arm`, not by
+  a failing program: before M31 no arm could be conditional.
+- **Evidence (observed in source):** `contract_checks.returned_bound` takes the
+  bound of a `match` from its literal arms; `verification.expression` builds a
+  solver term choosing arms by pattern; `lower.counting` (TL-128) reuses a map
+  slot when every arm writes the looked-up key; `codegen.switch_texts` and
+  `switch_spans` (TL-107) choose an arm by literal before testing it. Each
+  reads only `arm.pattern` and `arm.body`.
+- **Impact (suspected, had it shipped):** with a guard, `0 if c => 1` would be
+  treated as always taken: a wrong bound or solver term, an unsound contract
+  check removal, or a switch jumping into an arm whose guard is false.
+- **Resolution:** each declines a match with a guard (`codegen.has_guard`, or
+  `absent()`/`unknown()`), keeping its conservative result. Guarded matches use
+  ordinary tests in both back ends.
+- **Verify:** `tests/run/match_guards.vl` passes on both back ends, including
+  `word` and `digit`: matches of nine Str and Int literal arms, enough for the
+  TL-107 switches, where a false guard on `"2"`/`2` falls to the fallback.
+  When adding another pattern or arm feature, check these five sites.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;

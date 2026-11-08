@@ -192,9 +192,20 @@ fn match_arms(w: mut Walk, scrutinee: ast.Expr, arms: [ast.Arm]) {
     expr(mut w, scrutinee)
     for a in arms {
         pattern(mut w, a.pattern)
+        match a.guard {
+            Some(g) => expr(mut w, g)
+            None => {}
+        }
         match a.body {
             ast.ArmBody.Value(e) => expr(mut w, e)
             ast.ArmBody.Do(s) => stmt(mut w, s)
+            ast.ArmBody.Valued(b, value) => {
+                block(mut w, b)
+                match value {
+                    Some(e) => expr(mut w, e)
+                    None => {}
+                }
+            }
         }
     }
 }
@@ -205,6 +216,16 @@ fn pattern(w: mut Walk, p: ast.Pattern) {
         ast.PatternKind.Variant(_, _, _, _, args) => {
             for a in args {
                 pattern(mut w, a)
+            }
+        }
+        ast.PatternKind.Or(alternatives) => {
+            for a in alternatives {
+                pattern(mut w, a)
+            }
+        }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            for f in fields {
+                pattern(mut w, f.pattern)
             }
         }
         _ => {}

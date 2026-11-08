@@ -1,0 +1,6 @@
+// err: let_else_falls_through.vl:4:42: error: the 'else' block of a `let` runs when the pattern does not match, so it must leave: end it with return, break or continue [E3243]
+fn main() {
+    let o: Option[Int] = None
+    let Some(x) = o else { print("none") }
+    print(x)
+}

@@ -11,7 +11,18 @@ import os
 import parser
 import strings
 
+// The compact reference `vela guide` prints: the language, commands and
+// prelude. `vela guide --all` (M31) adds every built-in and std module's
+// signatures, so the compact one stays within its reading budget.
 pub fn reference(root: Str) -> Str uses fs, os {
+    return generate(root, false)
+}
+
+pub fn reference_all(root: Str) -> Str uses fs, os {
+    return generate(root, true)
+}
+
+fn generate(root: Str, all: Bool) -> Str uses fs, os {
     let mut out = strings.builder()
     strings.add(mut out, "# Vela language reference\n")
     strings.add(mut out, "\n")
@@ -36,13 +47,13 @@ pub fn reference(root: Str) -> Str uses fs, os {
     strings.add(mut out, "\n")
     strings.add(mut out, "`i8 i16 i32 i64 u8 u16 u32 u64` are fixed-width integers; Int=i64, Byte=u8 (0..255). Arithmetic/indexing panic on overflow/invalid indexes. Decimal, 0x hex and 0b binary literals allow separators/suffixes (255u8, 0xffff_ffffu32); unsuffixed integers infer context or Int. Signed minima/full u64 are supported. Byte literals: 'a', '\\n'. Width changes require explicit checked i8(x)..u64(x); int/byte remain aliases. Float is binary64 (1.5); float(n)/int(x) convert. Bool: true/false. Str is bytes with UTF-8 source literals and escapes \\n \\t \\r \\0 \\\\ \\\" \\u{e9}; raw r\"\\d+\", r#\"..\"# skip escapes. Unit: (). Import ints: checked_add/sub/mul/div/rem/neg return Option[T]; wrapping_* wrap modulo 2^width; saturating_* clamp. Division by zero panics except checked operations return None. ints.to_str covers all widths. &, |, ^, ~ preserve width. Left shifts discard high bits; signed right shifts sign-extend, unsigned zero-extend. Counts must be in 0..width or panic.\n")
     strings.add(mut out, "\n")
-    strings.add(mut out, "`+ - * / %` do arithmetic; `+` also joins two strings. `== != < <= > >=` compare; `&& || !` operate on Bool and short-circuit. Precedence, from tight to loose: calls/fields/index/`?`, unary `- ! ~`, `* / %`, `+ -`, `<< >>`, `&`, `^`, `|`, comparisons, `&&`, `||`. There is no truthiness, ternary operator, increment operator or compound assignment. Write `n = n + 1`.\n")
+    strings.add(mut out, "`+ - * / %` do arithmetic; `+` also joins two strings. `== != < <= > >=` compare; `&& || !` operate on Bool and short-circuit. Precedence, from tight to loose: calls/fields/index/`?`, unary `- ! ~`, `* / %`, `+ -`, `<< >>`, `&`, `^`, `|`, comparisons, `&&`, `||`. There is no truthiness, ternary or increment operator. `n += 1` (also -= *= /= %= &= |= ^= <<= >>=) is `n = n + 1`; a place's indexes are evaluated once.\n")
     strings.add(mut out, "\n")
     strings.add(mut out, "Interfaces are structural generic bounds: `pub type Show = interface { fn show(value: Self) -> Str }`; `fn render[T: Show](value: T) -> Str { return value.show() }`. Extend interfaces with `interface: Eq + Show`; qualify imported bounds as `T: views.Show`. Define methods in the receiver type's module with `pub fn Widget.show(value: Widget) -> Str { ... }`. `value.show()` passes the receiver first; `Widget.show(value)` calls the same function. A normal module function taking the receiver first is also eligible. Function-valued fields take precedence. Cross-module calls require pub. Resolution is static; imports cannot add or override methods. Interface signatures have no bodies, contracts, method type parameters or mutable parameters; the first parameter is Self. Concrete fs/os/net/clock/unsafe effects are allowed. Interfaces are bounds, not runtime value types. Eq, Ord and Key are ordinary prelude interfaces; primitive implementations are intrinsic. Operators use eq and compare for custom types. Map keys use eq and hash; equal keys must have equal hashes, and implementations must obey comparison laws.\n")
     strings.add(mut out, "```text\n" + interfaces.source() + "```\n\n")
     strings.add(mut out, "`let x = value` infers a type; `let x: Int = 1` annotates it. `let mut x = value` allows reassignment and changes to its fields/elements. Values have copy semantics: assignment, arguments, returns and closure captures copy logically. Arrays/maps/strings share storage until a change, then copy. Changing a copy never changes the original. String elements cannot be assigned. Struct fields use `x.field`.\n")
     strings.add(mut out, "\n")
-    strings.add(mut out, "`[1, 2]` is an array `[Int]`. Annotate an empty array: `let xs: [Int] = []`. Indexes start at 0. `xs[a..b]` copies an array slice; `s[a..b]` shares immutable string bytes. Both exclude b; strings index to Byte and positions count bytes. `len(s)` counts bytes. `for x in xs` visits elements; `for i in 0..n` excludes n; use an explicit bound for an inclusive loop. In match patterns, `a..=b` includes b. `for condition { ... }` is a while loop; `for { ... }` repeats indefinitely. `if condition { ... } else if ... else { ... }` controls statements; use a match expression for conditional values.\n")
+    strings.add(mut out, "`[1, 2]` is an array `[Int]`. Annotate an empty array: `let xs: [Int] = []`. Indexes start at 0. `xs[a..b]` copies an array slice; `s[a..b]` shares immutable string bytes. Both exclude b; strings index to Byte and positions count bytes. `len(s)` counts bytes. `for x in xs` visits elements; `for i in 0..n` excludes n; use an explicit bound for an inclusive loop. In match patterns, `a..=b` includes b. `for condition { ... }` is a while loop; `for { ... }` repeats indefinitely. `if condition { ... } else if ... else { ... }` controls statements; as a value, `if c { a } else { b }` needs else. A value block's value is its last expression.\n")
     strings.add(mut out, "\n")
     strings.add(mut out, "A map is `Map[K, V]`; keys satisfy Key. Write `let mut m: Map[Str, Int] = [:]` or `[\"a\": 1]`. `m[key] = value` inserts/replaces; `m[key]` panics if absent. Use maps.get for optional lookup. `for key in maps.keys(m)` visits keys in insertion order. Maps and arrays are values: pass them with `mut` to change a caller's copy.\n")
     strings.add(mut out, "\n")
@@ -60,7 +71,7 @@ pub fn reference(root: Str) -> Str uses fs, os {
     strings.add(mut out, "\n")
     strings.add(mut out, "`Option[T]` has `Some(T)` and `None`. `Result[T, E]` has `Ok(T)` and `Err(E)`. They are built in; annotate ambiguous constructors (`let r: Result[Int, Str] = Ok(1)`). A postfix `?` unwraps Some/Ok and returns None/Err from the enclosing function, which must return a compatible Option/Result. It does not throw exceptions. Use explicit matches for deliberate conversion between error types.\n")
     strings.add(mut out, "\n")
-    strings.add(mut out, "`match value { Some(x) => x, None => 0 }` is an expression; arms must agree in type and cover every case. A statement match may use blocks. `_` matches anything; names bind; variants destructure payloads. Literal and range patterns are supported. Put a fallback last. A bound variable is read-only. A new enum variant requires updating matches.\n")
+    strings.add(mut out, "`match value { Some(x) => x, None => 0 }` is an expression; arms must agree in type and cover every case. A statement match may use blocks. `_` matches anything; names bind; variants destructure payloads. Literal and range patterns are supported. `A | B` alternatives bind no names. `Point { x, y: 0 }` names every field, or ends with `..`. `p if cond =>` guards an arm; guarded arms do not count toward covering. Block arms: `=> { let y = f(x); y + 1 }`. Put a fallback last. A bound variable is read-only. A new enum variant requires updating matches. `let Some(v) = o else { return }` binds or leaves; `let Point { x, y } = p` destructures.\n")
     strings.add(mut out, "\n")
     strings.add(mut out, "## Modules and packages\n")
     strings.add(mut out, "\n")
@@ -102,6 +113,11 @@ pub fn reference(root: Str) -> Str uses fs, os {
         builtin(mut out, "", name)
     }
     strings.add(mut out, "```\n")
+    if !all {
+        strings.add(mut out, "\nModule signatures: `vela guide --all` lists every built-in and std module's functions; " +
+            "`vela query summary FILE` gives a module's API.\n")
+        return strings.build(out)
+    }
     for module in modules.builtin_modules() {
         strings.add(mut out, "\n### import " + module + "\n\n```text\n")
         for name in modules.builtin_functions(module) {

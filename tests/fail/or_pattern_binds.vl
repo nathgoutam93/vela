@@ -1,0 +1,7 @@
+// err: or_pattern_binds.vl:5:9: error: an alternative in a '|' pattern cannot bind names, but this one binds 'x'; match it in an arm of its own [E3238]
+fn main() {
+    let o: Option[Int] = Some(1)
+    match o {
+        Some(x) | None => print("any"),
+    }
+}

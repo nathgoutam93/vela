@@ -1,0 +1,81 @@
+// `if` with a value and block arms in a match expression (M31): a block's
+// value is its last expression, or an `if`/`match` statement with values;
+// a block without one must leave.
+// out: positive negative zero
+// out: ABCF
+// out: 15
+// out: 4 2
+// out: aa! long 5 xy
+// out: 7 3
+fn sign(n: Int) -> Str {
+    return if n > 0 { "positive" } else if n < 0 { "negative" } else { "zero" }
+}
+
+fn grade(score: Int) -> Str {
+    let letter = if score >= 90 {
+        "A"
+    } else if score >= 80 {
+        "B"
+    } else {
+        let low = score < 50
+        if low { "F" } else { "C" }
+    }
+    return letter
+}
+
+fn classify(o: Option[Int]) -> Int {
+    return match o {
+        Some(n) => {
+            let doubled = n * 2
+            match doubled > 10 {
+                true => doubled,
+                false => 0,
+            }
+        }
+        None => -1,
+    }
+}
+
+fn first_even_half(xs: [Int]) -> Int {
+    for x in xs {
+        let half = match x % 2 {
+            0 => x / 2,
+            _ => { continue },
+        }
+        return half
+    }
+    return -1
+}
+
+fn find(xs: [Int], want: Int) -> Int {
+    let mut i = 0
+    for x in xs {
+        let step = if x == want { return i } else { 1 }
+        i += step
+    }
+    return -1
+}
+
+fn label(name: Str) -> Str {
+    return match name {
+        "a" | "b" => {
+            let up = name + name
+            up + "!"
+        }
+        s if len(s) > 3 => {
+            let n = len(s)
+            f"long {n}"
+        }
+        _ => name,
+    }
+}
+
+fn main() {
+    print(sign(5) + " " + sign(-2) + " " + sign(0))
+    print(grade(95) + grade(85) + grade(70) + grade(10))
+    print(classify(Some(8)) + classify(Some(2)) + classify(None))
+    print(f"{first_even_half([3, 5, 8, 10])} {find([4, 7, 9], 9)}")
+    print(label("a") + " " + label("hello") + " " + label("xy"))
+    let absolute = fn(x: Int) -> Int { return if x > 0 { x } else { -x } }
+    print(f"{absolute(-7)} {1 + if true { 2 } else { 3 }}")
+}

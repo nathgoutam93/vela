@@ -1,0 +1,8 @@
+// err: struct_pattern_rest_last.vl:6:21: error: '..' ends a struct pattern, after the fields it names, found identifier 'x' [E2031]
+type Point = struct { x: Int, y: Int }
+
+fn main() {
+    match (Point { x: 1, y: 2 }) {
+        Point { .., x } => print(x),
+    }
+}

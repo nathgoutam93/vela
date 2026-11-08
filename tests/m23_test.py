@@ -437,8 +437,10 @@ def tooling(c,w,env):
     p.write_text('import clock\nfn now()->Result[Int,Str]{return clock.wall_ns()}\nfn main(){}')
     command(c,env,'fix',p);assert 'uses clock' in p.read_text();command(c,env,'check',p)
     guide=command(c,env,'guide').stdout;assert len(guide.encode())<=32000,len(guide.encode())
-    for module in ('net','clock','time','io','unicode','http','paths','processes'):assert 'import '+module in guide,module
-    assert 'pub fn copy[R: Reader, W: Writer]' in guide
+    # Module signatures are in `vela guide --all` (M31).
+    full=command(c,env,'guide','--all').stdout
+    for module in ('net','clock','time','io','unicode','http','paths','processes'):assert 'import '+module in full,module
+    assert 'pub fn copy[R: Reader, W: Writer]' in full
 
 def negative(c,w,env):
     cases=[('import clock\nfn f(){clock.wall_ns()}\nfn main(){}','E3036'),('import net\nfn f(){net.connect("a",1)}\nfn main(){}','E3036'),('import clock\nfn f(){unsafe{clock.wall_ns()}}\nfn main(){}','E3036'),('import sysio\nfn main(){let h:sysio.Unknown=1}','E3220'),('import clock\nfn main(){clock.sleep_ns(mut 1)}','E3096'),('import clock\nfn main(){}\ntest "bad"{with clock=["a"] {}}','E3093')]

@@ -345,7 +345,9 @@ design before implementation. Settle the guide budget before M31.
 
 ## M31: Expressions and patterns
 
-**Status:** planned.
+**Status:** implemented; see [the walkthrough](history/m31-expressions.md).
+Call-site type arguments are deferred to after 1.0 and comparison-operand
+inference moves to M32 (decided 2026-11-07); alternatives bind no names.
 
 **Needs:** M30.
 

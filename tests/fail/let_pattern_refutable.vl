@@ -1,0 +1,6 @@
+// err: let_pattern_refutable.vl:4:9: error: this pattern does not match every Option[Int], such as None; add `else { ... }` for the others [E3241]
+fn main() {
+    let o: Option[Int] = Some(1)
+    let Some(x) = o
+    print(x)
+}

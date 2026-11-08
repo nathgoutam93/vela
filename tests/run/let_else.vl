@@ -1,0 +1,52 @@
+// `let PATTERN = value else { ... }` (M31): the else block runs, and must
+// leave, when the pattern does not match. Without else, the pattern must
+// match every value.
+// out: 42
+// out: not a number: x
+// out: 40
+// out: 25
+// out: 3 apples
+// out: 9
+// out: b
+import text
+
+type Point = struct { x: Int, y: Int }
+type Pair = enum { Two(Str, Int) }
+
+fn parse(s: Str) -> Result[Int, Str] {
+    let Some(n) = text.parse_int(s) else {
+        return Err("not a number: " + s)
+    }
+    return Ok(n * 2)
+}
+
+fn first_big(xs: [Option[Int]]) -> Int {
+    for o in xs {
+        let Some(v) = o else { continue }
+        if v > 10 {
+            return v
+        }
+    }
+    return -1
+}
+
+fn at(xs: [Str], i: Int) -> Option[Str] {
+    return if i < len(xs) { Some(xs[i]) } else { None }
+}
+
+fn main() {
+    match parse("21") { Ok(n) => print(n), Err(e) => print(e) }
+    match parse("x") { Ok(n) => print(n), Err(e) => print(e) }
+    print(first_big([None, Some(3), None, Some(40)]))
+    let p = Point { x: 3, y: 4 }
+    let Point { x, y } = p
+    print(x * x + y * y)
+    let Pair.Two(name, count) = Pair.Two("apples", 3)
+    print(f"{count} {name}")
+    let Point { x: px, .. }: Point = Point { x: 9, y: 0 }
+    print(px)
+    let Some(w) = at(["a", "b"], 1) else { return }
+    print(w)
+    let Some(_) = at(["a"], 5) else { return }
+    print("not reached")
+}

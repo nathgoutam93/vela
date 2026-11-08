@@ -1,0 +1,59 @@
+// Struct patterns (M31): every field is named, unless `..` ends the
+// pattern; `x` alone binds field x.
+// out: origin
+// out: on y axis
+// out: on x axis at 3
+// out: diagonal 4
+// out: (1, 2)
+// out: centered circle 3
+// out: circle at x=7
+// out: 0 9
+// out: one s
+// out: A 2
+type Point = struct { x: Int, y: Int }
+type Named[T] = struct { name: Str, value: T }
+type Shape = enum { Circle(Point, Int), Poly([Point]) }
+type Big = struct { a: Str, b: [Int], c: Point, d: Option[Str] }
+
+fn where_is(p: Point) -> Str {
+    return match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x: 0, .. } => "on y axis",
+        Point { y: 0, x } => f"on x axis at {x}",
+        Point { x, y } if x == y => f"diagonal {x}",
+        Point { x, y } => f"({x}, {y})",
+    }
+}
+
+fn describe(s: Shape) -> Str {
+    return match s {
+        Shape.Circle(Point { x: 0, y: 0 }, r) => f"centered circle {r}",
+        Shape.Circle(Point { x, .. }, _) => f"circle at x={x}",
+        Shape.Poly(_) => "polygon",
+    }
+}
+
+fn unwrap_named(n: Named[Int]) -> Int {
+    return match n {
+        Named { name: "zero", .. } => 0,
+        Named { value, .. } => value,
+    }
+}
+
+fn big(v: Big) -> Str {
+    return match v {
+        Big { d: Some(s), c: Point { x: 1, .. }, .. } => "one " + s,
+        Big { a, b, .. } => f"{a} {len(b)}",
+    }
+}
+
+fn main() {
+    for p in [Point { x: 0, y: 0 }, Point { x: 0, y: 5 }, Point { x: 3, y: 0 }, Point { x: 4, y: 4 }, Point { x: 1, y: 2 }] {
+        print(where_is(p))
+    }
+    print(describe(Shape.Circle(Point { x: 0, y: 0 }, 3)))
+    print(describe(Shape.Circle(Point { x: 7, y: 0 }, 3)))
+    print(f"{unwrap_named(Named { name: "zero", value: 9 })} {unwrap_named(Named { name: "nine", value: 9 })}")
+    print(big(Big { a: "A", b: [1, 2], c: Point { x: 1, y: 1 }, d: Some("s") }))
+    print(big(Big { a: "A", b: [1, 2], c: Point { x: 2, y: 1 }, d: Some("s") }))
+}
