@@ -5,8 +5,8 @@
 
 For each task: the starting workspace must fail its hidden checks (or the
 task would grade nothing), and the workspace with the reference solution
-(tasks/NAME/solution/) laid over it must pass them. In the default suite
-as tests/eval_test.py, so the tasks keep working as Vela changes.
+(tasks/NAME/solution/) laid over it must pass them. Run it by hand after a language change, so the tasks keep
+working as Vela changes (it left the default suite in TL-141).
 """
 from __future__ import annotations
 

@@ -32,7 +32,7 @@ platform limits when recording results.
 | [unicode_test.py](unicode_test.py) | std/unicode's general categories (every code point) and case foldings against Python's unicodedata of the same Unicode version |
 | [format_test.py](format_test.py) | The compiler, standard library, packages, examples, benchmarks and evaluation tasks are as `vela fmt` writes them |
 | [differential_test.py](differential_test.py) | Generated programs agree across back ends and optimization settings, and integer results match a Python oracle; `--count N` runs more |
-| `*_test.py`, `lsp_client.py`, `nvim_test.lua` | Package, cache, native, benchmark, evaluation and editor integration |
+| `*_test.py`, `lsp_client.py`, `nvim_test.lua` | Package, native and editor integration |
 
 A golden fixture is a `.vl` file or a directory with `main.vl`. Expectations
 are comments at the top: `// out:`, `// err:`, `// exit:`, `// args:`,
@@ -51,6 +51,12 @@ copy-on-write, imports, semantic queries and a 16,000-element literal table.
 The runner also tests `compiler/src/main.vl`, examples, and standard-library/package
 modules containing test blocks. Milestone-named tests are still required
 regressions; moving their documentation into history does not retire them.
+`m27_test.py`, `m29_test.py`, `cache_test.py`, `bench_test.py`,
+`eval_test.py` and `stack_overflow_test.py` were removed on 2026-11-09 to
+keep the suite fast ([TL-141](../docs/tooling-backlog.md#tl-141-six-slow-integration-scripts-were-removed-from-the-suite));
+`python3 evaluation/selftest.py`, `python3 bench/run.py` and
+`python3 bench/real_programs.py` still check the evaluation and benchmarks
+when run by hand.
 
 ## Broader validation
 

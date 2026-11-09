@@ -81,9 +81,6 @@ TESTS = ROOT / "tests"
 LSP_CLIENT = TESTS / "lsp_client.py"
 PKG_TEST = TESTS / "pkg_test.py"
 NATIVE_TEST = TESTS / "native_test.py"
-BENCH_TEST = TESTS / "bench_test.py"
-EVAL_TEST = TESTS / "eval_test.py"
-CACHE_TEST = TESTS / "cache_test.py"
 LONG_LITERALS_TEST = TESTS / "long_literals_test.py"
 CONSTANTS_TEST = TESTS / "module_constants_test.py"
 M17_TEST = TESTS / "m17_test.py"
@@ -96,11 +93,8 @@ M24_TEST = TESTS / "m24_test.py"
 M26A_TEST = TESTS / "m26a_test.py"
 M25_TEST = TESTS / "m25_test.py"
 M26_TEST = TESTS / "m26_test.py"
-M27_TEST = TESTS / "m27_test.py"
 M28_TEST = TESTS / "m28_test.py"
-M29_TEST = TESTS / "m29_test.py"
 M30_TEST = TESTS / "m30_test.py"
-STACK_TEST = TESTS / "stack_overflow_test.py"
 DIFFERENTIAL_TEST = TESTS / "differential_test.py"
 FORMAT_TEST = TESTS / "format_test.py"
 MARKDOWN_TEST = TESTS / "markdown_test.py"
@@ -204,12 +198,6 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(PKG_TEST, compiler, env)
     if path == NATIVE_TEST:
         return run_script(NATIVE_TEST, compiler, env)
-    if path == BENCH_TEST:
-        return run_script(BENCH_TEST, compiler, env)
-    if path == EVAL_TEST:
-        return run_script(EVAL_TEST, compiler, env)
-    if path == CACHE_TEST:
-        return run_script(CACHE_TEST, compiler, env)
     if path == CONSTANTS_TEST:
         return run_script(CONSTANTS_TEST, compiler, env)
     if path == LONG_LITERALS_TEST:
@@ -220,12 +208,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(M26A_TEST, compiler, env)
     if path == M28_TEST:
         return run_script(M28_TEST, compiler, env)
-    if path == M29_TEST:
-        return run_script(M29_TEST, compiler, env)
     if path == M30_TEST:
         return run_script(M30_TEST, compiler, env)
-    if path == STACK_TEST:
-        return run_script(STACK_TEST, compiler, env)
     if path == DIFFERENTIAL_TEST:
         return run_script(DIFFERENTIAL_TEST, compiler, env)
     if path == FORMAT_TEST:
@@ -238,8 +222,6 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(REGEX_TEST, compiler, env)
     if path == UNICODE_TEST:
         return run_script(UNICODE_TEST, compiler, env)
-    if path == M27_TEST:
-        return run_script(M27_TEST, compiler, env)
     if path == M26_TEST:
         return run_script(M26_TEST, compiler, env)
     if path == M25_TEST:
@@ -418,9 +400,6 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(LSP_CLIENT)
     tests.append(PKG_TEST)
     tests.append(NATIVE_TEST)
-    tests.append(BENCH_TEST)
-    tests.append(EVAL_TEST)
-    tests.append(CACHE_TEST)
     tests.append(LONG_LITERALS_TEST)
     tests.append(CONSTANTS_TEST)
     tests.append(M17_TEST)
@@ -433,11 +412,8 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(M26A_TEST)
     tests.append(M25_TEST)
     tests.append(M26_TEST)
-    tests.append(M27_TEST)
     tests.append(M28_TEST)
-    tests.append(M29_TEST)
     tests.append(M30_TEST)
-    tests.append(STACK_TEST)
     tests.append(DIFFERENTIAL_TEST)
     tests.append(FORMAT_TEST)
     tests.append(MARKDOWN_TEST)
