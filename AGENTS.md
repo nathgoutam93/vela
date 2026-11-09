@@ -5,7 +5,9 @@ Use `compiler/README.md` and `tests/README.md` to locate active implementation
 and coverage. `docs/README.md` indexes current references; milestone
 walkthroughs live in `docs/history/`, with retained measurement reports in
 `bench/results/` and `evaluation/results/`. Milestone tests and the generated
-bootstrap seed remain active, required files.
+bootstrap seed remain active, required files. On 2026-11-09 the maintainer
+removed six slow integration scripts from the suite (TL-141); do not restore
+them, or add similar ones to the default suite, without asking.
 
 Read `docs/roadmap-after-m18.md` and `docs/tooling-backlog.md` before starting
 a milestone.

@@ -95,8 +95,8 @@ run and its repair cost must be recorded separately.
 
 `python3 evaluation/selftest.py` checks that every task fails as given and
 passes with its solution, so a check that grades nothing, or a task that
-cannot be done, shows up. It is in the default suite as
-`tests/eval_test.py`.
+cannot be done, shows up. Run it by hand after a language change; it left
+the default suite on 2026-11-09 (TL-141).
 
 `python3 evaluation/static.py` measures what can be measured without an agent:
 

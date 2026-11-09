@@ -4576,6 +4576,36 @@ No additional CI workflow run was requested or launched for reconciliation.
 - **Verify:** `lists.pop` on `[net.Tcp]` returns a socket that can be closed;
   a `tasks.map` worker declared `fn(s: take net.Tcp)` owns its socket.
 
+### TL-141: Six slow integration scripts were removed from the suite
+
+- **Status:** resolved by removal (2026-11-09, at the maintainer's direction).
+- **Discovery:** the maintainer asked to keep only essential tests running on
+  each change. Timing every test in `python3 run_tests.py --backend c
+  --jobs 4` (453 tests, 141 s wall time on Linux x86-64) showed 342 s of the
+  388 s spent in 29 Python integration scripts, and 24 s in 404 golden
+  fixtures.
+- **Removed:** `tests/m29_test.py` (71 s: real-program oracles and
+  incremental-cache correctness), `tests/stack_overflow_test.py` (20 s:
+  TL-088/TL-125 recursion panics), `tests/eval_test.py` (16 s: the
+  evaluation tasks), `tests/m27_test.py` (13 s: M27 observability, its
+  fixture `tests/fixtures/m27/observe.c`, and the platform workflow's
+  debugger step), `tests/cache_test.py` (12.5 s: the runtime build cache,
+  TL-028), `tests/bench_test.py` (8 s: benchmarks agree across languages).
+- **Impact:** entries that cite these scripts as regression coverage (among
+  them TL-028, TL-088, TL-125 and the M27 entries) keep their recorded
+  evidence but are no longer rechecked on each run; a recurrence would show
+  only through other tests or by hand. Milestone walkthroughs and
+  `bench/results/` still name the scripts as they were.
+- **Workaround:** `python3 evaluation/selftest.py`, `python3 bench/run.py`
+  and `python3 bench/real_programs.py --gate` still run by hand; the
+  scripts can be restored from git history (`git show 3ff0dda:tests/NAME`).
+- **Verify:** `python3 run_tests.py --backend c --jobs 4` and the native
+  suite pass without them.
+- **Validation:** on the same host, both suites pass, 447 tests each, in
+  100 s (C) and 104 s (native) wall time, against 141 s before. The rest is
+  about 247 s of work over four workers plus `m24_test` (24 s), which runs
+  alone after the others for its timing gate.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;
