@@ -13,8 +13,8 @@ import sys
 import tempfile
 import time
 ROOT=Path(__file__).resolve().parent.parent
-HELPER='''fn get[T,E:Show](r:Result[T,E])->T{match r{Ok(v)=>return v,Err(e)=>{print(e);assert(false);for{}}}}
-fn bad[T,E:Show](r:Result[T,E]){match r{Ok(_)=>assert(false),Err(e)=>assert(len(f"{e}")>0)}}
+HELPER='''fn get[T without Copy,E:Show](r:take Result[T,E])->T{match r{Ok(v)=>return v,Err(e)=>{print(e);assert(false);for{}}}}
+fn bad[T without Copy,E:Show](r:Result[T,E]){match r{Ok(_)=>assert(false),Err(e)=>assert(len(f"{e}")>0)}}
 '''
 def quote(s):return json.dumps(str(s),ensure_ascii=False)
 def command(c,env,*args,code=0,cwd=None):

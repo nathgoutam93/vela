@@ -73,6 +73,9 @@ pub type Table = struct {
     instances: [Int]  // Option, Result and generic instances, in the order first asked for
     arrays: [Int]  // the element type of each array type, likewise
     maps: [Int]  // key and value of each map type, likewise, two per map
+    // Whether any resource type can exist (M35): sysio.Handle was named, or
+    // something was declared `without Copy`. False lets is_resource answer at once.
+    resources: Bool
 }
 
 pub fn ERROR() -> Int {
@@ -120,7 +123,7 @@ fn info(tag: Tag, name: Str) -> TypeInfo {
 }
 
 pub fn new_table() -> Table {
-    let mut t = Table { types: [], index: [:], instances: [], arrays: [], maps: [] }
+    let mut t = Table { types: [], index: [:], instances: [], arrays: [], maps: [], resources: false }
     push(mut t.types, info(Tag.Error, "<error>"))
     for name in ["Int", "Byte", "Bool", "Str", "Unit"] {
         push(mut t.types, info(Tag.Prim, name))
@@ -141,6 +144,74 @@ pub fn new_table() -> Table {
 }
 
 pub fn HANDLE() -> Int { return 16 }
+
+// Whether values of type `ty` move instead of being copied (M35): a
+// resource. sysio.Handle is one; so is a type parameter or a struct or enum
+// declared `without Copy`, a struct or enum with a resource field or
+// payload, and an array, map, Option or Result of one. Every other type is
+// Copy. `memo` keeps settled answers between calls.
+pub fn is_resource(table: Table, ty: Int, memo: mut Map[Int, Bool]) -> Bool {
+    if !table.resources { return false }
+    let mut path: Map[Int, Bool] = [:]
+    let mut visited: [Int] = []
+    let answer = resource_walk(table, ty, mut memo, mut path, mut visited).yes
+    if !answer {
+        // Everything reachable was explored without finding a resource,
+        // cycles included: none of it is one.
+        for v in visited { memo[v] = false }
+    }
+    return answer
+}
+
+// `open`: the answer depended on a type still being decided further up a
+// cycle, so a "no" is not kept.
+type ResourceAnswer = struct { yes: Bool, open: Bool }
+
+fn resource_walk(table: Table, ty: Int, memo: mut Map[Int, Bool], path: mut Map[Int, Bool], visited: mut [Int]) -> ResourceAnswer {
+    if ty < 0 || ty >= len(table.types) { return ResourceAnswer { yes: false, open: false } }
+    if ty == HANDLE() { return ResourceAnswer { yes: true, open: false } }
+    match maps.get(memo, ty) {
+        Some(b) => return ResourceAnswer { yes: b, open: false }
+        None => {}
+    }
+    if maps.has(path, ty) { return ResourceAnswer { yes: false, open: true } }
+    let info = table.types[ty]
+    let mut declared = false
+    for w in info.without { if w == "Copy" { declared = true } }
+    if info.origin >= 0 {
+        for w in table.types[info.origin].without { if w == "Copy" { declared = true } }
+    }
+    if declared {
+        memo[ty] = true
+        return ResourceAnswer { yes: true, open: false }
+    }
+    let mut parts: [Int] = []
+    match info.tag {
+        Tag.Array => parts = info.args
+        Tag.Map => parts = info.args
+        Tag.Struct => { for f in info.fields { push(mut parts, f.ty) } }
+        Tag.Enum => {
+            parts = info.args
+            for v in info.variants { for p in v.payload { push(mut parts, p) } }
+        }
+        _ => {}
+    }
+    path[ty] = true
+    push(mut visited, ty)
+    let mut open = false
+    for p in parts {
+        let r = resource_walk(table, p, mut memo, mut path, mut visited)
+        if r.yes {
+            maps.remove(mut path, ty)
+            memo[ty] = true
+            return ResourceAnswer { yes: true, open: false }
+        }
+        if r.open { open = true }
+    }
+    maps.remove(mut path, ty)
+    if !open { memo[ty] = false }
+    return ResourceAnswer { yes: false, open: open }
+}
 
 pub fn is_integer(t: Int) -> Bool { return integers.width(t) > 0 }
 pub fn integer_width(t: Int) -> Int { return integers.width(t) }

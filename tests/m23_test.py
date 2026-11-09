@@ -16,8 +16,8 @@ import threading
 import time
 ROOT=Path(__file__).resolve().parent.parent
 HELPER='''
-fn get[T,E:Show](r:Result[T,E])->T{match r{Ok(v)=>return v,Err(e)=>{print(e);assert(false);for{}}}}
-fn bad[T,E](r:Result[T,E]){match r{Ok(_)=>assert(false),Err(_)=>{}}}
+fn get[T without Copy,E:Show](r:take Result[T,E])->T{match r{Ok(v)=>return v,Err(e)=>{print(e);assert(false);for{}}}}
+fn bad[T without Copy,E](r:Result[T,E]){match r{Ok(_)=>assert(false),Err(_)=>{}}}
 '''
 def quote(s):
     return json.dumps(s,ensure_ascii=False).replace('\\u0000','\\0')
@@ -67,14 +67,14 @@ test "clock nesting and effects"{
     }
     with clock=[9223372036854775807,0]{bad(time.sleep_ns(1));assert(get(time.monotonic_ns())==0)}
 }
-test "socket ownership, snapshots, task and fake lifetimes"{
+test "socket ownership, moves and fake lifetimes"{
+    // M35: a socket moves; it escapes its fake scope by moving out of it.
     let mut escaped:Option[net.Tcp]=None
     with net=[net.reply("host",80,"abcd","response"),net.failure("bad",80,IoError{kind:IoKind.Other,message:"refused"})]{
-        let s=get(net.connect("host",80));let mut copies=[s];let saved=copies;copies[0]=s
+        let s=get(net.connect("host",80))
         assert(get(s.write("ab"))==2);assert(get(s.write("cd"))==2)
-        let chunks=tasks.map([1,2],fn(n)=>get(s.read(4)));assert(len(chunks[0])==4 && len(chunks[1])==4)
+        assert(len(get(s.read(4)))==4);assert(len(get(s.read(4)))==4)
         assert(get(s.read(4))=="");bad(net.connect("bad",80));bad(s.read(0));bad(s.timeout(-1));escaped=Some(s)
-        get(saved[0].close());get(s.close());bad(copies[0].read(1))
     }
     match escaped{Some(s)=>{bad(s.read(1));bad(s.close())},None=>assert(false)}
     with net=[] {bad(net.connect("127.0.0.1",1));bad(net.connect("host\\0suffix",80));bad(net.udp_bind("",2))}
@@ -125,11 +125,11 @@ import io
 import os
 '''+HELPER+'''
 fn main(){let args=os.args();if len(args)>1{
-let s=get(net.connect("127.0.0.1",1));let copy=tasks_copy(s);get(s.write("x"));get(copy.close());bad(s.read(1))
+let s=get(net.connect("127.0.0.1",1));get(s.write("x"));let moved=keep(s);get(moved.close())
 print(get(processes.run(["true"],"")).status);print(get(time.wall_ns()));print(len(get(paths.list("."))))
 let mut r=io.reader("abc");let mut w=io.writer();let _=get(io.copy(mut r,mut w,3));print(w.text())
 }}
-fn tasks_copy(s:net.Tcp)->net.Tcp{return s}
+fn keep(s:take net.Tcp)->net.Tcp{return s}
 ''');cross(c,w,env,p)
     # Check cleanup obligations are enforced, even for an unclaimed expectation.
     test(c,w,env,'import net\nfn main(){}\ntest "unused"{with net=[net.reply("a",1,"","")] {}}',code=1,error='unconsumed fake')
@@ -218,7 +218,7 @@ def real_network(c,w,env):
         except Exception as e:errors.append(e)
         finally:udp.close()
     thread=threading.Thread(target=datagram);thread.start()
-    try:program(c,w,env,'import net\n'+HELPER+f'\nfn main(){{let s=get(net.udp_bind("127.0.0.1",0));assert(get(s.port())>0);assert(get(s.send("127.0.0.1",{port},"hi\\0udp"))==6);assert(get(s.receive(10)).data=="");let p=get(s.receive(10));assert(p.data=="reply" && p.port=={port});bad(s.receive(2));get(s.close());bad(s.port())}}')
+    try:program(c,w,env,'import net\n'+HELPER+f'\nfn main(){{let s=get(net.udp_bind("127.0.0.1",0));assert(get(s.port())>0);assert(get(s.send("127.0.0.1",{port},"hi\\0udp"))==6);assert(get(s.receive(10)).data=="");let p=get(s.receive(10));assert(p.data=="reply" && p.port=={port});bad(s.receive(2));get(s.close())}}')
     finally:thread.join(12)
     assert not thread.is_alive() and not errors,errors
     # Exercise Vela accept, timeout, close aliases and automatic descriptor drop.
@@ -297,7 +297,7 @@ def socket_storage(c,w,env):
         get(s.timeout(20));bad(s.read(1024));get(s.timeout(1000))
         let copies=tasks.map([1,2],fn(_)=>saved());assert(copies[1]==first && first[0]==255u8)
         get(s.write("b"));assert(get(s.read(4096))=="");assert(get(s.read(1))=="")
-        get(s.close());bad(s.read(1));assert(saved()==first)
+        get(s.close());assert(saved()==first)
     }}'''
     try:program(c,w,env,source)
     finally:thread.join(6)
@@ -440,7 +440,7 @@ def tooling(c,w,env):
     # Module signatures are in `vela guide --all` (M31).
     full=command(c,env,'guide','--all').stdout
     for module in ('net','clock','time','io','unicode','http','paths','processes'):assert 'import '+module in full,module
-    assert 'pub fn copy[R: Reader, W: Writer]' in full
+    assert 'pub fn copy[R: Reader without Copy, W: Writer without Copy]' in full
 
 def negative(c,w,env):
     cases=[('import clock\nfn f(){clock.wall_ns()}\nfn main(){}','E3036'),('import net\nfn f(){net.connect("a",1)}\nfn main(){}','E3036'),('import clock\nfn f(){unsafe{clock.wall_ns()}}\nfn main(){}','E3036'),('import sysio\nfn main(){let h:sysio.Unknown=1}','E3220'),('import clock\nfn main(){clock.sleep_ns(mut 1)}','E3096'),('import clock\nfn main(){}\ntest "bad"{with clock=["a"] {}}','E3093')]

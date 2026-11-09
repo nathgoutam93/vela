@@ -1,0 +1,38 @@
+// Plain parameters, loop variables, function values' captures and
+// parameters, and what matches a borrowed value borrow a resource (M35):
+// moving them is E3248. A field or element never moves alone (E3249).
+// err: resource_borrows.vl:17:35: error: 'l' borrows a resource (Lock) as parameter 'l', so it cannot be moved; declare it `l: take Lock` to receive the value [E3248]
+// err: resource_borrows.vl:18:53: error: 'l' borrows a resource (Lock) as parameter 'l', so it cannot be moved; declare it `l: take Lock` to receive the value [E3248]
+// err: resource_borrows.vl:21:31: error: 'l' borrows a resource (Lock) as a loop variable, so it cannot be moved; it can be read and passed to plain parameters, but not stored, returned or consumed [E3248]
+// err: resource_borrows.vl:25:61: error: 'a' borrows a resource (Lock) as a capture of a function value, so it cannot be moved; it can be read and passed to plain parameters, but not stored, returned or consumed [E3248]
+// err: resource_borrows.vl:26:61: error: 'l' borrows a resource (Lock) as a parameter of a function value, so it cannot be moved; it can be read and passed to plain parameters, but not stored, returned or consumed [E3248]
+// err: resource_borrows.vl:29:38: error: 'l' borrows a resource (Lock) as a binding of parameter 'o', so it cannot be moved; it can be read and passed to plain parameters, but not stored, returned or consumed [E3248]
+// err: resource_borrows.vl:32:15: error: field 'lock' is a resource (Lock) and cannot be moved out on its own; borrow it where it is, or match on the whole value [E3249]
+// err: resource_borrows.vl:33:15: error: an element of an array of resources (Lock) cannot be moved out on its own; borrow it where it is [E3249]
+type Lock = struct { fd: Int } without Copy
+type Holder = struct { lock: Lock, n: Int }
+fn open(fd: Int) -> Lock { return Lock { fd: fd } }
+fn close(l: take Lock) -> Int { return l.fd }
+fn peek(l: Lock) -> Int { return l.fd }
+fn keep(l: Lock) -> Lock { return l }
+fn store(l: Lock) -> Holder { return Holder { lock: l, n: 0 } }
+fn each(xs: [Lock], f: scoped fn(Lock) -> Int) -> Int uses f { return f(xs[0]) }
+fn loops(xs: [Lock]) {
+    for l in xs { print(close(l)) }
+}
+fn captured() {
+    let a = open(1)
+    print(each([open(2)], fn(l: Lock) -> Int { return close(a) }))
+    print(each([open(3)], fn(l: Lock) -> Int { return close(l) }))
+}
+fn matched(o: Option[Lock]) {
+    match o { Some(l) => print(close(l)), None => {} }
+}
+fn parts(h: take Holder, xs: take [Lock]) {
+    let l = h.lock
+    let x = xs[0]
+    match h.lock { Lock { fd } => print(fd) }
+    let n = h.n  // a Copy field is copied
+    print(n)
+}
+fn main() {}

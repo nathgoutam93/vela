@@ -1,0 +1,54 @@
+// A resource moves (M35): after it is assigned, stored, returned or
+// consumed, it holds no value (E3247), on any path, in any later iteration.
+// err: resource_moves.vl:17:16: error: 'a' was moved at line 16, so it holds no value here; use it before then, or give it a new value first [E3247]
+// err: resource_moves.vl:23:16: error: 'a' was moved at line 22, so it holds no value here; use it before then, or give it a new value first [E3247]
+// err: resource_moves.vl:28:16: error: 'a' was moved at line 27, so it holds no value here; use it before then, or give it a new value first [E3247]
+// err: resource_moves.vl:34:16: error: 'a' was moved at line 33, so it holds no value here; use it before then, or give it a new value first [E3247]
+// err: resource_moves.vl:38:33: error: 'a' was moved at line 38 by an earlier iteration, so it holds no value here; use it before then, or give it a new value first [E3247]
+// err: resource_moves.vl:52:11: error: 'o' was moved at line 51, so it holds no value here; use it before then, or give it a new value first [E3247]
+type Lock = struct { fd: Int } without Copy
+type Holder = struct { lock: Lock }
+fn open(fd: Int) -> Lock { return Lock { fd: fd } }
+fn close(l: take Lock) -> Int { return l.fd }
+fn peek(l: Lock) -> Int { return l.fd }
+fn assigned() {
+    let a = open(1)
+    let b = a
+    print(peek(a))
+    print(close(b))
+}
+fn closed() {
+    let a = open(2)
+    print(close(a))
+    print(peek(a))
+}
+fn stored() -> Holder {
+    let a = open(3)
+    let h = Holder { lock: a }
+    print(peek(a))
+    return h
+}
+fn on_one_path(c: Bool) {
+    let a = open(4)
+    if c { print(close(a)) }
+    print(peek(a))
+}
+fn in_a_loop() {
+    let a = open(5)
+    for i in 0..2 { print(close(a)) }
+}
+fn reassigned() {
+    let mut a = open(6)
+    print(close(a))
+    a = open(7)
+    print(peek(a))  // a holds a new value: no error
+    for i in 0..2 {
+        print(close(a))
+        a = open(8)  // and each iteration gives it one
+    }
+}
+fn by_match(o: take Option[Lock]) {
+    match o { Some(l) => print(close(l)), None => {} }
+    print(o.is_some())
+}
+fn main() {}

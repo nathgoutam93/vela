@@ -13,6 +13,10 @@
     "PatternKind.Struct": {
       "section": "statements-and-matching",
       "program": "tests/run/struct_patterns.vl"
+    },
+    "StmtKind.Defer": {
+      "section": "statements-and-matching",
+      "program": "tests/run/defer_exits.vl"
     }
   },
   "features": {
@@ -83,11 +87,29 @@
     "uses_type_parameter": {
       "section": "effects-contracts-and-tests",
       "program": "tests/run/io_copy.vl"
+    },
+    "resource_moves": {
+      "section": "resources",
+      "program": "tests/run/resource_moves.vl"
+    },
+    "take_parameter": {
+      "section": "resources",
+      "program": "tests/run/resource_moves.vl"
+    },
+    "type_parameter_without_copy": {
+      "section": "resources",
+      "program": "tests/cli/resource_fakes.vl"
+    },
+    "defer": {
+      "section": "statements-and-matching",
+      "program": "tests/run/defer_exits.vl"
     }
   },
   "contextual_words": [
     "const",
     "without",
-    "scoped"
+    "scoped",
+    "defer",
+    "take"
   ]
 }

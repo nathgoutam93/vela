@@ -10,6 +10,7 @@ fn bad(message: Str) -> IoError { return IoError { kind: IoKind.Invalid, message
 pub type Response = struct { status: Int, headers: Map[Str, Str], body: Str }
 type Url = struct { host: Str, port: Int, authority: Str, target: Str }
 type Stream = struct { socket: net.Tcp, buffer: Str }
+fn Stream.close(s: take Stream) -> Result[Unit, IoError] uses net { return match s { Stream { socket, .. } => socket.close() } }
 fn decimal(s: Str) -> Result[Int, IoError] {
     if len(s) == 0 { return Err(bad("empty decimal")) }; for c in s { if c < '0' || c > '9' { return Err(bad("invalid decimal")) } }
     match text.parse_int(s) { Some(n) => return Ok(n), None => return Err(bad("decimal overflow")) }
@@ -59,8 +60,8 @@ fn field(row: Str) -> Result[[Str], IoError] {
     let value = row[colon + 1..len(row)]; for c in value { if (c < 32 && c != '\t') || c == 127 { return Err(bad("invalid HTTP field value")) } }
     return Ok([name, text.trim(value)])
 }
-fn response(socket: net.Tcp, limit: Int) -> Result[Response, IoError] uses net {
-    let mut s = Stream { socket: socket, buffer: "" }; let mut remaining = 65536; let mut status = 0; let mut headers: Map[Str, Str] = [:]
+fn response(s: mut Stream, limit: Int) -> Result[Response, IoError] uses net {
+    let mut remaining = 65536; let mut status = 0; let mut headers: Map[Str, Str] = [:]
     for interim in 0..9 {
         let first = line(mut s, remaining)?; remaining = remaining - len(first) - 2
         if len(first) < 12 || (first[0..9] != "HTTP/1.1 " && first[0..9] != "HTTP/1.0 ") || (len(first) > 12 && first[12] != ' ') { return Err(bad("invalid HTTP status line")) }
@@ -96,17 +97,17 @@ fn response(socket: net.Tcp, limit: Int) -> Result[Response, IoError] uses net {
         let size = decimal(headers["content-length"])?; if size > limit { return Err(bad("HTTP body limit exceeded")) }; strings.add(mut body, take(mut s, size)?)
     } else {
         for { let part = s.buffer; s.buffer = ""; if len(part) > limit - total { return Err(bad("HTTP body limit exceeded")) }; strings.add(mut body, part); total = total + len(part)
-            let mut ask = 8192; if limit - total < 8192 { ask = limit - total + 1 }; s.buffer = socket.read(ask)?; if s.buffer == "" { break }
+            let mut ask = 8192; if limit - total < 8192 { ask = limit - total + 1 }; s.buffer = s.socket.read(ask)?; if s.buffer == "" { break }
         }
     }
     return Ok(Response { status: status, headers: headers, body: strings.build(body) })
 }
 pub fn get(value: Str) -> Result[Response, IoError] uses net { return get_limit(value, 8388608, 5000) }
 pub fn get_limit(value: Str, body_limit: Int, timeout_ms: Int) -> Result[Response, IoError] uses net {
-    if body_limit < 0 || body_limit > 67108864 { return Err(bad("invalid HTTP body limit")) }; let u = url(value)?; let socket = net.connect_timeout(u.host, u.port, timeout_ms)?
+    if body_limit < 0 || body_limit > 67108864 { return Err(bad("invalid HTTP body limit")) }; let u = url(value)?; let mut s = Stream { socket: net.connect_timeout(u.host, u.port, timeout_ms)?, buffer: "" }
+    defer { let _ = s.close() }  // on every path (M35)
     // timeout_ms covers the whole request, however a server spreads it out.
-    match sysio.net_deadline(socket.handle, timeout_ms) { Err(e) => { let _ = socket.close(); return Err(e) }, Ok(_) => {} }
-    let sent = socket.write("GET " + u.target + " HTTP/1.1\r\nHost: " + u.authority + "\r\nConnection: close\r\n\r\n")
-    match sent { Err(e) => { let _ = socket.close(); return Err(e) }, Ok(_) => {} }
-    let result = response(socket, body_limit); let _ = socket.close(); return result
+    sysio.net_deadline(s.socket.handle, timeout_ms)?
+    s.socket.write("GET " + u.target + " HTTP/1.1\r\nHost: " + u.authority + "\r\nConnection: close\r\n\r\n")?
+    return response(mut s, body_limit)
 }

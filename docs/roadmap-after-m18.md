@@ -422,7 +422,7 @@ the new signatures.
 
 ## M35: Resources
 
-**Status:** planned; its move and drop design needs review before implementation.
+**Status:** implemented; see [the walkthrough](history/m35-resources.md). Built on the current back ends (no LP-101 first); plain parameters borrow, `take` consumes, `without Copy` makes a resource, `defer` is block-scoped (decided 2026-11-09). Elements cannot yet be moved out of an array of resources (TL-140).
 
 **Needs:** M33 (consuming receivers) and M34 (typed `close` errors).
 

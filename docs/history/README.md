@@ -54,6 +54,7 @@ for day-to-day work.
 | [M32](m32-derived-conformances.md) | Derived conformances |
 | [M33](m33-mutable-receivers.md) | Mutable receivers |
 | [M34](m34-typed-errors.md) | Typed errors |
+| [M35](m35-resources.md) | Resources: `defer` and non-copyable handles |
 | [Next performance round](performance-next-round.md) | implementation, review and results |
 | [tooling-followup-before-m30](tooling-followup-before-m30.md) | Tooling follow-up before M30 |
 | [Networking runtime performance](network-runtime-performance.md) | Socket allocation, writes and operation lifetimes |

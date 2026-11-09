@@ -371,8 +371,20 @@ fn fn_decl_in(p: mut Parser, with_body: Bool) -> Result[ast.FnDecl, errors.Compi
             advance(mut p)
             scoped = !mutable
         }
+        // `x: take T` (M35): the function owns the argument. A contextual
+        // word: `take` followed by the start of a type.
+        let mut take = false
+        let taken = peek(p, 0)
+        let after = peek(p, 1).kind
+        if taken.kind == lexer.Kind.Ident && taken.text == "take" && (after == lexer.Kind.Ident || after == lexer.Kind.LBracket || after == lexer.Kind.LParen) {
+            if mutable || scoped {
+                push(mut p.errors, error(taken, "E2034", "a parameter is one of `mut`, `scoped` or `take`"))
+            }
+            advance(mut p)
+            take = !mutable && !scoped
+        }
         let t = type_name(mut p)?
-        push(mut params, ast.Param { name: pname.text, ty: t, line: pname.line, col: pname.col, mutable: mutable, scoped: scoped })
+        push(mut params, ast.Param { name: pname.text, ty: t, line: pname.line, col: pname.col, mutable: mutable, scoped: scoped, take: take })
         if peek(p, 0).kind != lexer.Kind.Comma {
             break
         }
@@ -506,8 +518,8 @@ fn without(p: mut Parser) -> Result[[Str], errors.CompileError] {
     advance(mut p)
     for {
         let name = peek(p, 0)
-        if name.kind != lexer.Kind.Ident || name.text != "Eq" && name.text != "Ord" && name.text != "Key" && name.text != "Show" {
-            return Err(error(name, "E2033", "expected Eq, Ord, Key or Show after 'without'" + found(name)))
+        if name.kind != lexer.Kind.Ident || name.text != "Eq" && name.text != "Ord" && name.text != "Key" && name.text != "Show" && name.text != "Copy" {
+            return Err(error(name, "E2033", "expected Eq, Ord, Key, Show or Copy after 'without'" + found(name)))
         }
         for done in out {
             if done == name.text { return Err(error(name, "E2033", "'" + name.text + "' is listed twice after 'without'")) }
@@ -553,7 +565,20 @@ fn type_params(p: mut Parser, owner: Str) -> Result[[ast.TypeParam], errors.Comp
                 advance(mut p)
             }
         }
-        push(mut out, ast.TypeParam { name: name.text, bounds: bounds, line: name.line, col: name.col })
+        // `[T without Copy]` (M35): T may be a resource, which the code
+        // never copies.
+        let w = peek(p, 0)
+        let mut movable = false
+        if w.kind == lexer.Kind.Ident && w.text == "without" {
+            advance(mut p)
+            let copy = peek(p, 0)
+            if copy.kind != lexer.Kind.Ident || copy.text != "Copy" {
+                return Err(error(copy, "E2033", "a type parameter can only be `without Copy`" + found(copy)))
+            }
+            advance(mut p)
+            movable = true
+        }
+        push(mut out, ast.TypeParam { name: name.text, bounds: bounds, movable: movable, line: name.line, col: name.col })
         if peek(p, 0).kind != lexer.Kind.Comma {
             break
         }
@@ -919,6 +944,16 @@ fn skip_statement(p: mut Parser) {
 fn statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
     let tok = peek(p, 0)
     let k = tok.kind
+    if k == lexer.Kind.Ident && tok.text == "defer" && starts_deferred(peek(p, 1).kind) {
+        // A contextual word, like `unsafe`: `defer` followed by a block or
+        // a simple statement (M35). A name `defer` is never followed by these.
+        advance(mut p)
+        if peek(p, 0).kind == lexer.Kind.LBrace {
+            return Ok(stmt(mut p, ast.StmtKind.Defer(block(mut p, "after defer")?), tok.line, tok.col))
+        }
+        let s = simple_statement(mut p)?
+        return Ok(stmt(mut p, ast.StmtKind.Defer(ast.Block { stmts: [s], end_line: s.line, end_col: s.col }), tok.line, tok.col))
+    }
     if k == lexer.Kind.Ident && tok.text == "unsafe" && peek(p, 1).kind == lexer.Kind.LBrace {
         advance(mut p)
         return Ok(stmt(mut p, ast.StmtKind.Unsafe(block(mut p, "after unsafe")?), tok.line, tok.col))
@@ -954,6 +989,10 @@ fn statement(p: mut Parser) -> Result[ast.Stmt, errors.CompileError] {
         return Err(error(tok, "E2014", "'else' must be on the same line as the '}' before it"))
     }
     return simple_statement(mut p)
+}
+
+fn starts_deferred(k: lexer.Kind) -> Bool {
+    return k == lexer.Kind.LBrace || k == lexer.Kind.Ident || k == lexer.Kind.Return || k == lexer.Kind.Break || k == lexer.Kind.Continue
 }
 
 // A statement that fits in a match arm: return, break, continue, a call,

@@ -17,7 +17,8 @@ fn serve(socket: net.Tcp, rounds: Int, size: Int) -> Result[Int, Str] uses net {
         let mut sent = 0
         for sent < size { let n = socket.write(data[sent..size])?; if n == 0 { return Err("zero write") }; sent = sent + n }
     }
-    socket.close()?
+    // A worker borrows its socket (M35); tasks.map took the array, and
+    // the sockets close as run returns.
     return Ok(rounds * size)
 }
 fn run(ready: Str, clients: Int, rounds: Int, size: Int) -> Result[Int, Str] uses net, fs {

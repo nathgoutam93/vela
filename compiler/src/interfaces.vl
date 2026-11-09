@@ -19,17 +19,17 @@ pub fn methods() -> Str {
         "pub type ParseError = struct { message: Str, offset: Int }\n" +
         "pub fn IoError.show(e: IoError) -> Str { return e.message }\n" +
         "pub fn ParseError.show(e: ParseError) -> Str { return e.message }\n" +
-        "fn hid_convert[T, E, F](r: Result[T, E]) -> Result[T, F] { return match r { Ok(x) => Ok(x), Err(e) => Err(hid_into(e)) } }\n" +
-        "pub fn Option.is_some[T](value: Option[T]) -> Bool { return match value { Some(_) => true, None => false } }\n" +
-        "pub fn Option.is_none[T](value: Option[T]) -> Bool { return match value { Some(_) => false, None => true } }\n" +
-        "pub fn Option.unwrap_or[T](value: Option[T], default: T) -> T { return match value { Some(x) => x, None => default } }\n" +
-        "pub fn Option.map[T, U](value: Option[T], f: scoped fn(T) -> U) -> Option[U] uses f {\n" +
+        "fn hid_convert[T without Copy, E, F](r: take Result[T, E]) -> Result[T, F] { return match r { Ok(x) => Ok(x), Err(e) => Err(hid_into(e)) } }\n" +
+        "pub fn Option.is_some[T without Copy](value: Option[T]) -> Bool { return match value { Some(_) => true, None => false } }\n" +
+        "pub fn Option.is_none[T without Copy](value: Option[T]) -> Bool { return match value { Some(_) => false, None => true } }\n" +
+        "pub fn Option.unwrap_or[T without Copy](value: take Option[T], default: take T) -> T { return match value { Some(x) => x, None => default } }\n" +
+        "pub fn Option.map[T without Copy, U without Copy](value: take Option[T], f: scoped fn(T) -> U) -> Option[U] uses f {\n" +
         "    return match value { Some(x) => Some(f(x)), None => None }\n" +
         "}\n" +
-        "pub fn Option.and_then[T, U](value: Option[T], f: scoped fn(T) -> Option[U]) -> Option[U] uses f {\n" +
+        "pub fn Option.and_then[T without Copy, U without Copy](value: take Option[T], f: scoped fn(T) -> Option[U]) -> Option[U] uses f {\n" +
         "    return match value { Some(x) => f(x), None => None }\n" +
         "}\n" +
-        "pub fn Option.ok_or[T, E](value: Option[T], error: E) -> Result[T, E] { return match value { Some(x) => Ok(x), None => Err(error) } }\n" +
+        "pub fn Option.ok_or[T without Copy, E](value: take Option[T], error: take E) -> Result[T, E] { return match value { Some(x) => Ok(x), None => Err(error) } }\n" +
         "pub fn Option.eq[T: Eq](a: Option[T], b: Option[T]) -> Bool {\n" +
         "    return match a {\n" +
         "        Some(x) => match b { Some(y) => x == y, None => false },\n" +
@@ -52,16 +52,16 @@ pub fn methods() -> Str {
         "    return match value { Some(x) => \"Some(\" + hid_show(x) + \")\", None => \"None\" }\n" +
         "}\n" +
         "\n" +
-        "pub fn Result.is_ok[T, E](value: Result[T, E]) -> Bool { return match value { Ok(_) => true, Err(_) => false } }\n" +
-        "pub fn Result.is_err[T, E](value: Result[T, E]) -> Bool { return match value { Ok(_) => false, Err(_) => true } }\n" +
-        "pub fn Result.unwrap_or[T, E](value: Result[T, E], default: T) -> T { return match value { Ok(x) => x, Err(_) => default } }\n" +
-        "pub fn Result.map[T, E, U](value: Result[T, E], f: scoped fn(T) -> U) -> Result[U, E] uses f {\n" +
+        "pub fn Result.is_ok[T without Copy, E](value: Result[T, E]) -> Bool { return match value { Ok(_) => true, Err(_) => false } }\n" +
+        "pub fn Result.is_err[T without Copy, E](value: Result[T, E]) -> Bool { return match value { Ok(_) => false, Err(_) => true } }\n" +
+        "pub fn Result.unwrap_or[T without Copy, E](value: take Result[T, E], default: take T) -> T { return match value { Ok(x) => x, Err(_) => default } }\n" +
+        "pub fn Result.map[T without Copy, E, U without Copy](value: take Result[T, E], f: scoped fn(T) -> U) -> Result[U, E] uses f {\n" +
         "    return match value { Ok(x) => Ok(f(x)), Err(e) => Err(e) }\n" +
         "}\n" +
-        "pub fn Result.map_err[T, E, F](value: Result[T, E], f: scoped fn(E) -> F) -> Result[T, F] uses f {\n" +
+        "pub fn Result.map_err[T without Copy, E, F](value: take Result[T, E], f: scoped fn(E) -> F) -> Result[T, F] uses f {\n" +
         "    return match value { Ok(x) => Ok(x), Err(e) => Err(f(e)) }\n" +
         "}\n" +
-        "pub fn Result.and_then[T, E, U](value: Result[T, E], f: scoped fn(T) -> Result[U, E]) -> Result[U, E] uses f {\n" +
+        "pub fn Result.and_then[T without Copy, E, U without Copy](value: take Result[T, E], f: scoped fn(T) -> Result[U, E]) -> Result[U, E] uses f {\n" +
         "    return match value { Ok(x) => f(x), Err(e) => Err(e) }\n" +
         "}\n" +
         "pub fn Result.eq[T: Eq, E: Eq](a: Result[T, E], b: Result[T, E]) -> Bool {\n" +

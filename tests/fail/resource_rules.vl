@@ -1,0 +1,35 @@
+// Where resources cannot go (M35): an escaping function value's captures
+// (E3250), a type parameter that may copy (E3251), a map or a fixed array
+// (E3252), and away from deferred code that reads them (E3254).
+// err: resource_rules.vl:16:58: error: 'x' was moved at line 16, so it holds no value here; use it before then, or give it a new value first [E3247]
+// err: resource_rules.vl:19:12: error: this function value captures 'a', a resource (Lock), but its captures are copies; pass it as an argument, or capture it in a closure written as a scoped argument [E3250]
+// err: resource_rules.vl:23:11: error: 'first' may copy its T, but here T is Lock, a resource that moves; declare `T without Copy` where the code never copies one [E3251]
+// err: resource_rules.vl:26:15: error: Map[Str, Lock] would hold resources (Lock), which only variables, fields, payloads, Option, Result and growable arrays can [E3252]
+// err: resource_rules.vl:26:34: error: [Lock; 2] would hold resources (Lock), which only variables, fields, payloads, Option, Result and growable arrays can [E3252]
+// err: resource_rules.vl:30:13: error: 'a' is used by deferred code (line 29), which reads it as the block exits, so it cannot be moved before then [E3254]
+type Lock = struct { fd: Int } without Copy
+fn open(fd: Int) -> Lock { return Lock { fd: fd } }
+fn close(l: take Lock) -> Int { return l.fd }
+fn peek(l: Lock) -> Int { return l.fd }
+fn first[T](xs: [T]) -> Int { return len(xs) }
+fn count[T without Copy](xs: [T]) -> Int { return len(xs) }
+fn copies[T without Copy](x: take T) -> [T] { return [x, x] }
+fn captures() -> fn() -> Int {
+    let a = open(1)
+    return fn() -> Int { return peek(a) }
+}
+fn generic() {
+    let xs = [open(2)]
+    print(first(xs))
+    print(count(xs))  // declared without Copy: allowed
+}
+fn holders(m: Map[Str, Lock], f: [Lock; 2]) {}
+fn deferred() {
+    let a = open(3)
+    defer print(peek(a))
+    let b = a
+    let c = open(4)
+    defer print(close(c))
+    print(peek(c))  // deferred code may consume it; it can still be borrowed
+}
+fn main() {}

@@ -1,4 +1,5 @@
-// Blocking sockets. Copies share a connection; close invalidates its aliases.
+// Blocking sockets. They are resources (M35): a socket moves instead of being
+// copied, and close consumes it; one never closed is closed when dropped.
 import sysio
 import strings
 import text
@@ -14,9 +15,9 @@ pub fn listen(host: Str, port: Int) -> Result[Listener, IoError] uses net { retu
 pub fn Listener.accept(s: Listener) -> Result[Tcp, IoError] uses net { return Ok(Tcp { handle: sysio.accept(s.handle)? }) }
 pub fn Tcp.read(s: Tcp, max: Int) -> Result[Str, IoError] uses net { return sysio.net_read(s.handle, max) }
 pub fn Tcp.write(s: Tcp, data: Str) -> Result[Int, IoError] uses net { return sysio.net_write(s.handle, data) }
-pub fn Tcp.close(s: Tcp) -> Result[Unit, IoError] uses net { return sysio.net_close(s.handle) }
-pub fn Listener.close(s: Listener) -> Result[Unit, IoError] uses net { return sysio.net_close(s.handle) }
-pub fn Udp.close(s: Udp) -> Result[Unit, IoError] uses net { return sysio.net_close(s.handle) }
+pub fn Tcp.close(s: take Tcp) -> Result[Unit, IoError] uses net { return sysio.net_close(s.handle) }
+pub fn Listener.close(s: take Listener) -> Result[Unit, IoError] uses net { return sysio.net_close(s.handle) }
+pub fn Udp.close(s: take Udp) -> Result[Unit, IoError] uses net { return sysio.net_close(s.handle) }
 pub fn Tcp.timeout(s: Tcp, ms: Int) -> Result[Unit, IoError] uses net { return sysio.net_timeout(s.handle, ms) }
 pub fn Listener.timeout(s: Listener, ms: Int) -> Result[Unit, IoError] uses net { return sysio.net_timeout(s.handle, ms) }
 pub fn Udp.timeout(s: Udp, ms: Int) -> Result[Unit, IoError] uses net { return sysio.net_timeout(s.handle, ms) }

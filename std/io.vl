@@ -13,7 +13,9 @@ fn bad(message: Str) -> IoError { return IoError { kind: IoKind.Invalid, message
 
 pub fn reader(data: Str) -> MemoryReader { return MemoryReader { data: data, position: 0 } }
 pub fn writer() -> MemoryWriter { return MemoryWriter { data: strings.builder() } }
-pub fn socket(connection: net.Tcp) -> Socket { return Socket { connection: connection } }
+pub fn socket(connection: take net.Tcp) -> Socket { return Socket { connection: connection } }
+// Close the connection under a socket reader or writer (M35).
+pub fn Socket.close(s: take Socket) -> Result[Unit, IoError] uses net { return match s { Socket { connection: c } => c.close() } }
 
 // Up to `max` bytes, or "" at the end.
 pub fn MemoryReader.read(r: mut MemoryReader, max: Int) -> Result[Str, IoError] {
@@ -42,7 +44,7 @@ pub fn Socket.write(s: mut Socket, data: Str) -> Result[Unit, IoError] uses net 
 
 // Everything `reader` gives, into `writer`, at most `limit` bytes: a finite
 // limit bounds copy even for an untrusted or infinite source. The size copied.
-pub fn copy[R: Reader, W: Writer](reader: mut R, writer: mut W, limit: Int) -> Result[Int, IoError] uses R, W {
+pub fn copy[R: Reader without Copy, W: Writer without Copy](reader: mut R, writer: mut W, limit: Int) -> Result[Int, IoError] uses R, W {
     if limit < 0 { return Err(bad("negative copy limit")) }
     let mut size = 0
     for {

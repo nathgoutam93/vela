@@ -79,7 +79,7 @@ fn compatible(t: types.Table, a: Int, b: Int) -> Bool {
 fn block(g: mut Graph, b: ast.Block) { for s in b.stmts { stmt(mut g, s) } }
 fn stmt(g: mut Graph, s: ast.Stmt) {
     match s.kind {
-        ast.StmtKind.Block(b) => block(mut g, b), ast.StmtKind.Unsafe(b) => block(mut g, b),
+        ast.StmtKind.Block(b) => block(mut g, b), ast.StmtKind.Unsafe(b) => block(mut g, b), ast.StmtKind.Defer(b) => block(mut g, b),
         ast.StmtKind.ExprStmt(e) => expr(mut g, e), ast.StmtKind.Let(_, _, _, e) => expr(mut g, e),
         ast.StmtKind.Assign(a, b) => { expr(mut g, a); expr(mut g, b) },
         ast.StmtKind.If(e, b, other) => { expr(mut g, e); block(mut g, b); match other { ast.Else.NoElse => {}, ast.Else.ElseBlock(b) => block(mut g, b), ast.Else.ElseIf(s) => stmt(mut g, s) } },

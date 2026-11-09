@@ -1115,6 +1115,7 @@ fn changed_stmt(k: checker.Checked, st: ast.Stmt, out: mut Map[Int, Bool]) {
             changed_arms(k, arms, mut out)
         }
         ast.StmtKind.Unsafe(b) => changed_block(k, b, mut out)
+        ast.StmtKind.Defer(b) => changed_block(k, b, mut out)
         ast.StmtKind.With(items, b) => {
             for item in items {
                 changed_expr(k, item.value, mut out)
@@ -1292,6 +1293,19 @@ fn walk_stmt(w: mut Walk, s: ast.Stmt) {
                 walk_expr(mut w, it.value)
             }
             walk_block(mut w, b)
+        }
+        ast.StmtKind.Defer(b) => {
+            // Deferred code runs at every exit of its block, so it is
+            // walked knowing nothing about the locals; the locals it
+            // changes are escaped and never trusted elsewhere (M35).
+            let before = w.env
+            let edges = w.edges
+            w.env.locals = [:]
+            w.env.limits = [:]
+            walk_block(mut w, b)
+            w.env = before
+            w.edges = edges
+            w.dead = false
         }
     }
 }
