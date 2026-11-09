@@ -326,7 +326,7 @@ fn builtin_def(b: mut Builder, name: Str, what: Str) -> Int {
 // this is how hover and completion show them.
 pub fn builtin_info(name: Str) -> [Str] { return builtin_info_for(name, "") }
 pub fn builtin_info_for(name: Str, target: Str) -> [Str] {
-    if name == "sysio.Handle" { return ["sysio.Handle", "Owning external I/O resource. Copies alias the resource; final release closes it."] }
+    if name == "sysio.Handle" { return ["sysio.Handle", "Owning external I/O resource (M35): it moves instead of being copied, and dropping it closes it."] }
     if len(name) > 6 && (name[0..6] == "sysio." || name[0..6] == "clock.") { return [sysops.signature(name[0..5], name[6..len(name)]), "Blocking systems I/O with test fakes, bounds and explicit effects."] }
     if len(name) > 7 && name[0..7] == "memory." { return [memops.signature(name[7..len(name)]), "Checked contiguous storage; views retain snapshots and writes use copy-on-write."] }
     if len(name) > 2 && name[0..2] == "c." {
@@ -425,6 +425,9 @@ pub fn signature(f: ast.FnDecl) -> Str {
         if p.scoped {
             strings.add(mut s, "scoped ")
         }
+        if p.take {
+            strings.add(mut s, "take ")
+        }
         strings.add(mut s, ast.type_text(p.ty))
     }
     if f.variadic { if len(f.params) > 0 { strings.add(mut s, ", ") }; strings.add(mut s, "...") }
@@ -471,6 +474,7 @@ fn type_param_text(p: ast.TypeParam) -> Str {
         }
         s = s + p.bounds[i]
     }
+    if p.movable { s = s + " without Copy" }
     return s
 }
 
@@ -989,6 +993,7 @@ fn stmt(b: mut Builder, s: ast.Stmt) {
         }
         ast.StmtKind.MatchStmt(scrutinee, arms) => match_arms(mut b, scrutinee, arms)
         ast.StmtKind.Unsafe(body) => block(mut b, body)
+        ast.StmtKind.Defer(body) => block(mut b, body)
         ast.StmtKind.With(items, body) => {
             for item in items {
                 add_use(mut b, item.line, item.col, item.name, word_def(mut b, item.name), "")

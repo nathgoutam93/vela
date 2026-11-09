@@ -4488,7 +4488,7 @@ No additional CI workflow run was requested or launched for reconciliation.
 
 ### TL-137: The guide still says interface methods have no mutable parameters
 
-- **Status:** open; scheduled with M35's guide changes.
+- **Status:** resolved in M35 (2026-11-09).
 - **Discovery:** M35 design review, reading the guide's handle text
   (2026-11-09, at `20baaab`, Linux x86-64).
 - **Evidence (observed):** `build/vela guide` prints "Interface signatures
@@ -4512,6 +4512,69 @@ No additional CI workflow run was requested or launched for reconciliation.
 - **Verify:** `build/vela guide | grep "mutable parameters"` matches the
   specification's wording, and `tests/m17_test.py`'s budget check still
   passes.
+- **Resolution:** the guide now says "Interface signatures have no bodies,
+  contracts, method type parameters or mutable parameters after the first,
+  which is Self or `mut Self`", as the specification does. Validated with
+  `build/vela guide`, and `python3 run_tests.py --backend c m17_test
+  m30_test` (the guide budget and the guide's examples) passing.
+
+### TL-138: The Windows systems fixture was not updated for typed errors
+
+- **Status:** resolved in M35 (2026-11-09); Windows execution belongs to
+  VAL-005.
+- **Discovery:** M35, reviewing every program that uses sockets.
+- **Evidence (observed):** `tests/fixtures/m26/windows_systems.vl`, built only
+  by the manually dispatched platform workflow
+  (`.github/workflows/platforms.yml`), declared
+  `fn get[T](r: Result[T, Str]) -> T` around fallible built-ins that M34 made
+  `Result[T, IoError]`, and shared one listener between two `tasks.map`
+  workers. No Linux suite checks the file, so M34 did not notice.
+- **Impact:** the next Windows run would fail to compile the fixture, before
+  testing any platform behavior.
+- **Workaround:** none needed after the fix.
+- **Proposed improvement:** check (not run) every platform fixture on every
+  host, so a language change cannot leave one behind.
+- **Resolution:** the helpers take `E: Show` and `T without Copy`; the
+  listener accepts after the client connects, on one thread.
+  `build/vela check tests/fixtures/m26/windows_systems.vl` passes on Linux.
+- **Verify:** a Windows platform run (VAL-005) builds and runs the fixture.
+
+### TL-139: Unmemoized resource checks made checking the compiler five times slower
+
+- **Status:** resolved in M35 (2026-11-09).
+- **Discovery:** M35, `python3 run_tests.py --backend c m24_test` failing its
+  query gate (`summary` must take under 1 s on the compiler's source).
+- **Evidence (observed):** with the first `types.is_resource`, which walked
+  each type's fields afresh, `vela check compiler/src/main.vl` took 1.80 s
+  against 0.32 s before M35, and `vela query summary` 1.87 s against 0.37 s.
+  The compiler imports `sysio`, which turns resource checks on, and every
+  generic call checks its type arguments.
+- **Suspected cause, confirmed by the fix:** recursive types (`ast.Expr`
+  through `ast.ExprKind`) made each walk revisit the whole AST type graph.
+- **Resolution:** answers are memoized per check, and a negative answer
+  settles every type its walk visited. Check is back to 0.33 s and the m24
+  query gate passes.
+- **Verify:** `vela check compiler/src/main.vl` stays within a few percent
+  of the pre-M35 time; m24's query gate passes.
+
+### TL-140: No element can be moved out of an array of resources
+
+- **Status:** deferred (proposal; not authorized before 1.0).
+- **Discovery:** M35, implementing arrays of resources.
+- **Evidence (observed):** `let s = xs[0]` is E3249 for `xs: [net.Tcp]`, and
+  `lists.pop` keeps requiring Copy: its body moves an element out, which
+  E3249 rejects, and `std/lists.vl` is compiled by the bootstrap seed
+  (TL-136). Function types have no `take`, so a `tasks.map` worker can only
+  borrow its socket.
+- **Impact:** a program can push sockets into an array, borrow them, and hand
+  the array to `tasks.map`, but cannot take one back out to close it early
+  or give it away; the elements close when the array is dropped.
+- **Workaround:** keep resources in separate variables or struct fields, or
+  let the array's drop close them.
+- **Proposed improvement:** a built-in or intrinsic that moves an element
+  out (`lists.pop` with `[T without Copy]`), and `take` in function types.
+- **Verify:** `lists.pop` on `[net.Tcp]` returns a socket that can be closed;
+  a `tasks.map` worker declared `fn(s: take net.Tcp)` owns its socket.
 
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**

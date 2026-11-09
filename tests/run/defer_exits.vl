@@ -1,0 +1,135 @@
+// `defer` (M35): deferred code runs as its block exits, by every path,
+// latest first, and reads its variables as they are at the exit.
+// out: a0
+// out: a1
+// out: b2
+// out: b1
+// out: x is 2
+// out: 20
+// out: body 0
+// out: i 0
+// out: i 1
+// out: i 2
+// out: g done
+// out: Err("no")
+// out: g done
+// out: Ok(7)
+// out: parsed 5
+// out: parse done
+// out: missing
+// out: parse done
+// out: in arm
+// out: arm done
+// out: outer 1
+// out: inner
+// out: outer 0
+// out: early
+// out: cleanup 3
+// out: late
+// out: cleanup 3
+// out: loop in defer 2
+// out: 3
+// out: with a scoped closure 6
+import lists
+import text
+
+fn ending() -> Int {
+    let mut x = 1
+    defer print(f"x is {x}")
+    x = 2
+    return x * 10  // the value is taken before the deferred code runs
+}
+
+fn maybe(fail: Bool) -> Result[Int, Str] {
+    if fail { return Err("no") }
+    return Ok(7)
+}
+
+fn g(fail: Bool) -> Result[Int, Str] {
+    defer print("g done")
+    let v = maybe(fail)?
+    return Ok(v)
+}
+
+fn parse(s: Str) {
+    defer print("parse done")
+    let Some(n) = text.parse_int(s) else {
+        print("missing")
+        return
+    }
+    print(f"parsed {n}")
+}
+
+fn several(early: Bool) {
+    // The body declares a local, and is written at both exits.
+    defer {
+        let n = 3
+        print(f"cleanup {n}")
+    }
+    if early {
+        print("early")
+        return
+    }
+    print("late")
+}
+
+fn bump(n: mut Int) ensures n == 3 {
+    defer n += 1  // ensures sees the value after deferred code
+    n = 2
+}
+
+fn main() {
+    {
+        defer print("a1")
+        print("a0")
+    }
+    {
+        defer print("b1")
+        defer print("b2")
+    }
+    print(ending())
+    for i in 0..5 {
+        defer print(f"i {i}")
+        if i == 1 { continue }
+        if i == 2 { break }
+        print(f"body {i}")
+    }
+    print(g(true))
+    print(g(false))
+    parse("5")
+    parse("")
+    match 1 {
+        1 => {
+            defer print("arm done")
+            print("in arm")
+        }
+        _ => {}
+    }
+    {
+        defer {
+            defer print("outer 0")
+            print("inner")
+        }
+        defer print("outer 1")
+    }
+    several(true)
+    several(false)
+    {
+        defer {
+            let mut k = 0
+            for {
+                k += 1
+                if k == 2 { break }
+            }
+            print(f"loop in defer {k}")
+        }
+    }
+    let mut n = 0
+    bump(mut n)
+    print(n)
+    let mut total = 0
+    {
+        defer lists.each([1, 2, 3], fn(x: Int) { total += x })
+    }
+    print(f"with a scoped closure {total}")
+}

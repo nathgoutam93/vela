@@ -1,0 +1,23 @@
+// Deferred code runs as its block exits, so nothing in it may leave it (M35).
+// err: defer_leaves.vl:8:11: error: 'return' cannot leave deferred code; it runs as its block exits [E3253]
+// err: defer_leaves.vl:9:24: error: '?' cannot leave deferred code; match the value instead [E3253]
+// err: defer_leaves.vl:11:15: error: 'break' cannot leave deferred code; it runs as its block exits [E3253]
+// err: defer_leaves.vl:12:17: error: 'continue' cannot leave deferred code; it runs as its block exits [E3253]
+fn r() -> Result[Int, Str] { return Ok(1) }
+fn f() -> Result[Int, Str] {
+    defer return
+    defer { let x = r()? }
+    for i in 0..3 {
+        defer break
+        defer { continue }
+        defer {
+            for { break }  // its own loop may break
+        }
+    }
+    defer {
+        let g = fn() -> Int { return 1 }  // a function value may return
+        print(g())
+    }
+    return Ok(1)
+}
+fn main() { print(f()) }

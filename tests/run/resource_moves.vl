@@ -1,0 +1,94 @@
+// Resources (M35): a type `without Copy`, or one holding a resource, moves
+// instead of being copied. Plain parameters and receivers borrow, `take`
+// consumes, and deferred code may consume what its block owns.
+// out: opened 1
+// out: peek 1
+// out: bumped 2
+// out: closed 2
+// out: opened 3
+// out: closed 3
+// out: opened 4
+// out: some true
+// out: closed 4
+// out: opened 5
+// out: opened 6
+// out: sum 11
+// out: element 5
+// out: opened 7
+// out: label door
+// out: closed 7
+// out: opened 8
+// out: working 8
+// out: closed 8
+// out: opened 9
+// out: try 9
+// out: closed 9
+// out: 0
+// out: opened 10
+// out: opened 11
+// out: closed 10
+type Lock = struct { fd: Int } without Copy
+type Door = struct { lock: Lock, label: Str }
+
+fn open(fd: Int) -> Lock {
+    print(f"opened {fd}")
+    return Lock { fd: fd }
+}
+fn Lock.peek(l: Lock) -> Int { return l.fd }
+fn Lock.bump(l: mut Lock) { l.fd += 1 }
+fn Lock.close(l: take Lock) -> Int {
+    print(f"closed {l.fd}")
+    return l.fd
+}
+fn sum(xs: [Lock]) -> Int {
+    let mut total = 0
+    for l in xs { total += l.peek() }
+    return total
+}
+fn wrap[T without Copy](x: take T) -> Option[T] { return Some(x) }
+fn checked(fd: Int) -> Result[Lock, Str] {
+    if fd < 0 { return Err("negative") }
+    return Ok(open(fd))
+}
+fn tried(fd: Int) -> Result[Int, Str] {
+    let l = checked(fd)?
+    print(f"try {l.peek()}")
+    return Ok(l.close())
+}
+fn work(fd: Int) {
+    let l = open(fd)
+    defer l.close()  // consumes l as the function returns
+    print(f"working {l.peek()}")
+}
+
+fn main() {
+    let mut a = open(1)
+    print(f"peek {a.peek()}")
+    a.bump()
+    print(f"bumped {a.peek()}")
+    let b = a  // a moves to b
+    let _ = b.close()
+    a = open(3)  // a holds a new value
+    let _ = a.close()
+    let o = wrap(open(4))
+    print(f"some {o.is_some()}")
+    match o {
+        Some(l) => { let _ = l.close() }
+        None => {}
+    }
+    let mut xs: [Lock] = []
+    push(mut xs, open(5))
+    push(mut xs, open(6))
+    print(f"sum {sum(xs)}")
+    print(f"element {xs[0].peek()}")
+    for l in xs { let n = l.peek() }
+    let d = Door { lock: open(7), label: "door" }
+    print(f"label {d.label}")
+    let Door { lock, .. } = d  // takes the door apart: lock owns its value
+    let _ = lock.close()
+    work(8)
+    print(tried(9).unwrap_or(0) - 9)
+    let m = checked(10).unwrap_or(open(11))
+    let _ = m.close()
+}
+

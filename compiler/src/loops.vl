@@ -220,6 +220,7 @@ fn uses_stmt(u: mut Uses, st: ast.Stmt, in_closure: Bool) {
             uses_arms(mut u, arms, in_closure)
         }
         ast.StmtKind.Unsafe(b) => uses_block(mut u, b, in_closure)
+        ast.StmtKind.Defer(b) => uses_block(mut u, b, in_closure)
         ast.StmtKind.With(items, b) => {
             for w in items {
                 uses_expr(mut u, w.value, in_closure)

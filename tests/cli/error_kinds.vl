@@ -10,7 +10,7 @@ import processes
 
 fn main() {}
 
-fn kind_of[T](r: Result[T, IoError]) -> IoKind {
+fn kind_of[T without Copy](r: Result[T, IoError]) -> IoKind {
     return match r { Ok(_) => IoKind.Other, Err(e) => e.kind }
 }
 

@@ -1,0 +1,69 @@
+// Sockets are resources (M35): an effect fake still intercepts one that is
+// moved into a struct, borrowed, copied into through io.copy, closed by a
+// defer, or handed to a worker by tasks.map.
+// command: test
+// out: PASS  resource_fakes.vl: test "a fake socket moves, borrows and closes"
+// out: PASS  resource_fakes.vl: test "tasks take an array of sockets"
+// out: 2 tests: 2 passed, 0 failed
+import io
+import net
+import tasks
+
+type Conn = struct { tcp: net.Tcp, label: Str }
+
+fn get[T without Copy, E](r: take Result[T, E]) -> T {
+    match r { Ok(v) => return v, Err(_) => { assert(false); for {} } }
+}
+
+fn open(host: Str) -> Result[Conn, IoError] uses net {
+    let tcp = net.connect(host, 80)?
+    return Ok(Conn { tcp: tcp, label: host })
+}
+
+// A plain parameter borrows: the caller keeps the connection.
+fn exchange(c: Conn, data: Str) -> Result[Str, IoError] uses net {
+    c.tcp.write(data)?
+    return c.tcp.read(len(data))
+}
+
+fn finish(c: take Conn) -> Result[Unit, IoError] uses net {
+    return match c { Conn { tcp, .. } => tcp.close() }
+}
+
+fn copy_through(host: Str) -> Result[Int, IoError] uses net {
+    let mut socket = io.socket(net.connect(host, 80)?)
+    defer { let _ = socket.close() }
+    let mut source = io.reader("ping")
+    return io.copy(mut source, mut socket, 100)
+}
+
+fn main() {}
+
+test "a fake socket moves, borrows and closes" {
+    with net = [net.reply("a", 80, "ping", "pong"), net.reply("b", 80, "ping", "")] {
+        let c = get(open("a"))
+        assert(c.label == "a")
+        assert(get(exchange(c, "ping")) == "pong")
+        assert(finish(c).is_ok())
+        assert(get(copy_through("b")) == 4)
+    }
+}
+
+test "tasks take an array of sockets" {
+    with net = [net.reply("x", 80, "hi", "one"), net.reply("y", 80, "hi", "two")] {
+        let mut sockets: [net.Tcp] = []
+        push(mut sockets, get(net.connect("x", 80)))
+        push(mut sockets, get(net.connect("y", 80)))
+        let mut open = 0
+        for s in sockets {
+            if s.timeout(1000).is_ok() { open += 1 }
+        }
+        assert(open == 2)
+        // The array moves to tasks.map; each worker borrows one socket.
+        let replies = tasks.map(sockets, fn(s: net.Tcp) -> Str {
+            let _ = get(s.write("hi"))
+            return get(s.read(3))
+        })
+        assert(replies == ["one", "two"])
+    }
+}

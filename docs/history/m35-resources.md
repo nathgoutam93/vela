@@ -1,13 +1,10 @@
 # M35: Resources
 
-**Status:** design under review. Implementation has not started. The
-[2026-11-07 decision](../design-baseline-to-1.0.md) requires this milestone's
-move, consumption and drop rules to be written and reviewed before
-implementation. The review may end with `defer` alone if the non-copyable
-design cannot meet the value-semantics and fakes requirements. This record
-opens that review. The maintainer still has to settle the
-[decisions](#decisions-for-the-maintainer) below; until then the rules are
-proposals.
+**Status:** implemented. The design was recorded and reviewed before
+implementation, as the [2026-11-07 decision](../design-baseline-to-1.0.md)
+requires; the maintainer accepted every recommendation on 2026-11-09 (see
+[decisions](#decisions-for-the-maintainer)), and [how it was
+built](#how-it-was-built) records what changed.
 
 M35 delivers
 [LP-008](../language-proposals-after-m30.md#lp-008-resource-handles-alias-under-value-semantics):
@@ -87,8 +84,9 @@ coupled.
 
 ## Decisions for the maintainer
 
-Each decision has a recommendation. The rules below assume all the
-recommendations are accepted.
+Recorded on 2026-11-09 with the maintainer: **every recommendation below is
+accepted** (D1-D9, with the spellings `take` and `defer`). The rules below are
+the accepted rules.
 
 | # | Question | Recommendation | Alternative |
 | --- | --- | --- | --- |
@@ -107,7 +105,9 @@ word, recognized only before a parameter's type. It cannot be a full
 keyword, because `lists.take` exists. `defer` becomes a keyword; no `.vl`
 file in the repository uses it as a name.
 
-## Proposed rules
+## The rules
+
+As designed, with the changes recorded [during implementation](#changes-from-the-design).
 
 ### Resource types
 
@@ -172,14 +172,14 @@ the caller's place, with the existing overlap rule E3144. `io.Socket.read`
 and `io.copy` already take `mut`, so they work unchanged.
 
 Trying to move out of a borrowed binding is **E3248**. Its fix depends on
-where the binding came from: declare the parameter `take`, iterate by
-`lists.pop`, and so on.
+where the binding came from: declare the parameter `take`, and so on.
 
 `match` on an owned local moves the whole local only if some arm moves a
 binding out of it. Otherwise the match borrows. Moving one field out of a
 resource (`let t = s.connection`), or one element out of an array
 (`let s = xs[0]`), is **E3249**. To take fields apart, destructure the whole
-value with a struct pattern; to take an element, use `lists.pop`.
+value with a struct pattern; an element cannot be taken out of an array
+(see the [changes](#changes-from-the-design)).
 
 ### Consuming parameters
 
@@ -207,8 +207,8 @@ does today.
 enclosing block exits, by any path: the end of the block, `return`,
 `break`, `continue`, `?`, or the exit of a `let ... else`. Rules:
 
-- Deferred code runs in reverse order of registration, and interleaves with
-  the drops of that block's locals in reverse declaration order.
+- Deferred code runs in reverse order of registration, before any of the
+  block's values are dropped. Ensures clauses check the values after it.
 - `return e` evaluates `e` before deferred code runs.
 - Deferred code reads bindings as they are at exit time. It does not
   snapshot them when the `defer` is written.
@@ -245,13 +245,13 @@ fn fetch(host: Str) -> Result[Str, IoError] uses net {
   may borrow captured resources and use them through `mut`, but may not move
   them.
 - **`tasks.map(xs, f)` and `tasks.each(xs, f)`** over a `[T]` of resources
-  consume `xs`, which must be owned. Each element moves to its worker. `f`'s
-  parameter is either `take T`, in which case the worker owns the element,
-  or plain, in which case the element is dropped after `f` returns. `f`
-  still may not capture resources.
+  consume `xs`, which must be owned. Each worker borrows its element, and
+  the elements are dropped after the join. `f` may borrow the resources it
+  captures, since the workers finish before the call returns.
 - **Prelude methods.** The Option and Result methods that move their payload
-  (`unwrap_or`, `map`, `and_then`, `map_err`, `ok_or`) become `take` and
-  `without Copy`, as do `lists.pop` and `io.copy`. Other std generics keep
+  (`unwrap_or`, `map`, `and_then`, `map_err`, `ok_or`) and `hid_convert`,
+  which `?` calls, become `take` and `without Copy`, and `io.copy` accepts
+  resources. Other std generics keep
   requiring Copy, and that can be relaxed in 1.x without breaking anything.
 
 ### Effects and fakes
@@ -271,7 +271,6 @@ both with a fake socket that is moved into a struct, borrowed through
   `fn Socket.close(s: take Socket)`, and
   `copy[R: Reader without Copy, W: Writer without Copy]`.
 - `std/http.vl`: `get_limit` uses `defer` instead of its three manual closes.
-- `std/lists.vl`: `pop[T without Copy](xs: mut [T]) -> Option[T]`.
 - Prelude: the Option and Result methods listed above.
 - Guide: replace "Socket copies alias; close rejects new calls; final
   release closes" with the move, borrow, `take` and `defer` rules. Also fix
@@ -308,22 +307,23 @@ expects. Known effects:
 - **`defer` as a keyword** breaks any program that used `defer` as a name.
   None in the repository does.
 
-## Proposed diagnostics
+## Diagnostics
 
-These codes are provisional; the next free code in the E3 range is E3247.
+As proposed, with E3252 narrowed to maps and fixed arrays (function types may
+have resource parameters, which borrow).
 
 | Code | Meaning |
 | --- | --- |
 | E3247 | Use of a value that may have been moved or closed. Names the move. |
 | E3248 | Moving out of a borrowed binding. Suggests `take`. |
-| E3249 | Moving a field or element out of a resource. Suggests a pattern or `lists.pop`. |
+| E3249 | Moving a field or element out of a resource. Suggests borrowing, or a match on the whole value. |
 | E3250 | An escaping closure or task function captures a resource. |
 | E3251 | A resource passed for a type parameter that requires Copy. Suggests `without Copy` at the definition. |
 | E3252 | A resource as a map key or value, fixed-array element, view or slot. |
 | E3253 | Deferred code leaves itself (`return`, `?`, `break`, `continue`). |
 | E3254 | A binding moved after a `defer` that mentions it. |
 
-## Implementation plan
+## Implementation plan (as designed)
 
 1. **Parser and AST:** add `defer` (statement or block); `take` before a
    parameter's type or a function-type parameter; and `without Copy` on
@@ -343,6 +343,138 @@ These codes are provisional; the next free code in the E3 range is E3247.
 5. **Spec, guide, `vela explain`, editor metadata (TL-009) and conformance
    mappings.**
 
+## How it was built
+
+### `defer`
+
+`defer` is a contextual word, like `unsafe`: `defer` followed by a block, a
+name, `return`, `break` or `continue` starts the statement
+(`parser.statement`), and a simple statement is wrapped in a block. The
+keyword list, frozen in the M30 manifest, is unchanged, and `defer` stays
+usable as a name. The AST gains `StmtKind.Defer(Block)`.
+
+The checker (`StmtKind.Defer` in `checker.stmt`) checks the body with the
+loop stack emptied and `defer_depth` raised: `return`, `?` and a `break`
+or `continue` with no loop of the body's own are E3253; a function value in
+the body resets the depth. A local that deferred code changes is marked
+escaped, so no range fact about it is trusted (`place`, and a scoped
+closure's writes); `ranges.walk_stmt` walks the body knowing nothing about
+the locals. Contract verification treats `defer` as unsupported.
+
+Each back end registers the body as a frame item in the innermost scope
+frame (`codegen.vl` `defer_item`, `lower.vl` likewise) and writes it at
+every exit that releases that frame: `defer_until` runs the deferred code
+of the frames being left, innermost first, then `release_only_until`
+releases their values. Returns and `?` run deferred code, then the ensures
+clauses, then the releases; falling off a function's end does the same.
+Deferred code therefore runs before any of its block's values are dropped,
+and ensures clauses see the values after it. The body is written once per
+exit, each time a block of its own.
+
+### Resource types
+
+`types.is_resource` decides from the type table: `sysio.Handle`, a
+declaration or type parameter whose `without` lists Copy, and any struct,
+enum, array, map, Option or Result reaching one. `Table.resources` is set
+when `sysio.Handle` is named or something is declared `without Copy`;
+until then the answer is no at once. Answers are memoized per check, and a
+negative answer settles every type the walk visited, cycles included (see
+[TL-139](../tooling-backlog.md#tl-139-unmemoized-resource-checks-made-checking-the-compiler-five-times-slower)).
+`ast.Param.take` and `ast.TypeParam.movable` carry the new syntax; a type
+parameter's `without Copy` is kept in its type's `without`, not among its
+interface bounds.
+
+E3251 is checked with the other bounds (`check_bounds`), for every type
+argument of a function call or a type instance. E3252 is checked when a map
+or fixed-array type is resolved, after every declaration is known. E3250 is
+checked as a function value's body ends. A resource declared `without Copy`
+derives nothing.
+
+### Moves and borrows
+
+`checker.moves` runs after a function body is typed, when any of its
+locals has a resource type, so most functions, the compiler's included,
+skip it. It follows every path, as the design describes: owned locals that
+may have moved, joined at every merge; loops walked twice, quietly the first
+time, so a value moved by an earlier iteration is reported where a later one
+reads it; break and continue states carried to the loop's exit and head with
+the deferred moves of the blocks they leave; a match moving its owned
+scrutinee when an arm moves a binding; `let Pattern = value` taking each
+name out of its hidden copy; closure bodies with their captures and
+parameters borrowed. Calls move into `take` parameters (method receivers
+included), variant payloads, `push`'s element and `tasks.map`/`each`'s array.
+
+The back ends do not change for moves or `take`: a move compiles as the copy
+it always was, a retain, and the checker guarantees the source is not read
+again; a `take` parameter is borrowed like any parameter (M11b) and retained
+only when stored.
+
+### The standard library and the prelude
+
+- `std/net.vl`: `close` on Tcp, Listener and Udp takes `take`.
+- `std/io.vl`: `socket(connection: take net.Tcp)`, a new
+  `Socket.close(s: take Socket)`, and
+  `copy[R: Reader without Copy, W: Writer without Copy]`.
+- `std/http.vl`: the response stream owns the socket; `get_limit` closes it
+  with `defer { let _ = s.close() }` on every path instead of three manual
+  closes.
+- Prelude: `hid_convert` (what `?` calls to convert an error) and the
+  Option and Result methods take their value with `take` and accept
+  resources (`[T without Copy]`).
+
+None of these modules is compiled by the bootstrap seed, so one seed update
+suffices (TL-136 did not apply).
+
+### Corpus revision
+
+`fakes.vl` unwrapped `net.connect` with a plain generic helper, which
+E3251 now rejects:
+
+| File | Old SHA-256 | New SHA-256 | Change |
+| --- | --- | --- | --- |
+| `fakes.vl` | `6fa4a95625330b296562e480f80ad4226ba2b5e659864e005f0a7cf2664de42f` | `6410dcfb9a7457f0a424fcfc70dbc1fe7b94d489ebb13c0c254adc45c5334383` | `fn get[T, E](value: Result[T, E])` became `fn get[T without Copy, E](value: take Result[T, E])` |
+
+The rule that changed is that a socket is a resource. The program keeps its
+expected outcome (exit 0, `fakes ok`). The old bytes are kept as
+`tests/fixtures/m30/migrated/fakes.m34.vl`, beside M34's `fakes.m30.vl`.
+
+### Tests, examples and the benchmark
+
+- `tests/m23_test.py`: the shared helpers take `T without Copy`. The case
+  that copied a socket into an array and read it from two tasks, and the
+  one returning a copy through `tasks_copy`, now move the socket; uses after
+  `close`, which were runtime errors, are compile errors covered by
+  `tests/fail/resource_moves.vl`. The full-duplex case (TL-022), two workers
+  sharing one socket, is unchanged: a `tasks.map` closure borrows.
+- `tests/m24_test.py`, `tests/cli/error_kinds.vl`,
+  `tests/fail/uses_type_param.vl`: helpers and parameters gain
+  `without Copy` or `take`; `tests/fail/without_unknown.vl`'s message
+  lists Copy.
+- `tests/fixtures/m26/windows_systems.vl` was already stale after M34 and
+  is fixed ([TL-138](../tooling-backlog.md#tl-138-the-windows-systems-fixture-was-not-updated-for-typed-errors)).
+- `bench/real/tcp_echo/main.vl`: a worker no longer closes the socket it
+  borrows; the sockets close as `run` returns, after the join. The client
+  does not wait for the server to close, so the workload is unchanged.
+- `examples/tcp_echo.vl` and `examples/http_fetch.vl` compile unchanged.
+
+### Changes from the design
+
+- **`defer` is a contextual word,** not a keyword, so the frozen keyword list
+  and every program using `defer` as a name are unaffected.
+- **Deferred code runs before the block's drops,** not interleaved with
+  them, and **ensures clauses check the values after deferred code**.
+- **`tasks.map`/`tasks.each` closures may borrow captured resources.** The
+  design forbade it, but the workers are joined before the call returns,
+  and TL-022's full-duplex test needs two workers sharing one socket.
+- **No element can be taken out of an array of resources.** `lists.pop`
+  would move an element, which its body cannot do under E3249, and
+  `std/lists.vl` is compiled by the seed (TL-136). Arrays of resources
+  support push, borrowing by index and `for`, and `tasks.map`/`each`
+  ([TL-140](../tooling-backlog.md#tl-140-no-element-can-be-moved-out-of-an-array-of-resources)).
+- **Function types carry no `take`:** a function value's parameters borrow,
+  so a `tasks.map` worker borrows its element, which is dropped after the
+  join (TL-140 records the proposal).
+
 ## Acceptance
 
 From the roadmap: use after move or close is a compile error; every exit path
@@ -352,26 +484,57 @@ applies: both fixed points, both suites, differential agreement, unchanged
 performance gates, specification, guide, explanations and conformance
 mappings.
 
-Planned fixtures:
+Fixtures added (each runs on the C and native back ends):
 
-- `tests/run/resource_moves.vl`: moves through `let`, return, fields, `take`,
-  Option and Result, `?`, and reassignment.
-- `tests/run/resource_borrows.vl`: plain parameters, receivers, `for`, and
-  `match` on a local.
 - `tests/run/defer_exits.vl`: every exit kind (end of block, return, break,
-  continue, `?`, let-else, a match arm), LIFO order, a `defer` in a loop,
-  deferred code that declares locals, and a nested `defer`.
-- `tests/run/resource_arrays.vl`: push, index borrow, `for`, and
-  `lists.pop`.
-- `tests/cli/resource_fakes.vl`: a fake socket moved, copied through
-  `io.copy`, closed by `defer`, and its rows consumed.
-- One `tests/fail/` file per new code, and one for each copy route in
-  "no copy aliases another": `let`, a Copy generic, an escaping capture, a
-  field, an element, a returned borrow, and a task capture.
-- **Exactly once:** run `python3 run_tests.py --sanitize` over the defer and
-  moves fixtures. Sanitizers instrument the C build only (VAL-001); the
-  native build's drops are covered by TL-099 differential agreement over
-  the same fixtures.
+  continue, `?`, let-else, a match arm), reverse order, a `defer` in a
+  loop, deferred code that declares locals and is written at two exits, a
+  nested `defer`, a loop inside deferred code, a scoped closure in it, and
+  an ensures clause seeing the value after deferred code.
+- `tests/run/resource_moves.vl`: moves through `let`, assignment,
+  reassignment, `take`, fields, Option, Result and `?`; borrowing through
+  plain and `mut` receivers, arrays, `for` and indexing; a let-pattern
+  taking a struct apart; a generic `[T without Copy]`; `defer` consuming a
+  value; prelude methods on resources.
+- `tests/cli/resource_fakes.vl`: a fake socket moved into a struct, borrowed,
+  consumed by a match, written through `io.copy` and closed by `defer`; an
+  array of fake sockets given to `tasks.map`.
+- `tests/fail/resource_moves.vl` (E3247 on each move route, on one path,
+  and by an earlier iteration), `tests/fail/resource_borrows.vl` (E3248 for
+  each kind of borrow, E3249 for a field and an element),
+  `tests/fail/resource_rules.vl` (E3250, E3251, E3252, E3254, and use after
+  move in generic code), `tests/fail/defer_leaves.vl` (E3253).
+
+## Validation
+
+Linux x86-64, 2026-11-09, branch `claude/confident-pascal-mu94ur` on `20baaab`:
+
+- `sh compiler/bootstrap/bootstrap.sh --update`: generations 2 and 3 write
+  identical C (195,155 lines); the seed is updated. One update sufficed: the
+  compiler itself uses none of the new syntax, and no module it compiles
+  changed signature.
+- `sh compiler/bootstrap/bootstrap.sh --native`: natives 1 and 2 write
+  identical assembly (1,954,622 lines).
+- `python3 run_tests.py --backend c --jobs 4` and `python3 run_tests.py
+  --jobs 4` (native): 452 of 453 passed each; the failure was
+  `tests/m23_test.py` asserting the old `io.copy` signature in
+  `vela guide --all`. After updating that assertion, `m23_test` passes on
+  both back ends. The suites include the m24 query gate, the m29 scale and
+  real-program gates, the m30 corpus and documents, and the guide budget.
+- `python3 tests/differential_test.py --count 300 --jobs 4`: 600 of 600
+  programs agree (C and native, optimization on and off).
+- `python3 run_tests.py --sanitize --backend c --jobs 4 defer resource
+  uses_type_param error_kinds`: 9 of 9 passed under ASan and UBSan with
+  leak checks: every exit path in `defer_exits.vl` and every move in
+  `resource_moves.vl` and `resource_fakes.vl` releases each value once.
+  Sanitizers instrument the C build only (VAL-001); the native build's
+  drops are covered by the same fixtures agreeing on both back ends.
+- `vela check compiler/src/main.vl`: 0.35-0.38 s, against 0.32-0.34 s before
+  M35 on the same host (see TL-139 for the regression found and fixed on the
+  way). `vela guide` is 21,560 bytes (limit 32,000).
+
+Not run: macOS, Windows, `--tsan`, the benchmark comparisons with other
+languages (`bench/network_compare.py`), and agent trials.
 
 ## Review risks
 
@@ -388,6 +551,16 @@ Planned fixtures:
 ## Tooling discoveries
 
 - [TL-137](../tooling-backlog.md#tl-137-the-guide-still-says-interface-methods-have-no-mutable-parameters):
-  the guide's interface paragraph contradicts M34's `mut Self`. Found while
-  reading the guide's handle text for this review. The fix is scheduled with
-  M35's guide changes.
+  the guide's interface paragraph contradicted M34's `mut Self`. Found during
+  the design review; resolved with M35's guide changes.
+- [TL-138](../tooling-backlog.md#tl-138-the-windows-systems-fixture-was-not-updated-for-typed-errors):
+  the Windows-only systems fixture was stale since M34; fixed and checked on
+  Linux, with Windows execution left to VAL-005.
+- [TL-139](../tooling-backlog.md#tl-139-unmemoized-resource-checks-made-checking-the-compiler-five-times-slower):
+  the first resource check made checking the compiler 5x slower; memoized,
+  resolved.
+- [TL-140](../tooling-backlog.md#tl-140-no-element-can-be-moved-out-of-an-array-of-resources):
+  no element can be moved out of an array of resources, and function types
+  have no `take`; deferred.
+- [TL-136](../tooling-backlog.md#tl-136-changing-a-std-api-the-compiler-imports-needs-two-seed-updates)
+  did not recur: no module the seed compiles changed.

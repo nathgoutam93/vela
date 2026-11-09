@@ -170,7 +170,8 @@ growable and fixed arrays. Annotate ambiguity rather than relying on an
 unconstrained `Ok`, `None`, `[]` or `[:]` to choose a type.
 
 Assignment, arguments, returns and captures have logical value-copy semantics.
-Changing one safe value must not change a prior copy. Strings are immutable;
+Changing one safe value must not change a prior copy. Resources (see
+[resources](#resources)) are the exception: they move instead of being copied. Strings are immutable;
 arrays/maps/managed aggregates may share storage until mutation. Reference
 counting, copy-on-write, inlining, boxing and borrowing optimizations must
 preserve this behavior. Storage addresses, reference counts and exact
@@ -214,6 +215,58 @@ visible in its lexical scope; inner scopes may shadow outer names. Repeated
 immutable `let _ = call()` acknowledges intentional discard without creating
 a useful local name. A discarded Result-returning call otherwise warns with
 E7009; it does not change runtime behavior or cause an automatic fix.
+
+### Resources
+
+A type is Copy unless it is a **resource**: `sysio.Handle` (so the socket
+types `net.Tcp`, `net.Listener`, `net.Udp` and `io.Socket`), a struct or
+enum declared `without Copy`, a struct or enum with a resource field or
+variant payload, and `[T]`, Option or Result of a resource. A resource is never
+copied, so no two values share one: it **moves**. A `let`, an assignment, a
+struct field, a variant payload, an array element, `push`, a `return`, the
+value of a block or match, `?`, and an argument for a `take` parameter move
+the value out of an owned variable, which then holds no value until it is
+assigned again. Owned variables are `let` and `let mut` locals, `take`
+parameters, and the bindings of a pattern matched against an owned value or
+a temporary. Reading a variable that may have moved, on any path, including
+an earlier loop iteration, is E3247; `close` consumes its receiver, so use
+after close is the same error. Every other use **borrows**: plain and `mut`
+parameters and receivers, `for` loop variables, the captures and parameters
+of a function value, and the bindings of a borrowed value may be read and
+passed to plain parameters, but moving one is E3248. A field or element of
+a resource does not move alone (E3249); a match moves its owned scrutinee when an
+arm moves one of its bindings, and `let Pattern { field, .. } = value`
+takes the value apart. A variable that `defer` code mentions cannot move
+before its block ends (E3254).
+
+A parameter `x: take T` (also a receiver: `fn Tcp.close(s: take Tcp)`) owns
+its argument, which the call moves in; it is not written at the call. `take`
+on a Copy type changes nothing. A resource that is not consumed is dropped,
+at the latest once no variable that held it is in scope; dropping a socket
+closes it and ignores any error. Exact drop timing is not otherwise
+observable; call `close`, or close in `defer`, to close at a known point and
+see the error. Panics and `os.exit` run no defer code and drop nothing.
+
+A type parameter accepts a resource only when declared `[T without Copy]`
+(`[R: io.Reader without Copy]` with bounds); its body then treats T as a
+resource. Any other is E3251. Maps and fixed arrays cannot hold resources
+(E3252). A function value whose captures would include a resource is E3250,
+unless it is written as the argument for a scoped parameter or for
+`tasks.map`/`tasks.each`, whose calls finish before returning: then it
+borrows them. Resources derive none of Eq, Ord, Key and Show unless their
+fields do; one declared `without Copy` derives none.
+
+```vela
+type Lock = struct { fd: Int } without Copy
+fn Lock.fd_of(l: Lock) -> Int { return l.fd }
+fn Lock.release(l: take Lock) -> Int { return l.fd }
+fn main() {
+    let a = Lock { fd: 3 }
+    let b = a  // a moves to b; reading a now is E3247
+    assert(b.fd_of() == 3)
+    assert(b.release() == 3)
+}
+```
 
 ## Expressions and operators
 
@@ -326,7 +379,8 @@ locals themselves, not copies, while the call it was passed to runs;
 closures nested in such a closure may do the same when they are scoped
 arguments too. Any other closure that changes a capture is E3060. In the
 call, no other argument may change or capture a local such a closure
-changes (E3144). `tasks.map` and `tasks.each` take ordinary parameters.
+changes (E3144). `tasks.map` and `tasks.each` take ordinary parameters; a
+closure written as their function may borrow captured resources.
 
 Generic declarations use `[T, U]` or bounds `[T: Eq + Key]`. Calls infer type
 arguments from arguments and the expected result; explicit type arguments
@@ -390,6 +444,7 @@ A struct or enum meets Eq, Ord, Key and Show without writing a method when:
   the closing brace on the same line. `without Eq`
   also leaves out Ord and Key, which extend Eq; listing an interface whose
   method the module defines is E3244, and a malformed list is E2033;
+- it is not declared `without Copy` (M35): such a resource derives none;
 - for Ord and Key, Eq is derived too: a type that defines its own `eq` must
   define `compare` and `hash` itself;
 - every field and variant payload meets the interface. A type reached again
@@ -451,8 +506,31 @@ iteration. `for i in a..b { ... }` evaluates bounds and iterates with b
 excluded. There is no inclusive loop-range syntax. `for x in iterable`
 visits array/string elements. `break` exits the innermost loop and `continue`
 starts its next iteration; both require an enclosing loop. `return expression`
-returns a value and `return` exits a no-result function. There is no defer,
+returns a value and `return` exits a no-result function. There is no
 exception catch, labeled break or async/await syntax.
+
+`defer STATEMENT` or `defer { ... }` registers code that runs when the
+enclosing block exits, by any path: its end, `return`, `break`, `continue`,
+`?`, or a `let ... else` that leaves. Deferred code runs in reverse order of
+registration, before the block's values are dropped; in a loop body it runs
+at the end of each iteration. It reads variables as they are at the exit:
+`return e` evaluates `e` first, and ensures clauses check the values after
+deferred code. Deferred code may not leave itself: `return`, `?`, and a
+`break` or `continue` of a loop outside it are E3253; its own loops and
+function values may. Its effects count toward the function's, and a
+discarded Result in it warns (E7009). `defer` is a contextual word: a
+statement starting `defer` followed by a block or a statement.
+
+```vela
+fn main() {
+    let mut log = ""
+    {
+        defer log = log + "closed"
+        log = log + "opened "
+    }
+    assert(log == "opened closed")
+}
+```
 
 `match expression { PATTERN => VALUE, ... }` produces a value when all arms
 agree in type; statement matches may use a block or simple statement per arm.
@@ -565,7 +643,9 @@ failure is not a Result unless an API specifically returns one.
 
 `tasks.map(xs, f)` joins worker calls and returns results in input order;
 `tasks.each(xs, f)` joins and returns nothing. They inherit f's effects.
-Captures are value snapshots. Worker scheduling and effect interleaving are
+Captures are value snapshots, except that resources are borrowed. An array of
+resources moves into the call: each worker borrows its element, and the
+elements are dropped after the join. Worker scheduling and effect interleaving are
 not ordered; mutable shared captures are unavailable. VELA_THREADS selects
 the worker count, not language semantics. WASI executes tasks sequentially.
 There is no promised worker identity, shared-state memory model or async API.

@@ -105,6 +105,7 @@ type Fn = struct {
     closure_result: Int  // -2 outside a closure
     closures: Int
     frames: [Frame]
+    deferred: [ast.Block]  // defer statements' bodies, by their frame item's saved index (M35)
     dead: Bool  // right after a return, break or continue
     observe: Bool
     sret: Int  // the register with where the result goes, when it is in memory; -1 otherwise
@@ -141,7 +142,7 @@ type Low = struct {
 fn new_fn(name: Str, result: Int) -> Fn {
     return Fn {
         f: ir.new_func(name, result), filename: "", current_fn: -1, params: [], args: [], cname: name, locals: [:],
-        captures: [:], closure_result: -2, closures: 0, frames: [], dead: false, observe: false, sret: -1, taken: [:], env: ranges.new_env([]), hoisted: [:], cached: [:],
+        captures: [:], closure_result: -2, closures: 0, frames: [], deferred: [], dead: false, observe: false, sret: -1, taken: [:], env: ranges.new_env([]), hoisted: [:], cached: [:],
         fuse: [], fused: [],
     }
 }
@@ -777,7 +778,27 @@ fn pop_frame(g: mut Low) {
     let frame = g.fs.frames[len(g.fs.frames) - 1]
     g.fs.frames = g.fs.frames[0..len(g.fs.frames) - 1]
     if !g.fs.dead {
+        defer_frame(mut g, frame)
         release_frame(mut g, frame)
+    }
+}
+
+// The marker in Item.ty for deferred code, whose body is
+// g.fs.deferred[saved] (M35), as in codegen.vl.
+fn defer_item() -> Int {
+    return -4
+}
+
+// Run a frame's deferred code, latest first, before its values are released.
+fn defer_frame(g: mut Low, frame: Frame) {
+    let mut i = len(frame.items) - 1
+    for i >= 0 {
+        let item = frame.items[i]
+        if item.ty == defer_item() {
+            block(mut g, g.fs.deferred[item.saved], "block")
+            g.fs.dead = false  // the checker allows no exit from deferred code
+        }
+        i = i - 1
     }
 }
 
@@ -785,7 +806,9 @@ fn release_frame(g: mut Low, frame: Frame) {
     let mut i = len(frame.items) - 1
     for i >= 0 {
         let item = frame.items[i]
-        if item.restore != "" {
+        if item.ty == defer_item() {
+            // run by defer_frame
+        } else if item.restore != "" {
             ccall(mut g, "vela_fake_" + item.restore + "_restore", [item.saved], [ir.KIND_INT()], ir.RET_NONE(), -1)
         } else {
             release(mut g, item.ty, item.v)
@@ -910,6 +933,26 @@ fn declare(g: mut Low, id: Int, v: Val) -> Val {
 // Release every frame up to and including the innermost one of kind
 // `stop` (for break and continue), or every frame ("", for return).
 fn release_until(g: mut Low, stop: Str) {
+    defer_until(mut g, stop)
+    release_only_until(mut g, stop)
+}
+
+// Run the deferred code of every frame `release_until(stop)` leaves,
+// innermost first.
+fn defer_until(g: mut Low, stop: Str) {
+    let mut f = len(g.fs.frames) - 1
+    for f >= 0 {
+        let frame = g.fs.frames[f]
+        defer_frame(mut g, frame)
+        if frame.kind == stop {
+            break
+        }
+        f = f - 1
+    }
+}
+
+// release_until, after defer_until has run the deferred code.
+fn release_only_until(g: mut Low, stop: Str) {
     let mut f = len(g.fs.frames) - 1
     for f >= 0 {
         let frame = g.fs.frames[f]
@@ -1418,6 +1461,7 @@ fn taken_in_stmt(g: Low, s: ast.Stmt, out: mut Map[Int, Bool]) {
             taken_in_arms(g, arms, mut out)
         }
         ast.StmtKind.Unsafe(body) => taken_in_block(g, body, mut out)
+        ast.StmtKind.Defer(body) => taken_in_block(g, body, mut out)
         ast.StmtKind.With(items, body) => {
             for w in items {
                 match w.value.kind {
@@ -1596,9 +1640,15 @@ fn function(g: mut Low, id: Int, params: [Int], args: [Int], name: Str) {
         stmt(mut g, s)
     }
     if !g.fs.dead && f.result == types.NOTHING() {
+        // Falling off the end: deferred code, then ensures, then releases.
+        defer_until(mut g, "")
         ensures_code(mut g, no_value())
+        let frame = g.fs.frames[len(g.fs.frames) - 1]
+        g.fs.frames = g.fs.frames[0..len(g.fs.frames) - 1]
+        release_frame(mut g, frame)
+    } else {
+        pop_frame(mut g)
     }
-    pop_frame(mut g)
     end_function(mut g, rt)
     finish(mut g)
 }
@@ -1811,8 +1861,9 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
         ast.StmtKind.Return(v) => {
             match v {
                 None => {
+                    defer_until(mut g, "")
                     ensures_code(mut g, no_value())
-                    release_until(mut g, "")
+                    release_only_until(mut g, "")
                     ret(mut g, -1)
                 }
                 Some(e) => {
@@ -1825,13 +1876,15 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
                     if in_memory(g, t) {
                         put(mut g, g.fs.sret, 0, t, c)
                         let result = mem_val(g.fs.sret, 0, t)
+                        defer_until(mut g, "")
                         ensures_code(mut g, result)
-                        release_until(mut g, "")
+                        release_only_until(mut g, "")
                         ret(mut g, -1)
                     } else {
                         let result = fresh(mut g, c)
+                        defer_until(mut g, "")
                         ensures_code(mut g, result)
-                        release_until(mut g, "")
+                        release_only_until(mut g, "")
                         ret(mut g, result.reg)
                     }
                 }
@@ -1846,6 +1899,15 @@ fn stmt_body(g: mut Low, s: ast.Stmt) {
         }
         ast.StmtKind.Unsafe(body) => block(mut g, body, "block")
         ast.StmtKind.With(items, body) => with_code(mut g, items, body)
+        ast.StmtKind.Defer(body) => {
+            // Registered in the innermost scope; lowered where it exits.
+            let mut f = len(g.fs.frames) - 1
+            for !is_scope(g.fs.frames[f].kind) {
+                f = f - 1
+            }
+            push(mut g.fs.frames[f].items, Item { v: no_value(), ty: defer_item(), restore: "<defer>", saved: len(g.fs.deferred) })
+            push(mut g.fs.deferred, body)
+        }
         ast.StmtKind.Block(_) => {}  // handled in stmt
     }
 }
@@ -3321,8 +3383,9 @@ fn try_value(g: mut Low, e: ast.Expr, written: ast.Expr) -> Val {
         retain(mut g, ti.args[1], err)
         put_payload(mut g, out, result, fi, 0, err)
     }
+    defer_until(mut g, "")
     ensures_code(mut g, out)
-    release_until(mut g, "")
+    release_only_until(mut g, "")
     ret(mut g, -1)
     place_label(mut g, go_on)
     return payload(mut g, v, t, types.variant_index(g.k.table, t, ok), 0)

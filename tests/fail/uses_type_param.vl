@@ -2,7 +2,7 @@
 import io
 import net
 
-fn send(c: net.Tcp, text: Str) -> Result[Int, IoError] {
+fn send(c: take net.Tcp, text: Str) -> Result[Int, IoError] {
     let mut r = io.reader(text)
     let mut s = io.socket(c)
     return io.copy(mut r, mut s, 1000)

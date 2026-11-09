@@ -141,10 +141,14 @@ type Checker = struct {
     target: Str
     library: Bool
     unsafe_depth: Int
+    defer_depth: Int  // inside deferred code, which no return, ? or outer break leaves (M35)
     escaped: Map[Int, Bool]
     signatures_done: Bool
     bound_uses: [BoundUse]
     key_uses: [KeyUse]
+    held: [KeyUse]  // map and fixed-array types, whose values may not be resources (M35)
+    resource_memo: Map[Int, Bool]  // types.is_resource's settled answers
+    task_fns: Map[Int, Bool]  // function values written as tasks.map/each's argument: they may borrow captured resources (M35)
     last_error: Int  // the reported diagnostic, including a deduplicated one
     errors: [errors.CompileError]
     warnings: [errors.CompileError]
@@ -223,7 +227,7 @@ pub fn check_target(loaded: modules.Loaded, for_tests: Bool, name: Str, target: 
     }
     let mut c = Checker {
         const_states: [:],
-        target: target, library: for_tests, unsafe_depth: 0, escaped: [:], signatures_done: false, bound_uses: [], key_uses: [], last_error: -1,
+        target: target, library: for_tests, unsafe_depth: 0, defer_depth: 0, escaped: [:], signatures_done: false, bound_uses: [], key_uses: [], held: [], resource_memo: [:], task_fns: [:], last_error: -1,
         errors: [], warnings: [], table: types.new_table(), modules: loaded.modules, order: loaded.order, current: 0,
         fns: [], decls: [], locals: [], ty: ty, refs: refs, breaks: breaks, scopes: [], current_fn: -1, generic_uses: [], loops: [],
         undefined: [], targs: targs, literal: literal, chained: breaks, type_scope: [:], effects_used: [:], effects_reported: [:], closures: [:],
@@ -594,6 +598,10 @@ fn program(c: mut Checker, for_tests: Bool) {
         c.current = use.module
         check_bounds(mut c, use.line, use.col, use.owner, use.param, use.actual)
     }
+    for use in c.held {
+        c.current = use.module
+        holds_resource(mut c, use.line, use.col, use.actual)
+    }
     for use in c.key_uses {
         c.current = use.module
         if !key_type(c, use.actual) {
@@ -677,7 +685,12 @@ fn make_type_params(c: mut Checker, params: [ast.TypeParam]) -> [Int] {
         }
         let mut bounds: [Str] = []
         for b in p.bounds { push(mut bounds, resolve_bound(mut c, b, p.line, p.col)) }
-        push(mut out, types.param(mut c.table, p.name, bounds, p.line, p.col))
+        let t = types.param(mut c.table, p.name, bounds, p.line, p.col)
+        if p.movable {
+            c.table.types[t].without = ["Copy"]  // a resource parameter (M35)
+            c.table.resources = true
+        }
+        push(mut out, t)
     }
     return out
 }
@@ -927,7 +940,10 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
     if t.module == "sysio" {
         let module = module_in_type(mut c, t.line, t.col, "sysio")
         if module < 0 { return types.ERROR() }
-        if t.name == "Handle" && len(t.args) == 0 { return types.HANDLE() }
+        if t.name == "Handle" && len(t.args) == 0 {
+            c.table.resources = true  // M35: sockets move
+            return types.HANDLE()
+        }
         report(mut c, t.line, t.col, "E3220", "unknown systems type; use sysio.Handle")
         return types.ERROR()
     }
@@ -941,7 +957,11 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
     if t.module == "" {
         completing(mut c, t.name, [])
     }
-    if t.name == "[;]" { return types.fixed(mut c.table, resolve_type(mut c, t.args[0]), t.length) }
+    if t.name == "[;]" {
+        let fixed = types.fixed(mut c.table, resolve_type(mut c, t.args[0]), t.length)
+        holds_resource(mut c, t.line, t.col, fixed)
+        return fixed
+    }
     if t.name == "[]" {
         let elem = resolve_type(mut c, t.args[0])
         return types.array(mut c.table, elem)
@@ -995,6 +1015,7 @@ fn resolve_type(c: mut Checker, t: ast.TypeName) -> Int {
             push(mut args, resolve_type(mut c, a))
         }
         if t.name == "Map" {
+            holds_resource(mut c, t.line, t.col, types.map(mut c.table, args[0], args[1]))
             if !c.signatures_done && (types.is_struct(c.table, args[0]) || types.is_enum(c.table, args[0])) {
                 let k = t.args[0]
                 push(mut c.key_uses, KeyUse { module: c.current, line: k.line, col: k.col, actual: args[0] })
@@ -1111,6 +1132,10 @@ fn check_bounds(c: mut Checker, line: Int, col: Int, owner: Str, p: Int, t: Int)
         return
     }
     let pname = types.get(c.table, p).name
+    if !listed(types.get(c.table, p).without, "Copy") && is_res(mut c, t) {
+        report(mut c, line, col, "E3251", owner + " may copy its " + pname + ", but here " + pname + " is " + show(c, t) +
+            ", a resource that moves; declare `" + pname + " without Copy` where the code never copies one")
+    }
     // A parameter its function names in `uses` takes its effects from the implementation (M34).
     let saved = c.any_effects
     c.any_effects = maps.has(c.effect_params, p)
@@ -1123,6 +1148,24 @@ fn check_bounds(c: mut Checker, line: Int, col: Int, owner: Str, p: Int, t: Int)
             failed_obligation(c, t, b, 0))
     }
     c.any_effects = saved
+}
+
+// A map or fixed array of resources is E3252 (M35): they hold resources
+// only in variables, fields, payloads, Option, Result and growable arrays.
+// Checked once every declaration is known.
+fn holds_resource(c: mut Checker, line: Int, col: Int, t: Int) {
+    if !c.signatures_done {
+        push(mut c.held, KeyUse { module: c.current, line: line, col: col, actual: t })
+        return
+    }
+    let info = types.get(c.table, t)
+    for a in info.args {
+        if is_res(mut c, a) {
+            report(mut c, line, col, "E3252", show(c, t) + " would hold resources (" + show(c, a) + "), which only variables, " +
+                "fields, payloads, Option, Result and growable arrays can")
+            return
+        }
+    }
 }
 
 fn new_local(c: mut Checker, name: Str, ty: Int, kind: Str, line: Int, col: Int) -> Int {
@@ -1233,6 +1276,7 @@ fn const_refs(c: mut Checker, e: ast.Expr) {
 
 fn function(c: mut Checker, id: Int) {
     if c.fns[id].decl.foreign != "" || c.fns[id].decl.constant { return }
+    let first_local = len(c.locals)
     c.unsafe_depth = 0
     c.current_fn = id
     c.undefined = []
@@ -1312,6 +1356,7 @@ fn function(c: mut Checker, id: Int) {
         }
         None => {}
     }
+    moves(mut c, id, first_local)
 }
 
 fn is_main(c: Checker, id: Int) -> Bool {
@@ -1775,12 +1820,23 @@ fn stmt(c: mut Checker, s: ast.Stmt) {
             c.unsafe_depth = c.unsafe_depth - 1
         }
         ast.StmtKind.With(items, body) => with_stmt(mut c, s, items, body)
+        ast.StmtKind.Defer(body) => {
+            // Its own loops may break; nothing in it may leave it.
+            let saved_loops = c.loops
+            c.loops = []
+            c.defer_depth = c.defer_depth + 1
+            block(mut c, body)
+            c.defer_depth = c.defer_depth - 1
+            c.loops = saved_loops
+        }
     }
 }
 
 fn jump(c: mut Checker, s: ast.Stmt, word: Str) {
     let n = len(c.loops)
-    if n == 0 {
+    if n == 0 && c.defer_depth > 0 {
+        report(mut c, s.line, s.col, "E3253", "'" + word + "' cannot leave deferred code; it runs as its block exits")
+    } else if n == 0 {
         report(mut c, s.line, s.col, "E3054", "'" + word + "' is only allowed inside a loop")
     } else if word == "break" && c.loops[n - 1].is_for {
         c.breaks[c.loops[n - 1].id] = true
@@ -1896,6 +1952,11 @@ fn place(c: mut Checker, target: ast.Expr, verb: Str) -> Int {
         return types.ERROR()
     }
     let ty = infer(mut c, target)
+    if c.defer_depth > 0 {
+        // Deferred code changes this local at every exit of its block, so
+        // no range fact about it holds afterwards (M35).
+        match c.refs[root.id] { Ref.Local(l) => c.escaped[l] = true, _ => {} }
+    }
     let mut constant_part = target
     for {
         match c.refs[constant_part.id] {
@@ -1963,6 +2024,11 @@ fn place(c: mut Checker, target: ast.Expr, verb: Str) -> Int {
 }
 
 fn return_stmt(c: mut Checker, s: ast.Stmt, v: Option[ast.Expr]) {
+    if c.defer_depth > 0 {
+        report(mut c, s.line, s.col, "E3253", "'return' cannot leave deferred code; it runs as its block exits")
+        match v { Some(e) => { let _ = value(mut c, e) }, None => {} }
+        return
+    }
     let n = len(c.in_closures)
     if n > 0 {
         closure_return(mut c, s, v)
@@ -3279,6 +3345,9 @@ fn index(c: mut Checker, e: ast.Expr, obj: ast.Expr, i: ast.Expr) -> Int {
 // `x?`: the value inside an Ok or Some, or the function returns the Err or
 // None at once.
 fn try_expr(c: mut Checker, e: ast.Expr, inner: ast.Expr) -> Int {
+    if c.defer_depth > 0 {
+        report_at(mut c, e, "E3253", "'?' cannot leave deferred code; match the value instead")
+    }
     let t = value(mut c, inner)
     if t == types.ERROR() {
         return types.ERROR()
@@ -4671,6 +4740,8 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
     }
     let saved_unsafe = c.unsafe_depth
     c.unsafe_depth = 0
+    let saved_defer = c.defer_depth
+    c.defer_depth = 0  // a function value's code may return
     push(mut c.in_closures, ClosureCtx {
         id: e.id, boundary: len(c.scopes), captures: [], result: res, effects: [], scoped: maps.has(c.scoped_args, e.id), writes: [],
     })
@@ -4682,6 +4753,7 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
     }
     c.loops = saved_loops
     c.unsafe_depth = saved_unsafe
+    c.defer_depth = saved_defer
     pop_scope(mut c)
     let ctx = c.in_closures[len(c.in_closures) - 1]
     c.in_closures = c.in_closures[0..len(c.in_closures) - 1]
@@ -4695,6 +4767,17 @@ fn closure(c: mut Checker, e: ast.Expr, params: [ast.ClosureParam], result: Opti
     }
     c.closures[e.id] = ClosureInfo { params: locals, captures: ctx.captures, result: final, writes: ctx.writes }
     if len(ctx.writes) > 0 { c.mutations[e.id] = -1 }
+    if c.defer_depth > 0 { for l in ctx.writes { c.escaped[l] = true } }
+    if !ctx.scoped && !maps.has(c.task_fns, e.id) {
+        // Its captures are copies, which a resource cannot have (M35).
+        for l in ctx.captures {
+            if is_res(mut c, c.locals[l].ty) {
+                report_at(mut c, e, "E3250", "this function value captures '" + c.locals[l].name + "', a resource (" + show(c, c.locals[l].ty) +
+                    "), but its captures are copies; pass it as an argument, or capture it in a closure written as a scoped argument")
+                break
+            }
+        }
+    }
     return types.func_with(mut c.table, param_types, final, ctx.effects)
 }
 
@@ -4756,6 +4839,10 @@ fn tasks_call(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr]) -> Int {
         c.pending = [result]
     }
     c.expected = types.func(mut c.table, [elem], result)
+    // Workers are joined before the call returns, so a function value
+    // written here may borrow the resources it captures (M35), as the
+    // full-duplex socket of TL-022 needs.
+    c.task_fns[args[1].id] = true
     let f = value(mut c, args[1])
     c.pending = saved_pending
     if f == types.ERROR() {
@@ -5662,6 +5749,7 @@ fn derive(c: mut Checker) {
             let t = c.decls[k]
             k = k + 1
             c.table.types[t].without = d.without
+            if listed(d.without, "Copy") { c.table.resources = true }
             if d.is_interface { continue }
             match maps.get(c.modules[m].types, d.name) {
                 Some(registered) => { if registered != t { continue } }  // a rejected second declaration
@@ -5682,7 +5770,8 @@ fn derive(c: mut Checker) {
                     c.current = m
                     report(mut c, d.line, d.col, "E3244", "'" + d.name + "' defines " + method + " and also lists " + bound_text(b) + " after 'without'")
                 }
-                let left_out = listed(d.without, bound_text(b)) || (b == "Ord" || b == "Key") && listed(d.without, "Eq")
+                // A resource declared `without Copy` derives nothing (M35).
+                let left_out = listed(d.without, bound_text(b)) || (b == "Ord" || b == "Key") && listed(d.without, "Eq") || listed(d.without, "Copy")
                 let clash = types.is_enum(c.table, t) && types.variant_index(c.table, t, method) >= 0
                 push(mut own, defined)
                 push(mut ok, !defined && !left_out && !clash)
@@ -6620,4 +6709,604 @@ fn system_builtin(c: mut Checker, e: ast.Expr, name: Str, args: [ast.Expr]) -> I
     if !arity(mut c, e, name, len(ps), len(args)) { for arg in args { infer(mut c, arg) }; return types.ERROR() }
     for i in 0..len(args) { check_expr(mut c, args[i], system_type(mut c, ps[i]), msg("systems argument must be " + sysops.type_text(ps[i]) + ", found ", "")) }
     return types.result(mut c.table, system_type(mut c, sysops.result(name)), io_error_type(c))
+}
+
+// ---- Moves and borrows (M35) ----
+//
+// A resource moves when an owned variable gives its value away: to a `let`,
+// an assignment, a field, a payload, an array, a return, `?` or a `take`
+// parameter. Reading it afterwards is E3247. Parameters (other than `take`),
+// loop variables, the captures and parameters of a function value, and the
+// bindings of a borrowed value borrow: moving them is E3248. A field or an
+// element never moves alone (E3249). A variable that deferred code mentions
+// keeps its value until its block ends (E3254). The analysis follows every
+// path after the function is typed; the back ends compile a move as a copy
+// the program can no longer observe, so they are unchanged.
+
+type MoveBlock = struct {
+    pinned: Map[Int, Int]  // resource locals deferred code mentions, with the defer's line
+    pending: Map[Int, Str]  // locals deferred code moves: moved as the block exits
+}
+
+type MoveLoop = struct {
+    breaks: [Map[Int, Str]]
+    continues: [Map[Int, Str]]
+    blocks: Int  // len(blocks) at the loop body's start
+}
+
+type Mover = struct {
+    moved: Map[Int, Str]  // owned resource locals that may have moved here, with where
+    dead: Bool  // no path reaches here
+    borrowed: Map[Int, Str]  // resource locals that borrow, with why
+    parts: Map[Int, Bool]  // bindings of a field or an element of a resource
+    parents: Map[Int, Int]  // bindings of an owned local's value, with that local
+    blocks: [MoveBlock]
+    loops: [MoveLoop]
+    quiet: Bool  // a loop's first pass, only finding what an iteration moves
+    seen: Map[Int, Bool]  // resource locals mentioned, while deferred code is walked
+}
+
+type LoopPass = struct {
+    end: Map[Int, Str]
+    ends: Bool  // some path reaches the end of the body, or a continue
+    breaks: [Map[Int, Str]]
+}
+
+fn is_res(c: mut Checker, t: Int) -> Bool {
+    if !c.table.resources { return false }
+    return types.is_resource(c.table, t, mut c.resource_memo)
+}
+
+fn res(c: mut Checker, t: Int) -> Bool {
+    return t >= 0 && is_res(mut c, t)
+}
+
+fn moves(c: mut Checker, id: Int, first: Int) {
+    let mut any = false
+    for l in first..len(c.locals) {
+        if res(mut c, c.locals[l].ty) {
+            any = true
+            break
+        }
+    }
+    if !any { return }
+    let f = c.fns[id]
+    let mut m = Mover { moved: [:], dead: false, borrowed: [:], parts: [:], parents: [:], blocks: [], loops: [], quiet: false, seen: [:] }
+    for i in 0..len(f.param_locals) {
+        if i < len(f.decl.params) && !f.decl.params[i].take {
+            m.borrowed[f.param_locals[i]] = "parameter '" + f.decl.params[i].name + "'"
+        }
+    }
+    move_block(mut c, mut m, f.decl.body)
+}
+
+fn move_report(c: mut Checker, m: Mover, e: ast.Expr, code: Str, message: Str) {
+    if !m.quiet { report_at(mut c, e, code, message) }
+}
+
+// Where a move happened, as at_line wrote it: "line L col C".
+fn position_of(at: Str) -> Int {
+    let mut line = 0
+    let mut col = 0
+    let mut in_col = false
+    for b in at {
+        if b == 'c' { in_col = true }
+        if b >= '0' && b <= '9' {
+            if in_col { col = col * 10 + int(b - '0') } else { line = line * 10 + int(b - '0') }
+        }
+    }
+    return line * 65536 + col
+}
+
+// "line L", for a message.
+fn shown_at(at: Str) -> Str {
+    for i in 0..len(at) {
+        if at[i] == ' ' && i + 1 < len(at) && at[i + 1] == 'c' { return at[0..i] }
+    }
+    return at
+}
+
+fn at_line(e: ast.Expr) -> Str {
+    return "line " + strings.from_int(e.line) + " col " + strings.from_int(e.col)
+}
+
+fn union_moved(a: Map[Int, Str], b: Map[Int, Str]) -> Map[Int, Str] {
+    let mut out = a
+    for l in maps.keys(b) {
+        if !maps.has(out, l) { out[l] = b[l] }
+    }
+    return out
+}
+
+// Join the state of another path into the current one.
+fn move_join(m: mut Mover, other: Map[Int, Str], other_dead: Bool) {
+    if other_dead { return }
+    if m.dead {
+        m.moved = other
+        m.dead = false
+        return
+    }
+    m.moved = union_moved(m.moved, other)
+}
+
+// The state a break or continue takes out of the loop: deferred code in the
+// blocks it leaves runs first.
+fn exit_state(m: Mover) -> Map[Int, Str] {
+    let mut out = m.moved
+    let start = m.loops[len(m.loops) - 1].blocks
+    for i in start..len(m.blocks) {
+        out = union_moved(out, m.blocks[i].pending)
+    }
+    return out
+}
+
+fn move_block(c: mut Checker, m: mut Mover, b: ast.Block) {
+    push(mut m.blocks, MoveBlock { pinned: [:], pending: [:] })
+    for s in b.stmts {
+        if m.dead { break }
+        move_stmt(mut c, mut m, s)
+    }
+    let top = m.blocks[len(m.blocks) - 1]
+    m.blocks = m.blocks[0..len(m.blocks) - 1]
+    if !m.dead { m.moved = union_moved(m.moved, top.pending) }
+}
+
+// A local that now holds a value of its own: declared, or assigned.
+fn move_fresh(m: mut Mover, l: Int) {
+    if maps.has(m.moved, l) { maps.remove(mut m.moved, l) }
+}
+
+fn local_ref(c: Checker, id: Int) -> Int {
+    return match c.refs[id] {
+        Ref.Local(l) => l
+        _ => -1
+    }
+}
+
+fn move_stmt(c: mut Checker, m: mut Mover, s: ast.Stmt) {
+    match s.kind {
+        ast.StmtKind.Block(b) => move_block(mut c, mut m, b)
+        ast.StmtKind.ExprStmt(e) => move_expr(mut c, mut m, e, false)
+        ast.StmtKind.Let(_, _, _, v) => {
+            move_expr(mut c, mut m, v, true)
+            let l = local_ref(c, s.id)
+            if l >= 0 { move_fresh(mut m, l) }
+        }
+        ast.StmtKind.Assign(target, v) => {
+            move_expr(mut c, mut m, v, true)
+            let mut whole = false
+            match target.kind {
+                ast.ExprKind.Name(_) => whole = true
+                _ => {}
+            }
+            let l = local_ref(c, target.id)
+            if whole && l >= 0 {
+                move_fresh(mut m, l)
+            } else {
+                move_expr(mut c, mut m, target, false)
+            }
+        }
+        ast.StmtKind.If(cond, then, otherwise) => {
+            move_expr(mut c, mut m, cond, false)
+            let before = m.moved
+            move_block(mut c, mut m, then)
+            let yes = m.moved
+            let yes_dead = m.dead
+            m.moved = before
+            m.dead = false
+            match otherwise {
+                ast.Else.NoElse => {}
+                ast.Else.ElseBlock(b) => move_block(mut c, mut m, b)
+                ast.Else.ElseIf(s2) => move_stmt(mut c, mut m, s2)
+            }
+            move_join(mut m, yes, yes_dead)
+        }
+        ast.StmtKind.For(cond, body) => {
+            let mut forever = false
+            match cond {
+                None => forever = true
+                Some(_) => {}
+            }
+            move_loop(mut c, mut m, cond, body, forever)
+        }
+        ast.StmtKind.ForRange(_, a, b, body) => {
+            move_expr(mut c, mut m, a, false)
+            move_expr(mut c, mut m, b, false)
+            move_loop(mut c, mut m, None, body, false)
+        }
+        ast.StmtKind.ForEach(_, xs, body) => {
+            move_expr(mut c, mut m, xs, false)
+            let l = local_ref(c, s.id)
+            if l >= 0 && res(mut c, c.locals[l].ty) { m.borrowed[l] = "a loop variable" }
+            move_loop(mut c, mut m, None, body, false)
+        }
+        ast.StmtKind.Break => {
+            if len(m.loops) > 0 {
+                let out = exit_state(m)
+                push(mut m.loops[len(m.loops) - 1].breaks, out)
+            }
+            m.dead = true
+        }
+        ast.StmtKind.Continue => {
+            if len(m.loops) > 0 {
+                let out = exit_state(m)
+                push(mut m.loops[len(m.loops) - 1].continues, out)
+            }
+            m.dead = true
+        }
+        ast.StmtKind.Return(v) => {
+            match v {
+                Some(e) => move_expr(mut c, mut m, e, true)
+                None => {}
+            }
+            m.dead = true
+        }
+        ast.StmtKind.MatchStmt(x, arms) => move_match(mut c, mut m, x, arms, false)
+        ast.StmtKind.Unsafe(b) => move_block(mut c, mut m, b)
+        ast.StmtKind.With(items, b) => {
+            for it in items { move_expr(mut c, mut m, it.value, false) }
+            move_block(mut c, mut m, b)
+        }
+        ast.StmtKind.Defer(b) => move_defer(mut c, mut m, s, b)
+    }
+}
+
+// One pass over a loop's body from state `start`.
+fn loop_pass(c: mut Checker, m: mut Mover, cond: Option[ast.Expr], body: ast.Block, start: Map[Int, Str]) -> LoopPass {
+    m.moved = start
+    m.dead = false
+    push(mut m.loops, MoveLoop { breaks: [], continues: [], blocks: len(m.blocks) })
+    match cond {
+        Some(e) => move_expr(mut c, mut m, e, false)
+        None => {}
+    }
+    move_block(mut c, mut m, body)
+    let l = m.loops[len(m.loops) - 1]
+    m.loops = m.loops[0..len(m.loops) - 1]
+    let mut out = LoopPass { end: m.moved, ends: !m.dead, breaks: l.breaks }
+    for st in l.continues {
+        if out.ends {
+            out.end = union_moved(out.end, st)
+        } else {
+            out.end = st
+            out.ends = true
+        }
+    }
+    return out
+}
+
+// A loop: the first pass finds what one iteration moves, quietly; the
+// second starts from that too, so a value moved by an earlier iteration
+// is reported where a later one uses it.
+fn move_loop(c: mut Checker, m: mut Mover, cond: Option[ast.Expr], body: ast.Block, forever: Bool) {
+    let entry = m.moved
+    let quiet = m.quiet
+    m.quiet = true
+    let first = loop_pass(mut c, mut m, cond, body, entry)
+    m.quiet = quiet
+    let mut start = entry
+    if first.ends { start = union_moved(entry, first.end) }
+    let second = loop_pass(mut c, mut m, cond, body, start)
+    m.dead = true
+    m.moved = [:]
+    for b in second.breaks { move_join(mut m, b, false) }
+    if !forever {
+        // The test can end it before any iteration, or after one.
+        move_join(mut m, start, false)
+        if second.ends { move_join(mut m, second.end, false) }
+    }
+}
+
+// Deferred code reads its variables as its block exits: it is checked
+// against the values they hold here, and pins every resource it mentions;
+// what it moves, it moves at the exit.
+fn move_defer(c: mut Checker, m: mut Mover, s: ast.Stmt, body: ast.Block) {
+    let saved_moved = m.moved
+    let saved_loops = m.loops
+    let saved_seen = m.seen
+    m.loops = []
+    m.seen = [:]
+    move_block(mut c, mut m, body)
+    let after = m.moved
+    let mentioned = m.seen
+    m.moved = saved_moved
+    m.dead = false
+    m.loops = saved_loops
+    m.seen = saved_seen
+    for l in maps.keys(mentioned) { m.seen[l] = true }
+    let top = len(m.blocks) - 1
+    for l in maps.keys(after) {
+        if !maps.has(saved_moved, l) { m.blocks[top].pending[l] = after[l] }
+    }
+    for l in maps.keys(mentioned) {
+        if !maps.has(m.blocks[top].pinned, l) { m.blocks[top].pinned[l] = s.line }
+    }
+}
+
+fn move_name(c: mut Checker, m: mut Mover, e: ast.Expr, l: Int, take: Bool) {
+    let name = c.locals[l].name
+    m.seen[l] = true
+    match maps.get(m.moved, l) {
+        Some(at) => {
+            let mut when = shown_at(at)
+            if position_of(at) >= e.line * 65536 + e.col { when = when + " by an earlier iteration" }
+            move_report(mut c, m, e, "E3247", "'" + name + "' was moved at " + when + ", so it holds no value here; " +
+                "use it before then, or give it a new value first")
+            return
+        }
+        None => {}
+    }
+    if !take { return }
+    match maps.get(m.borrowed, l) {
+        Some(why) => {
+            let mut hint = "; it can be read and passed to plain parameters, but not stored, returned or consumed"
+            if len(why) > 10 && why[0..10] == "parameter " {
+                hint = "; declare it `" + name + ": take " + show(c, c.locals[l].ty) + "` to receive the value"
+            }
+            move_report(mut c, m, e, "E3248", "'" + name + "' borrows a resource (" + show(c, c.locals[l].ty) + ") as " + why +
+                ", so it cannot be moved" + hint)
+            return
+        }
+        None => {}
+    }
+    if maps.has(m.parts, l) {
+        move_report(mut c, m, e, "E3249", "'" + name + "' is part of a resource that stays where it is, so it cannot be moved; " +
+            "borrow it, or match on the whole value")
+        return
+    }
+    for b in m.blocks {
+        match maps.get(b.pinned, l) {
+            Some(line) => {
+                move_report(mut c, m, e, "E3254", "'" + name + "' is used by deferred code (line " + strings.from_int(line) +
+                    "), which reads it as the block exits, so it cannot be moved before then")
+                return
+            }
+            None => {}
+        }
+    }
+    m.moved[l] = at_line(e)
+    match maps.get(m.parents, l) {
+        Some(p) => m.moved[p] = at_line(e)  // moving a binding takes the matched value apart
+        None => {}
+    }
+}
+
+fn move_expr(c: mut Checker, m: mut Mover, e: ast.Expr, take: Bool) {
+    if m.dead { return }
+    let t = c.ty[e.id]
+    let moving = take && res(mut c, t)
+    match e.kind {
+        ast.ExprKind.Name(_) => {
+            let l = local_ref(c, e.id)
+            if l >= 0 && res(mut c, c.locals[l].ty) { move_name(mut c, mut m, e, l, take) }
+        }
+        ast.ExprKind.Field(x, name) => {
+            if moving {
+                move_report(mut c, m, e, "E3249", "field '" + name + "' is a resource (" + show(c, t) + ") and cannot be moved out on its own; " +
+                    "borrow it where it is, or match on the whole value")
+            }
+            move_expr(mut c, mut m, x, false)
+        }
+        ast.ExprKind.Index(a, i) => {
+            if moving {
+                move_report(mut c, m, e, "E3249", "an element of an array of resources (" + show(c, t) + ") cannot be moved out on its own; borrow it where it is")
+            }
+            move_expr(mut c, mut m, a, false)
+            move_expr(mut c, mut m, i, false)
+        }
+        ast.ExprKind.Slice(a, lo, hi) => {
+            if res(mut c, t) {
+                move_report(mut c, m, e, "E3249", "a slice of an array of resources would copy them; borrow the elements where they are")
+            }
+            move_expr(mut c, mut m, a, false)
+            move_expr(mut c, mut m, lo, false)
+            move_expr(mut c, mut m, hi, false)
+        }
+        ast.ExprKind.Unary(_, x) => move_expr(mut c, mut m, x, false)
+        ast.ExprKind.Binary(_, a, b) => {
+            move_expr(mut c, mut m, a, false)
+            move_expr(mut c, mut m, b, false)
+        }
+        ast.ExprKind.Call(f, args) => move_call(mut c, mut m, e, f, args)
+        ast.ExprKind.Try(x) => move_expr(mut c, mut m, x, true)
+        ast.ExprKind.MutArg(x) => move_expr(mut c, mut m, x, false)
+        ast.ExprKind.ArrayLit(xs) => {
+            for x in xs { move_expr(mut c, mut m, x, true) }
+        }
+        ast.ExprKind.MapLit(entries) => {
+            for en in entries {
+                move_expr(mut c, mut m, en.key, false)
+                move_expr(mut c, mut m, en.value, false)
+            }
+        }
+        ast.ExprKind.StructLit(_, _, fields) => {
+            for fi in fields { move_expr(mut c, mut m, fi.value, true) }
+        }
+        ast.ExprKind.Interpolate(parts) => {
+            for hole in ast.interpolation_holes(parts) { move_expr(mut c, mut m, hole, false) }
+        }
+        ast.ExprKind.Match(x, arms) => move_match(mut c, mut m, x, arms, take)
+        ast.ExprKind.Closure(_, _, body, _) => move_closure(mut c, mut m, e, body)
+        _ => {}
+    }
+}
+
+fn move_call(c: mut Checker, m: mut Mover, e: ast.Expr, callee: ast.Expr, args: [ast.Expr]) {
+    match c.refs[e.id] {
+        Ref.Function(id) => {
+            move_expr(mut c, mut m, callee, false)
+            move_args(mut c, mut m, args, c.fns[id].decl.params, 0)
+        }
+        Ref.Method(t, name) => {
+            // `x.f(a)`: x is the first parameter.
+            let mut params: [ast.Param] = []
+            let dispatch = lookup_method(c.table, c.fns, c.modules, c.methods, t, name)
+            if dispatch.fn_id >= 0 { params = c.fns[dispatch.fn_id].decl.params }
+            match callee.kind {
+                ast.ExprKind.Field(obj, _) => {
+                    let take = len(params) > 0 && params[0].take
+                    move_expr(mut c, mut m, obj, take)
+                    move_args(mut c, mut m, args, params, 1)
+                }
+                _ => move_args(mut c, mut m, args, params, 0)
+            }
+        }
+        Ref.Variant(_, _) => {
+            for a in args { move_expr(mut c, mut m, a, true) }
+        }
+        Ref.Builtin(name) => {
+            for i in 0..len(args) {
+                // push(mut xs, x) moves x in; tasks.map and tasks.each take the array.
+                let take = name == "push" && i == 1 || (name == "tasks.map" || name == "tasks.each") && i == 0
+                move_expr(mut c, mut m, args[i], take)
+            }
+        }
+        _ => {
+            move_expr(mut c, mut m, callee, false)
+            for a in args { move_expr(mut c, mut m, a, false) }
+        }
+    }
+}
+
+fn move_args(c: mut Checker, m: mut Mover, args: [ast.Expr], params: [ast.Param], offset: Int) {
+    for i in 0..len(args) {
+        let k = i + offset
+        let take = k < len(params) && params[k].take
+        move_expr(mut c, mut m, args[i], take)
+    }
+}
+
+// The locals a pattern binds.
+fn pattern_locals(c: Checker, p: ast.Pattern, out: mut [Int]) {
+    match p.kind {
+        ast.PatternKind.Bind(_) => {
+            let l = local_ref(c, p.id)
+            if l >= 0 { push(mut out, l) }
+        }
+        ast.PatternKind.Variant(_, _, _, _, inner) => {
+            for q in inner { pattern_locals(c, q, mut out) }
+        }
+        ast.PatternKind.Struct(_, _, fields, _) => {
+            for f in fields { pattern_locals(c, f.pattern, mut out) }
+        }
+        _ => {}
+    }
+}
+
+// A match: its bindings own what they bind from an owned value, and moving
+// one moves the matched local; they borrow from a borrowed value, and are
+// parts of a field or element, which stays where it is.
+fn move_match(c: mut Checker, m: mut Mover, x: ast.Expr, arms: [ast.Arm], take: Bool) {
+    let mut owner = -1
+    let mut why = ""
+    let mut part = false
+    let scrutinee_res = res(mut c, c.ty[x.id])
+    // `let PATTERN = v` takes each name out of a hidden copy (parser.let_pattern).
+    let taking_out = len(arms) > 0 && arms[0].sugar == "let-bind"
+    match x.kind {
+        ast.ExprKind.Name(_) => {
+            let l = local_ref(c, x.id)
+            move_expr(mut c, mut m, x, false)
+            if l >= 0 && scrutinee_res && !taking_out {
+                match maps.get(m.borrowed, l) {
+                    Some(w) => why = "a binding of " + w
+                    None => {
+                        if maps.has(m.parts, l) { part = true } else { owner = l }
+                    }
+                }
+            }
+        }
+        ast.ExprKind.Field(_, _) => {
+            move_expr(mut c, mut m, x, false)
+            part = scrutinee_res
+        }
+        ast.ExprKind.Index(_, _) => {
+            move_expr(mut c, mut m, x, false)
+            part = scrutinee_res
+        }
+        _ => move_expr(mut c, mut m, x, true)
+    }
+    if m.dead { return }
+    let before = m.moved
+    let mut out: Map[Int, Str] = [:]
+    let mut out_dead = true
+    for arm in arms {
+        m.moved = before
+        m.dead = false
+        let mut bound: [Int] = []
+        pattern_locals(c, arm.pattern, mut bound)
+        for b in bound {
+            if !res(mut c, c.locals[b].ty) { continue }
+            move_fresh(mut m, b)
+            if why != "" {
+                m.borrowed[b] = why
+            } else if part {
+                m.parts[b] = true
+            } else if owner >= 0 {
+                m.parents[b] = owner
+            }
+        }
+        match arm.guard {
+            Some(g) => move_expr(mut c, mut m, g, false)
+            None => {}
+        }
+        match arm.body {
+            ast.ArmBody.Value(v) => move_expr(mut c, mut m, v, take)
+            ast.ArmBody.Do(st) => move_stmt(mut c, mut m, st)
+            ast.ArmBody.Valued(b, value) => {
+                push(mut m.blocks, MoveBlock { pinned: [:], pending: [:] })
+                for st in b.stmts {
+                    if m.dead { break }
+                    move_stmt(mut c, mut m, st)
+                }
+                match value {
+                    Some(v) => move_expr(mut c, mut m, v, take)
+                    None => {}
+                }
+                let top = m.blocks[len(m.blocks) - 1]
+                m.blocks = m.blocks[0..len(m.blocks) - 1]
+                if !m.dead { m.moved = union_moved(m.moved, top.pending) }
+            }
+        }
+        if !m.dead {
+            if out_dead {
+                out = m.moved
+                out_dead = false
+            } else {
+                out = union_moved(out, m.moved)
+            }
+        }
+    }
+    if len(arms) > 0 {
+        m.moved = out
+        m.dead = out_dead
+    }
+}
+
+// A function value's body: its captures and parameters borrow. Its moves
+// stay inside it.
+fn move_closure(c: mut Checker, m: mut Mover, e: ast.Expr, body: ast.Block) {
+    let saved_moved = m.moved
+    let saved_borrowed = m.borrowed
+    let saved_loops = m.loops
+    let saved_blocks = m.blocks
+    match maps.get(c.closures, e.id) {
+        Some(info) => {
+            for l in info.captures {
+                if res(mut c, c.locals[l].ty) && !maps.has(m.borrowed, l) { m.borrowed[l] = "a capture of a function value" }
+            }
+            for l in info.params {
+                if res(mut c, c.locals[l].ty) { m.borrowed[l] = "a parameter of a function value" }
+            }
+        }
+        None => {}
+    }
+    m.loops = []
+    m.blocks = []
+    move_block(mut c, mut m, body)
+    m.moved = saved_moved
+    m.borrowed = saved_borrowed
+    m.loops = saved_loops
+    m.blocks = saved_blocks
+    m.dead = false
 }

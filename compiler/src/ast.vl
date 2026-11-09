@@ -158,6 +158,7 @@ pub type StmtKind = enum {
     MatchStmt(Expr, [Arm])
     Unsafe(Block)
     With([WithItem], Block)  // in a test: fakes for the block
+    Defer(Block)  // run when the enclosing block exits (M35)
 }
 
 // `files = [...]` in `with files = [...], args = [...] { ... }`.
@@ -187,12 +188,14 @@ pub type Param = struct {
     col: Int
     mutable: Bool
     scoped: Bool  // `f: scoped fn(T)`: callable here, never kept (M33)
+    take: Bool  // `x: take T`: the function owns the argument, which moves in (M35)
 }
 
 // `T` or `T: Ord + Key` in `fn f[T](...)` or `type Box[T] = ...`.
 pub type TypeParam = struct {
     name: Str
     bounds: [Str]
+    movable: Bool  // `T without Copy` (M35): T may be a resource
     line: Int
     col: Int
 }
@@ -243,7 +246,7 @@ pub type TypeDecl = struct {
     line: Int
     col: Int
     public: Bool
-    without: [Str]  // interfaces it does not derive (M32): "Eq", "Ord", "Key", "Show"
+    without: [Str]  // interfaces it does not derive (M32): "Eq", "Ord", "Key", "Show"; "Copy" makes it a resource (M35)
 }
 
 pub type Import = struct {
@@ -553,6 +556,9 @@ fn sx_fn(f: FnDecl) -> Sx {
         if p.mutable {
             push(mut parts, atom("mut"))
         }
+        if p.take {
+            push(mut parts, atom("take"))
+        }
         if p.scoped {
             push(mut parts, atom("scoped"))
         }
@@ -649,6 +655,7 @@ fn sx_stmt(s: Stmt) -> Sx {
         }
         StmtKind.MatchStmt(scrutinee, arms) => return sx_match(scrutinee, arms)
         StmtKind.Unsafe(body) => return list([atom("unsafe"), sx_block(body)])
+        StmtKind.Defer(body) => return list([atom("defer"), sx_block(body)])
         StmtKind.With(items, body) => {
             let mut out = [atom("with")]
             for w in items {
