@@ -31,6 +31,7 @@ platform limits when recording results.
 | [regex_test.py](regex_test.py) | The regex package against the Rust regex crate's test data (each test it leaves out counted under its reason), patterns that make backtracking exponential within a time limit; `--fuzz N` compares random patterns and texts with Python's re, in ASCII and Unicode modes |
 | [unicode_test.py](unicode_test.py) | std/unicode's general categories (every code point) and case foldings against Python's unicodedata of the same Unicode version |
 | [format_test.py](format_test.py) | The compiler, standard library, packages, examples, benchmarks and evaluation tasks are as `vela fmt` writes them |
+| [tooling_smoke_test.py](tooling_smoke_test.py) | The core of the scripts TL-141 removed, in about 8 s: the runtime build cache, the incremental object cache, `vela profile`, JSON panic reports and stack overflow as a Vela panic; [cli/debug_trace.vl](cli/debug_trace.vl) checks `run --debug` stack traces |
 | [differential_test.py](differential_test.py) | Generated programs agree across back ends and optimization settings, and integer results match a Python oracle; `--count N` runs more |
 | `*_test.py`, `lsp_client.py`, `nvim_test.lua` | Package, native and editor integration |
 
@@ -54,6 +55,8 @@ regressions; moving their documentation into history does not retire them.
 `m27_test.py`, `m29_test.py`, `cache_test.py`, `bench_test.py`,
 `eval_test.py` and `stack_overflow_test.py` were removed on 2026-11-09 to
 keep the suite fast ([TL-141](../docs/tooling-backlog.md#tl-141-six-slow-integration-scripts-were-removed-from-the-suite));
+`tooling_smoke_test.py` and `cli/debug_trace.vl` keep a fast check of the
+areas only they covered;
 `python3 evaluation/selftest.py`, `python3 bench/run.py` and
 `python3 bench/real_programs.py` still check the evaluation and benchmarks
 when run by hand.

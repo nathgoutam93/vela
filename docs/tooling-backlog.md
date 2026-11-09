@@ -4605,6 +4605,20 @@ No additional CI workflow run was requested or launched for reconciliation.
   100 s (C) and 104 s (native) wall time, against 141 s before. The rest is
   about 247 s of work over four workers plus `m24_test` (24 s), which runs
   alone after the others for its timing gate.
+- **Partial restoration (2026-11-09, at the maintainer's request):** four
+  areas had lost all automatic coverage: the runtime build cache, the
+  incremental object cache (`compiler/src/incremental.vl`), observability
+  (`vela profile`, `--debug` traces, JSON panics) and stack overflow (TL-088).
+  `tests/tooling_smoke_test.py` keeps the core assertion of each removed
+  script (about 8 s per back end on Linux x86-64; the overflow check skips
+  itself under sanitizers), and `tests/cli/debug_trace.vl` checks the
+  `--debug` stack trace exactly. Still not rechecked automatically: cache
+  fallbacks for unwritable directories, toolchain identity, concurrent cache
+  writers, debugger execution, coverage reports, worker and policy overflow
+  cases, nested-expression depth (TL-092), real-program oracles and scale
+  budgets, the evaluation tasks and the cross-language benchmarks.
+  Validated with `python3 run_tests.py --backend c tooling_smoke
+  debug_trace`, the same on native, and with `--sanitize`.
 
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
