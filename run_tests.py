@@ -83,6 +83,7 @@ PKG_TEST = TESTS / "pkg_test.py"
 NATIVE_TEST = TESTS / "native_test.py"
 LONG_LITERALS_TEST = TESTS / "long_literals_test.py"
 CONSTANTS_TEST = TESTS / "module_constants_test.py"
+SMOKE_TEST = TESTS / "tooling_smoke_test.py"  # caches, profiling, stack overflow (TL-141)
 M17_TEST = TESTS / "m17_test.py"
 M19_TEST = TESTS / "m19_test.py"
 M20_TEST = TESTS / "m20_test.py"
@@ -200,6 +201,8 @@ def run_test(compiler: list[str], path: Path, env: dict[str, str]) -> list[str]:
         return run_script(NATIVE_TEST, compiler, env)
     if path == CONSTANTS_TEST:
         return run_script(CONSTANTS_TEST, compiler, env)
+    if path == SMOKE_TEST:
+        return run_script(SMOKE_TEST, compiler, env)
     if path == LONG_LITERALS_TEST:
         return run_script(LONG_LITERALS_TEST, compiler, env)
     if path == M17_TEST:
@@ -402,6 +405,7 @@ def find_tests(filters: list[str]) -> list[Path]:
     tests.append(NATIVE_TEST)
     tests.append(LONG_LITERALS_TEST)
     tests.append(CONSTANTS_TEST)
+    tests.append(SMOKE_TEST)
     tests.append(M17_TEST)
     tests.append(M19_TEST)
     tests.append(M20_TEST)

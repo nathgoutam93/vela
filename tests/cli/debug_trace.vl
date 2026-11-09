@@ -1,0 +1,19 @@
+// `vela run --debug` reports a panic with the Vela call stack (M27), on both
+// back ends. Kept in the default suite when m27_test.py was removed (TL-141).
+// command: run --debug FILE
+// out: start
+// err: debug_trace.vl:11:5: panic: assertion failed: x == 2 (left: 1, right: 2)
+// err:   at deep (debug_trace.vl:11:5)
+// err:   at middle (debug_trace.vl:14:5)
+// err:   at main (debug_trace.vl:18:5)
+// exit: 101
+fn deep(x: Int) {
+    assert(x == 2)
+}
+fn middle() {
+    deep(1)
+}
+fn main() {
+    print("start")
+    middle()
+}
