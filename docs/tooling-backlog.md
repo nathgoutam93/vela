@@ -4486,6 +4486,33 @@ No additional CI workflow run was requested or launched for reconciliation.
 - **Verify:** a std API change the compiler uses goes through one
   `bootstrap.sh --update`.
 
+### TL-137: The guide still says interface methods have no mutable parameters
+
+- **Status:** open; scheduled with M35's guide changes.
+- **Discovery:** M35 design review, reading the guide's handle text
+  (2026-11-09, at `20baaab`, Linux x86-64).
+- **Evidence (observed):** `build/vela guide` prints "Interface signatures
+  have no bodies, contracts, method type parameters or mutable parameters"
+  (`compiler/src/guide.vl:52`). The same guide later says "io.Reader/Writer
+  take `mut Self`" (`guide.vl:73`), and the specification allows `mut Self`
+  (`docs/specification.md:340`). A program declaring
+  `type Counter = interface { fn bump(c: mut Self) -> Int }` with a
+  `fn C.bump(c: mut C) -> Int` implementation and a
+  `fn twice[T: Counter](x: mut T)` caller builds and prints `2` with
+  `build/vela run`.
+- **Suspected cause:** M34 updated the specification and the error-model
+  paragraph but not the interface paragraph.
+- **Impact:** an agent reading the guide's interface rules would avoid
+  `mut Self`, or would treat it as an error.
+- **Workaround:** follow the specification, or the guide's later io
+  sentence.
+- **Proposed improvement:** change the sentence to "no other mutable
+  parameters; the first parameter is Self or `mut Self`", within the guide
+  budget.
+- **Verify:** `build/vela guide | grep "mutable parameters"` matches the
+  specification's wording, and `tests/m17_test.py`'s budget check still
+  passes.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;

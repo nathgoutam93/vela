@@ -422,7 +422,7 @@ the new signatures.
 
 ## M35: Resources
 
-**Status:** planned; its move and drop design needs review before implementation.
+**Status:** design under review; see [the walkthrough](history/m35-resources.md). It recommends building on the current back ends (no LP-101 first) and lists the decisions the maintainer must settle before implementation.
 
 **Needs:** M33 (consuming receivers) and M34 (typed `close` errors).
 
