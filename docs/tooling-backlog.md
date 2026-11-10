@@ -4620,6 +4620,85 @@ No additional CI workflow run was requested or launched for reconciliation.
   Validated with `python3 run_tests.py --backend c tooling_smoke
   debug_trace`, the same on native, and with `--sanitize`.
 
+### TL-142: `vela guide --all` lists Str errors for files and os functions that return IoError
+
+- **Status:** open.
+- **Discovery:** VAL-002's first model-driven trial (2026-11-09, at
+  `4c50f9e`), task 10-config. The agent reported that "`files.read`
+  returns `Result[Str, Str]`, not IoError".
+- **Evidence (observed):** `build/vela guide --all` prints, under
+  `### import files` and `### import os`, `fn read(path: Str) ->
+  Result[Str, Str] uses fs`, and likewise `write`, `remove`, `temp_dir`,
+  `os.run` and `os.output`. The checker types them with IoError: a
+  program with `let r: Result[Str, IoError] = files.read("nope")` prints
+  `IoKind.NotFound`. M34's walkthrough lists these functions as returning
+  IoError.
+- **Suspected cause:** the built-in modules' signatures come from compiler
+  metadata (LP-103), and the inventory that `guide --all` prints was not
+  updated with M34's typing.
+- **Impact:** agents read the wrong error type from the reference, and can
+  write programs that misuse the error (the 10-config agent built messages
+  around a `Str` error).
+- **Workaround:** trust `vela check`'s types, or the specification.
+- **Proposed improvement:** generate the inventory from the checker's
+  types for built-in functions, or update it, and add a test comparing the
+  two.
+- **Verify:** `vela guide --all | grep "Result\[[^]]*, Str\]"` finds no
+  built-in module function, and a test fails if the inventory and the
+  checker disagree.
+
+### TL-143: The short guide leaves out what agents look for first
+
+- **Status:** open.
+- **Discovery:** VAL-002's first model-driven trial (2026-11-09). Agents
+  reported these; the guide text was checked here.
+- **Evidence (reported, and checked against `build/vela guide`):**
+  - Which std modules need an import. Agents used `maps.get`, `math.sqrt`,
+    `ints.checked_*`, `text.parse_int` and `lists.sort` after finding them
+    with `vela guide --all` or in `std/`. The short guide mentions
+    `maps.get` and `maps.keys` with no `import maps`. Five of 21 agents
+    reported this (tasks 02, 04, 06, 19 and 20).
+  - That `os.args()[0]` is the program name. Three agents guessed it from
+    the `with args = ["program", "arg"]` fake (tasks 01, 02 and 09).
+  - Reading standard input in parts (`os.read(n)` until `""`) is only in
+    `vela guide --all` (task 03).
+  - That test blocks return nothing, so `?` does not work in them (task 18).
+- **Impact:** every agent still passed, but these cost extra tool calls:
+  `vela guide --all` searches, std greps, and compile-error round trips.
+- **Workaround:** `vela guide --all` and the std sources.
+- **Proposed improvement:** one guide line listing the importable built-in
+  modules (`maps`, `lists`, `text`, `math`, `ints`, `os`, `files`), and
+  short notes on `os.args()[0]` and `os.read`, within the guide budget.
+- **Verify:** the next trial's reports no longer mention these, and the
+  guide stays within its budget.
+
+### TL-144: Some syntax mistakes agents make get errors without a hint
+
+- **Status:** open.
+- **Discovery:** VAL-002's first model-driven trial (2026-11-09); each case
+  below was reproduced with `build/vela check`.
+- **Evidence (observed):**
+  - `while i < 3 { i += 1 }` gives `E2009: expected newline or ';' after
+    statement, found identifier 'i'`, with no mention that `for CONDITION`
+    is Vela's while loop. Two agents hit this (tasks 09 and 11).
+  - An unqualified variant pattern, `match s { Circle(r) => ... }`, gives
+    `E2001: expected '=>' after the pattern, found '('`, with no hint to
+    write `Shape.Circle(r)` (task 06).
+  - `let x = match r { Ok(v) => v, Err(e) => return Err(e) }` gives
+    `E2020: expected expression, found keyword 'return'`, with no hint to
+    use a match statement or `let ... else` (task 10).
+  - `lists.sort(maps.keys(m))` without `import maps` reports `E3137:
+    cannot tell what T is` before `E3151: unknown module 'maps'`, which is
+    the real cause (task 02).
+- **Impact:** each cost an agent a compile round trip or a guess; none
+  caused a failure.
+- **Workaround:** the guide's loop and match sections.
+- **Proposed improvement:** hints in E2009 (a `while` word), E2001 (a name
+  followed by `(` in a pattern), E2020 (`return` in a value arm), and
+  suppress E3137 when an argument has an unknown module.
+- **Verify:** each reproduction above prints the hint, and the E3137 case
+  reports only E3151.
+
 ## Outstanding validation
 - **Diagnostics review (post-M30, observed on Linux x86-64):**
   - `f"a } b"` printed `a } b` although `}}` is the brace escape;
@@ -4972,6 +5051,34 @@ No additional CI workflow run was requested or launched for reconciliation.
   validate diagnostic/query/proof/property shapes, not actual agent repair
   cost. The evaluation kit still has 21 tasks and no selected model/harness;
   actual model-driven comparisons remain required.
+
+- **2026-11-09, first model-driven trial (baseline, guide condition):**
+  - **Setup.** Every task was prepared with `python3 evaluation/prepare.py
+    TASK DIR --vela build/vela --context guide` outside the repository, at
+    `4c50f9e` (after M35). Each was given to one Claude Sonnet subagent of a
+    Claude Code session with `TASK.md`, an instruction to work only in its
+    workspace, and a request to report friction. Each was graded with
+    `python3 evaluation/grade.py`. Results with metadata are in
+    `evaluation/results/2026-11-09-sonnet-guide.jsonl`.
+  - **Result.** 21 of 21 passed, every score 1.00, with no errors, warnings
+    or unformatted files. Medians: 74k tokens, 7 tool calls and 23 s per
+    task. Ranges: 64k-79k tokens, 4-12 tool calls, at most 38 s. The token
+    counts include the harness's own system prompt and tools, so the
+    per-task differences, about 15k tokens, say more than the totals.
+  - **Isolation.** Isolation was by instruction, not sandboxing. A scan of
+    every run's tool calls found no access to the repository, the hidden
+    checks, the solutions or another workspace; four runs wrote scratch
+    files under `/tmp`.
+  - **Limits.**
+    - One run per task, so this is not evidence about variance.
+    - One condition only, so nothing yet answers the guide-versus-docs
+      question, and no turn counts.
+    - Task 21's agent could not run `vela verify --solver z3` (no z3
+      installed) and repaired from the counterexamples and property checks.
+  - **Friction the agents reported** is recorded as TL-142 (stale signatures
+    in `vela guide --all`), TL-143 (what the short guide leaves out) and
+    TL-144 (diagnostics without a hint). Remaining work for this item: the
+    comparison across conditions with repeated runs.
 
 ### VAL-003: Check the guide with the evaluation model's tokenizer
 
